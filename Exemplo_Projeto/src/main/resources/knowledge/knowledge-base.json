@@ -1,0 +1,140 @@
+{
+  "version": "2.0",
+  "description": "Base de conhecimento comum aos adaptadores SWI-Prolog e Drools",
+  "rules": [
+    {
+      "id": "R01_TRAVAGEM_CRITICA", "name": "Travagem perante colisao iminente", "priority": 100,
+      "decision": "TRAVAR_EMERGENCIA", "reason": "Obstaculo na faixa a menos de 8 m com velocidade superior a 60 km/h.",
+      "conditions": [
+        {"sensor":"obstaculoNaFaixa","operator":"EQ","value":true},
+        {"sensor":"distanciaObstaculo","operator":"LT","value":8},
+        {"sensor":"velocidade","operator":"GT","value":60}
+      ]
+    },
+    {
+      "id": "R02_FALHA_SENSOR_CRITICO", "name": "Falha de sensor critico", "priority": 99,
+      "decision": "IMPEDIR_CONDUCAO_AUTONOMA", "reason": "Um sensor critico nao esta operacional; a conducao autonoma deve ser interrompida.",
+      "conditions": [
+        {"sensor":"sensoresOperacionais","operator":"EQ","value":false},
+        {"sensor":"falhaSensorCritico","operator":"EQ","value":true}
+      ]
+    },
+    {
+      "id": "R03_PEAO_CRITICO", "name": "Protecao de peao ou ciclista", "priority": 98,
+      "decision": "TRAVAR_EMERGENCIA", "reason": "Foi detetado um peao ou ciclista na trajetoria a distancia critica.",
+      "conditions": [
+        {"sensor":"peaoNaTrajetoria","operator":"EQ","value":true},
+        {"sensor":"distanciaPeao","operator":"LT","value":12}
+      ]
+    },
+    {
+      "id": "R04_PRESSAO_CRITICA", "name": "Paragem por pressao critica", "priority": 95,
+      "decision": "PARAR_VERIFICAR_PNEUS", "reason": "A pressao dos pneus esta num nivel critico; e necessario parar em seguranca.",
+      "conditions": [{"sensor":"estadoPressaoPneus","operator":"EQ","value":"CRITICA"}]
+    },
+    {
+      "id": "R05_FADIGA_ELEVADA", "name": "Paragem por fadiga", "priority": 92,
+      "decision": "PARAR_DESCANSAR", "reason": "O nivel de fadiga do condutor e elevado; deve procurar uma area de descanso.",
+      "conditions": [{"sensor":"nivelFadiga","operator":"EQ","value":"ELEVADA"}]
+    },
+    {
+      "id": "R06_CONDUTOR_DISTRAIDO", "name": "Intervencao por distracao", "priority": 90,
+      "decision": "SOLICITAR_INTERVENCAO", "reason": "A camara do condutor detetou distracao.",
+      "conditions": [{"sensor":"condutorDistraido","operator":"EQ","value":true}]
+    },
+    {
+      "id": "R07_CINTO", "name": "Protecao dos ocupantes", "priority": 88,
+      "decision": "PARAR_SEGURANCA", "reason": "Nem todos os ocupantes usam cinto de seguranca.",
+      "conditions": [{"sensor":"cintosColocados","operator":"EQ","value":false}]
+    },
+    {
+      "id": "R08_PRESSAO_BAIXA", "name": "Conducao limitada por pressao baixa", "priority": 84,
+      "decision": "REDUZIR_VELOCIDADE", "reason": "A pressao esta baixa, mas nao critica; reduzir velocidade e evitar manobras bruscas.",
+      "conditions": [{"sensor":"estadoPressaoPneus","operator":"EQ","value":"BAIXA"}]
+    },
+    {
+      "id": "R08B_MODO_DEGRADADO", "name": "Modo degradado por falha nao critica", "priority": 82,
+      "decision": "REDUZIR_VELOCIDADE", "reason": "Existe uma falha nao critica; ativar modo degradado e limitar a velocidade.",
+      "conditions": [
+        {"sensor":"sensoresOperacionais","operator":"EQ","value":false},
+        {"sensor":"falhaSensorCritico","operator":"EQ","value":false}
+      ]
+    },
+    {
+      "id": "R09_PISO_INSTAVEL", "name": "Reducao por instabilidade", "priority": 80,
+      "decision": "REDUZIR_VELOCIDADE", "reason": "A IMU indica piso instavel e a velocidade excede 50 km/h.",
+      "conditions": [
+        {"sensor":"pisoInstavel","operator":"EQ","value":true},
+        {"sensor":"velocidade","operator":"GT","value":50}
+      ]
+    },
+    {
+      "id": "R10_PEAO_PROXIMO", "name": "Preparacao para peao ou ciclista", "priority": 78,
+      "decision": "PREPARAR_TRAVAGEM", "reason": "Existe um peao ou ciclista na trajetoria; reduzir e preparar travagem.",
+      "conditions": [
+        {"sensor":"peaoNaTrajetoria","operator":"EQ","value":true},
+        {"sensor":"distanciaPeao","operator":"GTE","value":12},
+        {"sensor":"distanciaPeao","operator":"LT","value":30}
+      ]
+    },
+    {
+      "id": "R11_MUDAR_ESQUERDA", "name": "Desvio pela esquerda", "priority": 75,
+      "decision": "MUDAR_ESQUERDA", "reason": "Existe obstaculo proximo, uma faixa a esquerda e essa faixa esta livre.",
+      "conditions": [
+        {"sensor":"obstaculoNaFaixa","operator":"EQ","value":true},
+        {"sensor":"distanciaObstaculo","operator":"GTE","value":8},
+        {"sensor":"distanciaObstaculo","operator":"LT","value":25},
+        {"sensor":"faixaAtual","operator":"LT_FIELD","value":"numeroFaixas"},
+        {"sensor":"faixaEsquerdaLivre","operator":"EQ","value":true}
+      ]
+    },
+    {
+      "id": "R12_MUDAR_DIREITA", "name": "Desvio pela direita", "priority": 70,
+      "decision": "MUDAR_DIREITA", "reason": "Existe obstaculo proximo, uma faixa a direita e essa faixa esta livre.",
+      "conditions": [
+        {"sensor":"obstaculoNaFaixa","operator":"EQ","value":true},
+        {"sensor":"distanciaObstaculo","operator":"GTE","value":8},
+        {"sensor":"distanciaObstaculo","operator":"LT","value":25},
+        {"sensor":"faixaAtual","operator":"GT","value":1},
+        {"sensor":"faixaDireitaLivre","operator":"EQ","value":true}
+      ]
+    },
+    {
+      "id": "R13_CHUVA_INTENSA", "name": "Adaptacao a chuva intensa", "priority": 68,
+      "decision": "REDUZIR_VELOCIDADE", "reason": "A chuva intensa exige menor velocidade e maior distancia de seguranca.",
+      "conditions": [{"sensor":"chuvaIntensa","operator":"EQ","value":true}]
+    },
+    {
+      "id": "R14_VISIBILIDADE", "name": "Adaptacao a visibilidade reduzida", "priority": 66,
+      "decision": "REDUZIR_VELOCIDADE", "reason": "A visibilidade reduzida exige iluminacao adequada e menor velocidade.",
+      "conditions": [{"sensor":"visibilidadeReduzida","operator":"EQ","value":true}]
+    },
+    {
+      "id": "R14B_FADIGA_MODERADA", "name": "Pausa por fadiga moderada", "priority": 64,
+      "decision": "RECOMENDAR_PAUSA", "reason": "A fadiga moderada exige monitorizacao e uma pausa assim que possivel.",
+      "conditions": [{"sensor":"nivelFadiga","operator":"EQ","value":"MODERADA"}]
+    },
+    {
+      "id": "R15_EXCESSO_VELOCIDADE", "name": "Cumprimento do limite", "priority": 60,
+      "decision": "REDUZIR_VELOCIDADE", "reason": "A velocidade das rodas excede o limite obtido pelo GPS.",
+      "conditions": [{"sensor":"velocidade","operator":"GT_FIELD","value":"limiteVelocidade"}]
+    },
+    {
+      "id": "R16_CONDUCAO_NORMAL", "name": "Manter conducao", "priority": 10,
+      "decision": "MANTER_VELOCIDADE", "reason": "Nao foram detetadas condicoes de risco e a velocidade respeita o limite.",
+      "conditions": [
+        {"sensor":"sensoresOperacionais","operator":"EQ","value":true},
+        {"sensor":"obstaculoNaFaixa","operator":"EQ","value":false},
+        {"sensor":"peaoNaTrajetoria","operator":"EQ","value":false},
+        {"sensor":"condutorDistraido","operator":"EQ","value":false},
+        {"sensor":"nivelFadiga","operator":"EQ","value":"NENHUMA"},
+        {"sensor":"cintosColocados","operator":"EQ","value":true},
+        {"sensor":"estadoPressaoPneus","operator":"EQ","value":"NORMAL"},
+        {"sensor":"pisoInstavel","operator":"EQ","value":false},
+        {"sensor":"chuvaIntensa","operator":"EQ","value":false},
+        {"sensor":"visibilidadeReduzida","operator":"EQ","value":false},
+        {"sensor":"velocidade","operator":"LTE_FIELD","value":"limiteVelocidade"}
+      ]
+    }
+  ]
+}

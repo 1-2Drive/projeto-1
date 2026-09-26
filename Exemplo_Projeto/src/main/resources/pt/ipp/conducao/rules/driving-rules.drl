@@ -1,0 +1,27 @@
+package pt.ipp.conducao.rules
+
+import pt.ipp.conducao.model.SensorInput;
+import pt.ipp.conducao.model.RuleDefinition;
+import pt.ipp.conducao.model.RuleResult;
+import pt.ipp.conducao.knowledge.ConditionEvaluator;
+
+global ConditionEvaluator evaluator;
+global java.util.List results;
+
+rule "KB - regra ativa"
+when
+    $input : SensorInput()
+    $rule : RuleDefinition()
+    eval(evaluator.matches($rule, $input))
+then
+    results.add(evaluator.result($rule, $input, true));
+end
+
+rule "KB - regra inativa para why-not"
+when
+    $input : SensorInput()
+    $rule : RuleDefinition()
+    eval(!evaluator.matches($rule, $input))
+then
+    results.add(evaluator.result($rule, $input, false));
+end

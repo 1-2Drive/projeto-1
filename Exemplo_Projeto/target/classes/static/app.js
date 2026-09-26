@@ -20,6 +20,9 @@ const scenePerson = document.querySelector('#scene-person');
 const rainLayer = document.querySelector('#rain-layer');
 const sceneCaption = document.querySelector('#scenario-caption');
 const sceneLegend = document.querySelector('#scene-legend');
+const continueTripButton = document.querySelector('#continue-trip');
+const finishTripButton = document.querySelector('#finish-trip');
+const finishedMessage = document.querySelector('#finished-message');
 
 const labels = {
   TRAVAR_EMERGENCIA: 'Travar de emergência',
@@ -30,6 +33,31 @@ const labels = {
   PARAR_SEGURANCA: 'Parar em segurança',
   PREPARAR_TRAVAGEM: 'Reduzir e preparar travagem',
   RECOMENDAR_PAUSA: 'Recomendar uma pausa',
+  SISTEMA_EM_ESPERA: 'Sistema em espera',
+  MANTER_IMOBILIZADO: 'Manter veículo imobilizado',
+  ESTACIONAR_LOCAL_SEGURO: 'Deslocar para local seguro',
+  ALERTAR_ASSISTENCIA: 'Ligar quatro piscas e pedir assistência',
+  NAO_CONDUZIR: 'Não conduzir',
+  BLOQUEAR_CONDUCAO: 'Bloquear condução',
+  PARAR_CONTACTAR_ASSISTENCIA: 'Parar e contactar assistência',
+  PARAR_SOLICITAR_ASSISTENCIA: 'Parar e solicitar assistência',
+  ALTERAR_ROTA_ABASTECIMENTO: 'Alterar rota para abastecimento',
+  DESACELERAR_AUMENTAR_DISTANCIA: 'Desacelerar e aumentar distância',
+  CANCELAR_ULTRAPASSAGEM: 'Cancelar ultrapassagem',
+  CORRIGIR_TRAJETORIA: 'Corrigir trajetória',
+  MANTER_FAIXA: 'Manter faixa',
+  EXECUTAR_MUDANCA_FAIXA: 'Executar mudança de faixa',
+  FACILITAR_PASSAGEM: 'Facilitar passagem',
+  CEDER_PASSAGEM: 'Ceder passagem',
+  PARAR_ANTES_LINHA: 'Parar antes da linha de segurança',
+  ATIVAR_MODO_SEGURO: 'Ativar modo seguro',
+  CALCULAR_VELOCIDADE_SEGURA: 'Calcular velocidade segura',
+  ALERTAR_MONITORIZAR: 'Alertar e monitorizar',
+  CONCLUIR_ULTRAPASSAGEM: 'Concluir ultrapassagem',
+  AVANCAR_PRECAUCAO: 'Avançar com precaução',
+  MONITORIZAR_OBSTACULO: 'Monitorizar obstáculo',
+  DESVIAR_CONTROLADO: 'Sinalizar e executar desvio controlado',
+  VIGIAR_PEAO: 'Manter vigilância reforçada',
   REDUZIR_VELOCIDADE: 'Reduzir velocidade',
   MUDAR_ESQUERDA: 'Mudar para a esquerda',
   MUDAR_DIREITA: 'Mudar para a direita',
@@ -40,8 +68,33 @@ const labels = {
 
 const questions = [
   {
+    id: 'veiculoLigado', source: 'Estado do veículo', type: 'choice',
+    text: 'O veículo está ligado?', help: 'Se estiver desligado, o sistema permanece em espera.'
+  },
+  {
+    id: 'veiculoParado', source: 'Sensores das rodas', type: 'choice',
+    text: 'O veículo está parado?', help: 'Esta resposta determina se é necessário avaliar o estacionamento.',
+    when: a => a.veiculoLigado === true
+  },
+  {
+    id: 'estacionadoCorretamente', source: 'Câmara e GPS', type: 'choice',
+    text: 'O veículo está corretamente estacionado?', help: 'Considere posição, sinalização e segurança do local.',
+    when: a => a.veiculoParado === true
+  },
+  {
+    id: 'localSeguroDisponivel', source: 'Câmara e mapa', type: 'choice',
+    text: 'É possível deslocar o veículo para um local seguro?', help: 'Apenas é considerada uma deslocação lenta e controlada.',
+    when: a => a.veiculoParado === true && a.estacionadoCorretamente === false
+  },
+  {
+    id: 'pretendeIniciarViagem', source: 'Utilizador', type: 'choice',
+    text: 'Pretende iniciar a viagem?', help: 'Se responder Não, o veículo permanece imobilizado.',
+    when: a => a.veiculoParado === true && a.estacionadoCorretamente === true
+  },
+  {
     id: 'sensoresOperacionais', source: 'Autodiagnóstico', type: 'choice',
-    text: 'Os sensores estão operacionais?', help: 'Considere câmara, radar, GPS, IMU e sensores das rodas.'
+    text: 'Os sensores estão operacionais?', help: 'Considere câmara, radar, GPS, IMU e sensores das rodas.',
+    when: a => evaluationCanContinue(a)
   },
   {
     id: 'falhaSensorCritico', source: 'Autodiagnóstico', type: 'choice',
@@ -60,13 +113,37 @@ const questions = [
     options: a => Array.from({length: a.numeroFaixas}, (_, index) => [`Faixa ${index + 1}`, index + 1])
   },
   {
-    id: 'obstaculoNaFaixa', source: 'Câmara frontal', type: 'choice',
-    text: 'Existe algum obstáculo na faixa de rodagem?', help: 'Considere apenas a faixa onde o veículo circula.'
+    id: 'consumiuAlcool', source: 'Condutor', type: 'choice',
+    text: 'Consumiu álcool antes de conduzir?', help: 'A resposta é usada apenas nesta simulação académica.'
+  },
+  {
+    id: 'taxaAlcoolConhecida', source: 'Condutor', type: 'choice',
+    text: 'A taxa de álcool é conhecida?', help: 'Por exemplo, através de um teste realizado antes da viagem.',
+    when: a => a.consumiuAlcool === true
+  },
+  {
+    id: 'taxaAlcoolAcimaPermitido', source: 'Teste de alcoolemia', type: 'choice',
+    text: 'A taxa está acima do limite permitido?', help: 'Use o resultado do teste disponível.',
+    when: a => a.taxaAlcoolConhecida === true
+  },
+  {
+    id: 'obstaculoDetetado', source: 'Câmara frontal', type: 'choice',
+    text: 'Foi detetado algum obstáculo?', help: 'Inclui objetos parados ou em movimento nas proximidades da via.'
+  },
+  {
+    id: 'obstaculoNaTrajetoria', source: 'Câmara e radar', type: 'choice',
+    text: 'O obstáculo está na trajetória do veículo?', help: 'Responda Não quando basta monitorizar a sua posição.',
+    when: a => a.obstaculoDetetado === true
+  },
+  {
+    id: 'espacoSeguroDesvio', source: 'Câmara e radar', type: 'choice',
+    text: 'Existe espaço seguro para desviar?', help: 'Considere faixas adjacentes, berma, ângulo morto e tráfego próximo.',
+    when: a => a.obstaculoNaTrajetoria === true
   },
   {
     id: 'distanciaObstaculo', source: 'Radar', type: 'number',
     text: 'A que distância está o obstáculo?', help: 'Indique a distância estimada em metros.',
-    min: 0, max: 1000, step: 0.5, value: 15, unit: 'm', when: a => a.obstaculoNaFaixa === true
+    min: 0, max: 1000, step: 0.5, value: 15, unit: 'm', when: a => a.obstaculoNaTrajetoria === true
   },
   {
     id: 'velocidade', source: 'Sensores das rodas', type: 'number',
@@ -83,6 +160,15 @@ const questions = [
     options: [['Sem fadiga', 'NENHUMA'], ['Fadiga moderada', 'MODERADA'], ['Fadiga elevada', 'ELEVADA']]
   },
   {
+    id: 'tomouMedicacao', source: 'Condutor', type: 'choice',
+    text: 'Tomou medicação que pode afetar a condução?', help: 'Considere avisos de sonolência, atenção ou coordenação.'
+  },
+  {
+    id: 'efeitosMedicacao', source: 'Condutor', type: 'choice',
+    text: 'Existem tonturas ou perda de atenção?', help: 'Uma resposta positiva impede a continuação segura.',
+    when: a => a.tomouMedicacao === true
+  },
+  {
     id: 'cintosColocados', source: 'Sensores dos bancos', type: 'choice',
     text: 'Todos os ocupantes usam cinto de segurança?', help: 'Inclua o condutor e todos os passageiros.'
   },
@@ -92,25 +178,123 @@ const questions = [
     options: [['Normal', 'NORMAL'], ['Baixa', 'BAIXA'], ['Crítica', 'CRITICA']]
   },
   {
+    id: 'avariaCritica', source: 'Autodiagnóstico', type: 'choice',
+    text: 'Existe alguma avaria crítica no veículo?', help: 'Inclui travagem, direção, motor ou sistema elétrico.'
+  },
+  {
+    id: 'energiaSuficiente', source: 'Gestão de energia', type: 'choice',
+    text: 'Existe combustível ou energia suficiente?', help: 'Considere a rota e a reserva disponível.',
+    when: a => a.avariaCritica === false
+  },
+  {
+    id: 'autonomiaLocalSeguro', source: 'GPS e energia', type: 'choice',
+    text: 'Existe autonomia até um local seguro?', help: 'Pode ser uma estação, carregador ou zona de paragem.',
+    when: a => a.energiaSuficiente === false
+  },
+  {
     id: 'pisoInstavel', source: 'IMU', type: 'choice',
     text: 'O veículo apresenta sinais de piso instável?', help: 'Inclui perda de aderência ou oscilações anormais.'
   },
   {
+    id: 'estaChovendo', source: 'Câmara frontal', type: 'choice',
+    text: 'Está a chover?', help: 'A intensidade será avaliada na pergunta seguinte.'
+  },
+  {
     id: 'chuvaIntensa', source: 'Câmara frontal', type: 'choice',
     text: 'Está a chover intensamente?', help: 'Considere chuva que reduza aderência ou aumente a distância de travagem.'
+    , when: a => a.estaChovendo === true
   },
   {
     id: 'visibilidadeReduzida', source: 'Câmara frontal', type: 'choice',
     text: 'A visibilidade está reduzida?', help: 'Pode dever-se a chuva, nevoeiro, noite ou encandeamento.'
   },
   {
-    id: 'peaoNaTrajetoria', source: 'Câmara e radar', type: 'choice',
-    text: 'Foi detetado um peão ou ciclista que pode entrar na trajetória?', help: 'Responda Sim quando existir risco de cruzamento da trajetória.'
+    id: 'velocidadeAdequada', source: 'Sistema de segurança', type: 'choice',
+    text: 'A velocidade é adequada às condições atuais?', help: 'Considere chuva, piso, visibilidade e tráfego.'
+  },
+  {
+    id: 'distanciaFrenteSegura', source: 'Radar', type: 'choice',
+    text: 'A distância para o veículo da frente é segura?', help: 'Considere a velocidade e as condições da estrada.'
+  },
+  {
+    id: 'tempoColisaoCritico', source: 'Radar', type: 'choice',
+    text: 'O tempo estimado para colisão é crítico?', help: 'Responda Sim quando já não for suficiente desacelerar progressivamente.',
+    when: a => a.distanciaFrenteSegura === false
+  },
+  {
+    id: 'peaoDetetado', source: 'Câmara e radar', type: 'choice',
+    text: 'Foi detetado um peão ou ciclista?', help: 'Inclui utilizadores vulneráveis junto à faixa de rodagem.'
+  },
+  {
+    id: 'peaoPodeEntrarTrajetoria', source: 'Câmara e radar', type: 'choice',
+    text: 'O peão ou ciclista pode entrar na trajetória?', help: 'Responda Sim quando existir risco de cruzamento da trajetória.',
+    when: a => a.peaoDetetado === true
   },
   {
     id: 'distanciaPeao', source: 'Radar', type: 'number',
     text: 'A que distância está o peão ou ciclista?', help: 'Indique a distância estimada em metros.',
-    min: 0, max: 1000, step: 0.5, value: 20, unit: 'm', when: a => a.peaoNaTrajetoria === true
+    min: 0, max: 1000, step: 0.5, value: 20, unit: 'm', when: a => a.peaoPodeEntrarTrajetoria === true
+  },
+  {
+    id: 'emUltrapassagem', source: 'Câmara e trajetória', type: 'choice',
+    text: 'O veículo está a ultrapassar?', help: 'Inclui uma manobra já iniciada ou prestes a começar.'
+  },
+  {
+    id: 'ultrapassagemPermitida', source: 'Mapa e sinalização', type: 'choice',
+    text: 'A ultrapassagem é permitida?', help: 'Considere sinalização vertical e marcas rodoviárias.',
+    when: a => a.emUltrapassagem === true
+  },
+  {
+    id: 'visibilidadeEspacoUltrapassagem', source: 'Câmara e radar', type: 'choice',
+    text: 'Existe visibilidade e espaço suficientes?', help: 'A manobra precisa de margem para ser concluída.',
+    when: a => a.ultrapassagemPermitida === true
+  },
+  {
+    id: 'veiculoSentidoContrario', source: 'Radar frontal', type: 'choice',
+    text: 'Aproxima-se algum veículo em sentido contrário?', help: 'Considere apenas veículos relevantes para a manobra.',
+    when: a => a.visibilidadeEspacoUltrapassagem === true
+  },
+  {
+    id: 'tempoConcluirUltrapassagem', source: 'Planeador de trajetória', type: 'choice',
+    text: 'Existe tempo seguro para concluir a ultrapassagem?', help: 'Compare o tempo necessário com a aproximação do outro veículo.',
+    when: a => a.veiculoSentidoContrario === true
+  },
+  {
+    id: 'mantemDentroFaixa', source: 'Câmara de faixa', type: 'choice',
+    text: 'O veículo mantém-se dentro da faixa?', help: 'Considere uma saída não intencional dos limites.'
+  },
+  {
+    id: 'piscaAtivado', source: 'Sistema elétrico', type: 'choice',
+    text: 'O pisca foi ativado?', help: 'A pergunta é relevante quando existe intenção de mudar de faixa.',
+    when: a => a.mantemDentroFaixa === false
+  },
+  {
+    id: 'mudancaFaixaSegura', source: 'Câmara e radar', type: 'choice',
+    text: 'A mudança de faixa é segura?', help: 'Considere ângulo morto, velocidade relativa e espaço lateral.',
+    when: a => a.piscaAtivado === true
+  },
+  {
+    id: 'aproximaCruzamento', source: 'GPS e câmara', type: 'choice',
+    text: 'Aproxima-se um cruzamento ou rotunda?', help: 'Inclui interseções com regras de prioridade.'
+  },
+  {
+    id: 'temPrioridade', source: 'Mapa e sinalização', type: 'choice',
+    text: 'O veículo tem prioridade?', help: 'Considere sinais, semáforos e regras da via.',
+    when: a => a.aproximaCruzamento === true
+  },
+  {
+    id: 'sinalPermiteAvancar', source: 'Câmara frontal', type: 'choice',
+    text: 'O semáforo ou sinal permite avançar?', help: 'Confirme também que a zona de passagem está livre.',
+    when: a => a.temPrioridade === true
+  },
+  {
+    id: 'veiculoEmergencia', source: 'Câmara e áudio', type: 'choice',
+    text: 'Existe algum veículo de emergência?', help: 'Considere sinais luminosos ou sonoros ativos.'
+  },
+  {
+    id: 'nivelRiscoGlobal', source: 'Agregador de risco', type: 'options',
+    text: 'Qual é o nível global de risco?', help: 'Síntese final dos sensores e condições observadas.',
+    options: [['Baixo', 'BAIXO'], ['Moderado', 'MODERADO'], ['Elevado', 'ELEVADO'], ['Crítico', 'CRITICO']]
   },
   {
     id: 'faixaEsquerdaLivre', source: 'Câmara frontal', type: 'choice',
@@ -134,11 +318,19 @@ let history = [];
 let currentQuestion = null;
 let evaluating = false;
 let earlyConclusion = null;
+let knowledgeRules = [];
 
 function obstacleAllowsLaneChange(values) {
-  return values.obstaculoNaFaixa === true
+  return values.obstaculoNaTrajetoria === true
+    && values.espacoSeguroDesvio === true
     && values.distanciaObstaculo >= 8
     && values.distanciaObstaculo < 25;
+}
+
+function evaluationCanContinue(values) {
+  if (values.veiculoLigado !== true) return false;
+  if (values.veiculoParado === false) return true;
+  return values.estacionadoCorretamente === true && values.pretendeIniciarViagem === true;
 }
 
 function applicableQuestions() {
@@ -227,26 +419,31 @@ function saveAnswer(value) {
 }
 
 function terminalConclusion() {
-  if (answers.sensoresOperacionais === false && answers.falhaSensorCritico === true) {
-    return 'Falha num sensor crítico: a condução autónoma não pode continuar.';
+  const rule = knowledgeRules
+    .filter(item => item.terminal)
+    .filter(item => item.conditions.every(conditionHasAnswer))
+    .filter(item => item.conditions.every(conditionMatches))
+    .sort((first, second) => second.priority - first.priority)[0];
+  return rule ? `${rule.reason} Regra terminal: ${rule.id}.` : null;
+}
+
+function conditionHasAnswer(condition) {
+  if (answers[condition.sensor] === undefined) return false;
+  return !condition.operator.endsWith('_FIELD') || answers[condition.value] !== undefined;
+}
+
+function conditionMatches(condition) {
+  const actual = answers[condition.sensor];
+  const expected = condition.operator.endsWith('_FIELD')
+    ? answers[condition.value] : condition.value;
+  switch (condition.operator) {
+    case 'EQ': return actual === expected;
+    case 'LT': case 'LT_FIELD': return actual < expected;
+    case 'LTE': case 'LTE_FIELD': return actual <= expected;
+    case 'GT': case 'GT_FIELD': return actual > expected;
+    case 'GTE': return actual >= expected;
+    default: return false;
   }
-  if (answers.nivelFadiga === 'ELEVADA') {
-    return 'Fadiga elevada: é necessária uma paragem imediata para descanso.';
-  }
-  if (answers.cintosColocados === false) {
-    return 'Existe um ocupante sem cinto: a marcha não pode continuar.';
-  }
-  if (answers.estadoPressaoPneus === 'CRITICA') {
-    return 'Pressão crítica dos pneus: é necessário parar em segurança.';
-  }
-  if (answers.peaoNaTrajetoria === true && answers.distanciaPeao < 12) {
-    return 'Peão ou ciclista a distância crítica: é necessária travagem de emergência.';
-  }
-  if (answers.obstaculoNaFaixa === true && answers.distanciaObstaculo < 8
-      && answers.velocidade > 60) {
-    return 'Colisão iminente: é necessária travagem de emergência.';
-  }
-  return null;
 }
 
 function removeAnswersThatBecameIrrelevant() {
@@ -274,6 +471,12 @@ backButton.addEventListener('click', () => {
 });
 
 restartButton.addEventListener('click', restartConsultation);
+continueTripButton.addEventListener('click', restartConsultation);
+finishTripButton.addEventListener('click', () => {
+  continueTripButton.hidden = true;
+  finishTripButton.hidden = true;
+  finishedMessage.hidden = false;
+});
 
 function restartConsultation() {
   answers = {};
@@ -283,6 +486,9 @@ function restartConsultation() {
   earlyConclusion = null;
   resultsSection.hidden = true;
   resultsContainer.replaceChildren();
+  continueTripButton.hidden = false;
+  finishTripButton.hidden = false;
+  finishedMessage.hidden = true;
   form.hidden = false;
   renderScenario();
   renderQuestion();
@@ -307,9 +513,9 @@ function renderScenario() {
   scenePerson.style.setProperty('--lane-x', laneX);
   sceneObstacle.style.top = `${distanceToSceneTop(answers.distanciaObstaculo)}px`;
   scenePerson.style.top = `${distanceToSceneTop(answers.distanciaPeao)}px`;
-  sceneObstacle.hidden = answers.obstaculoNaFaixa !== true;
-  scenePerson.hidden = answers.peaoNaTrajetoria !== true;
-  rainLayer.hidden = answers.chuvaIntensa !== true;
+  sceneObstacle.hidden = answers.obstaculoDetetado !== true;
+  scenePerson.hidden = answers.peaoDetetado !== true;
+  rainLayer.hidden = answers.estaChovendo !== true;
   roadScene.classList.toggle('low-visibility', answers.visibilidadeReduzida === true);
 
   const speedText = answers.velocidade === undefined ? '' : ` · ${answers.velocidade} km/h`;
@@ -317,9 +523,9 @@ function renderScenario() {
     ? `${laneCount} ${laneCount === 1 ? 'faixa' : 'faixas'} · veículo na faixa ${currentLane}${speedText}`
     : 'À espera dos dados da via';
   const items = [];
-  if (answers.obstaculoNaFaixa === true) items.push(`Obstáculo: ${answers.distanciaObstaculo ?? '?'} m`);
-  if (answers.peaoNaTrajetoria === true) items.push(`Peão/ciclista: ${answers.distanciaPeao ?? '?'} m`);
-  if (answers.chuvaIntensa === true) items.push('Chuva intensa');
+  if (answers.obstaculoDetetado === true) items.push(`Obstáculo: ${answers.distanciaObstaculo ?? 'fora da trajetória'}${answers.distanciaObstaculo === undefined ? '' : ' m'}`);
+  if (answers.peaoDetetado === true) items.push(`Peão/ciclista: ${answers.distanciaPeao ?? 'sob vigilância'}${answers.distanciaPeao === undefined ? '' : ' m'}`);
+  if (answers.estaChovendo === true) items.push(answers.chuvaIntensa ? 'Chuva intensa' : 'Chuva');
   if (answers.visibilidadeReduzida === true) items.push('Visibilidade reduzida');
   if (answers.estadoPressaoPneus) items.push(`Pneus: ${answers.estadoPressaoPneus.toLowerCase()}`);
   if (answers.sensoresOperacionais === false) items.push('Falha de sensores');
@@ -361,24 +567,62 @@ function answerLabel(question, value) {
 
 function shortQuestionName(id) {
   return {
-    obstaculoNaFaixa: 'Obstáculo', distanciaObstaculo: 'Distância', velocidade: 'Velocidade',
+    obstaculoDetetado: 'Obstáculo', obstaculoNaTrajetoria: 'Na trajetória',
+    espacoSeguroDesvio: 'Espaço para desvio', distanciaObstaculo: 'Distância', velocidade: 'Velocidade',
     sensoresOperacionais: 'Sensores', falhaSensorCritico: 'Falha crítica',
     numeroFaixas: 'N.º faixas', faixaAtual: 'Faixa atual',
     condutorDistraido: 'Distração', nivelFadiga: 'Fadiga', cintosColocados: 'Cintos',
-    estadoPressaoPneus: 'Pneus', pisoInstavel: 'Piso', chuvaIntensa: 'Chuva',
-    visibilidadeReduzida: 'Visibilidade', peaoNaTrajetoria: 'Peão/ciclista',
+    estadoPressaoPneus: 'Pneus', pisoInstavel: 'Piso', estaChovendo: 'Chuva', chuvaIntensa: 'Chuva intensa',
+    visibilidadeReduzida: 'Visibilidade', peaoDetetado: 'Peão/ciclista',
+    peaoPodeEntrarTrajetoria: 'Peão na trajetória',
     distanciaPeao: 'Distância peão',
+    veiculoLigado: 'Veículo ligado', veiculoParado: 'Veículo parado',
+    estacionadoCorretamente: 'Estacionamento', localSeguroDisponivel: 'Local seguro',
+    pretendeIniciarViagem: 'Iniciar viagem', consumiuAlcool: 'Álcool',
+    taxaAlcoolConhecida: 'Taxa conhecida', taxaAlcoolAcimaPermitido: 'Taxa acima',
+    tomouMedicacao: 'Medicação', efeitosMedicacao: 'Efeitos', avariaCritica: 'Avaria',
+    energiaSuficiente: 'Energia', autonomiaLocalSeguro: 'Autonomia',
+    velocidadeAdequada: 'Velocidade adequada', distanciaFrenteSegura: 'Distância frontal',
+    tempoColisaoCritico: 'Colisão crítica', emUltrapassagem: 'Ultrapassagem',
+    ultrapassagemPermitida: 'Permitida', visibilidadeEspacoUltrapassagem: 'Espaço',
+    veiculoSentidoContrario: 'Sentido contrário', tempoConcluirUltrapassagem: 'Tempo seguro',
+    mantemDentroFaixa: 'Na faixa', piscaAtivado: 'Pisca', mudancaFaixaSegura: 'Mudança segura',
+    aproximaCruzamento: 'Cruzamento', temPrioridade: 'Prioridade',
+    sinalPermiteAvancar: 'Sinal', veiculoEmergencia: 'Emergência', nivelRiscoGlobal: 'Risco',
     faixaEsquerdaLivre: 'Faixa esquerda', faixaDireitaLivre: 'Faixa direita',
     limiteVelocidade: 'Limite'
   }[id];
 }
 
 function completeSensorData() {
+  const coreSensors = new Set([
+    'velocidade', 'limiteVelocidade', 'distanciaObstaculo', 'obstaculoNaFaixa',
+    'faixaEsquerdaLivre', 'faixaDireitaLivre', 'numeroFaixas', 'faixaAtual',
+    'estadoPressaoPneus', 'pisoInstavel', 'condutorDistraido', 'sensoresOperacionais',
+    'falhaSensorCritico', 'nivelFadiga', 'cintosColocados', 'chuvaIntensa',
+    'visibilidadeReduzida', 'peaoNaTrajetoria', 'distanciaPeao'
+  ]);
+  const contexto = {
+    veiculoLigado: true, veiculoParado: false, estacionadoCorretamente: true,
+    localSeguroDisponivel: true, pretendeIniciarViagem: true,
+    consumiuAlcool: false, taxaAlcoolConhecida: false, taxaAlcoolAcimaPermitido: false,
+    tomouMedicacao: false, efeitosMedicacao: false, avariaCritica: false,
+    energiaSuficiente: true, autonomiaLocalSeguro: true, velocidadeAdequada: true,
+    distanciaFrenteSegura: true, tempoColisaoCritico: false, emUltrapassagem: false,
+    ultrapassagemPermitida: true, visibilidadeEspacoUltrapassagem: true,
+    veiculoSentidoContrario: false, tempoConcluirUltrapassagem: true,
+    mantemDentroFaixa: true, piscaAtivado: false, mudancaFaixaSegura: true,
+    aproximaCruzamento: false, temPrioridade: true, sinalPermiteAvancar: true,
+    veiculoEmergencia: false, nivelRiscoGlobal: 'BAIXO',
+    estaChovendo: false, obstaculoDetetado: false, obstaculoNaTrajetoria: false,
+    espacoSeguroDesvio: false, peaoDetetado: false, peaoPodeEntrarTrajetoria: false,
+    ...Object.fromEntries(Object.entries(answers).filter(([name]) => !coreSensors.has(name)))
+  };
   return {
     velocidade: answers.velocidade ?? 0,
     limiteVelocidade: answers.limiteVelocidade ?? 90,
-    distanciaObstaculo: answers.obstaculoNaFaixa ? answers.distanciaObstaculo : 1000,
-    obstaculoNaFaixa: answers.obstaculoNaFaixa ?? false,
+    distanciaObstaculo: answers.obstaculoNaTrajetoria ? answers.distanciaObstaculo : 1000,
+    obstaculoNaFaixa: answers.obstaculoNaTrajetoria ?? false,
     faixaEsquerdaLivre: answers.faixaEsquerdaLivre ?? false,
     faixaDireitaLivre: answers.faixaDireitaLivre ?? false,
     numeroFaixas: answers.numeroFaixas ?? 1,
@@ -392,8 +636,9 @@ function completeSensorData() {
     cintosColocados: answers.cintosColocados ?? true,
     chuvaIntensa: answers.chuvaIntensa ?? false,
     visibilidadeReduzida: answers.visibilidadeReduzida ?? false,
-    peaoNaTrajetoria: answers.peaoNaTrajetoria ?? false,
-    distanciaPeao: answers.peaoNaTrajetoria ? answers.distanciaPeao : 1000
+    peaoNaTrajetoria: answers.peaoPodeEntrarTrajetoria ?? false,
+    distanciaPeao: answers.peaoPodeEntrarTrajetoria ? answers.distanciaPeao : 1000,
+    contexto
   };
 }
 
@@ -475,6 +720,7 @@ async function loadKnowledgeBase() {
   try {
     const response = await fetch('/api/knowledge-base');
     const knowledge = await response.json();
+    knowledgeRules = knowledge.rules;
     document.querySelector('#kb-version').textContent = `Versão ${knowledge.version}`;
     const table = document.querySelector('#rules-table');
     table.replaceChildren();
@@ -499,5 +745,4 @@ function escapeHtml(value) {
   return node.innerHTML;
 }
 
-loadKnowledgeBase();
-restartConsultation();
+loadKnowledgeBase().finally(restartConsultation);

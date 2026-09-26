@@ -25,6 +25,10 @@ A consulta inclui o número de faixas e a faixa atual (a faixa 1 é a mais à
 direita), autodiagnóstico, fadiga, cintos, pressão dos pneus em três níveis,
 piso, chuva, visibilidade e deteção de peões/ciclistas.
 
+A versão completa acrescenta estado do veículo e estacionamento, álcool,
+medicação, avarias, energia, distância frontal, ultrapassagem, permanência na
+faixa, cruzamentos, prioridade, sinalização, veículos de emergência e risco global.
+
 O painel **Cenário atual** representa a via vista de cima e acompanha as
 respostas, posicionando o veículo, obstáculos e peões/ciclistas nas faixas e
 aplicando chuva ou visibilidade reduzida quando indicadas.

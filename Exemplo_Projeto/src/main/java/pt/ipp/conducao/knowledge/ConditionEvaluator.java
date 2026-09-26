@@ -77,7 +77,10 @@ public class ConditionEvaluator {
             case "visibilidadeReduzida" -> input.visibilidadeReduzida();
             case "peaoNaTrajetoria" -> input.peaoNaTrajetoria();
             case "distanciaPeao" -> input.distanciaPeao();
-            default -> throw new IllegalArgumentException("Sensor desconhecido: " + sensor);
+            default -> {
+                Object value = input.valorContexto(sensor);
+                yield value == null ? "desconhecido" : value;
+            }
         };
     }
 }

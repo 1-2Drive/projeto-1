@@ -135,6 +135,9 @@ button:disabled { opacity: .55; cursor: wait; }
 .rule p { margin: 3px 0 0; color: var(--muted); font-size: 13px; }
 .rule-id { color: var(--green); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
 .conflict { margin: 12px 0; padding: 10px; border-left: 3px solid var(--amber); background: var(--amber-light); color: #664314; font-size: 13px; }
+.continuation { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+.continuation p { margin: 0 auto 0 0; }
+.continuation span { color: var(--muted); font-weight: 700; }
 .terminal-notice { grid-column: 1 / -1; margin: 0 0 14px; padding: 13px 15px; border-left: 4px solid var(--red); background: var(--red-light); color: #6f231d; }
 details { margin-top: 20px; border-top: 1px solid var(--line); padding-top: 14px; }
 summary { cursor: pointer; font-weight: 650; }
@@ -142,7 +145,7 @@ summary { cursor: pointer; font-weight: 650; }
 .why-details .explanation { margin: 13px 0; }
 .inactive-rules { max-height: 340px; overflow: auto; margin-top: 10px; }
 .inactive-rules .rule p { color: var(--red); }
-.rules-table { display: grid; grid-template-columns: minmax(190px, .8fr) 1fr 90px 1.4fr; border: 1px solid var(--line); }
+.rules-table { display: grid; grid-template-columns: minmax(190px, .8fr) 1fr 110px 1.4fr; border: 1px solid var(--line); }
 .rules-table > div { padding: 9px 11px; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
 .rules-table > div:nth-child(4n+1) { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--green); }
 .rules-table .table-head { background: #edf0ef; color: #4e5a60; font-family: inherit; font-size: 11px; font-weight: 700; text-transform: uppercase; }

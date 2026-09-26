@@ -16,9 +16,11 @@ flowchart LR
     CMP --> UI
 ```
 
-O ficheiro `knowledge-base.json` é a única fonte das dezoito regras de domínio. O
+O ficheiro `knowledge-base.json` é a única fonte das quarenta e nove regras de domínio. O
 Drools recebe cada definição como facto e aplica meta-regras DRL. O Prolog recebe
 o mesmo JSON pela entrada padrão e interpreta as condições declarativas.
+Cada regra pode ainda declarar `terminal: true`; o questionário usa esse mesmo
+metadado para encerrar a recolha assim que todas as condições da regra são conhecidas.
 
 ## Sequência de uma avaliação
 

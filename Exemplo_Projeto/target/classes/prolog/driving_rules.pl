@@ -46,7 +46,7 @@ compare_value('GT_FIELD', Actual, Expected) :- Actual > Expected.
 compare_value('LTE_FIELD', Actual, Expected) :- Actual =< Expected.
 
 failure_text(Sensors, Condition, Text) :-
-    get_dict(Condition.sensor, Sensors, Actual),
-    expected_value(Sensors, Condition, Expected),
+    ( get_dict(Condition.sensor, Sensors, Actual) -> true ; Actual = desconhecido ),
+    ( expected_value(Sensors, Condition, Expected) -> true ; Expected = desconhecido ),
     format(atom(Text), '~w=~w nao satisfaz ~w ~w',
            [Condition.sensor, Actual, Condition.operator, Expected]).

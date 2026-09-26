@@ -21,7 +21,9 @@ public class ApiExceptionHandler {
     public Map<String, String> invalidInput(MethodArgumentNotValidException error) {
         String message = error.getBindingResult().getFieldErrors().stream().findFirst()
                 .map(field -> field.getField() + ": " + field.getDefaultMessage())
-                .orElse("Dados de entrada invalidos.");
+                .orElseGet(() -> error.getBindingResult().getGlobalErrors().stream().findFirst()
+                        .map(global -> global.getDefaultMessage())
+                        .orElse("Dados de entrada invalidos."));
         return Map.of("error", message);
     }
 }

@@ -48,7 +48,7 @@ Drools é um sistema de gestão de regras para Java. A memória de trabalho cont
 factos e a agenda controla a ativação de regras. Aqui, cada definição da base
 comum é inserida como facto numa sessão KIE; duas meta-regras classificam-na como
 ativa ou inativa. Desta forma, Drools participa efetivamente na inferência sem
-duplicar as dezoito regras de domínio em DRL.
+duplicar as quarenta e nove regras de domínio em DRL.
 
 ### 2.4 Explicabilidade
 
@@ -60,12 +60,13 @@ detetar erros de modelação.
 ## 3. Base de conhecimento comum
 
 A base encontra-se em `src/main/resources/knowledge/knowledge-base.json`. Cada
-regra tem identificador, nome, prioridade, decisão, motivo e uma lista de
+regra tem identificador, nome, prioridade, decisão, motivo, indicador terminal e uma lista de
 condições. Os operadores suportados são igualdade e comparações numéricas, além
 de comparações entre dois campos, como velocidade atual superior ao limite GPS.
 
-As dezoito regras cobrem cinco grupos: integridade dos sensores, condutor e
-ocupantes, estado dos pneus e piso, ambiente, e trajetória. Entre as decisões
+As quarenta e nove regras cobrem os grupos do diagrama: estado inicial,
+integridade dos sensores, condutor e ocupantes, veículo e energia, ambiente,
+trajetória, ultrapassagem, faixa, cruzamentos, emergência e risco global. Entre as decisões
 estão travagem de emergência, bloqueio da condução autónoma, paragem segura,
 redução de velocidade, preparação de travagem, mudança de faixa e condução normal.
 
@@ -117,10 +118,11 @@ resolução de conflitos sem esconder conhecimento potencialmente contraditório
 
 ## 6. Testes
 
-Os testes verificam a existência de dezoito regras, a travagem num cenário crítico,
+Os vinte e três testes verificam a existência de quarenta e nove regras, a travagem num cenário crítico,
 a equivalência entre motores, a deteção do conflito entre mudanças de faixa, a
 distinção entre pressão baixa e crítica, os limites laterais da estrada, a
-produção de `why not` e a validação da API. Novos casos devem ser adicionados
+distância de peões, falhas de sensores, prioridades combinadas, a produção de
+`why not` e a validação da API. Novos casos devem ser adicionados
 sempre que uma regra ou operador for introduzido.
 
 ## 7. Limitações

@@ -39,8 +39,14 @@ public class PrologAdapter implements InferenceEngine {
         try {
             process = new ProcessBuilder("swipl", "-q", "-s", prologProgram.toString(),
                     "-g", "main", "-t", "halt").start();
+            Map<String, Object> sensors = mapper.convertValue(input, new TypeReference<>() { });
+            Object context = sensors.remove("contexto");
+            sensors.putAll(SensorInput.contextoPadrao());
+            if (context instanceof Map<?, ?> values) {
+                values.forEach((key, value) -> sensors.put(String.valueOf(key), value));
+            }
             mapper.writeValue(process.getOutputStream(),
-                    Map.of("sensors", input, "knowledgeBase", knowledgeBase));
+                    Map.of("sensors", sensors, "knowledgeBase", knowledgeBase));
             process.getOutputStream().close();
             if (!process.waitFor(5, TimeUnit.SECONDS)) {
                 process.destroyForcibly();

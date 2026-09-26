@@ -3,8 +3,68 @@
   "description": "Base de conhecimento comum aos adaptadores SWI-Prolog e Drools",
   "rules": [
     {
+      "id":"D01_SISTEMA_ESPERA","name":"Veiculo desligado","priority":120,"decision":"SISTEMA_EM_ESPERA",
+      "reason":"O veiculo esta desligado; o sistema permanece em espera.","terminal":true,
+      "conditions":[{"sensor":"veiculoLigado","operator":"EQ","value":false}]
+    },
+    {
+      "id":"D02_MANTER_IMOBILIZADO","name":"Viagem nao iniciada","priority":119,"decision":"MANTER_IMOBILIZADO",
+      "reason":"O utilizador nao pretende iniciar a viagem.","terminal":true,
+      "conditions":[{"sensor":"veiculoParado","operator":"EQ","value":true},{"sensor":"estacionadoCorretamente","operator":"EQ","value":true},{"sensor":"pretendeIniciarViagem","operator":"EQ","value":false}]
+    },
+    {
+      "id":"D03_ESTACIONAR_LOCAL_SEGURO","name":"Reposicionar veiculo parado","priority":118,"decision":"ESTACIONAR_LOCAL_SEGURO",
+      "reason":"O veiculo nao esta corretamente estacionado, mas existe um local seguro proximo.","terminal":true,
+      "conditions":[{"sensor":"veiculoParado","operator":"EQ","value":true},{"sensor":"estacionadoCorretamente","operator":"EQ","value":false},{"sensor":"localSeguroDisponivel","operator":"EQ","value":true}]
+    },
+    {
+      "id":"D04_ALERTAR_ASSISTENCIA","name":"Sem local seguro","priority":118,"decision":"ALERTAR_ASSISTENCIA",
+      "reason":"Nao existe local seguro; ligar quatro piscas e solicitar assistencia.","terminal":true,
+      "conditions":[{"sensor":"veiculoParado","operator":"EQ","value":true},{"sensor":"estacionadoCorretamente","operator":"EQ","value":false},{"sensor":"localSeguroDisponivel","operator":"EQ","value":false}]
+    },
+    {
+      "id":"D05_ALCOOL_DESCONHECIDO","name":"Alcool sem medicao","priority":117,"decision":"NAO_CONDUZIR",
+      "reason":"Houve consumo de alcool e a taxa nao e conhecida; solicitar teste ou condutor alternativo.","terminal":true,
+      "conditions":[{"sensor":"consumiuAlcool","operator":"EQ","value":true},{"sensor":"taxaAlcoolConhecida","operator":"EQ","value":false}]
+    },
+    {
+      "id":"D06_ALCOOL_ACIMA_LIMITE","name":"Alcool acima do permitido","priority":117,"decision":"BLOQUEAR_CONDUCAO",
+      "reason":"A taxa de alcool esta acima do permitido; sugerir transporte alternativo.","terminal":true,
+      "conditions":[{"sensor":"consumiuAlcool","operator":"EQ","value":true},{"sensor":"taxaAlcoolConhecida","operator":"EQ","value":true},{"sensor":"taxaAlcoolAcimaPermitido","operator":"EQ","value":true}]
+    },
+    {
+      "id":"D07_EFEITOS_MEDICACAO","name":"Efeitos adversos de medicacao","priority":116,"decision":"BLOQUEAR_CONDUCAO",
+      "reason":"A medicacao provoca tonturas ou perda de atencao.","terminal":true,
+      "conditions":[{"sensor":"tomouMedicacao","operator":"EQ","value":true},{"sensor":"efeitosMedicacao","operator":"EQ","value":true}]
+    },
+    {
+      "id":"D08_AVARIA_CRITICA","name":"Avaria critica","priority":115,"decision":"PARAR_CONTACTAR_ASSISTENCIA",
+      "reason":"Foi detetada uma avaria critica; parar em seguranca e contactar assistencia.","terminal":true,
+      "conditions":[{"sensor":"avariaCritica","operator":"EQ","value":true}]
+    },
+    {
+      "id":"D09_SEM_AUTONOMIA","name":"Energia insuficiente","priority":114,"decision":"PARAR_SOLICITAR_ASSISTENCIA",
+      "reason":"Nao existe energia nem autonomia para chegar a um local seguro.","terminal":true,
+      "conditions":[{"sensor":"energiaSuficiente","operator":"EQ","value":false},{"sensor":"autonomiaLocalSeguro","operator":"EQ","value":false}]
+    },
+    {
+      "id":"D10_COLISAO_FRONTAL","name":"Tempo para colisao critico","priority":103,"decision":"TRAVAR_EMERGENCIA",
+      "reason":"A distancia frontal nao e segura e o tempo estimado para colisao e critico.","terminal":true,
+      "conditions":[{"sensor":"distanciaFrenteSegura","operator":"EQ","value":false},{"sensor":"tempoColisaoCritico","operator":"EQ","value":true}]
+    },
+    {
+      "id":"D11_RISCO_CRITICO","name":"Risco global critico","priority":102,"decision":"TRAVAR_EMERGENCIA",
+      "reason":"O nivel global de risco e critico.","terminal":true,
+      "conditions":[{"sensor":"nivelRiscoGlobal","operator":"EQ","value":"CRITICO"}]
+    },
+    {
+      "id":"D28_OBSTACULO_SEM_DESVIO","name":"Obstaculo sem espaco para desvio","priority":101,"decision":"TRAVAR_EMERGENCIA",
+      "reason":"O obstaculo esta na trajetoria e nao existe espaco seguro para desviar; executar travagem de emergencia.","terminal":true,
+      "conditions":[{"sensor":"obstaculoDetetado","operator":"EQ","value":true},{"sensor":"obstaculoNaTrajetoria","operator":"EQ","value":true},{"sensor":"espacoSeguroDesvio","operator":"EQ","value":false}]
+    },
+    {
       "id": "R01_TRAVAGEM_CRITICA", "name": "Travagem perante colisao iminente", "priority": 100,
-      "decision": "TRAVAR_EMERGENCIA", "reason": "Obstaculo na faixa a menos de 8 m com velocidade superior a 60 km/h.",
+      "decision": "TRAVAR_EMERGENCIA", "reason": "Obstaculo na faixa a menos de 8 m com velocidade superior a 60 km/h.", "terminal": true,
       "conditions": [
         {"sensor":"obstaculoNaFaixa","operator":"EQ","value":true},
         {"sensor":"distanciaObstaculo","operator":"LT","value":8},
@@ -13,7 +73,7 @@
     },
     {
       "id": "R02_FALHA_SENSOR_CRITICO", "name": "Falha de sensor critico", "priority": 99,
-      "decision": "IMPEDIR_CONDUCAO_AUTONOMA", "reason": "Um sensor critico nao esta operacional; a conducao autonoma deve ser interrompida.",
+      "decision": "IMPEDIR_CONDUCAO_AUTONOMA", "reason": "Um sensor critico nao esta operacional; a conducao autonoma deve ser interrompida.", "terminal": true,
       "conditions": [
         {"sensor":"sensoresOperacionais","operator":"EQ","value":false},
         {"sensor":"falhaSensorCritico","operator":"EQ","value":true}
@@ -21,7 +81,7 @@
     },
     {
       "id": "R03_PEAO_CRITICO", "name": "Protecao de peao ou ciclista", "priority": 98,
-      "decision": "TRAVAR_EMERGENCIA", "reason": "Foi detetado um peao ou ciclista na trajetoria a distancia critica.",
+      "decision": "TRAVAR_EMERGENCIA", "reason": "Foi detetado um peao ou ciclista na trajetoria a distancia critica.", "terminal": true,
       "conditions": [
         {"sensor":"peaoNaTrajetoria","operator":"EQ","value":true},
         {"sensor":"distanciaPeao","operator":"LT","value":12}
@@ -29,12 +89,12 @@
     },
     {
       "id": "R04_PRESSAO_CRITICA", "name": "Paragem por pressao critica", "priority": 95,
-      "decision": "PARAR_VERIFICAR_PNEUS", "reason": "A pressao dos pneus esta num nivel critico; e necessario parar em seguranca.",
+      "decision": "PARAR_VERIFICAR_PNEUS", "reason": "A pressao dos pneus esta num nivel critico; e necessario parar em seguranca.", "terminal": true,
       "conditions": [{"sensor":"estadoPressaoPneus","operator":"EQ","value":"CRITICA"}]
     },
     {
       "id": "R05_FADIGA_ELEVADA", "name": "Paragem por fadiga", "priority": 92,
-      "decision": "PARAR_DESCANSAR", "reason": "O nivel de fadiga do condutor e elevado; deve procurar uma area de descanso.",
+      "decision": "PARAR_DESCANSAR", "reason": "O nivel de fadiga do condutor e elevado; deve procurar uma area de descanso.", "terminal": true,
       "conditions": [{"sensor":"nivelFadiga","operator":"EQ","value":"ELEVADA"}]
     },
     {
@@ -44,13 +104,18 @@
     },
     {
       "id": "R07_CINTO", "name": "Protecao dos ocupantes", "priority": 88,
-      "decision": "PARAR_SEGURANCA", "reason": "Nem todos os ocupantes usam cinto de seguranca.",
+      "decision": "PARAR_SEGURANCA", "reason": "Nem todos os ocupantes usam cinto de seguranca.", "terminal": true,
       "conditions": [{"sensor":"cintosColocados","operator":"EQ","value":false}]
     },
     {
       "id": "R08_PRESSAO_BAIXA", "name": "Conducao limitada por pressao baixa", "priority": 84,
       "decision": "REDUZIR_VELOCIDADE", "reason": "A pressao esta baixa, mas nao critica; reduzir velocidade e evitar manobras bruscas.",
       "conditions": [{"sensor":"estadoPressaoPneus","operator":"EQ","value":"BAIXA"}]
+    },
+    {
+      "id":"D12_ALTERAR_ROTA_ENERGIA","name":"Rota para abastecimento","priority":83,"decision":"ALTERAR_ROTA_ABASTECIMENTO",
+      "reason":"A energia e insuficiente, mas existe autonomia para chegar a abastecimento ou carregamento.",
+      "conditions":[{"sensor":"energiaSuficiente","operator":"EQ","value":false},{"sensor":"autonomiaLocalSeguro","operator":"EQ","value":true}]
     },
     {
       "id": "R08B_MODO_DEGRADADO", "name": "Modo degradado por falha nao critica", "priority": 82,
@@ -78,6 +143,46 @@
       ]
     },
     {
+      "id":"D13_DESACELERAR_DISTANCIA","name":"Distancia frontal insegura","priority":79,"decision":"DESACELERAR_AUMENTAR_DISTANCIA",
+      "reason":"A distancia frontal nao e segura, mas ainda e possivel desacelerar progressivamente.",
+      "conditions":[{"sensor":"distanciaFrenteSegura","operator":"EQ","value":false},{"sensor":"tempoColisaoCritico","operator":"EQ","value":false}]
+    },
+    {
+      "id":"D29_MONITORIZAR_OBSTACULO","name":"Obstaculo fora da trajetoria","priority":51,"decision":"MONITORIZAR_OBSTACULO",
+      "reason":"Foi detetado um obstaculo fora da trajetoria; manter a sua posicao sob monitorizacao.",
+      "conditions":[{"sensor":"obstaculoDetetado","operator":"EQ","value":true},{"sensor":"obstaculoNaTrajetoria","operator":"EQ","value":false}]
+    },
+    {
+      "id":"D30_DESVIO_CONTROLADO","name":"Desvio com espaco seguro","priority":69,"decision":"DESVIAR_CONTROLADO",
+      "reason":"Existe um obstaculo na trajetoria e espaco seguro; sinalizar e executar um desvio controlado.",
+      "conditions":[{"sensor":"obstaculoDetetado","operator":"EQ","value":true},{"sensor":"obstaculoNaTrajetoria","operator":"EQ","value":true},{"sensor":"espacoSeguroDesvio","operator":"EQ","value":true}]
+    },
+    {
+      "id":"D31_VIGIAR_PEAO","name":"Peao fora da trajetoria","priority":52,"decision":"VIGIAR_PEAO",
+      "reason":"Foi detetado um peao ou ciclista sem risco atual de entrada na trajetoria; manter vigilancia reforcada.",
+      "conditions":[{"sensor":"peaoDetetado","operator":"EQ","value":true},{"sensor":"peaoPodeEntrarTrajetoria","operator":"EQ","value":false}]
+    },
+    {
+      "id":"D14_CANCELAR_ULTRAPASSAGEM_PROIBIDA","name":"Ultrapassagem proibida","priority":77,"decision":"CANCELAR_ULTRAPASSAGEM",
+      "reason":"A ultrapassagem nao e permitida.",
+      "conditions":[{"sensor":"emUltrapassagem","operator":"EQ","value":true},{"sensor":"ultrapassagemPermitida","operator":"EQ","value":false}]
+    },
+    {
+      "id":"D15_CANCELAR_ULTRAPASSAGEM_VISIBILIDADE","name":"Ultrapassagem sem espaco","priority":77,"decision":"CANCELAR_ULTRAPASSAGEM",
+      "reason":"Nao existe visibilidade ou espaco suficiente para ultrapassar.",
+      "conditions":[{"sensor":"emUltrapassagem","operator":"EQ","value":true},{"sensor":"ultrapassagemPermitida","operator":"EQ","value":true},{"sensor":"visibilidadeEspacoUltrapassagem","operator":"EQ","value":false}]
+    },
+    {
+      "id":"D16_CANCELAR_ULTRAPASSAGEM_TEMPO","name":"Ultrapassagem sem tempo","priority":77,"decision":"CANCELAR_ULTRAPASSAGEM",
+      "reason":"Vem um veiculo em sentido contrario e nao existe tempo seguro para concluir.",
+      "conditions":[{"sensor":"emUltrapassagem","operator":"EQ","value":true},{"sensor":"veiculoSentidoContrario","operator":"EQ","value":true},{"sensor":"tempoConcluirUltrapassagem","operator":"EQ","value":false}]
+    },
+    {
+      "id":"D17_CORRIGIR_TRAJETORIA","name":"Saida de faixa sem pisca","priority":76,"decision":"CORRIGIR_TRAJETORIA",
+      "reason":"O veiculo saiu da faixa sem sinalizar; alertar o condutor e corrigir suavemente.",
+      "conditions":[{"sensor":"mantemDentroFaixa","operator":"EQ","value":false},{"sensor":"piscaAtivado","operator":"EQ","value":false}]
+    },
+    {
       "id": "R11_MUDAR_ESQUERDA", "name": "Desvio pela esquerda", "priority": 75,
       "decision": "MUDAR_ESQUERDA", "reason": "Existe obstaculo proximo, uma faixa a esquerda e essa faixa esta livre.",
       "conditions": [
@@ -100,6 +205,36 @@
       ]
     },
     {
+      "id":"D18_MANTER_FAIXA","name":"Mudanca de faixa insegura","priority":74,"decision":"MANTER_FAIXA",
+      "reason":"A mudanca de faixa nao e segura; cancelar a manobra.",
+      "conditions":[{"sensor":"mantemDentroFaixa","operator":"EQ","value":false},{"sensor":"piscaAtivado","operator":"EQ","value":true},{"sensor":"mudancaFaixaSegura","operator":"EQ","value":false}]
+    },
+    {
+      "id":"D19_EXECUTAR_MUDANCA_FAIXA","name":"Mudanca de faixa segura","priority":73,"decision":"EXECUTAR_MUDANCA_FAIXA",
+      "reason":"A mudanca foi sinalizada e existe espaco seguro.",
+      "conditions":[{"sensor":"mantemDentroFaixa","operator":"EQ","value":false},{"sensor":"piscaAtivado","operator":"EQ","value":true},{"sensor":"mudancaFaixaSegura","operator":"EQ","value":true}]
+    },
+    {
+      "id":"D20_VEICULO_EMERGENCIA","name":"Facilitar passagem","priority":91,"decision":"FACILITAR_PASSAGEM",
+      "reason":"Foi detetado um veiculo de emergencia; abrir passagem e parar se necessario.",
+      "conditions":[{"sensor":"veiculoEmergencia","operator":"EQ","value":true}]
+    },
+    {
+      "id":"D21_CEDER_PASSAGEM","name":"Sem prioridade no cruzamento","priority":86,"decision":"CEDER_PASSAGEM",
+      "reason":"O veiculo nao tem prioridade; reduzir, ceder passagem ou parar.",
+      "conditions":[{"sensor":"aproximaCruzamento","operator":"EQ","value":true},{"sensor":"temPrioridade","operator":"EQ","value":false}]
+    },
+    {
+      "id":"D22_PARAR_SINAL","name":"Sinal nao permite avancar","priority":89,"decision":"PARAR_ANTES_LINHA",
+      "reason":"O semaforo ou sinal nao permite avancar.",
+      "conditions":[{"sensor":"aproximaCruzamento","operator":"EQ","value":true},{"sensor":"temPrioridade","operator":"EQ","value":true},{"sensor":"sinalPermiteAvancar","operator":"EQ","value":false}]
+    },
+    {
+      "id":"D23_MODO_SEGURO","name":"Risco global elevado","priority":87,"decision":"ATIVAR_MODO_SEGURO",
+      "reason":"O risco global e elevado; restringir manobras e aumentar distancias.",
+      "conditions":[{"sensor":"nivelRiscoGlobal","operator":"EQ","value":"ELEVADO"}]
+    },
+    {
       "id": "R13_CHUVA_INTENSA", "name": "Adaptacao a chuva intensa", "priority": 68,
       "decision": "REDUZIR_VELOCIDADE", "reason": "A chuva intensa exige menor velocidade e maior distancia de seguranca.",
       "conditions": [{"sensor":"chuvaIntensa","operator":"EQ","value":true}]
@@ -113,6 +248,26 @@
       "id": "R14B_FADIGA_MODERADA", "name": "Pausa por fadiga moderada", "priority": 64,
       "decision": "RECOMENDAR_PAUSA", "reason": "A fadiga moderada exige monitorizacao e uma pausa assim que possivel.",
       "conditions": [{"sensor":"nivelFadiga","operator":"EQ","value":"MODERADA"}]
+    },
+    {
+      "id":"D24_VELOCIDADE_INADEQUADA","name":"Velocidade inadequada as condicoes","priority":67,"decision":"CALCULAR_VELOCIDADE_SEGURA",
+      "reason":"A velocidade nao e adequada as condicoes; desacelerar progressivamente.",
+      "conditions":[{"sensor":"velocidadeAdequada","operator":"EQ","value":false}]
+    },
+    {
+      "id":"D25_RISCO_MODERADO","name":"Risco global moderado","priority":63,"decision":"ALERTAR_MONITORIZAR",
+      "reason":"O risco global e moderado; alertar o condutor e reforcar monitorizacao.",
+      "conditions":[{"sensor":"nivelRiscoGlobal","operator":"EQ","value":"MODERADO"}]
+    },
+    {
+      "id":"D26_EXECUTAR_ULTRAPASSAGEM","name":"Ultrapassagem segura","priority":50,"decision":"CONCLUIR_ULTRAPASSAGEM",
+      "reason":"A ultrapassagem e permitida e existem visibilidade, espaco e tempo seguros.",
+      "conditions":[{"sensor":"emUltrapassagem","operator":"EQ","value":true},{"sensor":"ultrapassagemPermitida","operator":"EQ","value":true},{"sensor":"visibilidadeEspacoUltrapassagem","operator":"EQ","value":true},{"sensor":"tempoConcluirUltrapassagem","operator":"EQ","value":true}]
+    },
+    {
+      "id":"D27_ATRAVESSAR_CRUZAMENTO","name":"Avancar no cruzamento","priority":45,"decision":"AVANCAR_PRECAUCAO",
+      "reason":"O veiculo tem prioridade e o sinal permite avancar; confirmar zona livre.",
+      "conditions":[{"sensor":"aproximaCruzamento","operator":"EQ","value":true},{"sensor":"temPrioridade","operator":"EQ","value":true},{"sensor":"sinalPermiteAvancar","operator":"EQ","value":true}]
     },
     {
       "id": "R15_EXCESSO_VELOCIDADE", "name": "Cumprimento do limite", "priority": 60,
@@ -133,6 +288,15 @@
         {"sensor":"pisoInstavel","operator":"EQ","value":false},
         {"sensor":"chuvaIntensa","operator":"EQ","value":false},
         {"sensor":"visibilidadeReduzida","operator":"EQ","value":false},
+        {"sensor":"avariaCritica","operator":"EQ","value":false},
+        {"sensor":"energiaSuficiente","operator":"EQ","value":true},
+        {"sensor":"velocidadeAdequada","operator":"EQ","value":true},
+        {"sensor":"distanciaFrenteSegura","operator":"EQ","value":true},
+        {"sensor":"emUltrapassagem","operator":"EQ","value":false},
+        {"sensor":"mantemDentroFaixa","operator":"EQ","value":true},
+        {"sensor":"aproximaCruzamento","operator":"EQ","value":false},
+        {"sensor":"veiculoEmergencia","operator":"EQ","value":false},
+        {"sensor":"nivelRiscoGlobal","operator":"EQ","value":"BAIXO"},
         {"sensor":"velocidade","operator":"LTE_FIELD","value":"limiteVelocidade"}
       ]
     }

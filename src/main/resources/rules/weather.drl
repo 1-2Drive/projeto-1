@@ -1,0 +1,73 @@
+package rules
+
+import com.one2drive.projeto1.decision.DecisionContext
+import com.one2drive.projeto1.decision.DecisionPriority
+import com.one2drive.projeto1.domain.DrivingAction
+import com.one2drive.projeto1.domain.RiskLevel
+import com.one2drive.projeto1.domain.WeatherCondition
+import com.one2drive.projeto1.drools.DroolsSupport
+import com.one2drive.projeto1.drools.events.ReducedGripEvent
+import com.one2drive.projeto1.drools.events.ReducedVisibilityEvent
+import com.one2drive.projeto1.drools.facts.WeatherStateFact
+
+global DroolsSupport droolsSupport
+
+rule "Rain lowers recommended safe speed"
+salience 340
+when
+    $ctx : DecisionContext()
+    WeatherStateFact(condition == WeatherCondition.RAIN, $visibility : visibilityFactor, $grip : gripFactor)
+then
+    double target = 65.0;
+    if ($visibility < 0.75 || $grip < 0.7) {
+        target = 55.0;
+    }
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.REDUCE_SPEED,
+        target,
+        RiskLevel.MODERATE,
+        DecisionPriority.SPEED_COMPLIANCE,
+        "Rain and reduced grip require conservative speed",
+        drools.getRule().getName(),
+        "visibility=" + $visibility + ", grip=" + $grip
+    );
+end
+
+rule "Low visibility requires stronger speed reduction"
+salience 350
+when
+    $ctx : DecisionContext()
+    $event : ReducedVisibilityEvent($visibility : visibilityFactor) from entry-point "ENVIRONMENT_STREAM"
+then
+    double target = Math.max(30.0, 75.0 * $visibility);
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.REDUCE_SPEED,
+        target,
+        RiskLevel.HIGH,
+        DecisionPriority.ROAD_HAZARD,
+        "Reduced visibility requires conservative speed",
+        drools.getRule().getName(),
+        "visibility=" + $visibility + ", source=" + $event.getSourceId()
+    );
+end
+
+rule "Low road grip requires stronger speed reduction"
+salience 350
+when
+    $ctx : DecisionContext()
+    $event : ReducedGripEvent($grip : gripFactor) from entry-point "ENVIRONMENT_STREAM"
+then
+    double target = Math.max(25.0, 80.0 * $grip);
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.REDUCE_SPEED,
+        target,
+        RiskLevel.HIGH,
+        DecisionPriority.ROAD_HAZARD,
+        "Reduced grip requires cautious speed",
+        drools.getRule().getName(),
+        "grip=" + $grip + ", source=" + $event.getSourceId()
+    );
+end

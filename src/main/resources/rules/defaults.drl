@@ -1,0 +1,28 @@
+package rules
+
+import com.one2drive.projeto1.decision.DecisionContext
+import com.one2drive.projeto1.decision.DecisionPriority
+import com.one2drive.projeto1.domain.DrivingAction
+import com.one2drive.projeto1.domain.RiskLevel
+import com.one2drive.projeto1.drools.DroolsSupport
+import com.one2drive.projeto1.drools.facts.VehicleStateFact
+
+global DroolsSupport droolsSupport
+
+rule "Default maintain speed baseline"
+salience -100
+when
+    $ctx : DecisionContext(priority <= 0)
+    VehicleStateFact($speed : speedKmh)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.MAINTAIN_SPEED,
+        $speed,
+        RiskLevel.LOW,
+        DecisionPriority.COMFORT_PROGRESS,
+        "No restrictive condition detected",
+        drools.getRule().getName(),
+        "baseline speed=" + $speed + " km/h"
+    );
+end

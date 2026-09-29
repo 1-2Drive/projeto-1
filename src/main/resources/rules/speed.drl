@@ -1,0 +1,72 @@
+package rules
+
+import com.one2drive.projeto1.decision.DecisionContext
+import com.one2drive.projeto1.decision.DecisionPriority
+import com.one2drive.projeto1.domain.DrivingAction
+import com.one2drive.projeto1.domain.RiskLevel
+import com.one2drive.projeto1.drools.DroolsSupport
+import com.one2drive.projeto1.drools.facts.AccelerationRequestState
+import com.one2drive.projeto1.drools.facts.CurrentSpeedLimit
+import com.one2drive.projeto1.drools.facts.VehicleStateFact
+
+global DroolsSupport droolsSupport
+
+rule "Reduce speed when exceeding detected limit"
+salience 300
+when
+    $ctx : DecisionContext()
+    VehicleStateFact( $speed : speedKmh )
+    CurrentSpeedLimit( $limit : limitKmh )
+    eval($speed > ($limit + 1.5))
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.REDUCE_SPEED,
+        $limit,
+        RiskLevel.MODERATE,
+        DecisionPriority.SPEED_COMPLIANCE,
+        "Vehicle exceeds current legal speed limit",
+        drools.getRule().getName(),
+        "speed=" + $speed + " km/h, limit=" + $limit + " km/h"
+    );
+end
+
+rule "Maintain speed when compliant with detected limit"
+salience 210
+when
+    $ctx : DecisionContext()
+    VehicleStateFact( $speed : speedKmh )
+    CurrentSpeedLimit( $limit : limitKmh )
+    eval($speed <= ($limit + 1.5))
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.MAINTAIN_SPEED,
+        $limit,
+        RiskLevel.LOW,
+        DecisionPriority.COMFORT_PROGRESS,
+        "Vehicle is compliant with legal limit",
+        drools.getRule().getName(),
+        "speed=" + $speed + " km/h, limit=" + $limit + " km/h"
+    );
+end
+
+rule "Allow acceleration request when safe context"
+salience 205
+when
+    $ctx : DecisionContext(priority <= DecisionPriority.COMFORT_PROGRESS)
+    AccelerationRequestState( $target : targetSpeedKmh, $ts : timestamp )
+    VehicleStateFact( $now : timestamp )
+    eval($target > 0 && ($now - $ts) < 1500)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.ACCELERATE,
+        $target,
+        RiskLevel.LOW,
+        DecisionPriority.COMFORT_PROGRESS,
+        "Driver acceleration request accepted",
+        drools.getRule().getName(),
+        "target=" + $target + " km/h"
+    );
+end

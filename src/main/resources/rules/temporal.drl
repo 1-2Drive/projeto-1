@@ -1,0 +1,35 @@
+package rules
+
+import com.one2drive.projeto1.decision.DecisionContext
+import com.one2drive.projeto1.decision.DecisionPriority
+import com.one2drive.projeto1.domain.DrivingAction
+import com.one2drive.projeto1.domain.RiskLevel
+import com.one2drive.projeto1.domain.WeatherCondition
+import com.one2drive.projeto1.drools.DroolsSupport
+import com.one2drive.projeto1.drools.events.TTCEvent
+import com.one2drive.projeto1.drools.facts.WeatherStateFact
+
+global DroolsSupport droolsSupport
+
+rule "Persistent low TTC in rain increases conservatism"
+salience 560
+when
+    $ctx : DecisionContext()
+    WeatherStateFact(condition == WeatherCondition.RAIN)
+    Number( intValue >= 2 ) from accumulate(
+        TTCEvent( ttcSeconds > 0.0, ttcSeconds < 3.0 ) over window:time(2s) from entry-point "PERCEPTION_STREAM",
+        count(1)
+    )
+    TTCEvent( $ttc : ttcSeconds > 0.0, ttcSeconds < 3.0 ) over window:time(2s) from entry-point "PERCEPTION_STREAM"
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.BRAKE,
+        15.0,
+        RiskLevel.HIGH,
+        DecisionPriority.COLLISION_AVOIDANCE,
+        "Rain + persistent low TTC => conservative braking",
+        drools.getRule().getName(),
+        "latest TTC=" + $ttc + "s"
+    );
+end

@@ -1,0 +1,112 @@
+package rules
+
+import com.one2drive.projeto1.decision.DecisionContext
+import com.one2drive.projeto1.decision.DecisionPriority
+import com.one2drive.projeto1.domain.DrivingAction
+import com.one2drive.projeto1.domain.RiskLevel
+import com.one2drive.projeto1.drools.DroolsSupport
+import com.one2drive.projeto1.drools.facts.StopSignState
+import com.one2drive.projeto1.drools.facts.VehicleStateFact
+import com.one2drive.projeto1.drools.facts.YieldSignState
+
+global DroolsSupport droolsSupport
+
+rule "Stop sign requires progressive deceleration"
+salience 610
+when
+    $ctx : DecisionContext()
+    StopSignState( signId != "none", satisfied == false, $distance : distanceMeters > 4.0, distanceMeters <= 35.0 )
+then
+    double target = Math.max(10.0, $distance * 1.5);
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.REDUCE_SPEED,
+        target,
+        RiskLevel.MODERATE,
+        DecisionPriority.LEGAL_MANDATORY_STOP,
+        "Approaching stop sign; decelerate progressively",
+        drools.getRule().getName(),
+        "distance=" + $distance + "m"
+    );
+end
+
+rule "Stop sign requires full stop near line"
+salience 620
+when
+    $ctx : DecisionContext()
+    $stop : StopSignState( signId != "none", satisfied == false, $distance : distanceMeters <= 4.0 )
+    VehicleStateFact($now : timestamp)
+    eval($stop.getStopStartTimestamp() < 0L || ($now - $stop.getStopStartTimestamp()) < 1200)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.STOP,
+        0.0,
+        RiskLevel.HIGH,
+        DecisionPriority.LEGAL_MANDATORY_STOP,
+        "Stop sign reached; full stop required",
+        drools.getRule().getName(),
+        "distance=" + $distance + "m"
+    );
+end
+
+rule "Start stop timer once vehicle is stopped"
+no-loop true
+salience 630
+when
+    $stop : StopSignState(signId != "none", satisfied == false, stopStartTimestamp < 0L, distanceMeters <= 4.0)
+    VehicleStateFact($speed : speedKmh, $now : timestamp)
+    eval($speed < 0.6)
+then
+    $stop.setStopStartTimestamp($now);
+    update($stop);
+end
+
+rule "Stop sign condition satisfied after full stop hold"
+no-loop true
+salience 635
+when
+    $stop : StopSignState(signId != "none", satisfied == false, $start : stopStartTimestamp > 0L)
+    VehicleStateFact($now : timestamp)
+    eval($now - $start >= 1200)
+then
+    $stop.setSatisfied(true);
+    update($stop);
+end
+
+rule "Proceed after stop sign condition satisfied"
+salience 200
+when
+    $ctx : DecisionContext()
+    StopSignState(signId != "none", satisfied == true, $distance : distanceMeters <= 4.0)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.CONTINUE,
+        25.0,
+        RiskLevel.LOW,
+        DecisionPriority.MANEUVER_SAFETY,
+        "Stop completed; proceed when safe",
+        drools.getRule().getName(),
+        "distance=" + $distance + "m"
+    );
+end
+
+rule "Yield sign requires cautionary reduction"
+salience 590
+when
+    $ctx : DecisionContext()
+    YieldSignState(signId != "none", $distance : distanceMeters > 0, distanceMeters <= 28)
+then
+    double target = Math.max(20.0, $distance + 12.0);
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.REDUCE_SPEED,
+        target,
+        RiskLevel.MODERATE,
+        DecisionPriority.LEGAL_MANDATORY_STOP,
+        "Yield sign detected; reduce speed and prepare to give way",
+        drools.getRule().getName(),
+        "distance=" + $distance + "m"
+    );
+end

@@ -1,0 +1,79 @@
+package rules
+
+import com.one2drive.projeto1.decision.DecisionContext
+import com.one2drive.projeto1.decision.DecisionPriority
+import com.one2drive.projeto1.domain.DrivingAction
+import com.one2drive.projeto1.domain.RiskLevel
+import com.one2drive.projeto1.drools.DroolsSupport
+import com.one2drive.projeto1.drools.facts.FrontVehicleState
+import com.one2drive.projeto1.drools.facts.VehicleStateFact
+import com.one2drive.projeto1.drools.events.FrontDistanceEvent
+
+global DroolsSupport droolsSupport
+
+rule "Brake when front vehicle distance low"
+salience 520
+when
+    $ctx : DecisionContext()
+    FrontVehicleState(targetId != "none", $distance : distanceMeters > 0, distanceMeters < 14.0, $relative : relativeSpeedMps > 0)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.BRAKE,
+        20.0,
+        RiskLevel.HIGH,
+        DecisionPriority.COLLISION_AVOIDANCE,
+        "Front vehicle too close",
+        drools.getRule().getName(),
+        "distance=" + $distance + "m, relativeSpeed=" + $relative + "m/s"
+    );
+end
+
+rule "Reduce speed when closing front vehicle"
+salience 500
+when
+    $ctx : DecisionContext()
+    FrontVehicleState(targetId != "none", $distance : distanceMeters >= 14.0, distanceMeters < 35.0, $relative : relativeSpeedMps > 0.8)
+then
+    double target = Math.max(20.0, $distance * 1.2);
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.REDUCE_SPEED,
+        target,
+        RiskLevel.MODERATE,
+        DecisionPriority.COLLISION_AVOIDANCE,
+        "Closing to front vehicle",
+        drools.getRule().getName(),
+        "distance=" + $distance + "m, relativeSpeed=" + $relative + "m/s"
+    );
+end
+
+rule "Approaching trend from sliding distance window"
+salience 505
+when
+    $ctx : DecisionContext()
+    $count : Number( intValue >= 3 ) from accumulate(
+        FrontDistanceEvent( $d : distanceMeters > 0 ) over window:length(5) from entry-point "PERCEPTION_STREAM",
+        count(1)
+    )
+    $min : Number() from accumulate(
+        FrontDistanceEvent( $dMin : distanceMeters > 0 ) over window:length(5) from entry-point "PERCEPTION_STREAM",
+        min($dMin)
+    )
+    $max : Number() from accumulate(
+        FrontDistanceEvent( $dMax : distanceMeters > 0 ) over window:length(5) from entry-point "PERCEPTION_STREAM",
+        max($dMax)
+    )
+    eval($min.doubleValue() < ($max.doubleValue() - 4.0))
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.REDUCE_SPEED,
+        35.0,
+        RiskLevel.MODERATE,
+        DecisionPriority.COLLISION_AVOIDANCE,
+        "Front distance trend decreasing quickly",
+        drools.getRule().getName(),
+        "samples=" + $count + ", max=" + $max + "m, min=" + $min + "m"
+    );
+end

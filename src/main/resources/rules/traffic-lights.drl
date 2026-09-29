@@ -1,0 +1,68 @@
+package rules
+
+import com.one2drive.projeto1.decision.DecisionContext
+import com.one2drive.projeto1.decision.DecisionPriority
+import com.one2drive.projeto1.domain.DrivingAction
+import com.one2drive.projeto1.domain.RiskLevel
+import com.one2drive.projeto1.domain.TrafficLightState
+import com.one2drive.projeto1.drools.DroolsSupport
+import com.one2drive.projeto1.drools.facts.TrafficLightStateFact
+import com.one2drive.projeto1.drools.facts.VehicleStateFact
+
+global DroolsSupport droolsSupport
+
+rule "Red traffic light requires stop"
+salience 600
+when
+    $ctx : DecisionContext()
+    TrafficLightStateFact(state == TrafficLightState.RED, $distance : distanceMeters, distanceMeters <= 45.0)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.STOP,
+        0.0,
+        RiskLevel.HIGH,
+        DecisionPriority.LEGAL_MANDATORY_STOP,
+        "Red traffic light detected",
+        drools.getRule().getName(),
+        "distance=" + $distance + "m"
+    );
+end
+
+rule "Yellow traffic light recommends deceleration"
+salience 580
+when
+    $ctx : DecisionContext()
+    TrafficLightStateFact(state == TrafficLightState.YELLOW, $distance : distanceMeters, distanceMeters <= 40.0)
+    VehicleStateFact($speed : speedKmh)
+then
+    double target = Math.max(15.0, $speed - 20.0);
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.REDUCE_SPEED,
+        target,
+        RiskLevel.MODERATE,
+        DecisionPriority.LEGAL_MANDATORY_STOP,
+        "Yellow traffic light; decelerate safely",
+        drools.getRule().getName(),
+        "distance=" + $distance + "m"
+    );
+end
+
+rule "Green traffic light allows progression when no higher hazard"
+salience 180
+when
+    $ctx : DecisionContext(priority < DecisionPriority.COLLISION_AVOIDANCE)
+    TrafficLightStateFact(state == TrafficLightState.GREEN, distanceMeters <= 40.0)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.CONTINUE,
+        50.0,
+        RiskLevel.LOW,
+        DecisionPriority.COMFORT_PROGRESS,
+        "Green light and no higher-priority hazard",
+        drools.getRule().getName(),
+        "green light observed"
+    );
+end

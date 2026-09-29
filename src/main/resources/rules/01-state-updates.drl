@@ -1,0 +1,315 @@
+package rules
+
+import com.one2drive.projeto1.domain.Lane
+import com.one2drive.projeto1.drools.events.*
+import com.one2drive.projeto1.drools.facts.*
+
+rule "Update current speed limit from latest sign"
+no-loop true
+when
+    $e : SpeedLimitDetectedEvent() from entry-point "ROAD_STREAM"
+    $limit : CurrentSpeedLimit()
+    eval($e.getTimestamp() >= $limit.getTimestamp()
+        && ($e.getTimestamp() > $limit.getTimestamp() || $e.getLimitKmh() != $limit.getLimitKmh()))
+then
+    if ($e.getLimitKmh() <= $limit.getLimitKmh() || $e.getDistanceMeters() < 12) {
+        $limit.setLimitKmh($e.getLimitKmh());
+        $limit.setSourceId($e.getSignId());
+        $limit.setTimestamp($e.getTimestamp());
+        update($limit);
+    }
+end
+
+rule "Update vehicle state from speed sensor"
+no-loop true
+when
+    $e : VehicleSpeedEvent() from entry-point "VEHICLE_STREAM"
+    $state : VehicleStateFact()
+    eval($e.getTimestamp() >= $state.getTimestamp()
+        && ($e.getTimestamp() > $state.getTimestamp() || Math.abs($e.getSpeedKmh() - $state.getSpeedKmh()) > 0.01))
+then
+    $state.setSpeedKmh($e.getSpeedKmh());
+    $state.setTimestamp($e.getTimestamp());
+    update($state);
+end
+
+rule "Update traffic light state"
+no-loop true
+when
+    $e : TrafficLightEvent() from entry-point "TRAFFIC_STREAM"
+    $state : TrafficLightStateFact()
+    eval($e.getTimestamp() >= $state.getTimestamp()
+        && ($e.getTimestamp() > $state.getTimestamp()
+            || $state.getState() != $e.getState()
+            || Math.abs($state.getDistanceMeters() - $e.getDistanceMeters()) > 0.01))
+then
+    $state.setLightId($e.getLightId());
+    $state.setState($e.getState());
+    $state.setDistanceMeters($e.getDistanceMeters());
+    $state.setTimestamp($e.getTimestamp());
+    update($state);
+end
+
+rule "Update stop sign state"
+no-loop true
+when
+    $e : StopSignEvent() from entry-point "ROAD_STREAM"
+    $state : StopSignState()
+    eval($e.getTimestamp() >= $state.getDetectedTimestamp()
+        && ($e.getTimestamp() > $state.getDetectedTimestamp()
+            || Math.abs($state.getDistanceMeters() - $e.getDistanceMeters()) > 0.01
+            || !$state.getSignId().equals($e.getSignId())))
+then
+    $state.setSignId($e.getSignId());
+    $state.setDistanceMeters($e.getDistanceMeters());
+    $state.setDetectedTimestamp($e.getTimestamp());
+    if ($e.getDistanceMeters() > 8) {
+        $state.setStopStartTimestamp(-1L);
+        $state.setSatisfied(false);
+    }
+    update($state);
+end
+
+rule "Update yield sign state"
+no-loop true
+when
+    $e : YieldSignEvent() from entry-point "ROAD_STREAM"
+    $state : YieldSignState()
+    eval($e.getTimestamp() >= $state.getTimestamp()
+        && ($e.getTimestamp() > $state.getTimestamp()
+            || Math.abs($state.getDistanceMeters() - $e.getDistanceMeters()) > 0.01
+            || !$state.getSignId().equals($e.getSignId())))
+then
+    $state.setSignId($e.getSignId());
+    $state.setDistanceMeters($e.getDistanceMeters());
+    $state.setTimestamp($e.getTimestamp());
+    update($state);
+end
+
+rule "Update weather state"
+no-loop true
+when
+    $e : WeatherEvent() from entry-point "ENVIRONMENT_STREAM"
+    $state : WeatherStateFact()
+    eval($e.getTimestamp() >= $state.getTimestamp()
+        && ($e.getTimestamp() > $state.getTimestamp()
+            || $state.getCondition() != $e.getCondition()
+            || Math.abs($state.getVisibilityFactor() - $e.getVisibilityFactor()) > 0.001
+            || Math.abs($state.getGripFactor() - $e.getGripFactor()) > 0.001))
+then
+    $state.setCondition($e.getCondition());
+    $state.setVisibilityFactor($e.getVisibilityFactor());
+    $state.setGripFactor($e.getGripFactor());
+    $state.setTimestamp($e.getTimestamp());
+    update($state);
+end
+
+rule "Update front vehicle from distance"
+no-loop true
+when
+    $e : FrontDistanceEvent() from entry-point "PERCEPTION_STREAM"
+    $state : FrontVehicleState()
+    eval($e.getTimestamp() >= $state.getTimestamp()
+        && ($e.getTimestamp() > $state.getTimestamp()
+            || !$e.getTargetId().equals($state.getTargetId())
+            || Math.abs($state.getDistanceMeters() - $e.getDistanceMeters()) > 0.01))
+then
+    $state.setTargetId($e.getTargetId());
+    $state.setDistanceMeters($e.getDistanceMeters());
+    $state.setTimestamp($e.getTimestamp());
+    update($state);
+end
+
+rule "Update front vehicle from relative speed"
+no-loop true
+when
+    $e : RelativeSpeedEvent() from entry-point "PERCEPTION_STREAM"
+    $state : FrontVehicleState(targetId == $e.getTargetId() || targetId == "none")
+    eval($e.getTimestamp() >= $state.getTimestamp()
+        && ($e.getTimestamp() > $state.getTimestamp()
+            || Math.abs($state.getRelativeSpeedMps() - $e.getRelativeSpeedMps()) > 0.01))
+then
+    $state.setTargetId($e.getTargetId());
+    $state.setRelativeSpeedMps($e.getRelativeSpeedMps());
+    $state.setTimestamp($e.getTimestamp());
+    update($state);
+end
+
+rule "Update front vehicle from ttc"
+no-loop true
+when
+    $e : TTCEvent() from entry-point "PERCEPTION_STREAM"
+    $state : FrontVehicleState(targetId == $e.getTargetId() || targetId == "none")
+    eval($e.getTimestamp() >= $state.getTimestamp()
+        && ($e.getTimestamp() > $state.getTimestamp()
+            || (Double.isInfinite($state.getTtcSeconds()) && !Double.isInfinite($e.getTtcSeconds()))
+            || (!Double.isInfinite($state.getTtcSeconds()) && Double.isInfinite($e.getTtcSeconds()))
+            || Math.abs($state.getTtcSeconds() - $e.getTtcSeconds()) > 0.01))
+then
+    $state.setTargetId($e.getTargetId());
+    $state.setTtcSeconds($e.getTtcSeconds());
+    $state.setTimestamp($e.getTimestamp());
+    update($state);
+end
+
+rule "Update pedestrian state"
+no-loop true
+when
+    $e : PedestrianDetectedEvent() from entry-point "PERCEPTION_STREAM"
+    $state : PedestrianStateFact()
+    eval($e.getTimestamp() >= $state.getTimestamp()
+        && ($e.getTimestamp() > $state.getTimestamp()
+            || !$e.getPedestrianId().equals($state.getPedestrianId())
+            || Math.abs($state.getDistanceMeters() - $e.getDistanceMeters()) > 0.01
+            || $state.isInPath() != $e.isInPath()))
+then
+    $state.setPedestrianId($e.getPedestrianId());
+    $state.setDistanceMeters($e.getDistanceMeters());
+    $state.setInPath($e.isInPath());
+    $state.setTimestamp($e.getTimestamp());
+    update($state);
+end
+
+rule "Update pothole state"
+no-loop true
+when
+    $e : PotholeDetectedEvent() from entry-point "ROAD_STREAM"
+    $state : PotholeStateFact()
+    eval($e.getTimestamp() >= $state.getTimestamp()
+        && ($e.getTimestamp() > $state.getTimestamp()
+            || !$e.getPotholeId().equals($state.getPotholeId())
+            || Math.abs($state.getDistanceMeters() - $e.getDistanceMeters()) > 0.01
+            || $state.getSeverity() != $e.getSeverity()))
+then
+    $state.setPotholeId($e.getPotholeId());
+    $state.setDistanceMeters($e.getDistanceMeters());
+    $state.setSeverity($e.getSeverity());
+    $state.setTimestamp($e.getTimestamp());
+    update($state);
+end
+
+rule "Update roadworks state"
+no-loop true
+when
+    $e : RoadworksDetectedEvent() from entry-point "ROAD_STREAM"
+    $state : RoadworksStateFact()
+    eval($e.getTimestamp() >= $state.getTimestamp()
+        && ($e.getTimestamp() > $state.getTimestamp()
+            || !$e.getRoadworksId().equals($state.getRoadworksId())
+            || Math.abs($state.getDistanceMeters() - $e.getDistanceMeters()) > 0.01
+            || $state.getSeverity() != $e.getSeverity()))
+then
+    $state.setRoadworksId($e.getRoadworksId());
+    $state.setDistanceMeters($e.getDistanceMeters());
+    $state.setSeverity($e.getSeverity());
+    $state.setTimestamp($e.getTimestamp());
+    update($state);
+end
+
+rule "Update barrier state"
+no-loop true
+when
+    $e : BarrierDetectedEvent() from entry-point "ROAD_STREAM"
+    $state : BarrierStateFact()
+    eval($e.getTimestamp() >= $state.getTimestamp()
+        && ($e.getTimestamp() > $state.getTimestamp()
+            || !$e.getBarrierId().equals($state.getBarrierId())
+            || Math.abs($state.getDistanceMeters() - $e.getDistanceMeters()) > 0.01
+            || $state.isOpen() != $e.isOpen()))
+then
+    $state.setBarrierId($e.getBarrierId());
+    $state.setDistanceMeters($e.getDistanceMeters());
+    $state.setOpen($e.isOpen());
+    $state.setTimestamp($e.getTimestamp());
+    update($state);
+end
+
+rule "Update roundabout state"
+no-loop true
+when
+    $e : RoundaboutDetectedEvent() from entry-point "ROAD_STREAM"
+    $state : RoundaboutStateFact()
+    eval($e.getTimestamp() >= $state.getTimestamp()
+        && ($e.getTimestamp() > $state.getTimestamp()
+            || !$e.getRoundaboutId().equals($state.getRoundaboutId())
+            || Math.abs($state.getDistanceMeters() - $e.getDistanceMeters()) > 0.01
+            || Math.abs($state.getApproachSpeedKmh() - $e.getApproachSpeedKmh()) > 0.01
+            || $state.isOccupied() != $e.isOccupied()))
+then
+    $state.setRoundaboutId($e.getRoundaboutId());
+    $state.setDistanceMeters($e.getDistanceMeters());
+    $state.setApproachSpeedKmh($e.getApproachSpeedKmh());
+    $state.setOccupied($e.isOccupied());
+    $state.setTimestamp($e.getTimestamp());
+    update($state);
+end
+
+rule "Update lane occupancy left"
+no-loop true
+when
+    $e : LaneOccupancyEvent(lane == Lane.LEFT) from entry-point "PERCEPTION_STREAM"
+    $state : LaneOccupancyState(lane == Lane.LEFT)
+    eval($e.getTimestamp() >= $state.getTimestamp()
+        && ($e.getTimestamp() > $state.getTimestamp()
+            || $state.isOccupied() != $e.isOccupied()
+            || Math.abs($state.getNearestDistanceMeters() - $e.getNearestDistanceMeters()) > 0.01))
+then
+    $state.setOccupied($e.isOccupied());
+    $state.setNearestDistanceMeters($e.getNearestDistanceMeters());
+    $state.setTimestamp($e.getTimestamp());
+    update($state);
+end
+
+rule "Update lane occupancy right"
+no-loop true
+when
+    $e : LaneOccupancyEvent(lane == Lane.RIGHT) from entry-point "PERCEPTION_STREAM"
+    $state : LaneOccupancyState(lane == Lane.RIGHT)
+    eval($e.getTimestamp() >= $state.getTimestamp()
+        && ($e.getTimestamp() > $state.getTimestamp()
+            || $state.isOccupied() != $e.isOccupied()
+            || Math.abs($state.getNearestDistanceMeters() - $e.getNearestDistanceMeters()) > 0.01))
+then
+    $state.setOccupied($e.isOccupied());
+    $state.setNearestDistanceMeters($e.getNearestDistanceMeters());
+    $state.setTimestamp($e.getTimestamp());
+    update($state);
+end
+
+rule "Update acceleration request"
+no-loop true
+when
+    $e : AccelerationRequestEvent() from entry-point "COMMAND_STREAM"
+    $state : AccelerationRequestState()
+    eval($e.getTimestamp() >= $state.getTimestamp()
+        && ($e.getTimestamp() > $state.getTimestamp() || Math.abs($state.getTargetSpeedKmh() - $e.getTargetSpeedKmh()) > 0.01))
+then
+    $state.setTargetSpeedKmh($e.getTargetSpeedKmh());
+    $state.setTimestamp($e.getTimestamp());
+    update($state);
+end
+
+rule "Update lane change request"
+no-loop true
+when
+    $e : LaneChangeRequestEvent() from entry-point "COMMAND_STREAM"
+    $state : LaneChangeRequestState()
+    eval($e.getTimestamp() >= $state.getTimestamp()
+        && ($e.getTimestamp() > $state.getTimestamp() || $state.getDirection() != $e.getDirection() || $state.isActive() == false))
+then
+    $state.setActive(true);
+    $state.setDirection($e.getDirection());
+    $state.setTimestamp($e.getTimestamp());
+    update($state);
+end
+
+rule "Expire lane change request"
+no-loop true
+when
+    $state : LaneChangeRequestState(active == true, $ts : timestamp)
+    VehicleStateFact($now : timestamp)
+    eval($now - $ts > 1500)
+then
+    $state.setActive(false);
+    update($state);
+end

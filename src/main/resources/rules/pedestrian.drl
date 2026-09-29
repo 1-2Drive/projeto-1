@@ -1,0 +1,46 @@
+package rules
+
+import com.one2drive.projeto1.decision.DecisionContext
+import com.one2drive.projeto1.decision.DecisionPriority
+import com.one2drive.projeto1.domain.DrivingAction
+import com.one2drive.projeto1.domain.RiskLevel
+import com.one2drive.projeto1.drools.DroolsSupport
+import com.one2drive.projeto1.drools.facts.PedestrianStateFact
+
+global DroolsSupport droolsSupport
+
+rule "Stop for pedestrian in crossing zone"
+salience 700
+when
+    $ctx : DecisionContext()
+    PedestrianStateFact(inPath == true, $distance : distanceMeters > 6.0, distanceMeters <= 24.0)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.STOP,
+        0.0,
+        RiskLevel.HIGH,
+        DecisionPriority.COLLISION_AVOIDANCE,
+        "Pedestrian detected in trajectory",
+        drools.getRule().getName(),
+        "distance=" + $distance + "m"
+    );
+end
+
+rule "Brake for pedestrian proximity"
+salience 710
+when
+    $ctx : DecisionContext()
+    PedestrianStateFact(inPath == true, $distance : distanceMeters > 24.0, distanceMeters <= 45.0)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.BRAKE,
+        20.0,
+        RiskLevel.HIGH,
+        DecisionPriority.COLLISION_AVOIDANCE,
+        "Pedestrian ahead in path; prepare stop",
+        drools.getRule().getName(),
+        "distance=" + $distance + "m"
+    );
+end

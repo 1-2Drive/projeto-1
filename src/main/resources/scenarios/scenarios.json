@@ -1,0 +1,167 @@
+[
+  {
+    "id": "S1",
+    "name": "Empty safe road",
+    "initialSpeedKmh": 60,
+    "initialWeather": "CLEAR",
+    "roadElements": [],
+    "actors": [],
+    "timedActions": []
+  },
+  {
+    "id": "S2",
+    "name": "90 to 50 speed limit",
+    "initialSpeedKmh": 90,
+    "initialWeather": "CLEAR",
+    "roadElements": [
+      {"type": "SPEED_LIMIT", "positionMeters": 140, "lane": "CENTER", "speedLimitKmh": 50}
+    ],
+    "actors": [],
+    "timedActions": []
+  },
+  {
+    "id": "S3",
+    "name": "Red traffic light",
+    "initialSpeedKmh": 70,
+    "initialWeather": "CLEAR",
+    "roadElements": [
+      {"type": "TRAFFIC_LIGHT", "positionMeters": 120, "lane": "CENTER", "trafficLightState": "RED"}
+    ],
+    "actors": [],
+    "timedActions": []
+  },
+  {
+    "id": "S4",
+    "name": "Stop sign",
+    "initialSpeedKmh": 55,
+    "initialWeather": "CLEAR",
+    "roadElements": [
+      {"type": "STOP_SIGN", "positionMeters": 110, "lane": "CENTER"}
+    ],
+    "actors": [],
+    "timedActions": []
+  },
+  {
+    "id": "S5",
+    "name": "Roundabout",
+    "initialSpeedKmh": 80,
+    "initialWeather": "CLEAR",
+    "roadElements": [
+      {"type": "ROUNDABOUT", "positionMeters": 170, "lane": "CENTER", "roundaboutApproachSpeedKmh": 30}
+    ],
+    "actors": [
+      {"type": "FRONT_VEHICLE", "positionMeters": 185, "lane": "CENTER", "speedKmh": 5}
+    ],
+    "timedActions": []
+  },
+  {
+    "id": "S6",
+    "name": "Pothole",
+    "initialSpeedKmh": 70,
+    "initialWeather": "CLEAR",
+    "roadElements": [
+      {"type": "POTHOLE", "positionMeters": 90, "lane": "CENTER", "severity": "HIGH"}
+    ],
+    "actors": [],
+    "timedActions": []
+  },
+  {
+    "id": "S7",
+    "name": "Closed barrier",
+    "initialSpeedKmh": 65,
+    "initialWeather": "CLEAR",
+    "roadElements": [
+      {"type": "BARRIER", "positionMeters": 130, "lane": "CENTER", "barrierOpen": false}
+    ],
+    "actors": [],
+    "timedActions": []
+  },
+  {
+    "id": "S8",
+    "name": "Pedestrian crossing",
+    "initialSpeedKmh": 60,
+    "initialWeather": "CLEAR",
+    "roadElements": [],
+    "actors": [
+      {"type": "PEDESTRIAN", "positionMeters": 95, "lane": "CENTER", "speedKmh": 3}
+    ],
+    "timedActions": []
+  },
+  {
+    "id": "S9",
+    "name": "Critical TTC",
+    "initialSpeedKmh": 95,
+    "initialWeather": "CLEAR",
+    "roadElements": [],
+    "actors": [
+      {"type": "FRONT_VEHICLE", "positionMeters": 80, "lane": "CENTER", "speedKmh": 30}
+    ],
+    "timedActions": []
+  },
+  {
+    "id": "S10",
+    "name": "Lane change blocked",
+    "initialSpeedKmh": 75,
+    "initialWeather": "CLEAR",
+    "roadElements": [],
+    "actors": [
+      {"type": "VEHICLE_LEFT", "positionMeters": 15, "lane": "LEFT", "speedKmh": 70}
+    ],
+    "timedActions": [
+      {"triggerTimeMillis": 500, "type": "REQUEST_LANE_CHANGE_LEFT"}
+    ]
+  },
+  {
+    "id": "S11",
+    "name": "Rain low grip",
+    "initialSpeedKmh": 85,
+    "initialWeather": "RAIN",
+    "roadElements": [],
+    "actors": [],
+    "timedActions": []
+  },
+  {
+    "id": "S11B",
+    "name": "Yield sign approach",
+    "initialSpeedKmh": 65,
+    "initialWeather": "CLEAR",
+    "roadElements": [
+      {"type": "YIELD_SIGN", "positionMeters": 100, "lane": "CENTER"}
+    ],
+    "actors": [
+      {"type": "FRONT_VEHICLE", "positionMeters": 118, "lane": "CENTER", "speedKmh": 20}
+    ],
+    "timedActions": []
+  },
+  {
+    "id": "S12",
+    "name": "Complex sequential scenario",
+    "initialSpeedKmh": 90,
+    "initialWeather": "CLEAR",
+    "roadElements": [],
+    "actors": [],
+    "timedActions": [
+      {
+        "triggerTimeMillis": 1500,
+        "type": "ADD_ROAD_ELEMENT",
+        "roadElement": {"type": "SPEED_LIMIT", "positionMeters": 140, "lane": "CENTER", "speedLimitKmh": 70}
+      },
+      {"triggerTimeMillis": 3500, "type": "SET_RAIN"},
+      {
+        "triggerTimeMillis": 4500,
+        "type": "ADD_ACTOR",
+        "actor": {"type": "FRONT_VEHICLE", "positionMeters": 95, "lane": "CENTER", "speedKmh": 35}
+      },
+      {
+        "triggerTimeMillis": 7000,
+        "type": "ADD_ROAD_ELEMENT",
+        "roadElement": {"type": "ROUNDABOUT", "positionMeters": 160, "lane": "CENTER", "roundaboutApproachSpeedKmh": 30}
+      },
+      {
+        "triggerTimeMillis": 9300,
+        "type": "ADD_ACTOR",
+        "actor": {"type": "PEDESTRIAN", "positionMeters": 70, "lane": "CENTER", "speedKmh": 3}
+      }
+    ]
+  }
+]

@@ -1,0 +1,43 @@
+package com.one2drive.projeto1.drools.listeners;
+
+import com.one2drive.projeto1.explanation.ExplanationTrace;
+import com.one2drive.projeto1.explanation.TimelineEntryType;
+import org.kie.api.event.rule.DefaultRuleRuntimeEventListener;
+import org.kie.api.event.rule.ObjectDeletedEvent;
+import org.kie.api.event.rule.ObjectInsertedEvent;
+import org.kie.api.event.rule.ObjectUpdatedEvent;
+
+public class WorkingMemoryTraceListener extends DefaultRuleRuntimeEventListener {
+    private final ExplanationTrace trace;
+
+    public WorkingMemoryTraceListener(ExplanationTrace trace) {
+        this.trace = trace;
+    }
+
+    @Override
+    public void objectInserted(ObjectInsertedEvent event) {
+        trace.add(
+            System.currentTimeMillis(),
+            TimelineEntryType.FACT_INSERTED,
+            "FACT INSERTED " + String.valueOf(event.getObject())
+        );
+    }
+
+    @Override
+    public void objectUpdated(ObjectUpdatedEvent event) {
+        trace.add(
+            System.currentTimeMillis(),
+            TimelineEntryType.FACT_UPDATED,
+            "FACT UPDATED " + String.valueOf(event.getObject())
+        );
+    }
+
+    @Override
+    public void objectDeleted(ObjectDeletedEvent event) {
+        trace.add(
+            System.currentTimeMillis(),
+            TimelineEntryType.FACT_DELETED,
+            "FACT DELETED " + String.valueOf(event.getOldObject())
+        );
+    }
+}

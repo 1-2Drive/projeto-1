@@ -1,0 +1,46 @@
+package rules
+
+import com.one2drive.projeto1.decision.DecisionContext
+import com.one2drive.projeto1.decision.DecisionPriority
+import com.one2drive.projeto1.domain.DrivingAction
+import com.one2drive.projeto1.domain.RiskLevel
+import com.one2drive.projeto1.drools.DroolsSupport
+import com.one2drive.projeto1.drools.facts.BarrierStateFact
+
+global DroolsSupport droolsSupport
+
+rule "Closed barrier requires stop"
+salience 640
+when
+    $ctx : DecisionContext()
+    BarrierStateFact(barrierId != "none", open == false, $distance : distanceMeters >= 0, distanceMeters <= 45.0)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.STOP,
+        0.0,
+        RiskLevel.HIGH,
+        DecisionPriority.LEGAL_MANDATORY_STOP,
+        "Closed barrier ahead",
+        drools.getRule().getName(),
+        "distance=" + $distance + "m"
+    );
+end
+
+rule "Open barrier allows continue if no higher priority"
+salience 170
+when
+    $ctx : DecisionContext(priority < DecisionPriority.COLLISION_AVOIDANCE)
+    BarrierStateFact(barrierId != "none", open == true, distanceMeters >= 0, distanceMeters <= 35.0)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.CONTINUE,
+        35.0,
+        RiskLevel.LOW,
+        DecisionPriority.COMFORT_PROGRESS,
+        "Barrier open and crossing allowed",
+        drools.getRule().getName(),
+        "barrier open"
+    );
+end

@@ -1,0 +1,57 @@
+package rules
+
+import com.one2drive.projeto1.decision.DecisionContext
+import com.one2drive.projeto1.decision.DecisionPriority
+import com.one2drive.projeto1.domain.DrivingAction
+import com.one2drive.projeto1.domain.HazardSeverity
+import com.one2drive.projeto1.domain.RiskLevel
+import com.one2drive.projeto1.drools.DroolsSupport
+import com.one2drive.projeto1.drools.facts.LaneOccupancyState
+import com.one2drive.projeto1.drools.facts.PotholeStateFact
+import com.one2drive.projeto1.drools.facts.RoadworksStateFact
+
+global DroolsSupport droolsSupport
+
+rule "Pothole ahead reduce speed"
+salience 460
+when
+    $ctx : DecisionContext()
+    PotholeStateFact(potholeId != "none", $distance : distanceMeters > 0, distanceMeters <= 40.0)
+then
+    double target = 30.0;
+    if ($distance < 15) {
+        target = 20.0;
+    }
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.REDUCE_SPEED,
+        target,
+        RiskLevel.MODERATE,
+        DecisionPriority.ROAD_HAZARD,
+        "Pothole ahead requires speed reduction",
+        drools.getRule().getName(),
+        "distance=" + $distance + "m"
+    );
+end
+
+rule "Roadworks ahead reduce speed"
+salience 450
+when
+    $ctx : DecisionContext()
+    RoadworksStateFact(roadworksId != "none", $distance : distanceMeters > 0, distanceMeters <= 60.0, $severity : severity)
+then
+    double target = 40.0;
+    if ($severity == HazardSeverity.HIGH) {
+        target = 25.0;
+    }
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.REDUCE_SPEED,
+        target,
+        RiskLevel.MODERATE,
+        DecisionPriority.ROAD_HAZARD,
+        "Roadworks zone ahead",
+        drools.getRule().getName(),
+        "distance=" + $distance + "m, severity=" + $severity
+    );
+end

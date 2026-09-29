@@ -60,6 +60,22 @@ public class WorldState {
         actors.add(actor);
     }
 
+    public Optional<RoadElement> findRoadElementById(String id) {
+        return roadElements.stream().filter(e -> e.getId().equals(id)).findFirst();
+    }
+
+    public Optional<DynamicActor> findActorById(String id) {
+        return actors.stream().filter(a -> a.getId().equals(id)).findFirst();
+    }
+
+    public boolean removeRoadElementById(String id) {
+        return roadElements.removeIf(e -> e.getId().equals(id));
+    }
+
+    public boolean removeActorById(String id) {
+        return actors.removeIf(a -> a.getId().equals(id));
+    }
+
     public List<RoadElement> getRoadElements() {
         return Collections.unmodifiableList(roadElements);
     }

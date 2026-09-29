@@ -1,0 +1,18 @@
+<section class="road-shell">
+  <div class="road-grid">
+    <div class="lane lane-top"></div>
+    <div class="lane lane-mid"></div>
+    <div class="lane lane-bottom"></div>
+  </div>
+
+  <div class="ego" [style.top.%]="egoLaneY()"></div>
+
+  @for (item of renderItems(); track item.id) {
+    <div class="item" [class]="'item ' + item.typeClass" [style.left.%]="item.x" [style.top.%]="item.y">
+      {{ item.label }}
+    </div>
+  }
+
+  <div class="sensor sensor-camera"></div>
+  <div class="sensor sensor-radar"></div>
+</section>

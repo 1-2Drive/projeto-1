@@ -1,0 +1,38 @@
+.panel {
+  background: #0e1721;
+  border: 1px solid #223447;
+  border-radius: 0.6rem;
+  padding: 0.7rem;
+  color: #dbe8f4;
+
+  h3 {
+    margin: 0 0 0.65rem;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    color: #9fb4c8;
+    letter-spacing: 0.06em;
+  }
+
+  .box {
+    background: #132233;
+    border: 1px solid #1f3142;
+    border-radius: 0.45rem;
+    padding: 0.5rem;
+
+    p {
+      margin: 0.2rem 0;
+      font-size: 0.75rem;
+      line-height: 1.3;
+    }
+
+    ul {
+      margin: 0.4rem 0 0;
+      padding-left: 1rem;
+
+      li {
+        font-size: 0.72rem;
+        line-height: 1.3;
+      }
+    }
+  }
+}

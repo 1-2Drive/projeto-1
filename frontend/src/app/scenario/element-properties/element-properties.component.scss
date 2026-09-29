@@ -1,0 +1,79 @@
+.panel {
+  background: #101a24;
+  border: 1px solid #223447;
+  border-radius: 0.6rem;
+  padding: 0.85rem;
+  color: #e5edf4;
+  display: grid;
+  gap: 0.65rem;
+
+  h3 {
+    margin: 0;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #9fb4c8;
+  }
+
+  .controls {
+    display: grid;
+    gap: 0.4rem;
+
+    label {
+      display: grid;
+      gap: 0.2rem;
+      font-size: 0.72rem;
+      color: #9ab0c3;
+    }
+
+    select,
+    input {
+      background: #142231;
+      border: 1px solid #27455d;
+      color: #e2ecf4;
+      border-radius: 0.35rem;
+      padding: 0.35rem 0.45rem;
+      font-size: 0.75rem;
+    }
+  }
+
+  .groups {
+    display: grid;
+    gap: 0.65rem;
+
+    article {
+      background: #142231;
+      border: 1px solid #223d54;
+      border-radius: 0.45rem;
+      padding: 0.45rem;
+    }
+
+    h4 {
+      margin: 0 0 0.4rem;
+      color: #9cc0dd;
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+  }
+
+  .btn-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.35rem;
+
+    button {
+      background: #1c3345;
+      border: 1px solid #3a607d;
+      color: #e8f2fb;
+      border-radius: 0.35rem;
+      padding: 0.35rem 0.45rem;
+      font-size: 0.7rem;
+      cursor: pointer;
+
+      &:hover {
+        background: #25455d;
+      }
+    }
+  }
+}

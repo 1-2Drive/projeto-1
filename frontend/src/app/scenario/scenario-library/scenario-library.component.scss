@@ -1,0 +1,49 @@
+.panel {
+  background: #101a24;
+  border: 1px solid #223447;
+  border-radius: 0.6rem;
+  padding: 0.85rem;
+  color: #e5edf4;
+
+  h3 {
+    margin: 0 0 0.6rem;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #9fb4c8;
+  }
+
+  ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.35rem;
+  }
+
+  button {
+    width: 100%;
+    text-align: left;
+    border: 1px solid #26435a;
+    border-radius: 0.4rem;
+    background: #152534;
+    color: #e5edf4;
+    padding: 0.42rem 0.5rem;
+    display: grid;
+    gap: 0.15rem;
+    cursor: pointer;
+
+    strong {
+      font-size: 0.73rem;
+      color: #98c5e8;
+    }
+
+    span {
+      font-size: 0.74rem;
+    }
+
+    &:hover {
+      background: #1b3042;
+    }
+  }
+}

@@ -1,0 +1,66 @@
+.panel {
+  background: #0e1721;
+  border: 1px solid #223447;
+  border-radius: 0.6rem;
+  padding: 0.7rem;
+  color: #dbe8f4;
+  height: 100%;
+  display: grid;
+  gap: 0.65rem;
+
+  .head {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.55rem;
+    align-items: center;
+
+    h3 {
+      margin: 0;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      color: #9fb4c8;
+      letter-spacing: 0.06em;
+    }
+
+    input {
+      background: #142231;
+      color: #e4edf5;
+      border: 1px solid #28465f;
+      border-radius: 0.35rem;
+      padding: 0.35rem 0.5rem;
+      font-size: 0.74rem;
+    }
+  }
+
+  .table-wrap {
+    overflow: auto;
+    max-height: 15.5rem;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.72rem;
+
+    th,
+    td {
+      border-bottom: 1px solid #1f2f3f;
+      padding: 0.3rem 0.25rem;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      color: #87a2b8;
+      font-size: 0.66rem;
+      position: sticky;
+      top: 0;
+      background: #0e1721;
+    }
+
+    .value {
+      max-width: 20rem;
+      word-break: break-word;
+    }
+  }
+}

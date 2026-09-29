@@ -1,0 +1,64 @@
+<section class="panel">
+  <h3>Scenario Toolbox</h3>
+
+  <div class="controls">
+    <label>
+      Lane
+      <select [ngModel]="lane()" (ngModelChange)="setLane($event)">
+        <option value="LEFT">LEFT</option>
+        <option value="CENTER">CENTER</option>
+        <option value="RIGHT">RIGHT</option>
+      </select>
+    </label>
+    <label>
+      Distance Ahead (m)
+      <input data-testid="distance-input" type="number" min="1" max="1000" [ngModel]="distanceAheadMeters()" (ngModelChange)="setDistance($event)" />
+    </label>
+    <label>
+      Vehicle Speed (km/h)
+      <input type="number" min="0" max="180" [ngModel]="actorSpeedKmh()" (ngModelChange)="setActorSpeed($event)" />
+    </label>
+  </div>
+
+  <div class="groups">
+    <article>
+      <h4>Traffic signs</h4>
+      <div class="btn-grid">
+        <button type="button" (click)="submitSign(30)">30</button>
+        <button data-testid="add-speed-50" type="button" (click)="submitSign(50)">50</button>
+        <button type="button" (click)="submitSign(70)">70</button>
+        <button type="button" (click)="submitSign(90)">90</button>
+        <button type="button" (click)="submitSign(120)">120</button>
+        <button type="button" (click)="submitStop()">STOP</button>
+        <button type="button" (click)="submitYield()">YIELD</button>
+      </div>
+    </article>
+
+    <article>
+      <h4>Traffic control</h4>
+      <div class="btn-grid">
+        <button type="button" (click)="submitTrafficLight('RED')">Traffic Light RED</button>
+        <button type="button" (click)="submitTrafficLight('GREEN')">Traffic Light GREEN</button>
+        <button type="button" (click)="submitBarrier(false)">Barrier Closed</button>
+        <button type="button" (click)="submitBarrier(true)">Barrier Open</button>
+        <button type="button" (click)="submitRoundabout()">Roundabout</button>
+      </div>
+    </article>
+
+    <article>
+      <h4>Hazards</h4>
+      <div class="btn-grid">
+        <button type="button" (click)="submitPothole()">Pothole</button>
+        <button type="button" (click)="submitRoadworks()">Roadworks</button>
+      </div>
+    </article>
+
+    <article>
+      <h4>Actors</h4>
+      <div class="btn-grid">
+        <button data-testid="add-vehicle" type="button" (click)="submitVehicle()">Vehicle</button>
+        <button data-testid="add-pedestrian" type="button" (click)="submitPedestrian()">Pedestrian</button>
+      </div>
+    </article>
+  </div>
+</section>

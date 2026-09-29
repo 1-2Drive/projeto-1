@@ -1,0 +1,19 @@
+<section class="panel">
+  <h3>Explanation</h3>
+  @if (snapshot(); as s) {
+    <div class="box">
+      <p><strong>Decision:</strong> {{ s.currentDecision.action }}</p>
+      <p><strong>Why:</strong> {{ s.currentDecision.reason }}</p>
+      <p><strong>Rule:</strong> {{ s.currentDecision.sourceRule }}</p>
+      @if (s.currentDecision.evidence.length > 0) {
+        <ul>
+          @for (line of s.currentDecision.evidence; track line) {
+            <li>{{ line }}</li>
+          }
+        </ul>
+      }
+    </div>
+  } @else {
+    <p>No explanation available.</p>
+  }
+</section>

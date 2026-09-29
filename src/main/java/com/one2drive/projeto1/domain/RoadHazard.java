@@ -1,7 +1,7 @@
 package com.one2drive.projeto1.domain;
 
 public abstract class RoadHazard extends RoadElement {
-    private final HazardSeverity severity;
+    private HazardSeverity severity;
 
     protected RoadHazard(double positionMeters, Lane lane, HazardSeverity severity) {
         super(positionMeters, lane);
@@ -10,6 +10,10 @@ public abstract class RoadHazard extends RoadElement {
 
     public HazardSeverity getSeverity() {
         return severity;
+    }
+
+    public void setSeverity(HazardSeverity severity) {
+        this.severity = severity;
     }
 
     @Override

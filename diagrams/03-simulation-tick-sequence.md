@@ -1,13 +1,15 @@
 ```mermaid
 sequenceDiagram
-    participant UI as UI/Scheduler
+    participant API as Spring API Loop
     participant ENG as SimulationEngine
     participant PHY as WorldPhysicsEngine
     participant SNS as SensorManager
     participant KIE as KnowledgeSession/KieSession
     participant ACT as DecisionActuator
+    participant SSE as SSE Publisher
+    participant ANG as Angular Frontend
 
-    UI->>ENG: tick()
+    API->>ENG: tick()
     ENG->>PHY: updateWorld(world, dt)
     ENG->>ENG: advance simTime + clocks
     ENG->>ENG: flushPendingMutations()
@@ -22,5 +24,7 @@ sequenceDiagram
     KIE-->>ENG: DecisionContext -> DrivingDecision
     ENG->>ACT: applyDecision(world, decision)
     ACT-->>ENG: ego state updated
-    ENG-->>UI: SimulationSnapshot
+    ENG-->>API: SimulationSnapshot
+    API->>SSE: publish(snapshot)
+    SSE-->>ANG: realtime update
 ```

@@ -1,0 +1,14 @@
+<section class="panel" data-testid="timeline-panel">
+  <h3>Inference Timeline</h3>
+  <div class="timeline">
+    @if (snapshot(); as s) {
+      @for (entry of s.recentTimeline; track entry.timestamp + entry.message) {
+        <article>
+          <time>{{ (entry.timestamp / 1000) | number: '1.3-3' }}s</time>
+          <strong>{{ entry.type }}</strong>
+          <p>{{ entry.message }}</p>
+        </article>
+      }
+    }
+  </div>
+</section>

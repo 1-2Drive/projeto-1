@@ -1,6 +1,9 @@
 ```mermaid
 flowchart LR
-    UI[JavaFX UI] --> ENGINE[SimulationEngine]
+    ANG[Angular Frontend] --> API[Spring Boot REST + SSE API]
+    JAVA_FX[JavaFX Legacy UI] --> ENGINE[SimulationEngine]
+    API --> ENGINE
+
     SCENARIO[ScenarioLibrary + JSON] --> ENGINE
     CONFIG[SimulationConfig] --> ENGINE
 
@@ -29,5 +32,7 @@ flowchart LR
     WORLD --> ENGINE
 
     DROOLS --> TRACE[ExplanationTrace + Timeline]
-    TRACE --> UI
+    TRACE --> API
+    TRACE --> JAVA_FX
+    API --> ANG
 ```

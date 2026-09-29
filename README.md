@@ -1,100 +1,272 @@
 # Drools Realtime Driving Expert System
 
-Academic project implementing a realtime driving decision support system with Java 17, Drools CEP, and a JavaFX simulator.
+Academic project implementing a continuous driving decision support loop with Java 17, Drools CEP, and a professional Angular realtime interface.
 
-The project keeps decision policy in Drools (rules) while simulation, sensors, and UI remain separate concerns.
+The expert-system policy remains fully in Java + Drools. Angular is presentation and interaction only.
 
 ## Project goal
 
-- Simulate driving scenarios with dynamic road events and actors.
-- Produce one driving decision per cycle using a rule-based expert system.
-- Explain decisions with fired-rule and working-memory evidence.
+- Prove a real-time loop: world change -> sensor perception -> Drools inference -> decision -> vehicle reaction -> new world state.
+- Keep expert policy as a central rules engine, not hardcoded UI conditions.
+- Provide clear explainability (timeline, working memory, source rule, evidence).
 
 ## Tech stack
 
 - Java 17
 - Maven
+- Spring Boot (REST + SSE realtime stream)
 - Drools 8.44.0.Final
-- JavaFX 21.0.2
-- JUnit 5
+- JavaFX 21.0.2 (legacy client retained)
+- Angular 18 (`frontend/`)
+- JUnit 5 + Playwright
 
-## Architecture (Java + Drools)
+## Target architecture
+
+```text
+Angular Frontend (presentation only)
+        |
+        | REST + SSE
+        v
+Spring Boot API
+        |
+        v
+SimulationEngine (core loop)
+        |
+        v
+WorldState -> Sensors -> Drools Entry Points -> Working Memory -> Inference Engine
+        |
+        v
+DrivingDecision -> DecisionActuator -> Updated WorldState -> next cycle
+```
+
+### Separation of concerns (mandatory)
+
+- Angular does not evaluate driving-policy conditions (`ttc`, pedestrian safety thresholds, speed-limit enforcement, lane occupancy conflict, etc.).
+- Angular responsibilities: visualize, animate backend coordinates, send user commands, display sensor/WM/rule/decision/explanation data.
+- Policy source-of-truth remains in DRL and Java Drools integration.
+
+## Backend modules
+
+- `src/main/java/com/one2drive/projeto1/simulation` - world model, physics, actuator, tick cycle.
+- `src/main/java/com/one2drive/projeto1/sensors` - speed/radar/camera/blind-spot/environment perception.
+- `src/main/java/com/one2drive/projeto1/drools` - KieSession, router, facts/events, listeners, query support.
+- `src/main/java/com/one2drive/projeto1/api` - Spring Boot API, request/response models, realtime SSE publishing.
+- `src/main/java/com/one2drive/projeto1/ui` - JavaFX legacy consumer.
+- `src/main/resources/rules` - DRL knowledge base.
+
+## Knowledge base and inference
 
 ### Knowledge Base
 
-- DRL files under `src/main/resources/rules`.
-- Rule sets for speed, signs, lights, hazards, weather, lane change, temporal logic, emergency logic, and defaults.
+- DRL files under `src/main/resources/rules`:
+  - declarations, state updates, emergency, temporal, speed, lights, signs, lane change, hazards, weather, defaults, queries.
 
 ### Working Memory
 
-- Facts in `src/main/java/com/one2drive/projeto1/drools/facts`.
-- Events in `src/main/java/com/one2drive/projeto1/drools/events`.
-- `DecisionContext` and `DrivingDecision` are inserted and updated each cycle.
+- Facts under `drools/facts`.
+- Events under `drools/events` routed via entry points:
+  - `VEHICLE_STREAM`
+  - `PERCEPTION_STREAM`
+  - `ROAD_STREAM`
+  - `TRAFFIC_STREAM`
+  - `ENVIRONMENT_STREAM`
+  - `COMMAND_STREAM`
 
-### Inference Engine
+### Inference engine
 
-- Stateful `KieSession` created in `KnowledgeSession`.
-- `kmodule.xml` configures stream event processing (`eventProcessingMode="stream"`).
-- Entry points are used by event type (`VEHICLE_STREAM`, `PERCEPTION_STREAM`, `ROAD_STREAM`, `TRAFFIC_STREAM`, `ENVIRONMENT_STREAM`, `COMMAND_STREAM`).
+- Stateful `KieSession` in stream mode (`kmodule.xml`).
+- Forward chaining on real sensor events.
+- Conflict handling with `DecisionContext` priority strategy.
 
-### Forward chaining strategy
+### CEP / temporal
 
-- Sensor and command events are inserted.
-- State-update rules derive latest facts.
-- Domain rules propose candidate decisions into `DecisionContext`.
-- Priority/conflict strategy picks final decision (`DecisionContext.propose`).
-- Final `DrivingDecision` is applied by simulation actuator.
+- Event metadata includes `@role(event)`, timestamp, and expiry.
+- Sliding windows and `accumulate` used for persistent TTC risk and temporal hazard correlation.
 
-### CEP and temporal reasoning
+## World truth vs sensor perception vs expert knowledge
 
-- Event declarations include `@role(event)`, `@timestamp(timestamp)`, `@expires(...)`.
-- Temporal rules use sliding windows (`window:time`, `window:length`) and `accumulate`.
-- Critical TTC persistence and rain+TTC conservatism are handled in temporal/emergency rules.
+The implementation enforces this separation.
 
-## Module responsibilities
+Example (speed sign):
 
-- `simulation` - world physics, tick loop, timed actions, actuator.
-- `sensors` - speed/radar/camera/blind-spot/environment event generation.
-- `drools` - session bootstrap, event routing, facts/events/listeners/queries.
-- `ui` - JavaFX rendering and controls, no policy decisions.
-- `explanation` - timeline/rule/fact trace model.
+- World truth: a `SpeedLimitSign` exists in world coordinates.
+- Sensor perception: camera emits `SpeedLimitDetectedEvent` only once sign is within camera range.
+- Expert knowledge: Drools only knows and reasons from detected events/facts, not from hidden world objects.
 
-## Sensors
+## API endpoints
 
-- `SpeedSensor`
-- `FrontRadarSensor` (distance, relative speed, TTC)
-- `CameraSensor` (signs, lights, obstacles, road structures, pedestrian)
-- `BlindSpotSensor`
-- `EnvironmentSensor` (weather, visibility, grip, reduced visibility/grip events)
+### Simulation commands
 
-## Simulation loop
+- `POST /api/simulation/start`
+- `POST /api/simulation/pause`
+- `POST /api/simulation/resume`
+- `POST /api/simulation/stop`
+- `POST /api/simulation/reset`
 
-Per tick (`SimulationEngine.tick`):
+### Simulation/state
 
-1. Advance physics and clocks.
-2. Apply pending world mutations and timed actions.
-3. Update vehicle state fact.
-4. Collect and route sensor events.
-5. Fire rules.
-6. Apply `DecisionContext` -> `DrivingDecision`.
-7. Actuate ego vehicle and produce snapshot.
+- `GET /api/simulation/state`
+- `GET /api/simulation/status`
 
-## Explanation module
+### Scenarios
 
-- `RuleRuntimeTraceListener` captures fired rules.
-- `WorkingMemoryTraceListener` captures insert/update/delete fact events.
-- `ExplanationTrace` stores timeline entries.
-- UI surfaces current decision reason, source rule, evidence, and working-memory snapshot.
+- `GET /api/scenarios`
+- `POST /api/scenarios/{id}/load`
 
-## Queries and live updates
+### World mutation
 
-- Query: `Current Driving Decision` in `src/main/resources/rules/queries.drl`.
-- LiveQuery integration in `KnowledgeSession` (`DecisionLiveQueryListener`) for UI update callbacks.
-- Tests use pseudo clock session without live query to keep deterministic lifecycle.
+- `POST /api/world/elements`
+- `PUT /api/world/elements/{id}`
+- `DELETE /api/world/elements/{id}`
+- `POST /api/world/actors`
+- `PUT /api/world/actors/{id}`
+- `DELETE /api/world/actors/{id}`
+
+### Environment
+
+- `POST /api/environment`
+
+### Drools / explanation
+
+- `GET /api/drools/working-memory`
+- `GET /api/drools/decision`
+- `GET /api/drools/rules/recent`
+- `GET /api/drools/timeline/recent`
+- `GET /api/explanations/recent`
+
+### Realtime stream
+
+- `GET /api/stream/snapshots` (Server-Sent Events)
+
+## Angular frontend structure
+
+Located in `frontend/`.
+
+```text
+frontend/src/app/
+  core/
+    api/
+    websocket/
+    models/
+    state/
+  simulation/
+    simulation-page/
+    road-canvas/
+    world-state/
+  scenario/
+    toolbox/
+    scenario-library/
+    element-properties/
+  telemetry/
+    speed-advisor/
+    sensors-panel/
+    vehicle-state/
+  expert-system/
+    decision-panel/
+    working-memory/
+    rule-timeline/
+    explanation-panel/
+  shared/
+    status-badge/
+    flow-stage/
+```
+
+## Running the project
+
+### Backend only (API + Drools + simulation)
+
+macOS/Linux:
+
+```bash
+mvn spring-boot:run
+```
+
+Windows (PowerShell):
+
+```powershell
+mvn spring-boot:run
+```
+
+### Frontend only
+
+macOS/Linux:
+
+```bash
+cd frontend
+npm install
+npm start
+```
+
+Windows (PowerShell):
+
+```powershell
+cd frontend
+npm install
+npm start
+```
+
+Frontend runs on `http://localhost:4200` and proxies `/api` to backend.
+
+### Full stack helper script (macOS/Linux)
+
+```bash
+./scripts/dev.sh
+```
+
+### Two-terminal alternative
+
+Terminal A:
+
+```bash
+mvn spring-boot:run
+```
+
+Terminal B:
+
+```bash
+cd frontend
+npm start
+```
+
+## Tests
+
+### Backend tests
+
+```bash
+mvn clean test
+```
+
+### Frontend unit tests
+
+```bash
+cd frontend
+npm test
+```
+
+### Frontend E2E (real backend required)
+
+1. Start backend (`mvn spring-boot:run`)
+2. Start frontend (`cd frontend && npm start`)
+3. Run E2E:
+
+```bash
+cd frontend
+npm run e2e
+```
+
+## JavaFX legacy UI
+
+The JavaFX interface remains available as a legacy/demo client:
+
+```bash
+mvn javafx:run
+```
+
+It is no longer the primary UI, but core simulation and Drools remain shared.
 
 ## Scenarios
 
-Defined in `src/main/resources/scenarios/scenarios.json`:
+Defined in `src/main/resources/scenarios/scenarios.json`.
 
 - `S1` Empty safe road
 - `S2` 90 to 50 speed limit
@@ -110,66 +282,22 @@ Defined in `src/main/resources/scenarios/scenarios.json`:
 - `S11B` Yield sign approach
 - `S12` Complex sequential scenario
 
-## How to run
+## Validation focus
 
-### Build
+Integration tests validate dynamic behavior end-to-end without injecting final decision facts:
 
-```bash
-mvn clean compile
-```
+- speed sign detection lifecycle,
+- TTC persistence and emergency response,
+- pedestrian dynamic insertion,
+- dynamic pothole insertion while running,
+- priority conflict (pedestrian safety over green-light progression),
+- weather mutation impact.
 
-### Test
+## Known limitations
 
-```bash
-mvn clean test
-```
-
-### Launch UI
-
-```bash
-mvn javafx:run
-```
-
-## Platform notes
-
-### macOS
-
-- Ensure JDK 17+ and Maven are installed.
-- JavaFX native modules are resolved by Maven (`javafx-maven-plugin`).
-- If macOS warns about native access in newer JDKs, the app can still start; warning is non-fatal in current setup.
-
-### Windows
-
-- Install JDK 17+ and Maven.
-- Run commands from PowerShell or Command Prompt in repository root.
-- If JavaFX runtime issues appear, ensure architecture-compatible JDK/JavaFX dependencies are used (Maven handles classifier resolution automatically in this project).
-
-## How to extend
-
-1. Add/adjust domain events or facts in `drools/events` and `drools/facts`.
-2. Update event declarations in `rules/00-declarations.drl`.
-3. Route new events via `EventRouter` entry points.
-4. Add state update logic in `rules/01-state-updates.drl` if needed.
-5. Add behavior rules in dedicated DRL files.
-6. Add unit and E2E tests.
-7. Optionally add scenario examples in `scenarios.json`.
-
-## Validation summary
-
-- Rule-level tests: `DrivingExpertSystemRulesTest`.
-- E2E simulation tests: `SimulationEngineE2ETest`.
-- Current suite size: 25 tests.
-
-Latest branch validation:
-
-- `mvn clean test` passed (`Tests run: 25, Failures: 0, Errors: 0`).
-
-## Limitations
-
-- JavaFX UI smoke validation is startup-only in non-interactive/headless CLI environments.
-- This project uses a simplified 1D/3-lane road model and does not model full vehicle dynamics.
-- Sensor models are deterministic/simplified and not calibrated against real-world hardware.
-- Rule conflict resolution is priority-based and does not include probabilistic uncertainty modeling.
+- SSE is used for realtime state streaming; WebSocket can be added later if bidirectional stream semantics are needed.
+- World model remains simplified (1D longitudinal movement + lane abstraction) for academic clarity.
+- JavaFX interaction is still manual in GUI environments; automated UI acceptance targets Angular.
 
 ## Diagrams
 

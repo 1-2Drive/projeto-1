@@ -1,0 +1,42 @@
+.panel {
+  background: #101a24;
+  border: 1px solid #223447;
+  border-radius: 0.6rem;
+  padding: 0.85rem;
+  color: #e5edf4;
+
+  h3 {
+    margin: 0 0 0.6rem;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #9fb4c8;
+  }
+
+  .decision-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    strong {
+      font-size: 1.05rem;
+      color: #f0f5fa;
+    }
+
+    .risk {
+      font-size: 0.72rem;
+      background: #28425a;
+      border: 1px solid #456888;
+      border-radius: 999px;
+      padding: 0.18rem 0.55rem;
+    }
+  }
+
+  .reason,
+  .rule {
+    margin: 0.5rem 0 0;
+    font-size: 0.78rem;
+    color: #c0d0de;
+    line-height: 1.35;
+  }
+}

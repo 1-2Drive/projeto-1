@@ -1,7 +1,7 @@
 package com.one2drive.projeto1.domain;
 
 public class Roundabout extends RoadStructure {
-    private final double recommendedApproachSpeedKmh;
+    private double recommendedApproachSpeedKmh;
 
     public Roundabout(double positionMeters, Lane lane, double recommendedApproachSpeedKmh) {
         super(positionMeters, lane);
@@ -10,6 +10,10 @@ public class Roundabout extends RoadStructure {
 
     public double getRecommendedApproachSpeedKmh() {
         return recommendedApproachSpeedKmh;
+    }
+
+    public void setRecommendedApproachSpeedKmh(double recommendedApproachSpeedKmh) {
+        this.recommendedApproachSpeedKmh = recommendedApproachSpeedKmh;
     }
 
     @Override

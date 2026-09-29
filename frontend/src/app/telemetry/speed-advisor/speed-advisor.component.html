@@ -1,0 +1,25 @@
+<section class="panel">
+  <h3>Speed Advisor</h3>
+  @if (snapshot(); as s) {
+    <div class="cards">
+      <article>
+        <span>Current</span>
+        <strong data-testid="speed-current">{{ s.speedAdvisor.currentKmh | number: '1.0-0' }}</strong>
+      </article>
+      <article>
+        <span>Limit</span>
+        <strong data-testid="speed-limit">{{ s.speedAdvisor.legalLimitKmh | number: '1.0-0' }}</strong>
+      </article>
+      <article>
+        <span>Recommended</span>
+        <strong data-testid="speed-recommended">{{ s.speedAdvisor.recommendedKmh | number: '1.0-0' }}</strong>
+      </article>
+      <article class="action">
+        <span>Action</span>
+        <strong data-testid="speed-action">{{ s.speedAdvisor.action }}</strong>
+      </article>
+    </div>
+  } @else {
+    <p>No speed recommendation.</p>
+  }
+</section>

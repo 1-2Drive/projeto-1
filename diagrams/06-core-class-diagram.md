@@ -9,7 +9,30 @@ classDiagram
       +setWeatherFactors(double,double)
       +addRoadElementAhead(...)
       +addActorAhead(...)
+      +updateRoadElementById(...)
+      +updateActorById(...)
+      +removeWorldObjectById(...)
     }
+
+    class SimulationRuntimeService {
+      +start()
+      +pause()
+      +resume()
+      +stop()
+      +reset()
+      +snapshot() ApiSimulationSnapshot
+    }
+
+    class RealtimeSnapshotPublisher {
+      +register() SseEmitter
+      +publish(ApiSimulationSnapshot)
+    }
+
+    class SimulationController
+    class WorldController
+    class ScenarioController
+    class DroolsController
+    class StreamController
 
     class KnowledgeSession {
       +getKieSession()
@@ -34,6 +57,12 @@ classDiagram
     class WorldState
     class DecisionActuator
 
+    SimulationController --> SimulationRuntimeService
+    WorldController --> SimulationRuntimeService
+    ScenarioController --> SimulationRuntimeService
+    DroolsController --> SimulationRuntimeService
+    StreamController --> RealtimeSnapshotPublisher
+    SimulationRuntimeService --> RealtimeSnapshotPublisher
     SimulationEngine --> KnowledgeSession
     SimulationEngine --> SensorManager
     SimulationEngine --> WorldState

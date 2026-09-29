@@ -1,0 +1,43 @@
+.panel {
+  background: #101a24;
+  border: 1px solid #223447;
+  border-radius: 0.6rem;
+  padding: 0.85rem;
+  color: #e5edf4;
+
+  h3 {
+    margin: 0 0 0.6rem;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #9fb4c8;
+  }
+
+  .sensor-list {
+    display: grid;
+    gap: 0.35rem;
+    max-height: 18rem;
+    overflow: auto;
+  }
+
+  .row {
+    display: grid;
+    grid-template-columns: 1fr;
+    background: #152534;
+    border: 1px solid #25465f;
+    border-radius: 0.35rem;
+    padding: 0.35rem 0.45rem;
+
+    span {
+      font-size: 0.68rem;
+      color: #8ea3b6;
+    }
+
+    strong {
+      font-size: 0.74rem;
+      color: #d5e1ec;
+      line-height: 1.35;
+      word-break: break-word;
+    }
+  }
+}

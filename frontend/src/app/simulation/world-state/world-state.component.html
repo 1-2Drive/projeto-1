@@ -1,0 +1,15 @@
+<section class="panel">
+  <h3>World State</h3>
+  @if (snapshot(); as s) {
+    <p><strong>Weather:</strong> {{ s.environment.weatherCondition }}</p>
+    <p><strong>Visibility:</strong> {{ s.environment.visibilityFactor | number: '1.2-2' }}</p>
+    <p><strong>Grip:</strong> {{ s.environment.gripFactor | number: '1.2-2' }}</p>
+
+    <h4>Objects</h4>
+    <ul>
+      @for (obj of s.worldObjects; track obj.id) {
+        <li>{{ obj.type }} · lane={{ obj.lane }} · rel={{ obj.positionMeters | number: '1.0-1' }}m</li>
+      }
+    </ul>
+  }
+</section>

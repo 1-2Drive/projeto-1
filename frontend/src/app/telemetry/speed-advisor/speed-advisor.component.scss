@@ -1,0 +1,44 @@
+.panel {
+  background: #101a24;
+  border: 1px solid #223447;
+  border-radius: 0.6rem;
+  padding: 0.85rem;
+  color: #e5edf4;
+
+  h3 {
+    margin: 0 0 0.6rem;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #9fb4c8;
+  }
+
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+
+    article {
+      background: #152534;
+      border-radius: 0.45rem;
+      padding: 0.5rem;
+      border: 1px solid #25465f;
+
+      span {
+        display: block;
+        color: #87a0b8;
+        font-size: 0.68rem;
+      }
+
+      strong {
+        display: block;
+        margin-top: 0.2rem;
+        font-size: 1.05rem;
+      }
+
+      &.action {
+        grid-column: span 2;
+      }
+    }
+  }
+}

@@ -1,7 +1,7 @@
 package com.one2drive.projeto1.domain;
 
 public class SpeedLimitSign extends TrafficSign {
-    private final int limitKmh;
+    private int limitKmh;
 
     public SpeedLimitSign(double positionMeters, Lane lane, int limitKmh) {
         super(positionMeters, lane);
@@ -10,6 +10,10 @@ public class SpeedLimitSign extends TrafficSign {
 
     public int getLimitKmh() {
         return limitKmh;
+    }
+
+    public void setLimitKmh(int limitKmh) {
+        this.limitKmh = limitKmh;
     }
 
     @Override

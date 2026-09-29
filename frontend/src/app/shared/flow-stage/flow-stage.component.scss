@@ -1,0 +1,28 @@
+.flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  font-family: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  font-size: 0.71rem;
+  letter-spacing: 0.04em;
+
+  .step {
+    padding: 0.2rem 0.44rem;
+    border-radius: 0.35rem;
+    background: #162230;
+    color: #95a8bb;
+    border: 1px solid #1f3142;
+
+    &.active {
+      color: #f7f9fb;
+      background: #315372;
+      border-color: #5a86b2;
+      box-shadow: 0 0 0.5rem rgba(90, 134, 178, 0.35);
+    }
+  }
+
+  .arrow {
+    color: #607488;
+  }
+}

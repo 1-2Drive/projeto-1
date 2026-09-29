@@ -2,10 +2,21 @@ package com.one2drive.projeto1.simulation;
 
 import com.one2drive.projeto1.config.SimulationConfig;
 import com.one2drive.projeto1.decision.DrivingDecision;
+import com.one2drive.projeto1.domain.Barrier;
+import com.one2drive.projeto1.domain.DynamicActor;
+import com.one2drive.projeto1.domain.Lane;
 import com.one2drive.projeto1.domain.LaneChangeDirection;
+import com.one2drive.projeto1.domain.Pothole;
+import com.one2drive.projeto1.domain.RoadElement;
+import com.one2drive.projeto1.domain.Roadworks;
+import com.one2drive.projeto1.domain.Roundabout;
+import com.one2drive.projeto1.domain.SpeedLimitSign;
+import com.one2drive.projeto1.domain.StaticObstacle;
+import com.one2drive.projeto1.domain.TrafficLight;
 import com.one2drive.projeto1.domain.WeatherCondition;
 import com.one2drive.projeto1.drools.events.AccelerationRequestEvent;
 import com.one2drive.projeto1.drools.KnowledgeSession;
+import com.one2drive.projeto1.drools.WorkingMemoryFactView;
 import com.one2drive.projeto1.drools.events.LaneChangeRequestEvent;
 import com.one2drive.projeto1.drools.facts.CurrentSpeedLimit;
 import com.one2drive.projeto1.drools.facts.VehicleStateFact;
@@ -16,7 +27,6 @@ import com.one2drive.projeto1.scenario.ScenarioDefinition;
 import com.one2drive.projeto1.scenario.ScenarioFactory;
 import com.one2drive.projeto1.scenario.ScenarioRoadElementDefinition;
 import com.one2drive.projeto1.scenario.ScenarioTimedAction;
-import com.one2drive.projeto1.scenario.ScenarioTimedActionType;
 import com.one2drive.projeto1.sensors.BlindSpotSensor;
 import com.one2drive.projeto1.sensors.CameraSensor;
 import com.one2drive.projeto1.sensors.EnvironmentSensor;
@@ -33,6 +43,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -243,18 +254,81 @@ public class SimulationEngine implements AutoCloseable {
         lastSensorValues.put(key, String.valueOf(event));
     }
 
+    private void enqueueWorldMutation(Runnable mutation) {
+        if (status == SimulationStatus.RUNNING) {
+            pendingWorldMutations.add(mutation);
+            return;
+        }
+        mutation.run();
+    }
+
     public synchronized void addRoadElementAhead(ScenarioRoadElementDefinition definition) {
         double base = worldState.getEgo().getPositionMeters();
         ScenarioRoadElementDefinition d = cloneRoadElement(definition);
         d.setPositionMeters(base + definition.getPositionMeters());
-        pendingWorldMutations.add(() -> worldState.addRoadElement(ScenarioFactory.createRoadElement(d)));
+        enqueueWorldMutation(() -> worldState.addRoadElement(ScenarioFactory.createRoadElement(d)));
+    }
+
+    public synchronized String addRoadElementAheadAndGetId(ScenarioRoadElementDefinition definition) {
+        double base = worldState.getEgo().getPositionMeters();
+        ScenarioRoadElementDefinition d = cloneRoadElement(definition);
+        d.setPositionMeters(base + definition.getPositionMeters());
+        RoadElement element = ScenarioFactory.createRoadElement(d);
+        enqueueWorldMutation(() -> worldState.addRoadElement(element));
+        return element.getId();
     }
 
     public synchronized void addActorAhead(ScenarioActorDefinition definition) {
         double base = worldState.getEgo().getPositionMeters();
         ScenarioActorDefinition d = cloneActor(definition);
         d.setPositionMeters(base + definition.getPositionMeters());
-        pendingWorldMutations.add(() -> worldState.addActor(ScenarioFactory.createActor(d)));
+        enqueueWorldMutation(() -> worldState.addActor(ScenarioFactory.createActor(d)));
+    }
+
+    public synchronized String addActorAheadAndGetId(ScenarioActorDefinition definition) {
+        double base = worldState.getEgo().getPositionMeters();
+        ScenarioActorDefinition d = cloneActor(definition);
+        d.setPositionMeters(base + definition.getPositionMeters());
+        DynamicActor actor = ScenarioFactory.createActor(d);
+        enqueueWorldMutation(() -> worldState.addActor(actor));
+        return actor.getId();
+    }
+
+    public synchronized boolean updateRoadElementById(String id, ScenarioRoadElementDefinition definition) {
+        Optional<RoadElement> maybeElement = worldState.findRoadElementById(id);
+        if (maybeElement.isEmpty()) {
+            return false;
+        }
+        RoadElement element = maybeElement.get();
+        enqueueWorldMutation(() -> applyRoadElementUpdate(element, definition));
+        return true;
+    }
+
+    public synchronized boolean updateActorById(String id, ScenarioActorDefinition definition) {
+        Optional<DynamicActor> maybeActor = worldState.findActorById(id);
+        if (maybeActor.isEmpty()) {
+            return false;
+        }
+        DynamicActor actor = maybeActor.get();
+        enqueueWorldMutation(() -> applyActorUpdate(actor, definition));
+        return true;
+    }
+
+    public synchronized boolean removeWorldObjectById(String id) {
+        boolean roadExists = worldState.findRoadElementById(id).isPresent();
+        boolean actorExists = worldState.findActorById(id).isPresent();
+        if (!roadExists && !actorExists) {
+            return false;
+        }
+        enqueueWorldMutation(() -> {
+            if (roadExists) {
+                worldState.removeRoadElementById(id);
+            }
+            if (actorExists) {
+                worldState.removeActorById(id);
+            }
+        });
+        return true;
     }
 
     private ScenarioRoadElementDefinition cloneRoadElement(ScenarioRoadElementDefinition src) {
@@ -280,7 +354,7 @@ public class SimulationEngine implements AutoCloseable {
     }
 
     public synchronized void setRain(boolean rain) {
-        pendingWorldMutations.add(() -> {
+        enqueueWorldMutation(() -> {
             if (rain) {
                 worldState.getWeatherState().setCondition(WeatherCondition.RAIN);
                 worldState.getWeatherState().setVisibilityFactor(0.7);
@@ -294,7 +368,7 @@ public class SimulationEngine implements AutoCloseable {
     }
 
     public synchronized void setWeatherFactors(double visibilityFactor, double gripFactor) {
-        pendingWorldMutations.add(() -> {
+        enqueueWorldMutation(() -> {
             worldState.getWeatherState().setVisibilityFactor(Math.max(0.2, Math.min(1.0, visibilityFactor)));
             worldState.getWeatherState().setGripFactor(Math.max(0.2, Math.min(1.0, gripFactor)));
             if (worldState.getWeatherState().getVisibilityFactor() < 0.95 || worldState.getWeatherState().getGripFactor() < 0.95) {
@@ -335,12 +409,87 @@ public class SimulationEngine implements AutoCloseable {
             legalLimit,
             currentDecision.getRecommendedSpeedKmh(),
             currentDecision.getAction().name(),
+            currentDecision.getRiskLevel().name(),
             currentDecision.getReason(),
             currentDecision.getSourceRule(),
             Map.copyOf(lastSensorValues),
             knowledgeSession.getInspector().snapshotFacts(),
             timeline
         );
+    }
+
+    private void applyRoadElementUpdate(RoadElement element, ScenarioRoadElementDefinition definition) {
+        if (definition.getLane() != null) {
+            element.setLane(definition.getLane());
+        }
+        double base = worldState.getEgo().getPositionMeters();
+        element.setPositionMeters(base + definition.getPositionMeters());
+
+        if (element instanceof SpeedLimitSign sign && definition.getSpeedLimitKmh() != null) {
+            sign.setLimitKmh(definition.getSpeedLimitKmh());
+        }
+        if (element instanceof Pothole pothole && definition.getSeverity() != null) {
+            pothole.setSeverity(definition.getSeverity());
+        }
+        if (element instanceof Roadworks roadworks && definition.getSeverity() != null) {
+            roadworks.setSeverity(definition.getSeverity());
+        }
+        if (element instanceof StaticObstacle obstacle && definition.getSeverity() != null) {
+            obstacle.setSeverity(definition.getSeverity());
+        }
+        if (element instanceof TrafficLight trafficLight && definition.getTrafficLightState() != null) {
+            trafficLight.setState(definition.getTrafficLightState());
+        }
+        if (element instanceof Barrier barrier && definition.getBarrierOpen() != null) {
+            barrier.setOpen(definition.getBarrierOpen());
+        }
+        if (element instanceof Roundabout roundabout && definition.getRoundaboutApproachSpeedKmh() != null) {
+            roundabout.setRecommendedApproachSpeedKmh(definition.getRoundaboutApproachSpeedKmh());
+        }
+    }
+
+    private void applyActorUpdate(DynamicActor actor, ScenarioActorDefinition definition) {
+        if (definition.getLane() != null) {
+            actor.setLane(definition.getLane());
+        }
+        double base = worldState.getEgo().getPositionMeters();
+        actor.setPositionMeters(base + definition.getPositionMeters());
+        actor.setSpeedMps(Math.max(0.0, definition.getSpeedKmh()) / 3.6);
+    }
+
+    public synchronized SimulationConfig getConfig() {
+        return config;
+    }
+
+    public synchronized List<WorkingMemoryFactView> getWorkingMemoryFactViews() {
+        return knowledgeSession.getInspector().snapshotFactViews();
+    }
+
+    public synchronized List<TimelineEntry> getTimelineEntries() {
+        return knowledgeSession.getTrace().snapshot();
+    }
+
+    public synchronized List<RoadRenderItem> getAllRoadItemsRelativeToEgo() {
+        double egoPos = worldState.getEgo().getPositionMeters();
+        List<RoadRenderItem> items = new ArrayList<>();
+
+        worldState.getRoadElements().forEach(element -> items.add(new RoadRenderItem(
+            element.getClass().getSimpleName(),
+            element.getId(),
+            element.getPositionMeters() - egoPos,
+            element.getLane().name(),
+            element.toString()
+        )));
+
+        worldState.getActors().forEach(actor -> items.add(new RoadRenderItem(
+            actor.getClass().getSimpleName(),
+            actor.getId(),
+            actor.getPositionMeters() - egoPos,
+            actor.getLane().name(),
+            actor.toString()
+        )));
+
+        return items;
     }
 
     public synchronized WorldState getWorldState() {

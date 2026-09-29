@@ -1,5 +1,16 @@
 ```mermaid
 flowchart TD
+    WORLD[WorldState objects] --> SENSORS[SensorManager]
+    SENSORS --> SPEED
+    SENSORS --> FRONT
+    SENSORS --> PEDESTRIAN
+    SENSORS --> LANE_OCC
+    SENSORS --> SIGNS
+    SENSORS --> HAZARDS
+    SENSORS --> TL
+    SENSORS --> WEATHER
+    SENSORS --> LOW_ENV
+
     SPEED[VehicleSpeedEvent] --> VEHICLE_STREAM
     FRONT[FrontDistanceEvent / RelativeSpeedEvent / TTCEvent] --> PERCEPTION_STREAM
     PEDESTRIAN[PedestrianDetectedEvent] --> PERCEPTION_STREAM

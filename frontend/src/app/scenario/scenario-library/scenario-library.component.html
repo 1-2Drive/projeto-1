@@ -1,0 +1,13 @@
+<section class="panel">
+  <h3>Prebuilt Scenarios</h3>
+  <ul>
+    @for (scenario of scenarios(); track scenario.id) {
+      <li>
+        <button type="button" (click)="loadScenario.emit(scenario.id)">
+          <strong>{{ scenario.id }}</strong>
+          <span>{{ scenario.name }}</span>
+        </button>
+      </li>
+    }
+  </ul>
+</section>

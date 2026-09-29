@@ -1,0 +1,145 @@
+:host {
+  display: block;
+}
+
+.page {
+  min-height: 100vh;
+  padding: 1rem;
+  background: linear-gradient(145deg, #0d141d 0%, #15212d 55%, #1c2d3f 100%);
+  color: #ecf3f9;
+  font-family: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  display: grid;
+  gap: 0.8rem;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+.top {
+  border: 1px solid #2f4459;
+  border-radius: 0.75rem;
+  background: rgba(10, 18, 27, 0.82);
+  padding: 0.8rem 1rem;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.7rem 1rem;
+  align-items: center;
+
+  .title {
+    h1 {
+      margin: 0;
+      font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
+      font-size: 1.12rem;
+      letter-spacing: 0.03em;
+      color: #f4fbff;
+    }
+
+    p {
+      margin: 0.2rem 0 0;
+      color: #9fb4c8;
+      font-size: 0.82rem;
+    }
+  }
+
+  .status-row {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .controls {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+
+    button {
+      background: #20384b;
+      border: 1px solid #3d6280;
+      color: #eaf4ff;
+      border-radius: 0.35rem;
+      padding: 0.35rem 0.6rem;
+      font-size: 0.75rem;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+
+      &:hover {
+        background: #2a4a63;
+      }
+    }
+  }
+}
+
+.error {
+  border: 1px solid #8f4040;
+  border-radius: 0.45rem;
+  background: rgba(143, 64, 64, 0.2);
+  padding: 0.45rem 0.6rem;
+  color: #ffc4c4;
+  font-size: 0.78rem;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(18rem, 22rem) minmax(0, 1fr) minmax(18rem, 22rem);
+  gap: 0.75rem;
+  min-height: 28rem;
+}
+
+.left,
+.right {
+  display: grid;
+  gap: 0.65rem;
+  align-content: start;
+}
+
+.center {
+  min-width: 0;
+}
+
+.bottom {
+  border: 1px solid #2b3f52;
+  border-radius: 0.7rem;
+  padding: 0.55rem;
+  background: rgba(11, 19, 28, 0.86);
+
+  .tabs {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+
+    button {
+      background: #162836;
+      border: 1px solid #34526a;
+      color: #d9e7f4;
+      border-radius: 0.35rem;
+      padding: 0.3rem 0.55rem;
+      font-size: 0.73rem;
+      cursor: pointer;
+
+      &.active {
+        background: #295171;
+        border-color: #5a86b2;
+      }
+    }
+  }
+
+  .tab-content {
+    margin-top: 0.6rem;
+  }
+}
+
+@media (max-width: 1320px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}

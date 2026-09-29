@@ -1,0 +1,11 @@
+<section class="panel">
+  <h3>Vehicle</h3>
+  @if (snapshot(); as s) {
+    <div class="kv"><span>Speed</span><strong>{{ s.egoVehicle.speedKmh | number: '1.0-1' }} km/h</strong></div>
+    <div class="kv"><span>Lane</span><strong>{{ s.egoVehicle.lane }}</strong></div>
+    <div class="kv"><span>Position</span><strong>{{ s.egoVehicle.positionMeters | number: '1.0-1' }} m</strong></div>
+    <div class="kv"><span>Acceleration</span><strong>{{ s.egoVehicle.accelerationMps2 | number: '1.1-2' }} m/s²</strong></div>
+  } @else {
+    <p>No data.</p>
+  }
+</section>

@@ -1,0 +1,15 @@
+<section class="panel">
+  <h3>Sensors</h3>
+  @if (snapshot(); as s) {
+    <div class="sensor-list">
+      @for (entry of s.sensorReadings | keyvalue; track entry.key) {
+        <div class="row">
+          <span>{{ entry.key }}</span>
+          <strong>{{ entry.value }}</strong>
+        </div>
+      }
+    </div>
+  } @else {
+    <p>Awaiting sensor data.</p>
+  }
+</section>

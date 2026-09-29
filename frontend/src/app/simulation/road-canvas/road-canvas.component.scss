@@ -1,0 +1,112 @@
+.road-shell {
+  position: relative;
+  height: 24rem;
+  border-radius: 0.75rem;
+  border: 1px solid #2b3b4b;
+  background: radial-gradient(circle at 20% 20%, #1b2a39 0%, #10171f 60%, #0b1016 100%);
+  overflow: hidden;
+
+  .road-grid {
+    position: absolute;
+    inset: 1rem;
+    background: #2a3948;
+    border-radius: 0.65rem;
+    border: 1px solid #4d5f71;
+  }
+
+  .lane {
+    position: absolute;
+    left: 0;
+    right: 0;
+    border-top: 2px dashed rgba(240, 247, 255, 0.35);
+
+    &.lane-top {
+      top: 33%;
+    }
+
+    &.lane-mid {
+      top: 66%;
+    }
+
+    &.lane-bottom {
+      display: none;
+    }
+  }
+
+  .ego {
+    position: absolute;
+    left: 22%;
+    transform: translate(-50%, -50%);
+    width: 3.2rem;
+    height: 1.5rem;
+    border-radius: 0.35rem;
+    border: 2px solid #f2c274;
+    background: linear-gradient(180deg, #eaa53f 0%, #ce8031 100%);
+    box-shadow: 0 0 1.25rem rgba(242, 194, 116, 0.45);
+  }
+
+  .item {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    min-width: 2rem;
+    height: 1.2rem;
+    border-radius: 0.35rem;
+    border: 1px solid #2e4559;
+    color: #f4fbff;
+    font-size: 0.62rem;
+    letter-spacing: 0.02em;
+    display: grid;
+    place-content: center;
+    padding: 0 0.2rem;
+
+    &.vehicle {
+      background: #357aa8;
+    }
+
+    &.pedestrian {
+      background: #b45d53;
+      border-radius: 50%;
+      width: 1.4rem;
+      min-width: 1.4rem;
+      height: 1.4rem;
+    }
+
+    &.sign {
+      background: #2e8f76;
+    }
+
+    &.control {
+      background: #8570c1;
+    }
+
+    &.hazard {
+      background: #8f6730;
+    }
+
+    &.structure {
+      background: #5b7386;
+    }
+  }
+
+  .sensor {
+    position: absolute;
+    left: 22%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    pointer-events: none;
+  }
+
+  .sensor-camera {
+    top: 50%;
+    width: 35%;
+    aspect-ratio: 1 / 1;
+    border: 1px dashed rgba(95, 178, 198, 0.45);
+  }
+
+  .sensor-radar {
+    top: 50%;
+    width: 28%;
+    aspect-ratio: 1 / 1;
+    border: 1px dashed rgba(160, 226, 179, 0.4);
+  }
+}

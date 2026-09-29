@@ -1,0 +1,31 @@
+<section class="panel">
+  <div class="head">
+    <h3>Working Memory</h3>
+    <input type="text" placeholder="Filter facts" (input)="setFilter($any($event.target).value)" />
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+      <tr>
+        <th>TYPE</th>
+        <th>VALUE</th>
+        <th>SOURCE</th>
+        <th>TIMESTAMP</th>
+        <th>STREAM</th>
+      </tr>
+      </thead>
+      <tbody>
+        @for (row of visibleRows(); track row.type + row.value + row.timestamp) {
+          <tr>
+            <td>{{ row.type }}</td>
+            <td class="value">{{ row.value }}</td>
+            <td>{{ row.source }}</td>
+            <td>{{ row.timestamp ?? '-' }}</td>
+            <td>{{ row.stream }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</section>

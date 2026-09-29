@@ -1,0 +1,13 @@
+<section class="panel">
+  <h3>Current Decision</h3>
+  @if (snapshot(); as s) {
+    <div class="decision-line">
+      <strong data-testid="decision-action">{{ s.currentDecision.action }}</strong>
+      <span class="risk">{{ s.currentDecision.riskLevel }}</span>
+    </div>
+    <p class="reason">{{ s.currentDecision.reason }}</p>
+    <p class="rule">Rule: {{ s.currentDecision.sourceRule }}</p>
+  } @else {
+    <p>Decision unavailable.</p>
+  }
+</section>

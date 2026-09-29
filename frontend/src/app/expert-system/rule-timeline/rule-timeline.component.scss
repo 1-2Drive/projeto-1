@@ -1,0 +1,49 @@
+.panel {
+  background: #0e1721;
+  border: 1px solid #223447;
+  border-radius: 0.6rem;
+  padding: 0.7rem;
+  color: #dbe8f4;
+  height: 100%;
+
+  h3 {
+    margin: 0 0 0.65rem;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    color: #9fb4c8;
+    letter-spacing: 0.06em;
+  }
+
+  .timeline {
+    max-height: 15.5rem;
+    overflow: auto;
+    display: grid;
+    gap: 0.45rem;
+
+    article {
+      border: 1px solid #1f3142;
+      border-radius: 0.45rem;
+      background: #132233;
+      padding: 0.4rem 0.55rem;
+      display: grid;
+      gap: 0.25rem;
+
+      time {
+        font-size: 0.66rem;
+        color: #8ea7bb;
+      }
+
+      strong {
+        font-size: 0.72rem;
+        color: #d7e5f2;
+      }
+
+      p {
+        margin: 0;
+        font-size: 0.72rem;
+        color: #bacbd9;
+        line-height: 1.25;
+      }
+    }
+  }
+}

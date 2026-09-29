@@ -1,0 +1,84 @@
+<main class="page">
+  <header class="top">
+    <div class="title">
+      <h1>Intelligent Driving Decision Support System</h1>
+      <p>Simulation {{ simulationSeconds() }}s · {{ snapshot()?.status ?? 'STOPPED' }}</p>
+    </div>
+
+    <div class="status-row">
+      <div data-testid="backend-status">
+        <app-status-badge label="Backend" [connected]="vm().connection.backendConnected" />
+      </div>
+      <app-status-badge label="Drools" [connected]="vm().connection.droolsActive" connectedText="ACTIVE" />
+      <app-status-badge
+        label="Simulation"
+        [connected]="(snapshot()?.status ?? 'STOPPED') === 'RUNNING'"
+        connectedText="RUNNING"
+        disconnectedText="STOPPED"
+      />
+      <span data-testid="simulation-status" class="sr-only">{{ snapshot()?.status ?? 'STOPPED' }}</span>
+    </div>
+
+    <div class="controls">
+      <button data-testid="start-btn" type="button" (click)="start()">START</button>
+      <button data-testid="pause-btn" type="button" (click)="pause()">PAUSE</button>
+      <button data-testid="resume-btn" type="button" (click)="resume()">RESUME</button>
+      <button data-testid="stop-btn" type="button" (click)="stop()">STOP</button>
+      <button data-testid="reset-btn" type="button" (click)="reset()">RESET</button>
+    </div>
+  </header>
+
+  <app-flow-stage [activeStage]="snapshot()?.activeStage ?? 'WORLD'" />
+
+  @if (vm().error) {
+    <aside class="error" data-testid="ui-error">{{ vm().error }}</aside>
+  }
+
+  <section class="layout">
+    <aside class="left">
+      <app-toolbox
+        (createRoadElement)="addRoadElement($event)"
+        (createActor)="addActor($event)"
+        (updateEnvironment)="updateEnvironment($event)"
+      />
+      <app-scenario-library [scenarios]="scenarios()" (loadScenario)="loadScenario($event)" />
+    </aside>
+
+    <section class="center">
+      <app-road-canvas [snapshot]="snapshot()" />
+    </section>
+
+    <aside class="right">
+      <app-vehicle-state [snapshot]="snapshot()" />
+      <app-speed-advisor [snapshot]="snapshot()" />
+      <app-decision-panel [snapshot]="snapshot()" />
+      <app-sensors-panel [snapshot]="snapshot()" />
+    </aside>
+  </section>
+
+  <section class="bottom">
+    <nav class="tabs">
+      <button [class.active]="activeTab() === 'timeline'" (click)="setTab('timeline')">Inference Timeline</button>
+      <button [class.active]="activeTab() === 'memory'" (click)="setTab('memory')">Working Memory</button>
+      <button [class.active]="activeTab() === 'explanation'" (click)="setTab('explanation')">Explanation</button>
+      <button [class.active]="activeTab() === 'world'" (click)="setTab('world')">World State</button>
+    </nav>
+
+    <div class="tab-content">
+      @switch (activeTab()) {
+        @case ('timeline') {
+          <app-rule-timeline [snapshot]="snapshot()" />
+        }
+        @case ('memory') {
+          <app-working-memory [snapshot]="snapshot()" />
+        }
+        @case ('explanation') {
+          <app-explanation-panel [snapshot]="snapshot()" />
+        }
+        @case ('world') {
+          <app-world-state [snapshot]="snapshot()" />
+        }
+      }
+    </div>
+  </section>
+</main>

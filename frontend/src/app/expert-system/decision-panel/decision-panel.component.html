@@ -1,17 +1,42 @@
-<section class="panel">
-  <h3>Current Decision</h3>
-  @if (snapshot(); as s) {
-    <div class="decision-line" [class.emergency]="s.currentDecision.action === 'EMERGENCY_BRAKE' || s.currentDecision.action === 'STOP'">
-      <strong data-testid="decision-action">{{ s.currentDecision.action }}</strong>
-      <span class="risk" [class]="'risk ' + riskClass()">{{ s.currentDecision.riskLevel }}</span>
+@if (decision(); as d) {
+  <section class="decision" [class]="'decision decision--' + tone()" data-testid="decision-panel">
+    <header class="decision__head">
+      <span class="decision__source">Drools · KieSession</span>
+      <span class="risk" [class]="'risk ' + riskClass()" data-testid="decision-risk">{{ d.riskLevel }}</span>
+    </header>
+
+    <div class="decision__main">
+      <span class="decision__eyebrow">Current action</span>
+      <strong class="decision__action" data-testid="decision-action">{{ d.action }}</strong>
     </div>
-    <div class="kvs">
-      <p><span>Recommended</span> <strong>{{ s.currentDecision.recommendedSpeedKmh | number: '1.0-0' }} km/h</strong></p>
-      <p><span>Source</span> <strong>Drools / KieSession</strong></p>
-      <p><span>Rule</span> <strong>{{ s.currentDecision.sourceRule }}</strong></p>
+
+    <div class="decision__grid">
+      <div class="cell">
+        <span>Recommended</span>
+        <strong data-testid="decision-recommended">{{ d.recommendedSpeedKmh | number: '1.0-0' }} <em>km/h</em></strong>
+      </div>
+      <div class="cell">
+        <span>Gap to current</span>
+        <strong [class.negative]="speedGapKmh() > 0">
+          {{ speedGapKmh() > 0 ? '+' : '' }}{{ speedGapKmh() | number: '1.0-1' }} <em>km/h</em>
+        </strong>
+      </div>
     </div>
-    <p class="reason">{{ s.currentDecision.reason }}</p>
-  } @else {
-    <p>Decision unavailable.</p>
+
+    <p class="decision__reason">{{ d.reason }}</p>
+
+    <footer class="decision__foot">
+      <span class="decision__rule" title="Fired Drools rule">{{ d.sourceRule }}</span>
+    </footer>
+  </section>
+
+  @if (!hasDecision()) {
+    <p class="hint">Press <strong>START</strong> to let the rule base reach its first decision.</p>
   }
-</section>
+} @else {
+  <section class="decision decision--idle">
+    <span class="decision__eyebrow">Current action</span>
+    <strong class="decision__action decision__action--idle">AWAITING_DECISION</strong>
+    <p class="hint">Waiting for the first Drools activation.</p>
+  </section>
+}

@@ -1,24 +1,52 @@
-<section class="panel">
-  <h3>Explanation</h3>
-  @if (snapshot(); as s) {
-    <div class="box">
-      <div class="line"><span>DECISION</span><strong>{{ s.currentDecision.action }}</strong></div>
-      <div class="line"><span>WHY</span><strong>{{ s.currentDecision.reason }}</strong></div>
-      <div class="line"><span>RULE</span><strong>{{ s.currentDecision.sourceRule }}</strong></div>
-       @if (s.currentDecision.evidence.length > 0) {
-         <div class="line"><span>EVIDENCE</span><strong>{{ s.currentDecision.evidence.length }} observation(s)</strong></div>
-       }
-      <div class="line"><span>RESULT</span><strong>{{ s.currentDecision.action }}</strong></div>
-      @if (s.currentDecision.evidence.length > 0) {
-        <h4>Evidence</h4>
-        <ul>
-          @for (line of s.currentDecision.evidence; track line) {
+@if (decision(); as d) {
+  <section class="why" data-testid="explanation-panel">
+    <header class="why__head">
+      <h3>Explanation</h3>
+      <span class="why__count">{{ evidence().length }} evidence item(s)</span>
+    </header>
+
+    <div class="chain">
+      <div class="step step--decision">
+        <span class="step__index">1</span>
+        <div class="step__body">
+          <span class="step__label">Decision</span>
+          <strong data-testid="explanation-action">{{ d.action }}</strong>
+        </div>
+      </div>
+
+      <div class="step">
+        <span class="step__index">2</span>
+        <div class="step__body">
+          <span class="step__label">Why</span>
+          <p class="step__text">{{ d.reason }}</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <span class="step__index">3</span>
+        <div class="step__body">
+          <span class="step__label">Fired rule</span>
+          <code class="step__code">{{ d.sourceRule }}</code>
+        </div>
+      </div>
+    </div>
+
+    @if (hasEvidence()) {
+      <div class="evidence">
+        <span class="evidence__title">Evidence used</span>
+        <ol class="evidence__list">
+          @for (line of evidence(); track line) {
             <li>{{ line }}</li>
           }
-        </ul>
-      }
-    </div>
-  } @else {
-    <p>No explanation available.</p>
-  }
-</section>
+        </ol>
+      </div>
+    } @else {
+      <p class="empty">No evidence recorded for this decision yet.</p>
+    }
+  </section>
+} @else {
+  <section class="why">
+    <header class="why__head"><h3>Explanation</h3></header>
+    <p class="empty">Waiting for the first decision.</p>
+  </section>
+}

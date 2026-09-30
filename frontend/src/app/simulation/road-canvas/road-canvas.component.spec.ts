@@ -44,6 +44,13 @@ describe('RoadCanvasComponent', () => {
       detectedObjectIds: ['a'],
       cameraDetectedObjectIds: ['a'],
       radarDetectedObjectIds: [],
+      sensorRanges: {
+        cameraRangeMeters: 120,
+        radarRangeMeters: 80,
+        blindSpotRangeMeters: 25,
+        cameraRateMillis: 200,
+        radarRateMillis: 100
+      },
       demoPhases: []
     });
 
@@ -51,6 +58,6 @@ describe('RoadCanvasComponent', () => {
 
     const text = fixture.nativeElement.textContent;
     expect(text).toContain('50');
-    expect(text).toContain('35m');
+    expect(text).toContain('35 m');
   });
 });

@@ -1,15 +1,50 @@
-<section class="panel">
-  <h3>Sensors</h3>
-  @if (snapshot(); as s) {
-    <div class="sensor-list">
-      @for (entry of sensorRows(); track entry.key) {
-        <div class="row">
-          <span>{{ formatLabel(entry.key) }}</span>
-          <strong>{{ entry.value }}</strong>
+<section class="panel" data-testid="sensors-panel">
+  <header class="panel__head">
+    <h3>Sensors</h3>
+    <span class="panel__meta">live facts</span>
+  </header>
+
+  @if (sensorRows().length > 0) {
+    <div class="facts">
+      @for (row of sensorRows(); track row.key) {
+        <div class="fact">
+          <span class="fact__label">{{ row.label }}</span>
+          <strong class="fact__value">{{ row.value }}</strong>
         </div>
+      } @empty {
+        <p class="empty">No sensor fact in working memory yet.</p>
       }
     </div>
   } @else {
-    <p>Awaiting sensor data.</p>
+    <p class="empty">Awaiting sensor data.</p>
+  }
+
+  @if (ranges(); as r) {
+    <div class="ranges">
+      <span class="ranges__title">Configured ranges</span>
+      <div class="ranges__grid">
+        <div class="range range--camera">
+          <span>Camera</span>
+          <strong>{{ r.cameraRangeMeters | number: '1.0-0' }} m</strong>
+          <em>{{ r.cameraRateMillis }} ms</em>
+        </div>
+        <div class="range range--radar">
+          <span>Radar</span>
+          <strong>{{ r.radarRangeMeters | number: '1.0-0' }} m</strong>
+          <em>{{ r.radarRateMillis }} ms</em>
+        </div>
+        <div class="range range--blind">
+          <span>Blind spot</span>
+          <strong>{{ r.blindSpotRangeMeters | number: '1.0-0' }} m</strong>
+          <em>side</em>
+        </div>
+      </div>
+
+      <div class="detections">
+        <span class="detections__tag detections__tag--camera">CAM {{ cameraDetections().length }}</span>
+        <span class="detections__tag detections__tag--radar">RADAR {{ radarDetections().length }}</span>
+        <span class="detections__tag detections__tag--all">TRACKED {{ trackedDetections().length }}</span>
+      </div>
+    </div>
   }
 </section>

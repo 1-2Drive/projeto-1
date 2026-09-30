@@ -15,6 +15,7 @@ import com.one2drive.projeto1.domain.SpeedLimitSign;
 import com.one2drive.projeto1.domain.StaticObstacle;
 import com.one2drive.projeto1.domain.TrafficLight;
 import com.one2drive.projeto1.domain.WeatherCondition;
+import com.one2drive.projeto1.drools.FactDescription;
 import com.one2drive.projeto1.drools.events.AccelerationRequestEvent;
 import com.one2drive.projeto1.drools.events.BarrierDetectedEvent;
 import com.one2drive.projeto1.drools.events.FrontDistanceEvent;
@@ -219,7 +220,7 @@ public class SimulationEngine implements AutoCloseable {
         List<Object> events = sensorManager.observe(worldState, simTimeMillis);
         knowledgeSession.getDecisionContext().beginCycle(simTimeMillis, worldState.getEgo().getSpeedKmh());
         for (Object event : events) {
-            knowledgeSession.getTrace().add(simTimeMillis, TimelineEntryType.SENSOR, "SENSOR " + event);
+            knowledgeSession.getTrace().add(simTimeMillis, TimelineEntryType.SENSOR, "SENSOR " + FactDescription.describe(event));
             knowledgeSession.getRouter().insertEvent(event);
             updateSensorPanel(event);
             recordDetectedObject(event);
@@ -303,7 +304,7 @@ public class SimulationEngine implements AutoCloseable {
 
     private void updateSensorPanel(Object event) {
         String key = event.getClass().getSimpleName();
-        lastSensorValues.put(key, String.valueOf(event));
+        lastSensorValues.put(key, FactDescription.describe(event));
     }
 
     private void recordDetectedObject(Object event) {

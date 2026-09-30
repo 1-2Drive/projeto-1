@@ -1,40 +1,256 @@
-<section class="road-shell">
-  <div class="road-grid" aria-hidden="true">
-    <div class="lane-fill"></div>
-    <div class="lane-divider lane-1"></div>
-    <div class="lane-divider lane-2"></div>
-    <div class="direction direction-left">LEFT</div>
-    <div class="direction direction-center">CENTER</div>
-    <div class="direction direction-right">RIGHT</div>
+<section class="road" [class.road--running]="running()">
+
+  <!-- ============ roadside ============ -->
+  <div class="verdicts" aria-hidden="true">
+    <div class="verdict verdict--top"></div>
+    <div class="verdict verdict--bottom"></div>
   </div>
 
-  <div class="sensor-zone camera-zone" aria-hidden="true"></div>
-  <div class="sensor-zone radar-zone" aria-hidden="true"></div>
-  <div class="sensor-zone blind-left" aria-hidden="true"></div>
-  <div class="sensor-zone blind-right" aria-hidden="true"></div>
-
-  <div class="ego" [style.top.%]="egoLaneY()" data-testid="road-ego">
-    <span>EGO</span>
+  <!-- ============ road surface ============ -->
+  <div class="surface" aria-hidden="true">
+    <div class="surface__asphalt"></div>
+    <div class="surface__edge surface__edge--top"></div>
+    <div class="surface__edge surface__edge--bottom"></div>
+    <div class="surface__lane surface__lane--1"></div>
+    <div class="surface__lane surface__lane--2"></div>
   </div>
 
-  @for (item of renderItems(); track item.id) {
+  <!-- ============ lane direction ============ -->
+  <div class="chevrons" aria-hidden="true">
+    @for (lane of laneLabels; track lane.lane) {
+      @for (offset of [-10, 18, 46, 74]; track offset) {
+        <svg class="chevron" [style.top.%]="lane.y" [style.left.%]="offset + 40" viewBox="0 0 12 20">
+          <path d="M2 2 L10 10 L2 18" fill="none" stroke="currentColor" stroke-width="2.2"
+                stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      }
+    }
+  </div>
+
+  <!-- ============ distance scale ============ -->
+  <div class="scale" aria-hidden="true">
+    @for (m of distanceTicks; track m) {
+      <div class="scale__tick" [style.left.%]="tickPercent(m)">
+        <span>{{ m }} m</span>
+      </div>
+    }
+  </div>
+
+  <!-- ============ sensor fields of view ============ -->
+  <div class="sensors" aria-hidden="true">
+    <div class="sensor-zone sensor-zone--radar"
+         [style.left.%]="egoXPercent()"
+         [style.width.%]="radarEdgePercent() - egoXPercent()"></div>
+    <div class="sensor-zone sensor-zone--camera"
+         [style.left.%]="egoXPercent()"
+         [style.width.%]="cameraEdgePercent() - egoXPercent()"></div>
+    <div class="sensor-zone sensor-zone--blind sensor-zone--blind-left"
+         [style.left.%]="egoXPercent()"
+         [style.width.%]="toPercentX(ranges().blindSpotRangeMeters) - egoXPercent()"></div>
+    <div class="sensor-zone sensor-zone--blind sensor-zone--blind-right"
+         [style.left.%]="egoXPercent()"
+         [style.width.%]="toPercentX(ranges().blindSpotRangeMeters) - egoXPercent()"></div>
+
+    <div class="sensor-edge sensor-edge--camera" [style.left.%]="cameraEdgePercent()">
+      <span class="sensor-edge__label"
+            [class.sensor-edge__label--flip]="cameraEdgePercent() > 62">CAMERA {{ ranges().cameraRangeMeters | number: '1.0-0' }} m</span>
+    </div>
+    <div class="sensor-edge sensor-edge--radar" [style.left.%]="radarEdgePercent()">
+      <span class="sensor-edge__label"
+            [class.sensor-edge__label--flip]="radarEdgePercent() > 62">RADAR {{ ranges().radarRangeMeters | number: '1.0-0' }} m</span>
+    </div>
+  </div>
+
+  <!-- ============ lane names ============ -->
+  <div class="lanes" aria-hidden="true">
+    @for (lane of laneLabels; track lane.lane) {
+      <span class="lane-tag" [style.top.%]="lane.y">{{ lane.lane }}</span>
+    }
+  </div>
+
+  <!-- ============ ego vehicle ============ -->
+  <div class="ego" [style.left.%]="egoXPercent()" [style.top.%]="egoYPercent()" data-testid="road-ego">
+    <svg class="car car--ego" viewBox="0 0 120 56" role="img" aria-label="Ego vehicle">
+      <defs>
+        <linearGradient id="egoBody" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#ffd98a" />
+          <stop offset="45%" stop-color="#f0b95a" />
+          <stop offset="100%" stop-color="#c98c34" />
+        </linearGradient>
+        <linearGradient id="egoGlass" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#20415c" />
+          <stop offset="100%" stop-color="#0d1c2b" />
+        </linearGradient>
+      </defs>
+
+      <ellipse class="car__shadow" cx="60" cy="30" rx="56" ry="23" />
+
+      <g class="car__wheels">
+        <rect x="82" y="1" width="24" height="11" rx="4" />
+        <rect x="82" y="44" width="24" height="11" rx="4" />
+        <rect x="16" y="1" width="24" height="11" rx="4" />
+        <rect x="16" y="44" width="24" height="11" rx="4" />
+      </g>
+
+      <path class="car__body" fill="url(#egoBody)" d="
+        M4,28 C4,18 10,11 21,9 L95,9 C109,9 117,17 117,28
+        C117,39 109,47 95,47 L21,47 C10,47 4,38 4,28 Z" />
+
+      <g class="car__mirrors">
+        <path d="M78,7 h10 a3,3 0 0 1 0,5 h-10 z" />
+        <path d="M78,44 h10 a3,3 0 0 0 0,5 h-10 z" />
+      </g>
+
+      <g class="car__glass" fill="url(#egoGlass)">
+        <path d="M88,14 C96,16 101,21 103,28 C101,35 96,40 88,42 Z" />
+        <path d="M52,15 L82,15 C84,15 85,16 85,18 L85,38 C85,40 84,41 82,41 L52,41 C50,41 49,40 49,38 L49,18 C49,16 50,15 52,15 Z" />
+        <path d="M36,16 L47,16 C48,16 49,17 49,18 L49,38 C49,39 48,40 47,40 L36,40 C34,40 33,39 33,38 L33,18 C33,17 34,16 36,16 Z" />
+      </g>
+
+      <path class="car__gloss" d="M22,12 L94,12 C103,12 110,17 112,22" />
+      <path class="car__sill" d="M24,44 L94,44" />
+
+      <g class="car__headlights">
+        <path d="M104,15 C110,17 114,21 115,25 L107,24 C106,20 105,17 104,15 Z" />
+        <path d="M104,41 C110,39 114,35 115,31 L107,32 C106,36 105,39 104,41 Z" />
+      </g>
+      <g class="car__taillights">
+        <path d="M6,17 C9,15 12,14 16,13 L16,20 C12,21 9,22 6,23 Z" />
+        <path d="M6,39 C9,41 12,42 16,43 L16,36 C12,35 9,34 6,33 Z" />
+      </g>
+    </svg>
+    <span class="ego__label">EGO</span>
+  </div>
+
+  <!-- ============ world objects ============ -->
+  @for (item of items(); track item.id) {
     <div
-      class="item"
-      [class]="'item ' + item.typeClass"
-      [class.detected-camera]="item.detectedByCamera"
-      [class.detected-radar]="item.detectedByRadar"
-      [style.left.%]="item.x"
-      [style.top.%]="item.y"
-      [attr.aria-label]="item.kind + ' at ' + item.relativeMeters.toFixed(1) + ' meters'"
+      class="obj"
+      [class]="'obj obj--' + item.kind"
+      [class.obj--detected]="item.detectedByCamera || item.detectedByRadar"
+      [class.obj--camera]="item.detectedByCamera"
+      [class.obj--radar]="item.detectedByRadar"
+      [attr.data-state]="item.state"
+      [style.left.%]="item.xPercent"
+      [style.top.%]="item.yPercent"
+      [attr.aria-label]="item.ariaLabel"
+      [attr.data-testid]="'obj-' + item.kind"
     >
-      <span class="tag">{{ item.label }}</span>
-      <span class="distance" *ngIf="shouldUseDetail(item)">{{ item.relativeMeters | number: '1.0-0' }}m</span>
+      @switch (item.kind) {
+        @case ('speedLimit') {
+          <svg class="sign sign--speed" viewBox="0 0 40 40" role="img">
+            <circle class="sign__disc" cx="20" cy="20" r="19" />
+            <circle class="sign__ring" cx="20" cy="20" r="15.5" />
+            <text class="sign__value" x="20" y="20">{{ item.label }}</text>
+          </svg>
+        }
+        @case ('stopSign') {
+          <svg class="sign sign--stop" viewBox="0 0 40 40" role="img">
+            <polygon class="sign__disc" points="20,1.5 37,10 37,30 20,38.5 3,30 3,10" />
+            <text class="sign__word" x="20" y="24">STOP</text>
+          </svg>
+        }
+        @case ('yieldSign') {
+          <svg class="sign sign--yield" viewBox="0 0 40 40" role="img">
+            <polygon class="sign__disc" points="20,3 38,33 2,33" />
+            <polygon class="sign__inner" points="20,9.5 31.5,29 8.5,29" />
+          </svg>
+        }
+        @case ('trafficLight') {
+          <svg class="light" viewBox="0 0 26 54" role="img">
+            <rect class="light__case" x="1" y="1" width="24" height="52" rx="5" />
+            <circle class="light__lamp light__lamp--red" cx="13" cy="13" r="7" />
+            <circle class="light__lamp light__lamp--amber" cx="13" cy="27" r="7" />
+            <circle class="light__lamp light__lamp--green" cx="13" cy="41" r="7" />
+          </svg>
+        }
+        @case ('roundabout') {
+          <svg class="structure structure--roundabout" viewBox="0 0 64 64" role="img">
+            <circle class="structure__ring" cx="32" cy="32" r="27" />
+            <circle class="structure__inner" cx="32" cy="32" r="13" />
+            <path class="structure__arms" d="M32,5 v9 M32,50 v9 M5,32 h9 M50,32 h9" />
+          </svg>
+        }
+        @case ('barrier') {
+          <svg class="structure structure--barrier" viewBox="0 0 52 30" role="img">
+            <rect class="structure__post" x="2" y="16" width="6" height="13" rx="2" />
+            <rect class="structure__post" x="44" y="16" width="6" height="13" rx="2" />
+            <rect class="structure__beam" x="2" y="9" width="48" height="9" rx="2" />
+            <path class="structure__stripes" d="M8,9 l6,9 M20,9 l6,9 M32,9 l6,9 M44,9 l6,9" />
+          </svg>
+        }
+        @case ('pothole') {
+          <svg class="hazard hazard--pothole" viewBox="0 0 48 30" role="img">
+            <ellipse class="hazard__hole" cx="24" cy="15" rx="17" ry="10" />
+            <ellipse class="hazard__rim" cx="24" cy="15" rx="22" ry="13" />
+            <ellipse class="hazard__water" cx="24" cy="15" rx="9" ry="5" />
+          </svg>
+        }
+        @case ('roadworks') {
+          <svg class="hazard hazard--roadworks" viewBox="0 0 44 44" role="img">
+            <polygon class="hazard__disc" points="22,2 42,37 2,37" />
+            <rect class="hazard__figure" x="20" y="16" width="4" height="12" rx="2" />
+            <circle class="hazard__figure" cx="22" cy="13" r="3" />
+          </svg>
+        }
+        @case ('obstacle') {
+          <svg class="hazard hazard--obstacle" viewBox="0 0 40 40" role="img">
+            <rect class="hazard__box" x="4" y="4" width="32" height="32" rx="5" />
+            <path class="hazard__cross" d="M13,13 l14,14 M27,13 l-14,14" />
+          </svg>
+        }
+        @case ('pedestrian') {
+          <svg class="person" viewBox="0 0 24 44" role="img">
+            <circle class="person__head" cx="12" cy="6" r="4.6" />
+            <path class="person__body" d="M12,11 c-4.2,0 -6.4,2.6 -6.4,6.2 l0,7.6 h12.8 l0,-7.6 c0,-3.6 -2.2,-6.2 -6.4,-6.2 z" />
+            <path class="person__legs" d="M8.6,25 l-1.2,16 M15.4,25 l1.2,16" />
+            <path class="person__arms" d="M6.4,14 l-2.6,9 M17.6,14 l2.6,9" />
+          </svg>
+        }
+        @case ('vehicle') {
+          <svg class="car car--other" viewBox="0 0 120 56" role="img" [attr.aria-label]="item.ariaLabel">
+            <ellipse class="car__shadow" cx="60" cy="30" rx="54" ry="21" />
+            <g class="car__wheels">
+              <rect x="84" y="3" width="22" height="10" rx="4" />
+              <rect x="84" y="43" width="22" height="10" rx="4" />
+              <rect x="16" y="3" width="22" height="10" rx="4" />
+              <rect x="16" y="43" width="22" height="10" rx="4" />
+            </g>
+            <path class="car__body" d="
+              M6,28 C6,19 12,13 22,11 L96,11 C108,11 116,18 116,28
+              C116,38 108,45 96,45 L22,45 C12,45 6,37 6,28 Z" />
+            <path class="car__glass" d="M54,16 L82,16 C84,16 85,17 85,19 L85,37 C85,39 84,40 82,40 L54,40 C52,40 51,39 51,37 L51,19 C51,17 52,16 54,16 Z" />
+            <path class="car__nose" d="M92,15 C99,17 104,21 106,26 L94,25 Z" />
+            <path class="car__tail" d="M10,17 L20,15 L20,22 L10,24 Z" />
+          </svg>
+        }
+      }
+
+      @if (item.detectedByCamera || item.detectedByRadar) {
+        <span class="obj__badge" [class.obj__badge--radar]="item.detectedByRadar && !item.detectedByCamera">
+          {{ item.detectedByCamera ? 'DETECTED' : 'RADAR' }}
+        </span>
+      }
+      <span class="obj__distance">{{ item.relativeMeters | number: '1.0-0' }} m</span>
     </div>
   }
 
-  <div class="legend">
-    <span><i class="camera"></i> Camera zone</span>
-    <span><i class="radar"></i> Front radar zone</span>
-    <span><i class="blind"></i> Blind spots</span>
+  <!-- ============ first-run invitation ============ -->
+  @if (awaitingStart()) {
+    <div class="await" data-testid="road-await-start">
+      <div class="await__card">
+        <span class="await__eyebrow">Simulation ready</span>
+        <strong>Press START to begin</strong>
+        <span>The road is empty and the vehicle is stationary. Add road conditions once the
+          simulation is running.</span>
+      </div>
+    </div>
+  }
+
+  <!-- ============ legend ============ -->
+  <div class="legend" aria-hidden="true">
+    <span><i class="dot dot--camera"></i>Camera FOV</span>
+    <span><i class="dot dot--radar"></i>Front radar</span>
+    <span><i class="dot dot--blind"></i>Blind spot</span>
   </div>
 </section>

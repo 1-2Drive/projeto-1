@@ -1,5 +1,6 @@
 package com.one2drive.projeto1.drools.listeners;
 
+import com.one2drive.projeto1.drools.FactDescription;
 import com.one2drive.projeto1.explanation.ExplanationTrace;
 import com.one2drive.projeto1.explanation.TimelineEntryType;
 import org.kie.api.event.rule.DefaultRuleRuntimeEventListener;
@@ -19,7 +20,7 @@ public class WorkingMemoryTraceListener extends DefaultRuleRuntimeEventListener 
         trace.add(
             event.getKieRuntime().getSessionClock().getCurrentTime(),
             TimelineEntryType.FACT_INSERTED,
-            "FACT INSERTED " + String.valueOf(event.getObject())
+            "FACT INSERTED " + FactDescription.describe(event.getObject())
         );
     }
 
@@ -28,7 +29,7 @@ public class WorkingMemoryTraceListener extends DefaultRuleRuntimeEventListener 
         trace.add(
             event.getKieRuntime().getSessionClock().getCurrentTime(),
             TimelineEntryType.FACT_UPDATED,
-            "FACT UPDATED " + String.valueOf(event.getObject())
+            "FACT UPDATED " + FactDescription.describe(event.getObject())
         );
     }
 
@@ -37,7 +38,7 @@ public class WorkingMemoryTraceListener extends DefaultRuleRuntimeEventListener 
         trace.add(
             event.getKieRuntime().getSessionClock().getCurrentTime(),
             TimelineEntryType.FACT_DELETED,
-            "FACT DELETED " + String.valueOf(event.getOldObject())
+            "FACT DELETED " + FactDescription.describe(event.getOldObject())
         );
     }
 }

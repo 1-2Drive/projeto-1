@@ -1,28 +1,53 @@
-<section class="panel">
-  <h3>Speed Advisor</h3>
-  @if (snapshot(); as s) {
-    <div class="cards" [class]="'cards ' + deltaClass()">
-      <article class="metric">
-        <span>CURRENT SPEED</span>
-        <strong data-testid="speed-current">{{ s.speedAdvisor.currentKmh | number: '1.0-0' }} <em>km/h</em></strong>
-      </article>
+@if (snapshot(); as s) {
+  <section class="gauge" data-testid="speed-advisor" [class.gauge--over]="!withinLimit()">
+    <header class="gauge__head">
+      <h3>Speed Advisor</h3>
+      <span class="gauge__action" data-testid="speed-action">{{ action() }}</span>
+    </header>
 
-      <article class="metric">
-        <span>LEGAL LIMIT</span>
-        <strong data-testid="speed-limit">{{ s.speedAdvisor.legalLimitKmh | number: '1.0-0' }} <em>km/h</em></strong>
-      </article>
+    <div class="gauge__dial">
+      <svg viewBox="0 0 180 100" class="dial" aria-hidden="true">
+        <path d="M 20 90 A 70 70 0 0 1 160 90" class="dial__track" />
 
-      <article class="metric emphasis">
-        <span>RECOMMENDED</span>
-        <strong data-testid="speed-recommended">{{ s.speedAdvisor.recommendedKmh | number: '1.0-0' }} <em>km/h</em></strong>
-      </article>
+        <path d="M 20 90 A 70 70 0 0 1 160 90" class="dial__value"
+              [style.stroke-dasharray]="valueDash() + ' ' + arcLength" />
 
-      <article class="action">
-        <span>ACTION</span>
-        <strong data-testid="speed-action">{{ s.speedAdvisor.action }}</strong>
-      </article>
+        <path d="M 20 90 A 70 70 0 0 1 160 90" class="dial__legal"
+              [style.stroke-dasharray]="limitDash() + ' ' + arcLength" />
+      </svg>
+
+      <div class="gauge__readout">
+        <strong data-testid="speed-current">{{ currentKmh() | number: '1.0-0' }}</strong>
+        <span>km/h</span>
+      </div>
+
+      <span class="gauge__pin gauge__pin--legal" [style.transform]="'rotate(' + limitAngle() + 'deg)'">
+        <em>{{ legalLimitKmh() | number: '1.0-0' }}</em>
+      </span>
+
+      <span class="gauge__pin gauge__pin--rec" [style.transform]="'rotate(' + recommendedAngle() + 'deg)'">
+        <em data-testid="speed-recommended">{{ recommendedKmh() | number: '1.0-0' }}</em>
+      </span>
     </div>
-  } @else {
-    <p>No speed recommendation.</p>
-  }
-</section>
+
+    <footer class="gauge__legend">
+      <span class="legend legend--limit">
+        Legal limit
+        <strong data-testid="speed-limit">{{ legalLimitKmh() | number: '1.0-0' }} km/h</strong>
+      </span>
+      <span class="legend legend--rec">
+        Recommended
+        <strong>{{ recommendedKmh() | number: '1.0-0' }} km/h</strong>
+      </span>
+      <span class="legend" [class]="'legend legend--delta legend--' + deltaClass()">
+        Delta
+        <strong>{{ deltaKmh() > 0 ? '+' : '' }}{{ deltaKmh() | number: '1.0-1' }} km/h</strong>
+      </span>
+    </footer>
+  </section>
+} @else {
+  <section class="gauge gauge--empty">
+    <header class="gauge__head"><h3>Speed Advisor</h3></header>
+    <p class="empty">Waiting for the first snapshot.</p>
+  </section>
+}

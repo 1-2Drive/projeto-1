@@ -1,21 +1,45 @@
-<section class="panel" data-testid="timeline-panel">
-  <div class="head">
-    <h3>Inference Timeline</h3>
+<section class="timeline" data-testid="timeline-panel">
+  <header class="head">
+    <div class="head__title">
+      <h3>Inference Timeline</h3>
+      <span class="head__hint">sensor → fact → rule → decision → actuator</span>
+    </div>
+
     <div class="filters" role="tablist" aria-label="Timeline filters">
       @for (type of eventTypes; track type) {
-         <button type="button" role="tab" [attr.aria-selected]="selectedType === type" [class.active]="selectedType === type" (click)="setType(type)">{{ type }}</button>
+        <button type="button" role="tab" [attr.aria-selected]="selectedType() === type"
+                [class.active]="selectedType() === type" (click)="setType(type)">
+          {{ type }}
+          @if (type !== 'ALL') {
+            <em>{{ counts()[type] }}</em>
+          }
+        </button>
       }
     </div>
-  </div>
-  <div class="timeline">
-    @if (snapshot(); as s) {
-       @for (entry of filteredEntries(); track $index) {
-        <article [class]="'entry tag-' + tagFor(entry.type, entry.message).toLowerCase()">
-          <time>{{ (entry.timestamp / 1000) | number: '1.3-3' }}s</time>
-          <strong>{{ tagFor(entry.type, entry.message) }}</strong>
-          <p>{{ entry.message }}</p>
-        </article>
-      }
+  </header>
+
+  <div class="stream">
+    @for (entry of filteredEntries(); track $index) {
+      <article class="entry" [class]="'entry entry--' + tagFor(entry.type).toLowerCase()">
+        <div class="entry__rail">
+          <span class="entry__dot"></span>
+        </div>
+        <div class="entry__body">
+          <div class="entry__meta">
+            <span class="entry__tag">{{ tagFor(entry.type) }}</span>
+            <time>{{ (entry.timestamp / 1000) | number: '1.3-3' }}s</time>
+          </div>
+          <p class="entry__message">{{ entry.message }}</p>
+        </div>
+      </article>
+    } @empty {
+      <p class="empty">
+        @if (snapshot()) {
+          No {{ selectedType() === 'ALL' ? '' : selectedType() }} entry yet. Press START to run the engine.
+        } @else {
+          Waiting for the first snapshot.
+        }
+      </p>
     }
   </div>
 </section>

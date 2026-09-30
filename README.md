@@ -369,6 +369,58 @@ npm ci
 Set-Location ..
 ```
 
+## Quick Start
+
+```bash
+./scripts/dev.sh
+```
+
+That single command starts the Drools backend on `http://localhost:8080` and the
+Angular UI on `http://localhost:4200`, and waits until both answer before printing
+`ready`. Press `Ctrl-C` once to stop both services.
+
+Then open **<http://localhost:4200>** in a browser.
+
+### The manual workflow
+
+The simulation starts **stopped on an empty road** and waits for you. The road canvas
+shows `Press START to begin` until the first tick, so nothing is simulated before you ask.
+
+1. Press **START**. The vehicle moves and the expert system starts perceiving.
+2. Add a road object from the **Scenario Toolbox** (left). Clicking a control opens the
+   configuration drawer; set the values and press **Add to road**.
+3. Watch the object travel toward the ego vehicle on the road canvas. It is only shown
+   with a `CAMERA` or `RADAR` badge once a sensor has actually detected it inside its
+   configured range — the ranges are listed in the Sensors panel.
+4. Watch Drools react: the timeline shows `SENSOR -> FACT -> RULE -> DECISION -> ACTUATOR`,
+   and the Decision panel shows the action, risk, recommended speed and fired rule.
+5. Use **PAUSE** / **RESUME** to step through, and **RESET** to return to the empty road.
+
+### A two-minute demonstration
+
+1. **START** the simulation.
+2. Click the **50** speed-limit sign, set distance to `150 m`, **Add to road**.
+3. When the camera reaches the sign (around 120 m of travel), the legal limit drops to
+   `50`, the gauge turns red, and Drools issues `REDUCE_SPEED`; the vehicle decelerates.
+4. Click **Vehicle**, set distance `45 m` and speed `15 km/h`, **Add to road**.
+   The radar detects it, computes TTC, and the timeline records the safety decision.
+
+### Optional: scripted demo
+
+The **RUN DEMO** button in the top-right corner replays the `S14_PRESENTATION_DEMO`
+scenario end to end with a phase strip. It is optional — manual mode is the default
+path and demo chrome stays hidden unless the demo is running.
+
+### Useful URLs
+
+| What | URL |
+| --- | --- |
+| Angular UI | <http://localhost:4200> |
+| Backend status | <http://localhost:8080/api/simulation/status> |
+| Realtime stream (SSE) | <http://localhost:8080/api/stream/snapshots> |
+| Working memory | <http://localhost:8080/api/drools/working-memory> |
+| Recent decisions | <http://localhost:8080/api/explanations/recent> |
+
 ## Running the project
 
 ### Running Backend
@@ -414,7 +466,8 @@ macOS/Linux (one command):
 ```
 
 The helper waits for the backend status endpoint and the Angular root page before
-reporting readiness. Press `Ctrl-C` to stop both child processes.
+reporting readiness. Press `Ctrl-C` to stop both services; it terminates each service
+process group, so the forked JVM and the Angular dev server are both stopped.
 
 ### Two-terminal alternative
 

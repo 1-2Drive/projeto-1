@@ -1,148 +1,134 @@
-<section class="panel">
-  <h3>Scenario Toolbox</h3>
+@if (definition(); as def) {
+  <div class="backdrop" (click)="close()" aria-hidden="true"></div>
 
-  <div class="controls">
-    <label>
-      Lane
-      <select [ngModel]="lane()" (ngModelChange)="setLane($event)">
-        <option value="LEFT">LEFT</option>
-        <option value="CENTER">CENTER</option>
-        <option value="RIGHT">RIGHT</option>
-      </select>
-    </label>
-    <label>
-      Distance Ahead (m)
-      <input data-testid="distance-input" type="number" min="1" max="1000" [ngModel]="distanceAheadMeters()" (ngModelChange)="setDistance($event)" />
-    </label>
-    <label>
-      Vehicle Speed (km/h)
-      <input type="number" min="0" max="180" [ngModel]="actorSpeedKmh()" (ngModelChange)="setActorSpeed($event)" />
-    </label>
-  </div>
-
-  <div class="groups">
-    <article>
-      <h4>Speed limits</h4>
-      <div class="btn-grid">
-        <button type="button" (click)="quickSpeedLimit(30)">30</button>
-        <button data-testid="add-speed-50" type="button" (click)="quickSpeedLimit(50)">50</button>
-        <button type="button" (click)="quickSpeedLimit(70)">70</button>
-        <button type="button" (click)="quickSpeedLimit(90)">90</button>
-        <button type="button" (click)="quickSpeedLimit(100)">100</button>
-        <button type="button" (click)="quickSpeedLimit(120)">120</button>
-        <button type="button" (click)="openConfig('SPEED_LIMIT')">Custom</button>
+  <aside class="drawer" role="dialog" aria-modal="true" [attr.aria-label]="def.title" data-testid="config-panel">
+    <header class="drawer__head">
+      <div>
+        <span class="drawer__eyebrow">World mutation</span>
+        <h3 data-testid="config-title">{{ def.title }}</h3>
       </div>
-    </article>
+      <button type="button" class="drawer__close" (click)="close()" aria-label="Close">✕</button>
+    </header>
 
-    <article>
-      <h4>Traffic</h4>
-      <div class="btn-grid">
-        <button type="button" (click)="openConfig('STOP_SIGN')">Stop</button>
-        <button type="button" (click)="openConfig('YIELD_SIGN')">Yield</button>
-        <button type="button" (click)="openConfig('TRAFFIC_LIGHT')">Traffic light</button>
-        <button type="button" (click)="openConfig('ROUNDABOUT')">Roundabout</button>
-      </div>
-    </article>
+    <p class="drawer__hint">{{ def.hint }}</p>
 
-    <article>
-      <h4>Hazards</h4>
-      <div class="btn-grid">
-        <button type="button" (click)="openConfig('POTHOLE')">Pothole</button>
-        <button type="button" (click)="openConfig('ROADWORKS')">Roadworks</button>
-        <button type="button" (click)="openConfig('STATIC_OBSTACLE')">Obstacle</button>
-        <button type="button" (click)="openConfig('BARRIER')">Barrier</button>
-      </div>
-    </article>
-
-    <article>
-      <h4>Actors</h4>
-      <div class="btn-grid">
-        <button data-testid="add-vehicle" type="button" (click)="openConfig('FRONT_VEHICLE')">Vehicle</button>
-        <button data-testid="add-pedestrian" type="button" (click)="openConfig('PEDESTRIAN')">Pedestrian</button>
-      </div>
-    </article>
-  </div>
-
-  @if (selectedAction(); as action) {
-    <section class="config" data-testid="config-panel">
-      <div class="config-head">
-        <h4>Configure {{ action }}</h4>
-        <button type="button" class="close" (click)="closeConfig()" aria-label="Close configuration">x</button>
-      </div>
-
-      <div class="config-form">
-        <label>
-          Lane
-          <select [ngModel]="lane()" (ngModelChange)="setLane($event)">
-            <option value="LEFT">LEFT</option>
-            <option value="CENTER">CENTER</option>
-            <option value="RIGHT">RIGHT</option>
-          </select>
+    <div class="drawer__body">
+      @if (def.needsSpeedLimit) {
+        <label class="field">
+          <span>Speed limit</span>
+          <div class="field__control">
+            <input data-testid="limit-input" type="number" min="20" max="130" step="5"
+                   [ngModel]="speedLimitKmh()" (ngModelChange)="setSpeedLimit($event)" />
+            <em>km/h</em>
+          </div>
         </label>
+      }
 
-        <label>
-          Distance ahead (m)
-          <input type="number" min="1" max="1000" [ngModel]="distanceAheadMeters()" (ngModelChange)="setDistance($event)" />
+      <label class="field">
+        <span>Distance ahead</span>
+        <div class="field__control">
+          <input data-testid="drawer-distance-input" type="number" min="1" max="1000" step="5"
+                 [ngModel]="distanceAheadMeters()" (ngModelChange)="setDistance($event)" />
+          <em>m</em>
+        </div>
+        @if (distanceError(); as error) {
+          <small class="field__error" role="alert">{{ error }}</small>
+        }
+      </label>
+
+      @if (def.needsActorSpeed) {
+        <label class="field">
+          <span>Speed</span>
+          <div class="field__control">
+            <input data-testid="actor-speed-input" type="number" min="0" max="180" step="5"
+                   [ngModel]="actorSpeedKmh()" (ngModelChange)="setActorSpeed($event)" />
+            <em>km/h</em>
+          </div>
+          @if (selectedAction() === 'PEDESTRIAN') {
+            <small class="field__note">Pedestrian speed is capped at 10 km/h.</small>
+          }
         </label>
+      }
 
-        @if (action === 'SPEED_LIMIT') {
-          <label>
-            Speed limit (km/h)
-            <input type="number" min="20" max="130" [ngModel]="speedLimitKmh()" (ngModelChange)="setSpeedLimit($event)" />
-          </label>
-        }
-
-        @if (action === 'TRAFFIC_LIGHT') {
-          <label>
-            State
-            <select [ngModel]="trafficLightState()" (ngModelChange)="setTrafficLightState($event)">
-              <option value="RED">RED</option>
-              <option value="GREEN">GREEN</option>
-              <option value="YELLOW">YELLOW</option>
+      @if (def.needsLane) {
+        <label class="field">
+          <span>Lane</span>
+          <div class="field__control">
+            <select data-testid="lane-select" [ngModel]="lane()" (ngModelChange)="setLane($event)">
+              <option value="LEFT">Left</option>
+              <option value="CENTER">Center</option>
+              <option value="RIGHT">Right</option>
             </select>
-          </label>
-        }
+          </div>
+        </label>
+      }
 
-        @if (action === 'POTHOLE' || action === 'ROADWORKS' || action === 'STATIC_OBSTACLE') {
-          <label>
-            Severity
-            <select [ngModel]="hazardSeverity()" (ngModelChange)="setSeverity($event)">
-              <option value="LOW">LOW</option>
-              <option value="MEDIUM">MEDIUM</option>
-              <option value="HIGH">HIGH</option>
+      @if (def.needsLightState) {
+        <label class="field">
+          <span>State</span>
+          <div class="field__control">
+            <select data-testid="light-state-select"
+                    [ngModel]="trafficLightState()" (ngModelChange)="setTrafficLightState($event)">
+              <option value="RED">Red</option>
+              <option value="YELLOW">Yellow</option>
+              <option value="GREEN">Green</option>
             </select>
-          </label>
-        }
+          </div>
+        </label>
+      }
 
-        @if (action === 'BARRIER') {
-          <label>
-            Barrier state
-            <select [ngModel]="barrierOpen() ? 'true' : 'false'" (ngModelChange)="setBarrierOpen($event)">
-              <option value="false">CLOSED</option>
-              <option value="true">OPEN</option>
+      @if (def.needsBarrierState) {
+        <label class="field">
+          <span>State</span>
+          <div class="field__control">
+            <select data-testid="barrier-state-select"
+                    [ngModel]="barrierOpen() ? 'true' : 'false'" (ngModelChange)="setBarrierOpen($event)">
+              <option value="false">Closed</option>
+              <option value="true">Open</option>
             </select>
-          </label>
-        }
+          </div>
+        </label>
+      }
 
-        @if (action === 'ROUNDABOUT') {
-          <label>
-            Approach speed (km/h)
-            <input type="number" min="10" max="80" [ngModel]="roundaboutSpeedKmh()" (ngModelChange)="setRoundaboutSpeed($event)" />
-          </label>
-        }
+      @if (def.needsSeverity) {
+        <label class="field">
+          <span>Severity</span>
+          <div class="field__control">
+            <select data-testid="severity-select"
+                    [ngModel]="hazardSeverity()" (ngModelChange)="setSeverity($event)">
+              <option value="LOW">Low</option>
+              <option value="MEDIUM">Medium</option>
+              <option value="HIGH">High</option>
+            </select>
+          </div>
+        </label>
+      }
 
-        @if (action === 'FRONT_VEHICLE' || action === 'PEDESTRIAN') {
-          <label>
-            Speed (km/h)
-            <input type="number" min="0" max="180" [ngModel]="actorSpeedKmh()" (ngModelChange)="setActorSpeed($event)" />
-          </label>
+      @if (def.needsRoundaboutSpeed) {
+        <label class="field">
+          <span>Approach speed</span>
+          <div class="field__control">
+            <input type="number" min="10" max="80" step="5"
+                   [ngModel]="roundaboutSpeedKmh()" (ngModelChange)="setRoundaboutSpeed($event)" />
+            <em>km/h</em>
+          </div>
+        </label>
+        @if (speedError(); as error) {
+          <small class="field__error" role="alert">{{ error }}</small>
         }
-      </div>
+      }
 
-      <div class="config-actions">
-        <button type="button" class="secondary" (click)="closeConfig()">Cancel</button>
-        <button type="button" class="primary" (click)="submitConfiguredAction()">Apply</button>
-      </div>
-    </section>
-  }
-</section>
+      @if (def.needsSpeedLimit || def.needsActorSpeed) {
+        @if (speedError(); as error) {
+          <small class="field__error" role="alert">{{ error }}</small>
+        }
+      }
+    </div>
+
+    <footer class="drawer__actions">
+      <button type="button" class="drawer__btn drawer__btn--ghost" (click)="close()">Cancel</button>
+      <button type="button" class="drawer__btn drawer__btn--primary"
+              data-testid="apply-config" (click)="confirm()">Add to road</button>
+    </footer>
+  </aside>
+}

@@ -60,7 +60,16 @@ export class SimulationPageComponent implements OnInit, OnDestroy {
   protected readonly canResume = computed(() => !this.vm().loading && this.isPaused());
   protected readonly canStop = computed(() => !this.vm().loading && this.simulationStatus() !== 'STOPPED');
   protected readonly canReset = computed(() => !this.vm().loading);
+
+  /** Backend only publishes demo phases while the scripted scenario is loaded. */
   protected readonly demoPhases = computed(() => this.snapshot()?.demoPhases ?? []);
+  protected readonly demoRunning = computed(() => this.demoPhases().length > 0);
+
+  /** True until the first tick, used to invite the user to press START. */
+  protected readonly awaitingStart = computed(() => {
+    const snapshot = this.snapshot();
+    return !!snapshot && snapshot.simulationTimeMillis === 0 && snapshot.status === 'STOPPED';
+  });
 
   ngOnInit(): void {
     this.state.initialize();

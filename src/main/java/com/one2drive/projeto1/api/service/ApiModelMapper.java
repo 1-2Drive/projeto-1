@@ -5,6 +5,7 @@ import com.one2drive.projeto1.api.model.ApiRoadElement;
 import com.one2drive.projeto1.api.model.ApiSimulationSnapshot;
 import com.one2drive.projeto1.api.model.ApiTimelineEntry;
 import com.one2drive.projeto1.api.model.ApiWorkingMemoryRow;
+import com.one2drive.projeto1.config.SimulationConfig;
 import com.one2drive.projeto1.decision.DrivingDecision;
 import com.one2drive.projeto1.drools.WorkingMemoryFactView;
 import com.one2drive.projeto1.explanation.TimelineEntry;
@@ -23,6 +24,7 @@ import java.util.stream.IntStream;
 public class ApiModelMapper {
     public ApiSimulationSnapshot mapSnapshot(SimulationEngine engine, SimulationSnapshot snapshot) {
         DrivingDecision decision = engine.getCurrentDecision();
+        SimulationConfig config = engine.getConfig();
         List<ApiRoadElement> worldObjects = engine.getAllRoadItemsRelativeToEgo().stream()
             .map(this::mapRoadItem)
             .toList();
@@ -94,6 +96,13 @@ public class ApiModelMapper {
             snapshot.detectedObjectIds(),
             snapshot.cameraDetectedObjectIds(),
             snapshot.radarDetectedObjectIds(),
+            new ApiSimulationSnapshot.SensorRangesView(
+                config.getCameraRangeMeters(),
+                config.getRadarRangeMeters(),
+                config.getBlindSpotRangeMeters(),
+                config.getCameraRateMillis(),
+                config.getRadarRateMillis()
+            ),
             demoPhases(engine)
         );
     }
@@ -143,12 +152,18 @@ public class ApiModelMapper {
         return Double.isFinite(candidate) ? candidate : currentSpeed;
     }
 
+    /**
+     * Presentation phases are only meaningful for the scripted demo scenario, so an
+     * empty list keeps the manual workflow free of demo chrome.
+     */
     private List<ApiSimulationSnapshot.DemoPhaseView> demoPhases(SimulationEngine engine) {
+        if (!"S14_PRESENTATION_DEMO".equals(engine.getScenarioId())) {
+            return List.of();
+        }
+
         List<String> ids = List.of("normal", "speed-limit", "weather", "ttc", "yield", "pedestrian");
         List<String> labels = List.of("Normal driving", "Speed limit", "Weather", "TTC safety", "Yield / roundabout", "Pedestrian");
-        Set<String> evidence = "S14_PRESENTATION_DEMO".equals(engine.getScenarioId())
-            ? engine.getDemoEvidence()
-            : Set.of();
+        Set<String> evidence = engine.getDemoEvidence();
         String activeId = ids.stream().filter(id -> !evidence.contains(id)).findFirst().orElse(null);
 
         return IntStream.range(0, ids.size())

@@ -1,6 +1,6 @@
 <section class="panel">
   <h3>Prebuilt Scenarios</h3>
-  <ul>
+  <ul class="list">
     @for (scenario of scenarios(); track scenario.id) {
       <li>
         <button type="button" (click)="loadScenario.emit(scenario.id)">

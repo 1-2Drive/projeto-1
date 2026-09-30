@@ -1,8 +1,8 @@
-import { ChangeDetectionStrategy, Component, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CreateActorRequest, CreateRoadElementRequest } from '../../core/models/api.models';
 
-type ToolboxAction =
+export type ToolboxAction =
   | 'SPEED_LIMIT'
   | 'STOP_SIGN'
   | 'YIELD_SIGN'
@@ -15,6 +15,80 @@ type ToolboxAction =
   | 'FRONT_VEHICLE'
   | 'PEDESTRIAN';
 
+interface ActionDefinition {
+  title: string;
+  hint: string;
+  needsLane: boolean;
+  needsSeverity: boolean;
+  needsSpeedLimit: boolean;
+  needsLightState: boolean;
+  needsBarrierState: boolean;
+  needsRoundaboutSpeed: boolean;
+  needsActorSpeed: boolean;
+}
+
+const ACTIONS: Record<ToolboxAction, ActionDefinition> = {
+  SPEED_LIMIT: {
+    title: 'Add speed limit', hint: 'Camera detects the sign only inside its range.',
+    needsLane: true, needsSeverity: false, needsSpeedLimit: true,
+    needsLightState: false, needsBarrierState: false, needsRoundaboutSpeed: false, needsActorSpeed: false
+  },
+  STOP_SIGN: {
+    title: 'Add stop sign', hint: 'Vehicle must decelerate, stop and hold before proceeding.',
+    needsLane: true, needsSeverity: false, needsSpeedLimit: false,
+    needsLightState: false, needsBarrierState: false, needsRoundaboutSpeed: false, needsActorSpeed: false
+  },
+  YIELD_SIGN: {
+    title: 'Add yield sign', hint: 'Approach cautiously and give way when safe.',
+    needsLane: true, needsSeverity: false, needsSpeedLimit: false,
+    needsLightState: false, needsBarrierState: false, needsRoundaboutSpeed: false, needsActorSpeed: false
+  },
+  TRAFFIC_LIGHT: {
+    title: 'Add traffic light', hint: 'Red requires a stop, yellow decelerates, green allows progress.',
+    needsLane: true, needsSeverity: false, needsSpeedLimit: false,
+    needsLightState: true, needsBarrierState: false, needsRoundaboutSpeed: false, needsActorSpeed: false
+  },
+  ROUNDABOUT: {
+    title: 'Add roundabout', hint: 'Approach speed is recommended by the Drools rule base.',
+    needsLane: true, needsSeverity: false, needsSpeedLimit: false,
+    needsLightState: false, needsBarrierState: false, needsRoundaboutSpeed: true, needsActorSpeed: false
+  },
+  POTHOLE: {
+    title: 'Add pothole', hint: 'Camera detects the defect once the vehicle reaches it.',
+    needsLane: true, needsSeverity: true, needsSpeedLimit: false,
+    needsLightState: false, needsBarrierState: false, needsRoundaboutSpeed: false, needsActorSpeed: false
+  },
+  ROADWORKS: {
+    title: 'Add roadworks', hint: 'Triggers the road-hazard knowledge base rules.',
+    needsLane: true, needsSeverity: true, needsSpeedLimit: false,
+    needsLightState: false, needsBarrierState: false, needsRoundaboutSpeed: false, needsActorSpeed: false
+  },
+  STATIC_OBSTACLE: {
+    title: 'Add obstacle', hint: 'Detected by the front camera, treated as a road hazard.',
+    needsLane: true, needsSeverity: true, needsSpeedLimit: false,
+    needsLightState: false, needsBarrierState: false, needsRoundaboutSpeed: false, needsActorSpeed: false
+  },
+  BARRIER: {
+    title: 'Add barrier', hint: 'A closed barrier produces a mandatory stop decision.',
+    needsLane: true, needsSeverity: false, needsSpeedLimit: false,
+    needsLightState: false, needsBarrierState: true, needsRoundaboutSpeed: false, needsActorSpeed: false
+  },
+  FRONT_VEHICLE: {
+    title: 'Add vehicle', hint: 'Radar measures distance, relative speed and time-to-collision.',
+    needsLane: true, needsSeverity: false, needsSpeedLimit: false,
+    needsLightState: false, needsBarrierState: false, needsRoundaboutSpeed: false, needsActorSpeed: true
+  },
+  PEDESTRIAN: {
+    title: 'Add pedestrian', hint: 'Camera detects the pedestrian inside its range only.',
+    needsLane: true, needsSeverity: false, needsSpeedLimit: false,
+    needsLightState: false, needsBarrierState: false, needsRoundaboutSpeed: false, needsActorSpeed: true
+  }
+};
+
+/**
+ * Drawer used to configure and add a world object while the simulation is running.
+ * Emits REST payloads only; it never decides anything about driving.
+ */
 @Component({
   selector: 'app-element-properties',
   standalone: true,
@@ -27,159 +101,142 @@ export class ElementPropertiesComponent {
   readonly createRoadElement = output<CreateRoadElementRequest>();
   readonly createActor = output<CreateActorRequest>();
 
+  readonly selectedAction = signal<ToolboxAction | null>(null);
   readonly lane = signal('CENTER');
   readonly distanceAheadMeters = signal(150);
-  readonly actorSpeedKmh = signal(30);
-  readonly selectedAction = signal<ToolboxAction | null>(null);
   readonly speedLimitKmh = signal(50);
   readonly trafficLightState = signal('RED');
-  readonly hazardSeverity = signal('HIGH');
   readonly barrierOpen = signal(false);
+  readonly hazardSeverity = signal('HIGH');
   readonly roundaboutSpeedKmh = signal(30);
+  readonly actorSpeedKmh = signal(30);
+  readonly submitted = signal(false);
 
-  protected openConfig(action: ToolboxAction): void {
+  protected readonly definition = computed(() => {
+    const action = this.selectedAction();
+    return action ? ACTIONS[action] : null;
+  });
+
+  /** Mirrors the backend request validation so invalid input never reaches the API. */
+  protected readonly distanceError = computed(() => {
+    if (!this.submitted()) {
+      return null;
+    }
+    const value = this.distanceAheadMeters();
+    if (!Number.isFinite(value) || value < 1 || value > 1000) {
+      return 'Distance must be between 1 and 1000 m.';
+    }
+    return null;
+  });
+
+  protected readonly speedError = computed(() => {
+    if (!this.submitted()) {
+      return null;
+    }
+    const definition = this.definition();
+    if (!definition) {
+      return null;
+    }
+    if (definition.needsSpeedLimit) {
+      const value = this.speedLimitKmh();
+      return value >= 20 && value <= 130 ? null : 'Limit must be between 20 and 130 km/h.';
+    }
+    if (definition.needsActorSpeed) {
+      const value = this.actorSpeedKmh();
+      return value >= 0 && value <= 180 ? null : 'Speed must be between 0 and 180 km/h.';
+    }
+    if (definition.needsRoundaboutSpeed) {
+      const value = this.roundaboutSpeedKmh();
+      return value >= 10 && value <= 80 ? null : 'Approach speed must be between 10 and 80 km/h.';
+    }
+    return null;
+  });
+
+  protected readonly invalid = computed(() => !!this.distanceError() || !!this.speedError());
+
+  /** Opens the drawer, pre-filled with an optional default limit (speed presets). */
+  open(action: ToolboxAction, defaultLimit?: number): void {
+    if (defaultLimit !== undefined) {
+      this.speedLimitKmh.set(defaultLimit);
+    }
+    this.submitted.set(false);
     this.selectedAction.set(action);
   }
 
-  protected closeConfig(): void {
+  protected close(): void {
     this.selectedAction.set(null);
+    this.submitted.set(false);
   }
 
-  protected submitConfiguredAction(): void {
+  protected confirm(): void {
+    this.submitted.set(true);
+    if (this.invalid() || !this.definition()) {
+      return;
+    }
+
     const action = this.selectedAction();
     if (!action) {
       return;
     }
+
     switch (action) {
       case 'SPEED_LIMIT':
-        this.submitSign(this.speedLimitKmh());
+        this.createRoadElement.emit({
+          type: 'SPEED_LIMIT',
+          lane: this.lane(),
+          distanceAheadMeters: this.distanceAheadMeters(),
+          speedLimitKmh: this.speedLimitKmh()
+        });
         break;
       case 'STOP_SIGN':
-        this.submitStop();
+        this.createRoadElement.emit(this.simpleElement('STOP_SIGN'));
         break;
       case 'YIELD_SIGN':
-        this.submitYield();
+        this.createRoadElement.emit(this.simpleElement('YIELD_SIGN'));
         break;
       case 'TRAFFIC_LIGHT':
-        this.submitTrafficLight(this.trafficLightState());
+        this.createRoadElement.emit({
+          ...this.simpleElement('TRAFFIC_LIGHT'),
+          trafficLightState: this.trafficLightState()
+        });
         break;
       case 'ROUNDABOUT':
-        this.submitRoundabout();
+        this.createRoadElement.emit({
+          ...this.simpleElement('ROUNDABOUT'),
+          roundaboutApproachSpeedKmh: this.roundaboutSpeedKmh()
+        });
         break;
       case 'POTHOLE':
-        this.submitPothole();
+        this.createRoadElement.emit({ ...this.simpleElement('POTHOLE'), severity: this.hazardSeverity() });
         break;
       case 'ROADWORKS':
-        this.submitRoadworks();
+        this.createRoadElement.emit({ ...this.simpleElement('ROADWORKS'), severity: this.hazardSeverity() });
         break;
       case 'STATIC_OBSTACLE':
-        this.submitStaticObstacle();
+        this.createRoadElement.emit({ ...this.simpleElement('STATIC_OBSTACLE'), severity: this.hazardSeverity() });
         break;
       case 'BARRIER':
-        this.submitBarrier(this.barrierOpen());
+        this.createRoadElement.emit({ ...this.simpleElement('BARRIER'), barrierOpen: this.barrierOpen() });
         break;
       case 'FRONT_VEHICLE':
-        this.submitVehicle();
+        this.createActor.emit({
+          type: 'FRONT_VEHICLE',
+          lane: this.lane(),
+          distanceAheadMeters: this.distanceAheadMeters(),
+          speedKmh: this.actorSpeedKmh()
+        });
         break;
       case 'PEDESTRIAN':
-        this.submitPedestrian();
+        this.createActor.emit({
+          type: 'PEDESTRIAN',
+          lane: this.lane(),
+          distanceAheadMeters: this.distanceAheadMeters(),
+          speedKmh: Math.min(this.actorSpeedKmh(), 10)
+        });
         break;
     }
-    this.closeConfig();
-  }
 
-  protected quickSpeedLimit(limit: number): void {
-    this.speedLimitKmh.set(limit);
-    this.submitSign(limit);
-  }
-
-  protected submitSign(limit: number): void {
-    this.createRoadElement.emit({
-      type: 'SPEED_LIMIT',
-      lane: this.lane(),
-      distanceAheadMeters: this.distanceAheadMeters(),
-      speedLimitKmh: limit
-    });
-  }
-
-  protected submitStop(): void {
-    this.createRoadElement.emit({ type: 'STOP_SIGN', lane: this.lane(), distanceAheadMeters: this.distanceAheadMeters() });
-  }
-
-  protected submitYield(): void {
-    this.createRoadElement.emit({ type: 'YIELD_SIGN', lane: this.lane(), distanceAheadMeters: this.distanceAheadMeters() });
-  }
-
-  protected submitTrafficLight(state: string): void {
-    this.createRoadElement.emit({
-      type: 'TRAFFIC_LIGHT',
-      lane: this.lane(),
-      distanceAheadMeters: this.distanceAheadMeters(),
-      trafficLightState: state
-    });
-  }
-
-  protected submitBarrier(open: boolean): void {
-    this.createRoadElement.emit({
-      type: 'BARRIER',
-      lane: this.lane(),
-      distanceAheadMeters: this.distanceAheadMeters(),
-      barrierOpen: open
-    });
-  }
-
-  protected submitPothole(): void {
-    this.createRoadElement.emit({
-      type: 'POTHOLE',
-      lane: this.lane(),
-      distanceAheadMeters: this.distanceAheadMeters(),
-      severity: this.hazardSeverity()
-    });
-  }
-
-  protected submitRoadworks(): void {
-    this.createRoadElement.emit({
-      type: 'ROADWORKS',
-      lane: this.lane(),
-      distanceAheadMeters: this.distanceAheadMeters(),
-      severity: this.hazardSeverity()
-    });
-  }
-
-  protected submitStaticObstacle(): void {
-    this.createRoadElement.emit({
-      type: 'STATIC_OBSTACLE',
-      lane: this.lane(),
-      distanceAheadMeters: this.distanceAheadMeters(),
-      severity: this.hazardSeverity()
-    });
-  }
-
-  protected submitRoundabout(): void {
-    this.createRoadElement.emit({
-      type: 'ROUNDABOUT',
-      lane: this.lane(),
-      distanceAheadMeters: this.distanceAheadMeters(),
-      roundaboutApproachSpeedKmh: this.roundaboutSpeedKmh()
-    });
-  }
-
-  protected submitVehicle(): void {
-    this.createActor.emit({
-      type: 'FRONT_VEHICLE',
-      lane: this.lane(),
-      distanceAheadMeters: this.distanceAheadMeters(),
-      speedKmh: this.actorSpeedKmh()
-    });
-  }
-
-  protected submitPedestrian(): void {
-    this.createActor.emit({
-      type: 'PEDESTRIAN',
-      lane: this.lane(),
-      distanceAheadMeters: this.distanceAheadMeters(),
-      speedKmh: Math.min(this.actorSpeedKmh(), 10)
-    });
+    this.close();
   }
 
   protected setLane(value: string): void {
@@ -187,30 +244,38 @@ export class ElementPropertiesComponent {
   }
 
   protected setDistance(value: string): void {
-    this.distanceAheadMeters.set(Math.max(1, Number(value)));
-  }
-
-  protected setActorSpeed(value: string): void {
-    this.actorSpeedKmh.set(Math.max(0, Number(value)));
+    this.distanceAheadMeters.set(Number(value));
   }
 
   protected setSpeedLimit(value: string): void {
-    this.speedLimitKmh.set(Math.max(20, Math.min(130, Number(value))));
+    this.speedLimitKmh.set(Number(value));
   }
 
   protected setTrafficLightState(value: string): void {
     this.trafficLightState.set(value);
   }
 
-  protected setSeverity(value: string): void {
-    this.hazardSeverity.set(value);
-  }
-
   protected setBarrierOpen(value: string): void {
     this.barrierOpen.set(value === 'true');
   }
 
+  protected setSeverity(value: string): void {
+    this.hazardSeverity.set(value);
+  }
+
   protected setRoundaboutSpeed(value: string): void {
-    this.roundaboutSpeedKmh.set(Math.max(10, Math.min(80, Number(value))));
+    this.roundaboutSpeedKmh.set(Number(value));
+  }
+
+  protected setActorSpeed(value: string): void {
+    this.actorSpeedKmh.set(Number(value));
+  }
+
+  private simpleElement(type: string): CreateRoadElementRequest {
+    return {
+      type,
+      lane: this.lane(),
+      distanceAheadMeters: this.distanceAheadMeters()
+    };
   }
 }

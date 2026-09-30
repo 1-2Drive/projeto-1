@@ -1,6 +1,9 @@
-import { ChangeDetectionStrategy, Component, input } from '@angular/core';
-import { ApiSimulationSnapshot } from '../../core/models/api.models';
+import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
+import { ApiSimulationSnapshot } from '../../core/models/api.models';
+
+type RiskLevel = 'risk-low' | 'risk-medium' | 'risk-high';
+type ActionTone = 'go' | 'caution' | 'stop';
 
 @Component({
   selector: 'app-decision-panel',
@@ -13,14 +16,37 @@ import { DecimalPipe } from '@angular/common';
 export class DecisionPanelComponent {
   readonly snapshot = input<ApiSimulationSnapshot | null>(null);
 
-  protected riskClass(): string {
-    const risk = (this.snapshot()?.currentDecision.riskLevel ?? 'LOW').toUpperCase();
-    if (risk.includes('HIGH') || risk.includes('CRITICAL')) {
+  protected readonly decision = computed(() => this.snapshot()?.currentDecision ?? null);
+  protected readonly hasDecision = computed(() => this.decision()?.action !== 'AWAITING_DECISION');
+
+  protected readonly riskClass = computed<RiskLevel>(() => {
+    const risk = (this.decision()?.riskLevel ?? 'LOW').toUpperCase();
+    if (risk.includes('CRITICAL') || risk.includes('HIGH')) {
       return 'risk-high';
     }
-    if (risk.includes('MODERATE')) {
+    if (risk.includes('MODERATE') || risk.includes('MEDIUM')) {
       return 'risk-medium';
     }
     return 'risk-low';
-  }
+  });
+
+  protected readonly tone = computed<ActionTone>(() => {
+    const action = (this.decision()?.action ?? '').toUpperCase();
+    if (action.includes('EMERGENCY') || action === 'STOP' || action.includes('HOLD')) {
+      return 'stop';
+    }
+    if (action.includes('REDUCE') || action.includes('DECELER') || action.includes('CAUTION') || action.includes('YIELD')) {
+      return 'caution';
+    }
+    return 'go';
+  });
+
+  protected readonly speedGapKmh = computed(() => {
+    const decision = this.decision();
+    const egoSpeed = this.snapshot()?.egoVehicle.speedKmh ?? 0;
+    if (!decision) {
+      return 0;
+    }
+    return Math.round((egoSpeed - decision.recommendedSpeedKmh) * 10) / 10;
+  });
 }

@@ -87,6 +87,13 @@ export interface ApiSimulationSnapshot {
   detectedObjectIds: string[];
   cameraDetectedObjectIds: string[];
   radarDetectedObjectIds: string[];
+  sensorRanges: {
+    cameraRangeMeters: number;
+    radarRangeMeters: number;
+    blindSpotRangeMeters: number;
+    cameraRateMillis: number;
+    radarRateMillis: number;
+  };
   demoPhases: { id: string; label: string; status: DemoPhaseStatus }[];
 }
 

@@ -73,6 +73,13 @@ describe('RealtimeStreamService', () => {
         detectedObjectIds: [],
         cameraDetectedObjectIds: [],
         radarDetectedObjectIds: [],
+        sensorRanges: {
+          cameraRangeMeters: 120,
+          radarRangeMeters: 80,
+          blindSpotRangeMeters: 25,
+          cameraRateMillis: 200,
+          radarRateMillis: 100
+        },
         demoPhases: []
       }
     });

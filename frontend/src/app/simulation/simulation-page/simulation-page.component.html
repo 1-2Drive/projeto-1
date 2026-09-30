@@ -1,20 +1,22 @@
 <main class="page">
+
+  <!-- ============================ header ============================ -->
   <header class="top">
-    <div class="title">
-      <h1>Sistema Inteligente de Apoio a Decisao de Conducao</h1>
-      <p>Real-time Expert System · Java · Drools</p>
+    <div class="top__identity">
+      <h1>Sistema Inteligente de Apoio à Decisão de Condução</h1>
+      <p>Realtime Expert System · Java · Drools · CEP</p>
     </div>
 
-    <div class="status-row">
-      <div data-testid="backend-status">
-        <app-status-badge label="Backend" [connected]="vm().connection.backendConnected" />
-      </div>
-      <app-status-badge label="Drools" [connected]="vm().connection.droolsActive" connectedText="ACTIVE" />
+    <div class="top__status">
       <app-status-badge
-        label="Simulation"
-        [connected]="simulationStatus() === 'RUNNING'"
-        connectedText="RUNNING"
-        [disconnectedText]="simulationStatus()"
+        label="Backend"
+        [connected]="vm().connection.backendConnected"
+        data-testid="backend-status"
+      />
+      <app-status-badge
+        label="Drools"
+        [connected]="vm().connection.droolsActive"
+        connectedText="ACTIVE"
       />
       <app-status-badge
         label="Stream"
@@ -22,45 +24,93 @@
         [connectedText]="vm().connection.streamStatus"
         [disconnectedText]="vm().connection.streamStatus"
       />
-      <div class="clock">TIME <strong>{{ simulationClock() }}</strong></div>
+      <div class="state" [class.state--running]="isRunning()" [class.state--paused]="isPaused()">
+        <span class="state__dot"></span>
+        <span class="state__label">Simulation</span>
+        <strong class="state__value">{{ simulationStatus() }}</strong>
+      </div>
+      <div class="clock">
+        <span>Time</span>
+        <strong data-testid="simulation-clock">{{ simulationClock() }}</strong>
+      </div>
       <span data-testid="simulation-status" class="sr-only">{{ simulationStatus() }}</span>
     </div>
-
-    <div class="controls">
-      <button data-testid="start-btn" type="button" [disabled]="!canStart()" (click)="start()" title="Start simulation">START</button>
-      <button data-testid="pause-btn" type="button" [disabled]="!canPause()" (click)="pause()" title="Pause simulation">PAUSE</button>
-      <button data-testid="resume-btn" type="button" [disabled]="!canResume()" (click)="resume()" title="Resume simulation">RESUME</button>
-      <button data-testid="stop-btn" type="button" [disabled]="!canStop()" (click)="stop()" title="Stop simulation">STOP</button>
-      <button data-testid="reset-btn" type="button" [disabled]="!canReset()" (click)="reset()" title="Reset to baseline">RESET</button>
-      <button data-testid="run-demo-btn" type="button" class="btn-demo" [disabled]="vm().loading" (click)="runPresentationDemo()" title="Load scenario S14_PRESENTATION_DEMO and start">RUN PRESENTATION DEMO</button>
-      <button type="button" [disabled]="vm().loading" (click)="restartDemo()" title="Restart presentation demo">RESTART DEMO</button>
-      <button type="button" [disabled]="!canStop()" (click)="stopDemo()" title="Stop demo">STOP DEMO</button>
-    </div>
   </header>
+
+  <!-- ============================ control bar ============================ -->
+  <nav class="controls" aria-label="Simulation controls">
+    <div class="controls__primary">
+      <button data-testid="start-btn" type="button" class="btn btn--primary"
+              [disabled]="!canStart()" (click)="start()" title="Start the simulation (START)">
+        <span class="btn__glyph" aria-hidden="true">▶</span>START
+      </button>
+      <button data-testid="pause-btn" type="button" class="btn"
+              [disabled]="!canPause()" (click)="pause()" title="Freeze the simulation to inspect evidence">
+        <span class="btn__glyph" aria-hidden="true">❚❚</span>PAUSE
+      </button>
+      <button data-testid="stop-btn" type="button" class="btn"
+              [disabled]="!canStop()" (click)="stop()" title="Stop the simulation">
+        <span class="btn__glyph" aria-hidden="true">■</span>STOP
+      </button>
+      <button data-testid="reset-btn" type="button" class="btn"
+              [disabled]="!canReset()" (click)="reset()" title="Reset world, sensors and Drools working memory">
+        <span class="btn__glyph" aria-hidden="true">↺</span>RESET
+      </button>
+    </div>
+
+    <div class="controls__demo">
+      <span class="controls__demo-label">Automated demo</span>
+      <button data-testid="run-demo-btn" type="button" class="btn btn--ghost"
+              [disabled]="vm().loading" (click)="runPresentationDemo()"
+              title="Load the scripted presentation scenario and start it">
+        RUN DEMO
+      </button>
+      <button type="button" class="btn btn--ghost btn--icon"
+              [disabled]="!canStop()" (click)="restartDemo()" title="Restart the scripted demo"
+              aria-label="Restart automated demo">↻</button>
+      <button type="button" class="btn btn--ghost btn--icon"
+              [disabled]="!canStop()" (click)="stopDemo()" title="Stop the scripted demo"
+              aria-label="Stop automated demo">✕</button>
+    </div>
+  </nav>
 
   <app-flow-stage [activeStage]="snapshot()?.activeStage ?? 'WORLD'" />
 
   @if (vm().error) {
-    <aside class="error" data-testid="ui-error">
+    <aside class="error" data-testid="ui-error" role="alert">
       <span>{{ vm().error }}</span>
       <button type="button" (click)="clearError()">Dismiss</button>
     </aside>
   }
 
-  <section class="demo-progress" aria-label="Presentation demo progress">
-    <h2>Presentation Demo</h2>
-    <div class="steps">
-      @for (phase of demoPhases(); track phase.id) {
-        <div class="step" [class.done]="phase.status === 'DONE'" [class.active]="phase.status === 'ACTIVE'">
-          <span class="mark">{{ phase.status === 'DONE' ? '✓' : (phase.status === 'ACTIVE' ? '▶' : '○') }}</span>
-          <span>{{ phase.label }}</span>
-        </div>
-      }
-    </div>
-  </section>
+  <!-- Only rendered while the scripted demo scenario is loaded. -->
+  @if (demoPhases().length > 0) {
+    <section class="demo" aria-label="Automated demo progress">
+      <span class="demo__title">Automated demo</span>
+      <div class="demo__steps">
+        @for (phase of demoPhases(); track phase.id) {
+          <div class="demo__step"
+               [class.demo__step--done]="phase.status === 'DONE'"
+               [class.demo__step--active]="phase.status === 'ACTIVE'"
+               [attr.data-testid]="'demo-phase-' + phase.id">
+            <span class="demo__mark" aria-hidden="true">
+              @switch (phase.status) {
+                @case ('DONE') { ✓ }
+                @case ('ACTIVE') { ▶ }
+                @default { ○ }
+              }
+            </span>
+            <span class="demo__label">{{ phase.label }}</span>
+          </div>
+        }
+      </div>
+    </section>
+  }
 
-  <section class="layout">
-    <aside class="left">
+  <!-- ============================ workspace ============================ -->
+  <section class="workspace">
+
+    <aside class="workspace__left" aria-label="Scenario controls">
       <app-toolbox
         [simulationStatus]="simulationStatus()"
         (createRoadElement)="addRoadElement($event)"
@@ -70,27 +120,40 @@
       <app-scenario-library [scenarios]="scenarios()" (loadScenario)="loadScenario($event)" />
     </aside>
 
-    <section class="center">
+    <section class="workspace__center">
       <app-road-canvas [snapshot]="snapshot()" />
     </section>
 
-    <aside class="right">
-      <app-vehicle-state [snapshot]="snapshot()" />
+    <aside class="workspace__right" aria-label="Decision and telemetry">
       <app-speed-advisor [snapshot]="snapshot()" />
       <app-decision-panel [snapshot]="snapshot()" />
       <app-sensors-panel [snapshot]="snapshot()" />
+      <app-vehicle-state [snapshot]="snapshot()" />
     </aside>
   </section>
 
-  <section class="bottom">
-    <nav class="tabs" role="tablist" aria-label="Expert system details">
-      <button role="tab" [attr.aria-selected]="activeTab() === 'timeline'" [class.active]="activeTab() === 'timeline'" (click)="setTab('timeline')">Inference Timeline</button>
-      <button role="tab" [attr.aria-selected]="activeTab() === 'memory'" [class.active]="activeTab() === 'memory'" (click)="setTab('memory')">Working Memory</button>
-      <button role="tab" [attr.aria-selected]="activeTab() === 'explanation'" [class.active]="activeTab() === 'explanation'" (click)="setTab('explanation')">Explanation</button>
-      <button role="tab" [attr.aria-selected]="activeTab() === 'world'" [class.active]="activeTab() === 'world'" (click)="setTab('world')">World State</button>
+  <!-- ============================ evidence ============================ -->
+  <section class="evidence">
+    <nav class="tabs" role="tablist" aria-label="Expert system evidence">
+      <button role="tab" [attr.aria-selected]="activeTab() === 'timeline'"
+              [class.active]="activeTab() === 'timeline'" (click)="setTab('timeline')">
+        Inference Timeline
+      </button>
+      <button role="tab" [attr.aria-selected]="activeTab() === 'memory'"
+              [class.active]="activeTab() === 'memory'" (click)="setTab('memory')">
+        Working Memory
+      </button>
+      <button role="tab" [attr.aria-selected]="activeTab() === 'explanation'"
+              [class.active]="activeTab() === 'explanation'" (click)="setTab('explanation')">
+        Explanation
+      </button>
+      <button role="tab" [attr.aria-selected]="activeTab() === 'world'"
+              [class.active]="activeTab() === 'world'" (click)="setTab('world')">
+        World State
+      </button>
     </nav>
 
-    <div class="tab-content">
+    <div class="tabs__body">
       @switch (activeTab()) {
         @case ('timeline') {
           <app-rule-timeline [snapshot]="snapshot()" />

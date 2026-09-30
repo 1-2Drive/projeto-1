@@ -51,6 +51,31 @@ select {
   font-family: inherit;
 }
 
+/* Scrollable panels must look scrollable: the toolbox, scenario library, sensor
+   list, timeline and fact lists all scroll inside a fixed-height column. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #33506a transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #33506a;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #3f95cf;
+}
+
 button,
 input,
 select {

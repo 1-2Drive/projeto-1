@@ -39,12 +39,19 @@ describe('SpeedAdvisorComponent', () => {
       detectedObjectIds: [],
       cameraDetectedObjectIds: [],
       radarDetectedObjectIds: [],
+      sensorRanges: {
+        cameraRangeMeters: 120,
+        radarRangeMeters: 80,
+        blindSpotRangeMeters: 25,
+        cameraRateMillis: 200,
+        radarRateMillis: 100
+      },
       demoPhases: []
     });
 
     fixture.detectChanges();
 
-    const cards = fixture.nativeElement.querySelector('.cards') as HTMLElement;
-    expect(cards.classList.contains('above')).toBeTrue();
+    const legend = fixture.nativeElement.querySelector('.legend--delta') as HTMLElement;
+    expect(legend.classList.contains('legend--above')).toBeTrue();
   });
 });

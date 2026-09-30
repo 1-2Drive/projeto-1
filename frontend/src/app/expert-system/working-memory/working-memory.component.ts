@@ -1,7 +1,13 @@
-import { ChangeDetectionStrategy, Component, input, signal } from '@angular/core';
-import { ApiSimulationSnapshot } from '../../core/models/api.models';
+import { ChangeDetectionStrategy, Component, computed, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ApiSimulationSnapshot, ApiWorkingMemoryRow } from '../../core/models/api.models';
 
+type FactStatus = 'RECENT' | 'STABLE' | 'STATIC';
+
+/**
+ * Inspector for the Drools session working memory. It only reads the snapshot the
+ * backend publishes; it never inserts or retires facts itself.
+ */
 @Component({
   selector: 'app-working-memory',
   standalone: true,
@@ -12,38 +18,34 @@ import { FormsModule } from '@angular/forms';
 })
 export class WorkingMemoryComponent {
   readonly snapshot = input<ApiSimulationSnapshot | null>(null);
-  readonly filter = signal('');
+  protected readonly filter = signal('');
 
   protected setFilter(value: string): void {
     this.filter.set(value.toLowerCase());
   }
 
-  protected visibleRows() {
-    const snap = this.snapshot();
-    if (!snap) {
-      return [];
-    }
+  protected readonly totalFacts = computed(() => this.snapshot()?.workingMemory.length ?? 0);
+
+  protected readonly visibleRows = computed<ApiWorkingMemoryRow[]>(() => {
+    const rows = this.snapshot()?.workingMemory ?? [];
     const filter = this.filter();
     if (!filter) {
-      return snap.workingMemory;
+      return rows;
     }
-    return snap.workingMemory.filter((row) =>
+    return rows.filter((row) =>
       row.type.toLowerCase().includes(filter) ||
       row.value.toLowerCase().includes(filter) ||
+      row.source.toLowerCase().includes(filter) ||
       row.stream.toLowerCase().includes(filter) ||
       this.statusFor(row.timestamp).toLowerCase().includes(filter)
     );
-  }
+  });
 
-  protected statusFor(timestamp: number | null): string {
+  protected statusFor(timestamp: number | null): FactStatus {
     if (timestamp === null) {
       return 'STATIC';
     }
     const simTime = this.snapshot()?.simulationTimeMillis ?? 0;
-    if (simTime - timestamp < 3000) {
-      return 'RECENT';
-    }
-    return 'STABLE';
+    return simTime - timestamp < 3000 ? 'RECENT' : 'STABLE';
   }
-
 }

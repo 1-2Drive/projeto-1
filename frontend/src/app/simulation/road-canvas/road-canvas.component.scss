@@ -1,237 +1,713 @@
-.road-shell {
+:host {
+  display: block;
+  width: 100%;
+}
+
+/* ===================== road shell ===================== */
+.road {
   position: relative;
-  height: 30rem;
-  border-radius: var(--ds-radius-lg);
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  max-height: 40rem;
+  min-height: 20rem;
   border: 1px solid var(--ds-border);
-  background: radial-gradient(circle at 20% 20%, #23384c 0%, #111a24 58%, #0a1017 100%);
+  border-radius: var(--ds-radius-lg);
+  background:
+    linear-gradient(180deg, #0e1a22 0%, #0a1319 100%);
   overflow: hidden;
   box-shadow: var(--ds-shadow);
+  contain: paint;
+}
 
-  .road-grid {
-    position: absolute;
-    inset: 0.9rem;
-    border-radius: var(--ds-radius-md);
-    border: 1px solid #3e4f62;
-    background: linear-gradient(180deg, #2b3642 0%, #222e39 100%);
-  }
+/* ===================== roadside ===================== */
+.verdicts {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
 
-  .lane-fill {
-    position: absolute;
-    inset: 0;
-    background-image: linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0.5px, transparent 0.5px);
-    background-size: 6% 100%;
-  }
+.verdict {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 11.5%;
+  background:
+    repeating-linear-gradient(115deg, #16241d 0 9px, #131f19 9px 18px);
+  border-bottom: 1px solid rgba(120, 160, 140, 0.14);
+}
 
-  .lane-divider {
-    position: absolute;
-    left: 0;
-    right: 0;
-    border-top: 2px dashed rgba(235, 243, 251, 0.35);
+.verdict--top {
+  top: 0;
+}
 
-    &.lane-1 {
-      top: 33%;
-    }
+.verdict--bottom {
+  bottom: 0;
+  border-bottom: 0;
+  border-top: 1px solid rgba(120, 160, 140, 0.14);
+}
 
-    &.lane-2 {
-      top: 66%;
-    }
-  }
+/* ===================== road surface ===================== */
+.surface {
+  position: absolute;
+  top: 11.5%;
+  bottom: 11.5%;
+  left: 0;
+  right: 0;
+}
 
-  .direction {
-    position: absolute;
-    right: 0.55rem;
-    color: #8ca1b3;
-    font-size: 0.63rem;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+.surface__asphalt {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, #1b222b 0%, #161c24 45%, #12171e 100%);
+  box-shadow: inset 0 22px 44px rgba(0, 0, 0, 0.42);
+}
 
-    &.direction-left {
-      top: 17%;
-    }
+/* solid white edge lines */
+.surface__edge {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: rgba(228, 236, 244, 0.5);
+}
 
-    &.direction-center {
-      top: 48%;
-    }
+.surface__edge--top {
+  top: 0;
+}
 
-    &.direction-right {
-      top: 80%;
-    }
-  }
+.surface__edge--bottom {
+  bottom: 0;
+}
 
-  .ego {
-    position: absolute;
-    left: 20%;
-    transform: translate(-50%, -50%);
-    width: 4rem;
-    height: 1.65rem;
-    border-radius: 0.35rem;
-    border: 2px solid #dca95c;
-    background: linear-gradient(180deg, #cb964f 0%, #b3782f 100%);
-    box-shadow: 0 0 1.2rem rgba(220, 169, 92, 0.4);
-    display: grid;
-    place-content: center;
-    z-index: 4;
+/* dashed lane dividers */
+.surface__lane {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 2px dashed rgba(216, 226, 236, 0.4);
+}
 
-    span {
-      font-size: 0.62rem;
-      font-weight: 700;
-      letter-spacing: 0.05em;
-      color: #11171d;
-    }
-  }
+.surface__lane--1 {
+  top: 33.333%;
+}
 
-  .sensor-zone {
-    position: absolute;
-    left: 20%;
-    transform: translate(-50%, -50%);
-    pointer-events: none;
-    z-index: 2;
-  }
+.surface__lane--2 {
+  top: 66.667%;
+}
 
-  .camera-zone {
-    top: 50%;
-    width: 54%;
-    height: 62%;
-    border: 1px solid rgba(99, 177, 215, 0.45);
-    clip-path: polygon(0% 50%, 100% 14%, 100% 86%);
-    background: linear-gradient(90deg, rgba(74, 148, 184, 0.16) 0%, rgba(74, 148, 184, 0.04) 100%);
-  }
+/* ===================== direction chevrons ===================== */
+.chevrons {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  color: rgba(226, 235, 244, 0.16);
+}
 
-  .radar-zone {
-    top: 50%;
-    width: 48%;
-    height: 50%;
-    border: 1px dashed rgba(113, 219, 157, 0.55);
-    border-radius: 45% 50% 50% 45%;
-    background: radial-gradient(circle, rgba(77, 155, 114, 0.18) 0%, rgba(77, 155, 114, 0) 72%);
-  }
+.chevron {
+  position: absolute;
+  width: 0.85rem;
+  height: 1.35rem;
+  transform: translate(-50%, -50%);
+}
 
-  .blind-left,
-  .blind-right {
-    width: 10%;
-    height: 16%;
-    border-radius: 0.4rem;
-    border: 1px dashed rgba(158, 171, 186, 0.28);
-    background: rgba(100, 120, 140, 0.13);
-    top: 33%;
-  }
+/* ===================== distance scale ===================== */
+.scale {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 11.5%;
+  pointer-events: none;
+  z-index: 4;
+}
 
-  .blind-left {
-    left: 14%;
-  }
+.scale__tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 1px solid rgba(150, 180, 205, 0.18);
+}
 
-  .blind-right {
-    left: 14%;
-    top: 67%;
-  }
+.scale__tick span {
+  position: absolute;
+  top: 0.35rem;
+  left: 0.3rem;
+  font-family: var(--ds-font-mono);
+  font-size: 0.62rem;
+  color: rgba(184, 203, 219, 0.62);
+  white-space: nowrap;
+}
 
-  .item {
-    position: absolute;
-    transform: translate(-50%, -50%);
-    min-width: 2.2rem;
-    min-height: 1.2rem;
-    border-radius: 0.35rem;
-    border: 1px solid #33485b;
-    color: #f4fbff;
-    font-size: 0.62rem;
-    letter-spacing: 0.02em;
-    display: grid;
-    place-content: center;
-    padding: 0.2rem;
-    z-index: 3;
-    transition: transform 180ms ease, box-shadow 180ms ease;
+/* ===================== sensor fields of view ===================== */
+.sensors {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
 
-    .tag {
-      font-weight: 700;
-      text-align: center;
-    }
+.sensor-zone {
+  position: absolute;
+  top: 11.5%;
+  bottom: 11.5%;
+}
 
-    .distance {
-      font-size: 0.55rem;
-      color: #d7e9f7;
-      text-align: center;
-      margin-top: 0.08rem;
-    }
+/* radar: long forward corridor along the ego lane */
+.sensor-zone--radar {
+  background: linear-gradient(90deg, rgba(94, 214, 148, 0.16) 0%, rgba(94, 214, 148, 0.03) 72%, transparent 100%);
+  border-top: 1px solid rgba(94, 214, 148, 0.22);
+  border-bottom: 1px solid rgba(94, 214, 148, 0.22);
+  mask-image: linear-gradient(90deg, #000 0%, #000 78%, transparent 100%);
+}
 
-    &.vehicle {
-      background: #356d95;
-      border-radius: 0.28rem;
-    }
+/* camera: widening frustum */
+.sensor-zone--camera {
+  clip-path: polygon(0% 32%, 100% 0%, 100% 100%, 0% 68%);
+  background: linear-gradient(90deg, rgba(96, 176, 226, 0.17) 0%, rgba(96, 176, 226, 0.02) 78%, transparent 100%);
+  mask-image: linear-gradient(90deg, #000 0%, #000 82%, transparent 100%);
+}
 
-    &.pedestrian {
-      background: #97544d;
-      border-radius: 50%;
-      width: 1.65rem;
-      min-width: 1.65rem;
-      height: 1.65rem;
-    }
+/* blind spot: lateral bands beside the ego */
+.sensor-zone--blind {
+  height: 8%;
+  top: auto;
+  bottom: auto;
+  background: rgba(198, 212, 226, 0.11);
+  border: 1px dashed rgba(198, 212, 226, 0.26);
+  border-radius: 3px;
+  mask-image: none;
+}
 
-    &.sign {
-      background: #2d7d63;
-    }
+.sensor-zone--blind-left {
+  top: 11.5%;
+}
 
-    &.control {
-      background: #6e6fb6;
-    }
+.sensor-zone--blind-right {
+  bottom: 11.5%;
+}
 
-    &.hazard {
-      background: #86632f;
-    }
+.sensor-edge {
+  position: absolute;
+  top: 11.5%;
+  bottom: 11.5%;
+  width: 0;
+  z-index: 2;
+}
 
-    &.structure {
-      background: #5a7085;
-    }
+.sensor-edge--camera {
+  border-left: 1px dashed rgba(96, 176, 226, 0.65);
+}
 
-    &.detected-camera,
-    &.detected-radar {
-      box-shadow: 0 0 0.6rem rgba(109, 200, 244, 0.45);
-      transform: translate(-50%, -50%) scale(1.04);
-    }
-  }
+.sensor-edge--radar {
+  border-left: 1px dashed rgba(94, 214, 148, 0.6);
+}
 
-  .legend {
-    position: absolute;
-    bottom: 0.65rem;
-    left: 0.65rem;
-    display: flex;
-    gap: 0.6rem;
-    flex-wrap: wrap;
-    z-index: 4;
+.sensor-edge__label {
+  position: absolute;
+  bottom: 0.35rem;
+  left: 0.35rem;
+  padding: 0.12rem 0.35rem;
+  border-radius: 3px;
+  background: rgba(8, 14, 20, 0.78);
+  font-family: var(--ds-font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
 
-    span {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.25rem;
-      border: 1px solid rgba(70, 90, 109, 0.8);
-      border-radius: var(--ds-radius-sm);
-      background: rgba(12, 19, 27, 0.72);
-      color: #adc1d2;
-      padding: 0.2rem 0.35rem;
-      font-size: 0.64rem;
-    }
-
-    i {
-      width: 0.65rem;
-      height: 0.65rem;
-      border-radius: 50%;
-
-      &.camera {
-        background: rgba(99, 177, 215, 0.9);
-      }
-
-      &.radar {
-        background: rgba(113, 219, 157, 0.9);
-      }
-
-      &.blind {
-        background: rgba(158, 171, 186, 0.7);
-      }
-    }
+  /* Near the right edge the label would be clipped, so it reads leftward instead. */
+  &--flip {
+    left: auto;
+    right: 0.35rem;
   }
 }
 
-@media (max-width: 1366px) {
-  .road-shell {
-    height: 24rem;
-  }
+.sensor-edge--camera .sensor-edge__label {
+  color: #a5d3f2;
+}
+
+/* Camera and radar boundaries are usually close together, so stack their labels. */
+.sensor-edge--radar .sensor-edge__label {
+  bottom: 1.45rem;
+}
+
+.sensor-edge--radar .sensor-edge__label {
+  color: #9fe3bd;
+}
+
+/* ===================== lane tags ===================== */
+.lanes {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.lane-tag {
+  position: absolute;
+  right: 0.4rem;
+  transform: translateY(-50%);
+  font-family: var(--ds-font-mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.12em;
+  color: rgba(176, 197, 215, 0.45);
+}
+
+/* ===================== vehicles ===================== */
+.ego {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 6;
+  width: 7.2rem;
+  pointer-events: none;
+}
+
+.ego__label {
+  position: absolute;
+  left: 50%;
+  bottom: -1.15rem;
+  transform: translateX(-50%);
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  background: rgba(232, 176, 82, 0.16);
+  border: 1px solid rgba(232, 176, 82, 0.5);
+  color: #f6cf8d;
+  font-family: var(--ds-font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.14em;
+}
+
+.car {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.car__shadow {
+  fill: rgba(0, 0, 0, 0.42);
+}
+
+.car__wheels rect {
+  fill: #0c1116;
+  stroke: #1d2831;
+  stroke-width: 0.8;
+}
+
+.car--other {
+  width: 6.2rem;
+}
+
+.car--other .car__body {
+  fill: #5b7796;
+  stroke: #7c99b8;
+  stroke-width: 1;
+}
+
+.car--other .car__glass {
+  fill: #22384c;
+}
+
+.car--other .car__nose {
+  fill: #a9c6de;
+  opacity: 0.55;
+}
+
+.car--other .car__tail {
+  fill: #d98a8a;
+  opacity: 0.75;
+}
+
+.car__mirrors path {
+  fill: #c99a48;
+}
+
+.car__gloss {
+  fill: none;
+  stroke: rgba(255, 244, 222, 0.55);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+}
+
+.car__sill {
+  fill: none;
+  stroke: rgba(120, 78, 24, 0.5);
+  stroke-width: 1.2;
+  stroke-linecap: round;
+}
+
+.car__headlights path {
+  fill: #fff3cf;
+}
+
+.car__taillights path {
+  fill: #e2564f;
+}
+
+/* ===================== objects ===================== */
+.obj {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 5;
+  display: grid;
+  justify-items: center;
+  gap: 0.15rem;
+  transition: filter 140ms ease;
+}
+
+.obj--vehicle {
+  width: 6.2rem;
+}
+
+.obj--pedestrian {
+  width: 1.55rem;
+}
+
+.obj--speedLimit,
+.obj--stopSign,
+.obj--yieldSign {
+  width: 2.5rem;
+}
+
+.obj--trafficLight {
+  width: 1.35rem;
+}
+
+.obj--roundabout {
+  width: 4.2rem;
+}
+
+.obj--barrier {
+  width: 3.6rem;
+}
+
+.obj--pothole {
+  width: 3.4rem;
+}
+
+.obj--roadworks {
+  width: 2.3rem;
+}
+
+.obj--obstacle {
+  width: 1.9rem;
+}
+
+/* detection highlight (not colour-only: badge text too) */
+.obj--detected {
+  filter: drop-shadow(0 0 0.55rem rgba(122, 205, 245, 0.6));
+}
+
+.obj--radar {
+  filter: drop-shadow(0 0 0.5rem rgba(120, 224, 163, 0.55));
+}
+
+.obj__badge {
+  position: absolute;
+  top: -0.95rem;
+  padding: 0.05rem 0.3rem;
+  border-radius: 3px;
+  background: rgba(56, 130, 180, 0.9);
+  border: 1px solid rgba(140, 208, 244, 0.85);
+  color: #eaf6ff;
+  font-family: var(--ds-font-mono);
+  font-size: 0.52rem;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  z-index: 8;
+}
+
+.obj__badge--radar {
+  background: rgba(38, 122, 80, 0.9);
+  border-color: rgba(126, 224, 165, 0.8);
+  color: #e9fff3;
+}
+
+.obj__distance {
+  font-family: var(--ds-font-mono);
+  font-size: 0.56rem;
+  color: rgba(196, 214, 229, 0.75);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+  white-space: nowrap;
+}
+
+/* ===================== signs ===================== */
+.sign {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.sign--speed .sign__disc {
+  fill: #f4f6f8;
+}
+
+.sign--speed .sign__ring {
+  fill: none;
+  stroke: #d0332f;
+  stroke-width: 4.2;
+}
+
+.sign__value {
+  fill: #1a1f24;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.sign--stop .sign__disc {
+  fill: #c92f28;
+  stroke: #f3f5f7;
+  stroke-width: 2.6;
+  stroke-linejoin: round;
+}
+
+.sign__word {
+  fill: #fff;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 8.4px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-anchor: middle;
+}
+
+.sign--yield .sign__disc {
+  fill: #f2f4f6;
+  stroke: #c92f28;
+  stroke-width: 3;
+  stroke-linejoin: round;
+}
+
+.sign--yield .sign__inner {
+  fill: #c92f28;
+}
+
+/* ===================== traffic light ===================== */
+.light {
+  width: 100%;
+  height: auto;
+}
+
+.light__case {
+  fill: #1b232c;
+  stroke: #333f4b;
+  stroke-width: 1.4;
+}
+
+.light__lamp {
+  fill: #222c36;
+  stroke: rgba(0, 0, 0, 0.5);
+  stroke-width: 0.6;
+}
+
+/* active lamp is driven by the backend-reported traffic light state */
+.obj--trafficLight[data-state='RED'] .light__lamp--red {
+  fill: #e2453c;
+}
+
+.obj--trafficLight[data-state='YELLOW'] .light__lamp--amber {
+  fill: #e0a838;
+}
+
+.obj--trafficLight[data-state='GREEN'] .light__lamp--green {
+  fill: #3ec472;
+}
+
+/* ===================== structures ===================== */
+.structure {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.structure--roundabout .structure__ring {
+  fill: rgba(70, 96, 120, 0.28);
+  stroke: rgba(150, 190, 225, 0.75);
+  stroke-width: 3;
+}
+
+.structure--roundabout .structure__inner {
+  fill: rgba(28, 44, 60, 0.7);
+  stroke: rgba(150, 190, 225, 0.45);
+  stroke-width: 2;
+}
+
+.structure--roundabout .structure__arms {
+  stroke: rgba(150, 190, 225, 0.55);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.structure--barrier .structure__post {
+  fill: #3d4854;
+}
+
+.structure--barrier .structure__beam {
+  fill: #d8483f;
+}
+
+.structure--barrier .structure__stripes {
+  stroke: #f5f7f9;
+  stroke-width: 2.4;
+}
+
+/* ===================== hazards ===================== */
+.hazard {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.hazard--pothole .hazard__hole {
+  fill: #080c10;
+}
+
+.hazard--pothole .hazard__rim {
+  fill: none;
+  stroke: rgba(120, 132, 145, 0.55);
+  stroke-width: 2.5;
+  stroke-dasharray: 5 4;
+}
+
+.hazard--pothole .hazard__water {
+  fill: rgba(70, 110, 150, 0.5);
+}
+
+.hazard--roadworks .hazard__disc {
+  fill: #e0a12c;
+  stroke: #1d2229;
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.hazard--roadworks .hazard__figure {
+  fill: #1d2229;
+}
+
+.hazard--obstacle .hazard__box {
+  fill: #6c7683;
+  stroke: #97a3b1;
+  stroke-width: 2;
+}
+
+.hazard--obstacle .hazard__cross {
+  stroke: #c9d2dc;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+/* ===================== pedestrian ===================== */
+.person {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.person__head {
+  fill: #f0c9a6;
+}
+
+.person__body {
+  fill: #3d8fd4;
+  stroke: #8ec4ec;
+  stroke-width: 1.1;
+}
+
+.person__legs,
+.person__arms {
+  stroke: #2c6d9f;
+  stroke-width: 3;
+  stroke-linecap: round;
+  fill: none;
+}
+
+/* ===================== first-run invitation ===================== */
+.await {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: 7;
+  pointer-events: none;
+  padding: 1rem;
+}
+
+.await__card {
+  display: grid;
+  gap: 0.35rem;
+  justify-items: center;
+  text-align: center;
+  max-width: 27rem;
+  padding: 1.35rem 1.6rem;
+  border-radius: var(--ds-radius-md);
+  border: 1px solid var(--ds-border-strong);
+  background: rgba(10, 17, 24, 0.9);
+  backdrop-filter: blur(3px);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55);
+}
+
+.await__eyebrow {
+  font-family: var(--ds-font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ds-text-muted);
+}
+
+.await__card strong {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.22rem;
+  letter-spacing: 0.01em;
+  color: var(--ds-text-primary);
+}
+
+.await__card span:last-child {
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--ds-text-secondary);
+}
+
+/* ===================== legend ===================== */
+.legend {
+  position: absolute;
+  left: 0.6rem;
+  bottom: 0.5rem;
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  padding: 0.16rem 0.4rem;
+  border-radius: 3px;
+  border: 1px solid rgba(70, 92, 112, 0.75);
+  background: rgba(9, 15, 21, 0.8);
+  color: #a9bfd2;
+  font-size: 0.62rem;
+}
+
+.dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+}
+
+.dot--camera {
+  background: #60b0e2;
+}
+
+.dot--radar {
+  background: #5ed694;
+}
+
+.dot--blind {
+  background: #c6d6e2;
 }

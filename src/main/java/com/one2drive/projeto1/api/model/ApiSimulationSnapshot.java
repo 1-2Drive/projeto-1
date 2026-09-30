@@ -21,6 +21,7 @@ public record ApiSimulationSnapshot(
     List<String> detectedObjectIds,
     List<String> cameraDetectedObjectIds,
     List<String> radarDetectedObjectIds,
+    SensorRangesView sensorRanges,
     List<DemoPhaseView> demoPhases
 ) {
     public record EgoVehicleView(double speedKmh, double positionMeters, String lane, double accelerationMps2) {
@@ -30,6 +31,19 @@ public record ApiSimulationSnapshot(
     }
 
     public record SpeedAdvisorView(double currentKmh, double legalLimitKmh, double recommendedKmh, String action) {
+    }
+
+    /**
+     * Configured detection ranges, published so the UI can draw sensor zones from
+     * the same configuration the backend uses instead of duplicating constants.
+     */
+    public record SensorRangesView(
+        double cameraRangeMeters,
+        double radarRangeMeters,
+        double blindSpotRangeMeters,
+        long cameraRateMillis,
+        long radarRateMillis
+    ) {
     }
 
     public record DemoPhaseView(String id, String label, String status) {

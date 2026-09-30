@@ -39,12 +39,19 @@ describe('DecisionPanelComponent', () => {
       detectedObjectIds: [],
       cameraDetectedObjectIds: [],
       radarDetectedObjectIds: [],
+      sensorRanges: {
+        cameraRangeMeters: 120,
+        radarRangeMeters: 80,
+        blindSpotRangeMeters: 25,
+        cameraRateMillis: 200,
+        radarRateMillis: 100
+      },
       demoPhases: []
     });
 
     fixture.detectChanges();
 
-    const line = fixture.nativeElement.querySelector('.decision-line') as HTMLElement;
-    expect(line.classList.contains('emergency')).toBeTrue();
+    const panel = fixture.nativeElement.querySelector('.decision') as HTMLElement;
+    expect(panel.classList.contains('decision--stop')).toBeTrue();
   });
 });

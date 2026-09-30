@@ -43,14 +43,14 @@ class SimulationEngineE2ETest {
                 engine.tick();
             }
             List<String> earlyTimeline = engine.snapshot().timeline();
-            assertFalse(earlyTimeline.stream().anyMatch(line -> line.contains("SpeedLimitDetectedEvent{limitKmh=50")));
+            assertFalse(earlyTimeline.stream().anyMatch(line -> line.contains("Camera read speed limit 50 km/h")));
 
             boolean detected = false;
             boolean ruleFired = false;
             boolean decisionReduce = false;
             for (int i = 0; i < 45; i++) {
                 SimulationSnapshot s = engine.tick();
-                detected = detected || s.timeline().stream().anyMatch(line -> line.contains("SpeedLimitDetectedEvent{limitKmh=50"));
+                detected = detected || s.timeline().stream().anyMatch(line -> line.contains("Camera read speed limit 50 km/h"));
                 ruleFired = ruleFired || s.timeline().stream().anyMatch(line -> line.contains("Reduce speed when exceeding detected limit"));
                 decisionReduce = decisionReduce || DrivingAction.REDUCE_SPEED.name().equals(s.currentDecision());
                 if (detected && ruleFired && decisionReduce) {
@@ -157,13 +157,13 @@ class SimulationEngineE2ETest {
             for (int i = 0; i < 5; i++) {
                 engine.tick();
             }
-            assertFalse(engine.snapshot().timeline().stream().anyMatch(line -> line.contains("PedestrianDetectedEvent")));
+            assertFalse(engine.snapshot().timeline().stream().anyMatch(line -> line.contains("Camera read pedestrian")));
 
             boolean detected = false;
             boolean safetyDecision = false;
             for (int i = 0; i < 70; i++) {
                 SimulationSnapshot snapshot = engine.tick();
-                detected = detected || snapshot.timeline().stream().anyMatch(line -> line.contains("PedestrianDetectedEvent"));
+                detected = detected || snapshot.timeline().stream().anyMatch(line -> line.contains("Camera read pedestrian"));
                 safetyDecision = safetyDecision
                     || snapshot.currentDecision().equals(DrivingAction.BRAKE.name())
                     || snapshot.currentDecision().equals(DrivingAction.STOP.name())
@@ -207,7 +207,7 @@ class SimulationEngineE2ETest {
             boolean reacted = false;
             for (int i = 0; i < 40; i++) {
                 SimulationSnapshot snapshot = engine.tick();
-                detected = detected || snapshot.timeline().stream().anyMatch(line -> line.contains("PotholeDetectedEvent"));
+                detected = detected || snapshot.timeline().stream().anyMatch(line -> line.contains("Camera read pothole"));
                 reacted = reacted || snapshot.currentDecision().equals(DrivingAction.REDUCE_SPEED.name())
                     || snapshot.currentDecision().equals(DrivingAction.BRAKE.name());
                 if (detected && reacted) {
@@ -278,7 +278,7 @@ class SimulationEngineE2ETest {
 
             SimulationSnapshot snapshot = engine.snapshot();
             assertEquals(WeatherCondition.RAIN, engine.getWorldState().getWeatherState().getCondition());
-            assertTrue(snapshot.timeline().stream().anyMatch(line -> line.contains("ReducedVisibilityEvent") || line.contains("ReducedGripEvent")));
+            assertTrue(snapshot.timeline().stream().anyMatch(line -> line.contains("visibility reduced to") || line.contains("road grip reduced to")));
             assertTrue(snapshot.timeline().stream().anyMatch(line -> line.contains("Low visibility requires stronger speed reduction")
                 || line.contains("Low road grip requires stronger speed reduction")
                 || line.contains("Reduced grip requires cautious speed")

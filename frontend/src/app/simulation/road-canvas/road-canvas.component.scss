@@ -1,112 +1,237 @@
 .road-shell {
   position: relative;
-  height: 24rem;
-  border-radius: 0.75rem;
-  border: 1px solid #2b3b4b;
-  background: radial-gradient(circle at 20% 20%, #1b2a39 0%, #10171f 60%, #0b1016 100%);
+  height: 30rem;
+  border-radius: var(--ds-radius-lg);
+  border: 1px solid var(--ds-border);
+  background: radial-gradient(circle at 20% 20%, #23384c 0%, #111a24 58%, #0a1017 100%);
   overflow: hidden;
+  box-shadow: var(--ds-shadow);
 
   .road-grid {
     position: absolute;
-    inset: 1rem;
-    background: #2a3948;
-    border-radius: 0.65rem;
-    border: 1px solid #4d5f71;
+    inset: 0.9rem;
+    border-radius: var(--ds-radius-md);
+    border: 1px solid #3e4f62;
+    background: linear-gradient(180deg, #2b3642 0%, #222e39 100%);
   }
 
-  .lane {
+  .lane-fill {
+    position: absolute;
+    inset: 0;
+    background-image: linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0.5px, transparent 0.5px);
+    background-size: 6% 100%;
+  }
+
+  .lane-divider {
     position: absolute;
     left: 0;
     right: 0;
-    border-top: 2px dashed rgba(240, 247, 255, 0.35);
+    border-top: 2px dashed rgba(235, 243, 251, 0.35);
 
-    &.lane-top {
+    &.lane-1 {
       top: 33%;
     }
 
-    &.lane-mid {
+    &.lane-2 {
       top: 66%;
     }
+  }
 
-    &.lane-bottom {
-      display: none;
+  .direction {
+    position: absolute;
+    right: 0.55rem;
+    color: #8ca1b3;
+    font-size: 0.63rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+
+    &.direction-left {
+      top: 17%;
+    }
+
+    &.direction-center {
+      top: 48%;
+    }
+
+    &.direction-right {
+      top: 80%;
     }
   }
 
   .ego {
     position: absolute;
-    left: 22%;
+    left: 20%;
     transform: translate(-50%, -50%);
-    width: 3.2rem;
-    height: 1.5rem;
+    width: 4rem;
+    height: 1.65rem;
     border-radius: 0.35rem;
-    border: 2px solid #f2c274;
-    background: linear-gradient(180deg, #eaa53f 0%, #ce8031 100%);
-    box-shadow: 0 0 1.25rem rgba(242, 194, 116, 0.45);
+    border: 2px solid #dca95c;
+    background: linear-gradient(180deg, #cb964f 0%, #b3782f 100%);
+    box-shadow: 0 0 1.2rem rgba(220, 169, 92, 0.4);
+    display: grid;
+    place-content: center;
+    z-index: 4;
+
+    span {
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: #11171d;
+    }
+  }
+
+  .sensor-zone {
+    position: absolute;
+    left: 20%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .camera-zone {
+    top: 50%;
+    width: 54%;
+    height: 62%;
+    border: 1px solid rgba(99, 177, 215, 0.45);
+    clip-path: polygon(0% 50%, 100% 14%, 100% 86%);
+    background: linear-gradient(90deg, rgba(74, 148, 184, 0.16) 0%, rgba(74, 148, 184, 0.04) 100%);
+  }
+
+  .radar-zone {
+    top: 50%;
+    width: 48%;
+    height: 50%;
+    border: 1px dashed rgba(113, 219, 157, 0.55);
+    border-radius: 45% 50% 50% 45%;
+    background: radial-gradient(circle, rgba(77, 155, 114, 0.18) 0%, rgba(77, 155, 114, 0) 72%);
+  }
+
+  .blind-left,
+  .blind-right {
+    width: 10%;
+    height: 16%;
+    border-radius: 0.4rem;
+    border: 1px dashed rgba(158, 171, 186, 0.28);
+    background: rgba(100, 120, 140, 0.13);
+    top: 33%;
+  }
+
+  .blind-left {
+    left: 14%;
+  }
+
+  .blind-right {
+    left: 14%;
+    top: 67%;
   }
 
   .item {
     position: absolute;
     transform: translate(-50%, -50%);
-    min-width: 2rem;
-    height: 1.2rem;
+    min-width: 2.2rem;
+    min-height: 1.2rem;
     border-radius: 0.35rem;
-    border: 1px solid #2e4559;
+    border: 1px solid #33485b;
     color: #f4fbff;
     font-size: 0.62rem;
     letter-spacing: 0.02em;
     display: grid;
     place-content: center;
-    padding: 0 0.2rem;
+    padding: 0.2rem;
+    z-index: 3;
+    transition: transform 180ms ease, box-shadow 180ms ease;
+
+    .tag {
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .distance {
+      font-size: 0.55rem;
+      color: #d7e9f7;
+      text-align: center;
+      margin-top: 0.08rem;
+    }
 
     &.vehicle {
-      background: #357aa8;
+      background: #356d95;
+      border-radius: 0.28rem;
     }
 
     &.pedestrian {
-      background: #b45d53;
+      background: #97544d;
       border-radius: 50%;
-      width: 1.4rem;
-      min-width: 1.4rem;
-      height: 1.4rem;
+      width: 1.65rem;
+      min-width: 1.65rem;
+      height: 1.65rem;
     }
 
     &.sign {
-      background: #2e8f76;
+      background: #2d7d63;
     }
 
     &.control {
-      background: #8570c1;
+      background: #6e6fb6;
     }
 
     &.hazard {
-      background: #8f6730;
+      background: #86632f;
     }
 
     &.structure {
-      background: #5b7386;
+      background: #5a7085;
+    }
+
+    &.detected-camera,
+    &.detected-radar {
+      box-shadow: 0 0 0.6rem rgba(109, 200, 244, 0.45);
+      transform: translate(-50%, -50%) scale(1.04);
     }
   }
 
-  .sensor {
+  .legend {
     position: absolute;
-    left: 22%;
-    transform: translate(-50%, -50%);
-    border-radius: 50%;
-    pointer-events: none;
-  }
+    bottom: 0.65rem;
+    left: 0.65rem;
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    z-index: 4;
 
-  .sensor-camera {
-    top: 50%;
-    width: 35%;
-    aspect-ratio: 1 / 1;
-    border: 1px dashed rgba(95, 178, 198, 0.45);
-  }
+    span {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      border: 1px solid rgba(70, 90, 109, 0.8);
+      border-radius: var(--ds-radius-sm);
+      background: rgba(12, 19, 27, 0.72);
+      color: #adc1d2;
+      padding: 0.2rem 0.35rem;
+      font-size: 0.64rem;
+    }
 
-  .sensor-radar {
-    top: 50%;
-    width: 28%;
-    aspect-ratio: 1 / 1;
-    border: 1px dashed rgba(160, 226, 179, 0.4);
+    i {
+      width: 0.65rem;
+      height: 0.65rem;
+      border-radius: 50%;
+
+      &.camera {
+        background: rgba(99, 177, 215, 0.9);
+      }
+
+      &.radar {
+        background: rgba(113, 219, 157, 0.9);
+      }
+
+      &.blind {
+        background: rgba(158, 171, 186, 0.7);
+      }
+    }
+  }
+}
+
+@media (max-width: 1366px) {
+  .road-shell {
+    height: 24rem;
   }
 }

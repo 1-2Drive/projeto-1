@@ -12,6 +12,11 @@ public class RealtimeSimulationClock implements SimulationClock {
     }
 
     @Override
+    public void reset() {
+        // wall-clock time is not reset with the simulation
+    }
+
+    @Override
     public boolean isPseudo() {
         return false;
     }

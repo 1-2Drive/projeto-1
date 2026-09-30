@@ -10,7 +10,7 @@ import {
   UiModel,
   UiStatus
 } from '../models/api.models';
-import { finalize, forkJoin, Subscription } from 'rxjs';
+import { finalize, forkJoin, Observable, Subscription } from 'rxjs';
 
 @Injectable({
   providedIn: 'root'
@@ -19,6 +19,8 @@ export class SimulationStateService {
   private readonly api = inject(BackendApiService);
   private readonly stream = inject(RealtimeStreamService);
   private streamSubscription?: Subscription;
+  private reconnectTimer?: ReturnType<typeof setTimeout>;
+  private destroyed = false;
 
   private readonly state = signal<UiModel>({
     snapshot: null,
@@ -26,7 +28,8 @@ export class SimulationStateService {
     connection: {
       backendConnected: false,
       droolsActive: false,
-      simulationStatus: 'STOPPED'
+      simulationStatus: 'STOPPED',
+      streamStatus: 'DISCONNECTED'
     },
     error: null,
     loading: false
@@ -40,6 +43,7 @@ export class SimulationStateService {
   readonly loading = computed(() => this.state().loading);
 
   initialize(): void {
+    this.destroyed = false;
     this.patch({ loading: true, error: null });
     forkJoin({
       snapshot: this.api.getState(),
@@ -55,69 +59,79 @@ export class SimulationStateService {
             connection: {
               backendConnected: status.backend === 'CONNECTED',
               droolsActive: status.drools === 'ACTIVE',
-              simulationStatus: snapshot.status
+              simulationStatus: snapshot.status,
+              streamStatus: 'RECONNECTING'
             }
           });
           this.connectRealtime();
         },
         error: () => this.patch({
           error: 'Backend unavailable. Start Java server and refresh.',
-          connection: { backendConnected: false, droolsActive: false, simulationStatus: 'STOPPED' }
+          connection: { backendConnected: false, droolsActive: false, simulationStatus: 'STOPPED', streamStatus: 'DISCONNECTED' }
         })
       });
   }
 
   start(): void {
-    this.api.startSimulation().subscribe({
-      error: () => this.patch({ error: 'Unable to start simulation.' })
-    });
+    this.runCommand(this.api.startSimulation(), 'Unable to start simulation.', 'RUNNING');
   }
 
   pause(): void {
-    this.api.pauseSimulation().subscribe({
-      error: () => this.patch({ error: 'Unable to pause simulation.' })
-    });
+    this.runCommand(this.api.pauseSimulation(), 'Unable to pause simulation.', 'PAUSED');
   }
 
   resume(): void {
-    this.api.resumeSimulation().subscribe({
-      error: () => this.patch({ error: 'Unable to resume simulation.' })
-    });
+    this.runCommand(this.api.resumeSimulation(), 'Unable to resume simulation.', 'RUNNING');
   }
 
   stop(): void {
-    this.api.stopSimulation().subscribe({
-      error: () => this.patch({ error: 'Unable to stop simulation.' })
-    });
+    this.runCommand(this.api.stopSimulation(), 'Unable to stop simulation.', 'STOPPED');
   }
 
   reset(): void {
-    this.api.resetSimulation().subscribe({
-      error: () => this.patch({ error: 'Unable to reset simulation.' })
-    });
+    this.runCommand(this.api.resetSimulation(), 'Unable to reset simulation.', 'STOPPED');
   }
 
   loadScenario(id: string): void {
     this.api.loadScenario(id).subscribe({
-      error: () => this.patch({ error: `Unable to load scenario ${id}.` })
+      next: (response) => {
+        if (!response.success) this.patch({ error: response.message || `Unable to load scenario ${id}.` });
+      },
+      error: (err) => this.patch({ error: this.errorMessage(err, `Unable to load scenario ${id}.`) })
+    });
+  }
+
+  runPresentationDemo(scenarioId = 'S14_PRESENTATION_DEMO'): void {
+    this.api.loadScenario(scenarioId).subscribe({
+      next: (response) => response.success ? this.start() : this.patch({ error: response.message }),
+      error: (err) => this.patch({ error: this.errorMessage(err, `Unable to run demo scenario ${scenarioId}.`) })
     });
   }
 
   addRoadElement(payload: CreateRoadElementRequest): void {
     this.api.addRoadElement(payload).subscribe({
-      error: () => this.patch({ error: 'Failed to add road element.' })
+      next: (response) => {
+        if (!response.success) this.patch({ error: response.message });
+      },
+      error: (err) => this.patch({ error: this.errorMessage(err, 'Failed to add road element.') })
     });
   }
 
   addActor(payload: CreateActorRequest): void {
     this.api.addActor(payload).subscribe({
-      error: () => this.patch({ error: 'Failed to add actor.' })
+      next: (response) => {
+        if (!response.success) this.patch({ error: response.message });
+      },
+      error: (err) => this.patch({ error: this.errorMessage(err, 'Failed to add actor.') })
     });
   }
 
   updateEnvironment(payload: EnvironmentUpdateRequest): void {
     this.api.updateEnvironment(payload).subscribe({
-      error: () => this.patch({ error: 'Failed to update environment.' })
+      next: (response) => {
+        if (!response.success) this.patch({ error: response.message });
+      },
+      error: (err) => this.patch({ error: this.errorMessage(err, 'Failed to update environment.') })
     });
   }
 
@@ -126,29 +140,68 @@ export class SimulationStateService {
   }
 
   private connectRealtime(): void {
+    if (this.destroyed) {
+      return;
+    }
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = undefined;
+    }
     this.streamSubscription?.unsubscribe();
+    this.patch({
+      connection: {
+        ...this.state().connection,
+        streamStatus: 'RECONNECTING'
+      }
+    });
+
     this.streamSubscription = this.stream.connect().subscribe({
       next: (message) => {
         this.patch({
+          error: null,
           snapshot: message.payload,
           connection: {
             backendConnected: true,
             droolsActive: true,
-            simulationStatus: message.payload.status
+            simulationStatus: message.payload.status,
+            streamStatus: 'LIVE'
           }
         });
       },
       error: () => {
         this.patch({
-          error: 'Realtime channel disconnected.',
+          error: 'Realtime channel disconnected. Trying to reconnect...',
           connection: {
             ...this.state().connection,
             backendConnected: false,
-            droolsActive: false
+            droolsActive: false,
+            streamStatus: 'RECONNECTING'
           }
         });
+        this.reconnectTimer = setTimeout(() => this.connectRealtime(), 1200);
       }
     });
+  }
+
+  private runCommand(command$: Observable<unknown>, fallbackMessage: string, status?: 'RUNNING' | 'PAUSED' | 'STOPPED'): void {
+    command$.subscribe({
+      next: (response: unknown) => {
+        const command = response as { success?: boolean; message?: string };
+        if (command.success === false) {
+          this.patch({ error: command.message || fallbackMessage });
+          return;
+        }
+        if (status) {
+          this.patch({ connection: { ...this.state().connection, simulationStatus: status } });
+        }
+      },
+      error: (err: unknown) => this.patch({ error: this.errorMessage(err, fallbackMessage) })
+    });
+  }
+
+  private errorMessage(error: unknown, fallback: string): string {
+    const maybeMessage = (error as { error?: { message?: string } })?.error?.message;
+    return maybeMessage && typeof maybeMessage === 'string' ? maybeMessage : fallback;
   }
 
   private patch(partial: Partial<UiModel>): void {
@@ -156,6 +209,17 @@ export class SimulationStateService {
   }
 
   destroy(): void {
+    this.destroyed = true;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = undefined;
+    }
     this.streamSubscription?.unsubscribe();
+    this.patch({
+      connection: {
+        ...this.state().connection,
+        streamStatus: 'DISCONNECTED'
+      }
+    });
   }
 }

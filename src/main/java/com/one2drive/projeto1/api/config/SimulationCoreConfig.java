@@ -23,7 +23,9 @@ public class SimulationCoreConfig {
     public SimulationEngine simulationEngine(SimulationConfig config, ScenarioLibrary scenarioLibrary) {
         ScenarioDefinition defaultScenario = scenarioLibrary.findById("S1")
             .orElseGet(() -> scenarioLibrary.getScenarios().stream().findFirst().orElseThrow());
-        return new SimulationEngine(config, defaultScenario, false, decision -> {
+        // The scheduler is realtime, while the KIE clock follows simulation ticks.
+        // This keeps CEP windows deterministic across pause, reset, and slow clients.
+        return new SimulationEngine(config, defaultScenario, true, decision -> {
         });
     }
 }

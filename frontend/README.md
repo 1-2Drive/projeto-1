@@ -1,27 +1,75 @@
 # Frontend
 
-This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 18.2.21.
+Angular 18 application for the Intelligent Driving Decision Support System.
+
+This app is **presentation-only**. It renders backend world coordinates, sensor
+readings, Drools decisions, listener timelines, Working Memory and explanations,
+and it sends commands to the Spring Boot API. It never evaluates driving policy.
+
+## Prerequisites
+
+- Node.js 20.x (validated with 20.20.2) and npm 10.x (validated with 10.8.2).
+- The Spring Boot backend running on `http://localhost:8080`.
+
+## Install
+
+```bash
+npm ci
+```
 
 ## Development server
 
-Run `ng serve` for a dev server. Navigate to `http://localhost:4200/`. The application will automatically reload if you change any of the source files.
+```bash
+npm start
+```
 
-## Code scaffolding
+Serves `http://localhost:4200/` and proxies `/api` to the backend via
+`proxy.conf.json`. Hot reload is enabled.
 
-Run `ng generate component component-name` to generate a new component. You can also use `ng generate directive|pipe|service|class|guard|interface|enum|module`.
+## Tests
 
-## Build
+```bash
+npm test
+```
 
-Run `ng build` to build the project. The build artifacts will be stored in the `dist/` directory.
+Karma + Jasmine in headless Chrome (`ng test --watch=false --browsers=ChromeHeadless`).
 
-## Running unit tests
+## Production build
 
-Run `ng test` to execute the unit tests via [Karma](https://karma-runner.github.io).
+```bash
+npm run build
+```
 
-## Running end-to-end tests
+Output goes to `dist/frontend`.
 
-Run `ng e2e` to execute the end-to-end tests via a platform of your choice. To use this command, you need to first add a package that implements end-to-end testing capabilities.
+## End-to-end tests
 
-## Further help
+The E2E suite runs against the **real** stack (real Angular app, real Spring Boot
+API, real SimulationEngine, real sensors, real Drools session, real SSE stream).
+Start the backend and this dev server first.
 
-To get more help on the Angular CLI use `ng help` or go check out the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+```bash
+npm run e2e
+```
+
+Useful overrides:
+
+```bash
+# custom output directory
+npm run e2e -- --output=/tmp/projeto1-playwright
+
+# single browser executable
+PLAYWRIGHT_CHROMIUM_EXECUTABLE="/path/to/chrome" npm run e2e
+```
+
+## Source layout
+
+```text
+src/app/
+  core/          REST client, SSE client, models, signal-based state
+  simulation/    page composition, road canvas, world state
+  scenario/      scenario toolbox, element configuration, scenario library
+  telemetry/     vehicle, speed advisor, sensors
+  expert-system/ decision, working memory, inference timeline, explanation
+  shared/        status badge, flow stage
+```

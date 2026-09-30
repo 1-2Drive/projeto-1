@@ -46,4 +46,10 @@ public class RoadworksStateFact {
     public void setTimestamp(long timestamp) {
         this.timestamp = timestamp;
     }
+
+    @Override
+    public String toString() {
+        return "RoadworksStateFact{roadworksId='" + roadworksId + "', distanceMeters=" + distanceMeters
+            + ", severity=" + severity + "}";
+    }
 }

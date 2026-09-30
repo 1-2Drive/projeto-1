@@ -44,4 +44,10 @@ public class BarrierStateFact {
     public void setTimestamp(long timestamp) {
         this.timestamp = timestamp;
     }
+
+    @Override
+    public String toString() {
+        return "BarrierStateFact{barrierId='" + barrierId + "', distanceMeters=" + distanceMeters
+            + ", open=" + open + "}";
+    }
 }

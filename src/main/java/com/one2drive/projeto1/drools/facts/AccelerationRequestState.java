@@ -24,4 +24,9 @@ public class AccelerationRequestState {
     public void setTimestamp(long timestamp) {
         this.timestamp = timestamp;
     }
+
+    @Override
+    public String toString() {
+        return "AccelerationRequestState{targetSpeedKmh=" + targetSpeedKmh + "}";
+    }
 }

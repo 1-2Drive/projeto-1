@@ -1,44 +1,87 @@
 .panel {
-  background: #101a24;
-  border: 1px solid #223447;
-  border-radius: 0.6rem;
+  background: var(--ds-bg-elevated);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
   padding: 0.85rem;
-  color: #e5edf4;
+  color: var(--ds-text-primary);
 
   h3 {
     margin: 0 0 0.6rem;
     font-size: 0.8rem;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: #9fb4c8;
+    color: var(--ds-text-secondary);
   }
 
   .cards {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.5rem;
+    gap: var(--ds-space-2);
 
-    article {
-      background: #152534;
-      border-radius: 0.45rem;
+    article.metric {
+      background: var(--ds-bg-muted);
+      border-radius: var(--ds-radius-sm);
       padding: 0.5rem;
-      border: 1px solid #25465f;
+      border: 1px solid var(--ds-border);
 
       span {
         display: block;
-        color: #87a0b8;
-        font-size: 0.68rem;
+        color: var(--ds-text-muted);
+        font-size: 0.65rem;
+        letter-spacing: 0.06em;
       }
 
       strong {
         display: block;
         margin-top: 0.2rem;
-        font-size: 1.05rem;
+        font-size: 1.08rem;
+
+        em {
+          font-style: normal;
+          font-size: 0.62em;
+          color: var(--ds-text-secondary);
+        }
       }
 
-      &.action {
-        grid-column: span 2;
+      &.emphasis {
+        border-color: var(--ds-info);
       }
+    }
+
+    article.action {
+      grid-column: span 2;
+      border-radius: var(--ds-radius-sm);
+      border: 1px solid var(--ds-border);
+      background: #152434;
+      padding: 0.55rem;
+
+      span {
+        display: block;
+        color: var(--ds-text-muted);
+        font-size: 0.65rem;
+        letter-spacing: 0.06em;
+      }
+
+      strong {
+        display: block;
+        margin-top: 0.2rem;
+        font-size: 0.95rem;
+      }
+    }
+
+    &.above article.emphasis {
+      border-color: var(--ds-danger);
+      background: rgba(129, 52, 52, 0.24);
+    }
+
+    &.equal article.emphasis {
+      border-color: var(--ds-success);
+      background: rgba(53, 127, 82, 0.22);
+    }
+
+    &.below article.emphasis {
+      border-color: var(--ds-warning);
+      background: rgba(124, 102, 41, 0.22);
     }
   }
 }

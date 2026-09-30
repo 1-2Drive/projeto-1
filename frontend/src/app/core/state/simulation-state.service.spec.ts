@@ -28,7 +28,11 @@ class BackendApiServiceMock {
       recentRules: [],
       recentFacts: [],
       activeStage: 'WORLD',
-      tickMillis: 100
+      tickMillis: 100,
+      detectedObjectIds: [],
+      cameraDetectedObjectIds: [],
+      radarDetectedObjectIds: [],
+      demoPhases: []
     });
   }
 
@@ -103,7 +107,11 @@ class RealtimeStreamServiceMock {
         recentRules: [],
         recentFacts: [],
         activeStage: 'DECISION',
-        tickMillis: 100
+        tickMillis: 100,
+        detectedObjectIds: [],
+        cameraDetectedObjectIds: [],
+        radarDetectedObjectIds: [],
+        demoPhases: []
       }
     });
   }
@@ -128,6 +136,7 @@ describe('SimulationStateService', () => {
 
     expect(service.snapshot()?.status).toBe('RUNNING');
     expect(service.connection().backendConnected).toBeTrue();
+    expect(service.connection().streamStatus).toBe('LIVE');
     expect(service.scenarios().length).toBe(1);
   });
 });

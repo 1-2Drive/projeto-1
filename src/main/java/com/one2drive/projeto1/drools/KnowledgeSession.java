@@ -29,6 +29,8 @@ import org.kie.api.runtime.rule.ViewChangedEventListener;
 import java.util.function.Consumer;
 
 public class KnowledgeSession implements AutoCloseable {
+    private static final KieContainer KIE_CONTAINER = createKieContainer();
+
     private final KieSession kieSession;
     private final EventRouter router;
     private final WorkingMemoryInspector inspector;
@@ -71,7 +73,6 @@ public class KnowledgeSession implements AutoCloseable {
                                            boolean pseudoClock,
                                            boolean enableLiveQuery) {
         KieServices ks = KieServices.Factory.get();
-        KieContainer container = ks.getKieClasspathContainer();
 
         var configuration = ks.newKieSessionConfiguration();
         if (pseudoClock) {
@@ -80,7 +81,7 @@ public class KnowledgeSession implements AutoCloseable {
             configuration.setOption(ClockTypeOption.REALTIME);
         }
 
-        KieSession kieSession = container.newKieSession(configuration);
+        KieSession kieSession = KIE_CONTAINER.newKieSession(configuration);
         if (kieSession == null) {
             throw new IllegalStateException("Unable to create KieSession from classpath container");
         }
@@ -126,6 +127,10 @@ public class KnowledgeSession implements AutoCloseable {
             decision,
             liveQuery
         );
+    }
+
+    private static KieContainer createKieContainer() {
+        return KieServices.Factory.get().getKieClasspathContainer();
     }
 
     public KieSession getKieSession() {

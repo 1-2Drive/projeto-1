@@ -13,8 +13,11 @@ import com.one2drive.projeto1.simulation.SimulationEngine;
 import com.one2drive.projeto1.simulation.SimulationSnapshot;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Set;
+import java.util.stream.IntStream;
 
 @Component
 public class ApiModelMapper {
@@ -28,17 +31,22 @@ public class ApiModelMapper {
             .map(this::mapWorkingMemory)
             .toList();
 
-        List<ApiTimelineEntry> timeline = engine.getTimelineEntries().stream()
+        List<ApiTimelineEntry> allTimeline = engine.getTimelineEntries().stream()
             .map(this::mapTimeline)
             .toList();
+        int timelineStart = Math.max(0, allTimeline.size() - 160);
+        List<ApiTimelineEntry> timeline = allTimeline.subList(timelineStart, allTimeline.size());
 
-        List<String> recentRules = timeline.stream()
+        List<ApiTimelineEntry> reverseTimeline = new ArrayList<>(timeline);
+        Collections.reverse(reverseTimeline);
+
+        List<String> recentRules = reverseTimeline.stream()
             .filter(t -> t.type().contains("RULE"))
             .map(ApiTimelineEntry::message)
             .limit(20)
             .toList();
 
-        List<String> recentFacts = timeline.stream()
+        List<String> recentFacts = reverseTimeline.stream()
             .filter(t -> t.type().contains("FACT"))
             .map(ApiTimelineEntry::message)
             .limit(20)
@@ -63,12 +71,12 @@ public class ApiModelMapper {
             new ApiSimulationSnapshot.SpeedAdvisorView(
                 snapshot.egoSpeedKmh(),
                 snapshot.legalLimitKmh(),
-                snapshot.recommendedSpeedKmh(),
+                finiteOrCurrent(snapshot.recommendedSpeedKmh(), snapshot.egoSpeedKmh()),
                 snapshot.currentDecision()
             ),
             new ApiDecisionView(
                 decision.getAction().name(),
-                decision.getRecommendedSpeedKmh(),
+                finiteOrCurrent(decision.getRecommendedSpeedKmh(), snapshot.egoSpeedKmh()),
                 decision.getRiskLevel().name(),
                 decision.getReason(),
                 decision.getSourceRule(),
@@ -82,7 +90,11 @@ public class ApiModelMapper {
             recentRules,
             recentFacts,
             activeStage,
-            (int) engine.getConfig().getTickMillis()
+            (int) engine.getConfig().getTickMillis(),
+            snapshot.detectedObjectIds(),
+            snapshot.cameraDetectedObjectIds(),
+            snapshot.radarDetectedObjectIds(),
+            demoPhases(engine)
         );
     }
 
@@ -118,6 +130,33 @@ public class ApiModelMapper {
         if (latest.contains("DECISION")) {
             return "DECISION";
         }
+        if (latest.contains("ACTUATOR")) {
+            return "ACTUATOR";
+        }
+        if (latest.contains("SENSOR")) {
+            return "SENSORS";
+        }
         return "SENSORS";
+    }
+
+    private double finiteOrCurrent(double candidate, double currentSpeed) {
+        return Double.isFinite(candidate) ? candidate : currentSpeed;
+    }
+
+    private List<ApiSimulationSnapshot.DemoPhaseView> demoPhases(SimulationEngine engine) {
+        List<String> ids = List.of("normal", "speed-limit", "weather", "ttc", "yield", "pedestrian");
+        List<String> labels = List.of("Normal driving", "Speed limit", "Weather", "TTC safety", "Yield / roundabout", "Pedestrian");
+        Set<String> evidence = "S14_PRESENTATION_DEMO".equals(engine.getScenarioId())
+            ? engine.getDemoEvidence()
+            : Set.of();
+        String activeId = ids.stream().filter(id -> !evidence.contains(id)).findFirst().orElse(null);
+
+        return IntStream.range(0, ids.size())
+            .mapToObj(index -> {
+                String id = ids.get(index);
+                String status = evidence.contains(id) ? "DONE" : id.equals(activeId) ? "ACTIVE" : "PENDING";
+                return new ApiSimulationSnapshot.DemoPhaseView(id, labels.get(index), status);
+            })
+            .toList();
     }
 }

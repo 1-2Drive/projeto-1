@@ -5,5 +5,7 @@ public interface SimulationClock {
 
     void advanceBy(long millis);
 
+    void reset();
+
     boolean isPseudo();
 }

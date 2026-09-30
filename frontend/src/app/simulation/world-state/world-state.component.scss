@@ -1,15 +1,15 @@
 .panel {
-  background: #0e1721;
-  border: 1px solid #223447;
-  border-radius: 0.6rem;
+  background: #0f1823;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
   padding: 0.7rem;
-  color: #dbe8f4;
+  color: var(--ds-text-primary);
 
   h3 {
     margin: 0 0 0.65rem;
     font-size: 0.8rem;
     text-transform: uppercase;
-    color: #9fb4c8;
+    color: var(--ds-text-secondary);
     letter-spacing: 0.06em;
   }
 

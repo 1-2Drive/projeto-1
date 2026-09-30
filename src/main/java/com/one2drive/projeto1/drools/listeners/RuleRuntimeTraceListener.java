@@ -22,25 +22,25 @@ public class RuleRuntimeTraceListener extends DefaultAgendaEventListener impleme
 
     @Override
     public void matchCreated(MatchCreatedEvent event) {
-        trace.add(System.currentTimeMillis(), TimelineEntryType.RULE_ACTIVATED,
+        trace.add(event.getKieRuntime().getSessionClock().getCurrentTime(), TimelineEntryType.RULE_ACTIVATED,
             "RULE ACTIVATED \"" + event.getMatch().getRule().getName() + "\"");
     }
 
     @Override
     public void matchCancelled(MatchCancelledEvent event) {
-        trace.add(System.currentTimeMillis(), TimelineEntryType.RULE_CANCELLED,
+        trace.add(event.getKieRuntime().getSessionClock().getCurrentTime(), TimelineEntryType.RULE_CANCELLED,
             "RULE CANCELLED \"" + event.getMatch().getRule().getName() + "\"");
     }
 
     @Override
     public void beforeMatchFired(BeforeMatchFiredEvent event) {
-        trace.add(System.currentTimeMillis(), TimelineEntryType.RULE_BEFORE_FIRE,
+        trace.add(event.getKieRuntime().getSessionClock().getCurrentTime(), TimelineEntryType.RULE_BEFORE_FIRE,
             "RULE ABOUT TO FIRE \"" + event.getMatch().getRule().getName() + "\"");
     }
 
     @Override
     public void afterMatchFired(AfterMatchFiredEvent event) {
-        trace.add(System.currentTimeMillis(), TimelineEntryType.RULE_FIRED,
+        trace.add(event.getKieRuntime().getSessionClock().getCurrentTime(), TimelineEntryType.RULE_FIRED,
             "RULE FIRED \"" + event.getMatch().getRule().getName() + "\"");
     }
 

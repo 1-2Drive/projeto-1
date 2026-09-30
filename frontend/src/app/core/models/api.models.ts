@@ -1,4 +1,6 @@
 export type SimulationStatus = 'RUNNING' | 'PAUSED' | 'STOPPED';
+export type StreamStatus = 'LIVE' | 'RECONNECTING' | 'DISCONNECTED';
+export type DemoPhaseStatus = 'DONE' | 'ACTIVE' | 'PENDING';
 
 export interface ScenarioSummary {
   id: string;
@@ -82,6 +84,10 @@ export interface ApiSimulationSnapshot {
   recentFacts: string[];
   activeStage: string;
   tickMillis: number;
+  detectedObjectIds: string[];
+  cameraDetectedObjectIds: string[];
+  radarDetectedObjectIds: string[];
+  demoPhases: { id: string; label: string; status: DemoPhaseStatus }[];
 }
 
 export interface ApiSystemStatus {
@@ -123,6 +129,7 @@ export interface UiStatus {
   backendConnected: boolean;
   droolsActive: boolean;
   simulationStatus: SimulationStatus;
+  streamStatus: StreamStatus;
 }
 
 export interface UiModel {

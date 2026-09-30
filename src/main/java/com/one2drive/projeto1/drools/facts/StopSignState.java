@@ -54,4 +54,11 @@ public class StopSignState {
     public void setSatisfied(boolean satisfied) {
         this.satisfied = satisfied;
     }
+
+    @Override
+    public String toString() {
+        return "StopSignState{signId='" + signId + "', distanceMeters=" + distanceMeters
+            + ", stopStartTimestamp=" + stopStartTimestamp
+            + ", satisfied=" + satisfied + "}";
+    }
 }

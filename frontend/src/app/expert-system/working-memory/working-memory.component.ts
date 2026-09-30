@@ -30,7 +30,20 @@ export class WorkingMemoryComponent {
     return snap.workingMemory.filter((row) =>
       row.type.toLowerCase().includes(filter) ||
       row.value.toLowerCase().includes(filter) ||
-      row.stream.toLowerCase().includes(filter)
+      row.stream.toLowerCase().includes(filter) ||
+      this.statusFor(row.timestamp).toLowerCase().includes(filter)
     );
   }
+
+  protected statusFor(timestamp: number | null): string {
+    if (timestamp === null) {
+      return 'STATIC';
+    }
+    const simTime = this.snapshot()?.simulationTimeMillis ?? 0;
+    if (simTime - timestamp < 3000) {
+      return 'RECENT';
+    }
+    return 'STABLE';
+  }
+
 }

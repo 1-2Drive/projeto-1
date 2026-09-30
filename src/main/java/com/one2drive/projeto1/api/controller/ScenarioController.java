@@ -42,7 +42,7 @@ public class ScenarioController {
     }
 
     @PostMapping("/{id}/load")
-    public ResponseEntity<ApiCommandResponse> load(@PathVariable String id) {
+    public ResponseEntity<ApiCommandResponse> load(@PathVariable("id") String id) {
         runtime.loadScenario(id);
         return ResponseEntity.ok(new ApiCommandResponse(true, "Scenario loaded: " + id));
     }

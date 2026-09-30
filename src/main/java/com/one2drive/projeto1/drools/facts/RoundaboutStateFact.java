@@ -58,4 +58,11 @@ public class RoundaboutStateFact {
     public void setTimestamp(long timestamp) {
         this.timestamp = timestamp;
     }
+
+    @Override
+    public String toString() {
+        return "RoundaboutStateFact{roundaboutId='" + roundaboutId + "', distanceMeters=" + distanceMeters
+            + ", approachSpeedKmh=" + approachSpeedKmh
+            + ", occupied=" + occupied + "}";
+    }
 }

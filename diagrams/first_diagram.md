@@ -1,3 +1,13 @@
+# Modelo conceptual do sistema de apoio à decisão
+
+> **Scope note:** this diagram describes the *conceptual* driving decision-support
+> model that inspired the project. The implemented academic Expert System covers
+> the **road, environment, traffic, and manoeuvre** branches (see
+> `diagrams/01-system-architecture.md`). Driver-condition (alcohol, fatigue,
+> distraction), vehicle-fault/energy, and oncoming-traffic branches are out of the
+> current implementation scope.
+
+```mermaid
 flowchart TD
     INICIO([Iniciar avaliação de segurança]) --> LIGADO{O veículo está ligado?}
 

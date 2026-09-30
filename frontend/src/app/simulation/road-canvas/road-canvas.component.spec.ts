@@ -32,19 +32,25 @@ describe('RoadCanvasComponent', () => {
       },
       sensorReadings: {},
       worldObjects: [
-        { id: 'a', type: 'SpeedLimitSign', positionMeters: 80, lane: 'CENTER', details: 'limitKmh=50' }
+        { id: 'a', type: 'SpeedLimitSign', positionMeters: 80, lane: 'CENTER', details: 'limitKmh=50' },
+        { id: 'b', type: 'FrontVehicleActor', positionMeters: 35, lane: 'CENTER', details: 'speed=22' }
       ],
       workingMemory: [],
       recentTimeline: [],
       recentRules: [],
       recentFacts: [],
       activeStage: 'SENSORS',
-      tickMillis: 100
+      tickMillis: 100,
+      detectedObjectIds: ['a'],
+      cameraDetectedObjectIds: ['a'],
+      radarDetectedObjectIds: [],
+      demoPhases: []
     });
 
     fixture.detectChanges();
 
     const text = fixture.nativeElement.textContent;
     expect(text).toContain('50');
+    expect(text).toContain('35m');
   });
 });

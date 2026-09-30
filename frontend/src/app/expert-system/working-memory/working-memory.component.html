@@ -13,6 +13,7 @@
         <th>SOURCE</th>
         <th>TIMESTAMP</th>
         <th>STREAM</th>
+        <th>STATUS</th>
       </tr>
       </thead>
       <tbody>
@@ -23,6 +24,9 @@
             <td>{{ row.source }}</td>
             <td>{{ row.timestamp ?? '-' }}</td>
             <td>{{ row.stream }}</td>
+            <td>
+              <span class="status" [class]="'status ' + statusFor(row.timestamp).toLowerCase()">{{ statusFor(row.timestamp) }}</span>
+            </td>
           </tr>
         }
       </tbody>

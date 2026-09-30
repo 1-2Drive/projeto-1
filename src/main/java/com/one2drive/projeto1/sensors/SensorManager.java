@@ -28,6 +28,10 @@ public class SensorManager {
         return allEvents;
     }
 
+    public void reset() {
+        lastUpdateMillis.clear();
+    }
+
     public List<Sensor<Object>> getSensors() {
         return sensors;
     }

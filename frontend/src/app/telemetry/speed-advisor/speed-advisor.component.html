@@ -1,21 +1,24 @@
 <section class="panel">
   <h3>Speed Advisor</h3>
   @if (snapshot(); as s) {
-    <div class="cards">
-      <article>
-        <span>Current</span>
-        <strong data-testid="speed-current">{{ s.speedAdvisor.currentKmh | number: '1.0-0' }}</strong>
+    <div class="cards" [class]="'cards ' + deltaClass()">
+      <article class="metric">
+        <span>CURRENT SPEED</span>
+        <strong data-testid="speed-current">{{ s.speedAdvisor.currentKmh | number: '1.0-0' }} <em>km/h</em></strong>
       </article>
-      <article>
-        <span>Limit</span>
-        <strong data-testid="speed-limit">{{ s.speedAdvisor.legalLimitKmh | number: '1.0-0' }}</strong>
+
+      <article class="metric">
+        <span>LEGAL LIMIT</span>
+        <strong data-testid="speed-limit">{{ s.speedAdvisor.legalLimitKmh | number: '1.0-0' }} <em>km/h</em></strong>
       </article>
-      <article>
-        <span>Recommended</span>
-        <strong data-testid="speed-recommended">{{ s.speedAdvisor.recommendedKmh | number: '1.0-0' }}</strong>
+
+      <article class="metric emphasis">
+        <span>RECOMMENDED</span>
+        <strong data-testid="speed-recommended">{{ s.speedAdvisor.recommendedKmh | number: '1.0-0' }} <em>km/h</em></strong>
       </article>
+
       <article class="action">
-        <span>Action</span>
+        <span>ACTION</span>
         <strong data-testid="speed-action">{{ s.speedAdvisor.action }}</strong>
       </article>
     </div>

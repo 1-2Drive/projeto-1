@@ -1,6 +1,7 @@
 package rules
 
 import com.one2drive.projeto1.domain.Lane
+import com.one2drive.projeto1.domain.TrafficLightState
 import com.one2drive.projeto1.drools.events.*
 import com.one2drive.projeto1.drools.facts.*
 
@@ -311,5 +312,139 @@ when
     eval($now - $ts > 1500)
 then
     $state.setActive(false);
+    update($state);
+end
+
+rule "Clear stale front vehicle perception"
+no-loop true
+salience -100
+when
+    $state : FrontVehicleState(targetId != "none", $timestamp : timestamp)
+    VehicleStateFact($now : timestamp)
+    eval($now - $timestamp > 600)
+then
+    $state.setTargetId("none");
+    $state.setDistanceMeters(Double.POSITIVE_INFINITY);
+    $state.setRelativeSpeedMps(0.0);
+    $state.setTtcSeconds(Double.POSITIVE_INFINITY);
+    $state.setTimestamp($now);
+    update($state);
+end
+
+rule "Clear stale pedestrian perception"
+no-loop true
+salience -100
+when
+    $state : PedestrianStateFact(pedestrianId != "none", $timestamp : timestamp)
+    VehicleStateFact($now : timestamp)
+    eval($now - $timestamp > 600)
+then
+    $state.setPedestrianId("none");
+    $state.setDistanceMeters(Double.POSITIVE_INFINITY);
+    $state.setInPath(false);
+    $state.setTimestamp($now);
+    update($state);
+end
+
+rule "Clear stale stop sign perception"
+no-loop true
+salience -100
+when
+    $state : StopSignState(signId != "none", $timestamp : detectedTimestamp)
+    VehicleStateFact($now : timestamp)
+    eval($now - $timestamp > 600)
+then
+    $state.setSignId("none");
+    $state.setDistanceMeters(Double.POSITIVE_INFINITY);
+    $state.setDetectedTimestamp($now);
+    $state.setStopStartTimestamp(-1L);
+    $state.setSatisfied(false);
+    update($state);
+end
+
+rule "Clear stale yield sign perception"
+no-loop true
+salience -100
+when
+    $state : YieldSignState(signId != "none", $timestamp : timestamp)
+    VehicleStateFact($now : timestamp)
+    eval($now - $timestamp > 600)
+then
+    $state.setSignId("none");
+    $state.setDistanceMeters(Double.POSITIVE_INFINITY);
+    $state.setTimestamp($now);
+    update($state);
+end
+
+rule "Clear stale traffic light perception"
+no-loop true
+salience -100
+when
+    $state : TrafficLightStateFact(lightId != "none", $timestamp : timestamp)
+    VehicleStateFact($now : timestamp)
+    eval($now - $timestamp > 600)
+then
+    $state.setLightId("none");
+    $state.setState(TrafficLightState.GREEN);
+    $state.setDistanceMeters(Double.POSITIVE_INFINITY);
+    $state.setTimestamp($now);
+    update($state);
+end
+
+rule "Clear stale pothole perception"
+no-loop true
+salience -100
+when
+    $state : PotholeStateFact(potholeId != "none", $timestamp : timestamp)
+    VehicleStateFact($now : timestamp)
+    eval($now - $timestamp > 600)
+then
+    $state.setPotholeId("none");
+    $state.setDistanceMeters(Double.POSITIVE_INFINITY);
+    $state.setTimestamp($now);
+    update($state);
+end
+
+rule "Clear stale roadworks perception"
+no-loop true
+salience -100
+when
+    $state : RoadworksStateFact(roadworksId != "none", $timestamp : timestamp)
+    VehicleStateFact($now : timestamp)
+    eval($now - $timestamp > 600)
+then
+    $state.setRoadworksId("none");
+    $state.setDistanceMeters(Double.POSITIVE_INFINITY);
+    $state.setTimestamp($now);
+    update($state);
+end
+
+rule "Clear stale barrier perception"
+no-loop true
+salience -100
+when
+    $state : BarrierStateFact(barrierId != "none", $timestamp : timestamp)
+    VehicleStateFact($now : timestamp)
+    eval($now - $timestamp > 600)
+then
+    $state.setBarrierId("none");
+    $state.setDistanceMeters(Double.POSITIVE_INFINITY);
+    $state.setOpen(true);
+    $state.setTimestamp($now);
+    update($state);
+end
+
+rule "Clear stale roundabout perception"
+no-loop true
+salience -100
+when
+    $state : RoundaboutStateFact(roundaboutId != "none", $timestamp : timestamp)
+    VehicleStateFact($now : timestamp)
+    eval($now - $timestamp > 600)
+then
+    $state.setRoundaboutId("none");
+    $state.setDistanceMeters(Double.POSITIVE_INFINITY);
+    $state.setOccupied(false);
+    $state.setTimestamp($now);
     update($state);
 end

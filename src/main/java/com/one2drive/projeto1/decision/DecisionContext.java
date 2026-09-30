@@ -82,4 +82,14 @@ public class DecisionContext {
             evidence
         );
     }
+
+    @Override
+    public String toString() {
+        return "DecisionContext{action=" + action
+            + ", recommendedSpeedKmh=" + recommendedSpeedKmh
+            + ", riskLevel=" + riskLevel
+            + ", priority=" + priority
+            + ", sourceRule='" + sourceRule + "'"
+            + ", evidence=" + evidence + "}";
+    }
 }

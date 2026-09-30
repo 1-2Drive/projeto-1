@@ -16,4 +16,9 @@ public class ProcessedEvent {
     public long getTimestamp() {
         return timestamp;
     }
+
+    @Override
+    public String toString() {
+        return "ProcessedEvent{event=" + event + ", timestamp=" + timestamp + "}";
+    }
 }

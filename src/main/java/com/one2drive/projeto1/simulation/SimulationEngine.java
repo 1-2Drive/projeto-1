@@ -4,6 +4,7 @@ import com.one2drive.projeto1.config.SimulationConfig;
 import com.one2drive.projeto1.decision.DrivingDecision;
 import com.one2drive.projeto1.domain.Barrier;
 import com.one2drive.projeto1.domain.DynamicActor;
+import com.one2drive.projeto1.domain.DrivingAction;
 import com.one2drive.projeto1.domain.Lane;
 import com.one2drive.projeto1.domain.LaneChangeDirection;
 import com.one2drive.projeto1.domain.Pothole;
@@ -15,13 +16,27 @@ import com.one2drive.projeto1.domain.StaticObstacle;
 import com.one2drive.projeto1.domain.TrafficLight;
 import com.one2drive.projeto1.domain.WeatherCondition;
 import com.one2drive.projeto1.drools.events.AccelerationRequestEvent;
+import com.one2drive.projeto1.drools.events.BarrierDetectedEvent;
+import com.one2drive.projeto1.drools.events.FrontDistanceEvent;
 import com.one2drive.projeto1.drools.KnowledgeSession;
 import com.one2drive.projeto1.drools.WorkingMemoryFactView;
 import com.one2drive.projeto1.drools.events.LaneChangeRequestEvent;
+import com.one2drive.projeto1.drools.events.ObstacleDetectedEvent;
+import com.one2drive.projeto1.drools.events.PedestrianDetectedEvent;
+import com.one2drive.projeto1.drools.events.PotholeDetectedEvent;
+import com.one2drive.projeto1.drools.events.RoadworksDetectedEvent;
+import com.one2drive.projeto1.drools.events.RoundaboutDetectedEvent;
+import com.one2drive.projeto1.drools.events.RelativeSpeedEvent;
+import com.one2drive.projeto1.drools.events.SpeedLimitDetectedEvent;
+import com.one2drive.projeto1.drools.events.StopSignEvent;
+import com.one2drive.projeto1.drools.events.TTCEvent;
+import com.one2drive.projeto1.drools.events.TrafficLightEvent;
+import com.one2drive.projeto1.drools.events.YieldSignEvent;
 import com.one2drive.projeto1.drools.facts.CurrentSpeedLimit;
 import com.one2drive.projeto1.drools.facts.VehicleStateFact;
 import com.one2drive.projeto1.explanation.ExplanationTrace;
 import com.one2drive.projeto1.explanation.TimelineEntry;
+import com.one2drive.projeto1.explanation.TimelineEntryType;
 import com.one2drive.projeto1.scenario.ScenarioActorDefinition;
 import com.one2drive.projeto1.scenario.ScenarioDefinition;
 import com.one2drive.projeto1.scenario.ScenarioFactory;
@@ -41,9 +56,11 @@ import org.kie.api.time.SessionPseudoClock;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -51,13 +68,19 @@ import java.util.function.Consumer;
 public class SimulationEngine implements AutoCloseable {
     private final SimulationConfig config;
     private final SimulationClock simulationClock;
-    private final KnowledgeSession knowledgeSession;
+    private KnowledgeSession knowledgeSession;
     private final WorldPhysicsEngine physicsEngine;
     private final DecisionActuator actuator;
     private final SensorManager sensorManager;
     private final List<ScenarioTimedAction> timedActions;
     private final List<Runnable> pendingWorldMutations;
     private final Map<String, String> lastSensorValues;
+    private final Map<String, Long> detectedObjectTimestamps;
+    private final Map<String, Long> cameraDetectedObjectTimestamps;
+    private final Map<String, Long> radarDetectedObjectTimestamps;
+    private final Set<String> demoEvidence;
+    private final boolean pseudoClock;
+    private final Consumer<DrivingDecision> decisionConsumer;
 
     private WorldState worldState;
     private long simTimeMillis;
@@ -66,24 +89,29 @@ public class SimulationEngine implements AutoCloseable {
     private DrivingDecision currentDecision;
     private FactHandle vehicleStateHandle;
     private VehicleStateFact vehicleStateFact;
+    private String scenarioId;
 
     public SimulationEngine(SimulationConfig config,
                             ScenarioDefinition scenarioDefinition,
                             boolean pseudoClock,
                             Consumer<DrivingDecision> decisionConsumer) {
         this.config = config;
+        this.pseudoClock = pseudoClock;
+        this.decisionConsumer = decisionConsumer;
         this.simulationClock = pseudoClock ? new PseudoSimulationClock(0) : new RealtimeSimulationClock();
         this.physicsEngine = new WorldPhysicsEngine(config);
         this.actuator = new DecisionActuator(config);
         this.pendingWorldMutations = new CopyOnWriteArrayList<>();
         this.lastSensorValues = new HashMap<>();
+        this.detectedObjectTimestamps = new HashMap<>();
+        this.cameraDetectedObjectTimestamps = new HashMap<>();
+        this.radarDetectedObjectTimestamps = new HashMap<>();
+        this.demoEvidence = new HashSet<>();
 
-        ExplanationTrace trace = new ExplanationTrace(500);
-        this.knowledgeSession = pseudoClock
-            ? KnowledgeSession.createPseudoClock(trace, decisionConsumer)
-            : KnowledgeSession.createRealtime(trace, decisionConsumer);
+        this.knowledgeSession = createKnowledgeSession();
 
         this.worldState = ScenarioFactory.buildWorld(scenarioDefinition, config);
+        this.scenarioId = scenarioDefinition.getId();
         this.worldState.setSimTimeMillis(0);
         this.simTimeMillis = 0;
         this.status = SimulationStatus.STOPPED;
@@ -102,6 +130,13 @@ public class SimulationEngine implements AutoCloseable {
         ));
 
         insertInitialVehicleFact();
+    }
+
+    private KnowledgeSession createKnowledgeSession() {
+        ExplanationTrace trace = new ExplanationTrace(500);
+        return pseudoClock
+            ? KnowledgeSession.createPseudoClock(trace, decisionConsumer)
+            : KnowledgeSession.createRealtime(trace, decisionConsumer);
     }
 
     private void insertInitialVehicleFact() {
@@ -135,7 +170,12 @@ public class SimulationEngine implements AutoCloseable {
     }
 
     public synchronized void reset(ScenarioDefinition scenarioDefinition) {
+        pendingWorldMutations.clear();
+        knowledgeSession.close();
+        knowledgeSession = createKnowledgeSession();
+        simulationClock.reset();
         worldState = ScenarioFactory.buildWorld(scenarioDefinition, config);
+        scenarioId = scenarioDefinition.getId();
         worldState.setSimTimeMillis(0);
         simTimeMillis = 0;
         scenarioActionCursor = 0;
@@ -145,9 +185,12 @@ public class SimulationEngine implements AutoCloseable {
         status = SimulationStatus.STOPPED;
         currentDecision = knowledgeSession.getDrivingDecision();
         currentDecision.reset(0);
-        if (vehicleStateHandle != null) {
-            knowledgeSession.getKieSession().delete(vehicleStateHandle);
-        }
+        sensorManager.reset();
+        lastSensorValues.clear();
+        detectedObjectTimestamps.clear();
+        cameraDetectedObjectTimestamps.clear();
+        radarDetectedObjectTimestamps.clear();
+        demoEvidence.clear();
         insertInitialVehicleFact();
     }
 
@@ -176,8 +219,10 @@ public class SimulationEngine implements AutoCloseable {
         List<Object> events = sensorManager.observe(worldState, simTimeMillis);
         knowledgeSession.getDecisionContext().beginCycle(simTimeMillis, worldState.getEgo().getSpeedKmh());
         for (Object event : events) {
+            knowledgeSession.getTrace().add(simTimeMillis, TimelineEntryType.SENSOR, "SENSOR " + event);
             knowledgeSession.getRouter().insertEvent(event);
             updateSensorPanel(event);
+            recordDetectedObject(event);
         }
 
         knowledgeSession.getKieSession().fireAllRules();
@@ -190,6 +235,13 @@ public class SimulationEngine implements AutoCloseable {
 
         knowledgeSession.getTrace().addDecision(currentDecision);
         actuator.applyDecision(worldState, currentDecision);
+        knowledgeSession.getTrace().add(
+            simTimeMillis,
+            TimelineEntryType.ACTUATOR,
+            "ACTUATOR " + currentDecision.getAction() + " acceleration=" + worldState.getEgo().getAccelerationMps2()
+        );
+        markDemoEvidence(events);
+        purgeExpiredDetections();
 
         return snapshot();
     }
@@ -252,6 +304,69 @@ public class SimulationEngine implements AutoCloseable {
     private void updateSensorPanel(Object event) {
         String key = event.getClass().getSimpleName();
         lastSensorValues.put(key, String.valueOf(event));
+    }
+
+    private void recordDetectedObject(Object event) {
+        String objectId = null;
+        if (event instanceof SpeedLimitDetectedEvent e) objectId = e.getSignId();
+        else if (event instanceof TrafficLightEvent e) objectId = e.getLightId();
+        else if (event instanceof StopSignEvent e) objectId = e.getSignId();
+        else if (event instanceof YieldSignEvent e) objectId = e.getSignId();
+        else if (event instanceof PedestrianDetectedEvent e) objectId = e.getPedestrianId();
+        else if (event instanceof PotholeDetectedEvent e) objectId = e.getPotholeId();
+        else if (event instanceof BarrierDetectedEvent e) objectId = e.getBarrierId();
+        else if (event instanceof RoundaboutDetectedEvent e) objectId = e.getRoundaboutId();
+        else if (event instanceof RoadworksDetectedEvent e) objectId = e.getRoadworksId();
+        else if (event instanceof ObstacleDetectedEvent e) objectId = e.getObstacleId();
+        else if (event instanceof FrontDistanceEvent e) objectId = e.getTargetId();
+        else if (event instanceof RelativeSpeedEvent e) objectId = e.getTargetId();
+        else if (event instanceof TTCEvent e) objectId = e.getTargetId();
+        if (objectId != null && !objectId.isBlank()) {
+            detectedObjectTimestamps.put(objectId, simTimeMillis);
+            if (event instanceof FrontDistanceEvent || event instanceof RelativeSpeedEvent || event instanceof TTCEvent) {
+                radarDetectedObjectTimestamps.put(objectId, simTimeMillis);
+            } else {
+                cameraDetectedObjectTimestamps.put(objectId, simTimeMillis);
+            }
+        }
+    }
+
+    private void purgeExpiredDetections() {
+        long expiry = 600L;
+        detectedObjectTimestamps.entrySet().removeIf(entry -> simTimeMillis - entry.getValue() > expiry);
+        cameraDetectedObjectTimestamps.entrySet().removeIf(entry -> simTimeMillis - entry.getValue() > expiry);
+        radarDetectedObjectTimestamps.entrySet().removeIf(entry -> simTimeMillis - entry.getValue() > expiry);
+    }
+
+    private void markDemoEvidence(List<Object> events) {
+        if (simTimeMillis > 0) {
+            demoEvidence.add("normal");
+        }
+        boolean hasSpeedLimit = events.stream().anyMatch(SpeedLimitDetectedEvent.class::isInstance);
+        boolean hasReducedWeather = events.stream().anyMatch(event -> event instanceof com.one2drive.projeto1.drools.events.ReducedVisibilityEvent
+            || event instanceof com.one2drive.projeto1.drools.events.ReducedGripEvent);
+        boolean hasTtc = events.stream().anyMatch(TTCEvent.class::isInstance);
+        boolean hasYieldOrRoundabout = events.stream().anyMatch(event -> event instanceof YieldSignEvent || event instanceof RoundaboutDetectedEvent);
+        boolean hasPedestrian = events.stream().anyMatch(PedestrianDetectedEvent.class::isInstance);
+        DrivingAction action = currentDecision.getAction();
+
+        if (hasSpeedLimit && action == DrivingAction.REDUCE_SPEED) {
+            demoEvidence.add("speed-limit");
+        }
+        if (hasReducedWeather && action == DrivingAction.REDUCE_SPEED) {
+            demoEvidence.add("weather");
+        }
+        if (hasTtc && action == DrivingAction.EMERGENCY_BRAKE) {
+            demoEvidence.add("ttc");
+        }
+        if (hasYieldOrRoundabout && (action == DrivingAction.REDUCE_SPEED || action == DrivingAction.WAIT
+            || action == DrivingAction.CONTINUE)) {
+            demoEvidence.add("yield");
+        }
+        if (hasPedestrian && (action == DrivingAction.BRAKE || action == DrivingAction.STOP
+            || action == DrivingAction.EMERGENCY_BRAKE)) {
+            demoEvidence.add("pedestrian");
+        }
     }
 
     private void enqueueWorldMutation(Runnable mutation) {
@@ -414,7 +529,10 @@ public class SimulationEngine implements AutoCloseable {
             currentDecision.getSourceRule(),
             Map.copyOf(lastSensorValues),
             knowledgeSession.getInspector().snapshotFacts(),
-            timeline
+            timeline,
+            detectedObjectTimestamps.keySet().stream().sorted().toList(),
+            cameraDetectedObjectTimestamps.keySet().stream().sorted().toList(),
+            radarDetectedObjectTimestamps.keySet().stream().sorted().toList()
         );
     }
 
@@ -502,6 +620,14 @@ public class SimulationEngine implements AutoCloseable {
 
     public synchronized ExplanationTrace getTrace() {
         return knowledgeSession.getTrace();
+    }
+
+    public synchronized String getScenarioId() {
+        return scenarioId;
+    }
+
+    public synchronized Set<String> getDemoEvidence() {
+        return Set.copyOf(demoEvidence);
     }
 
     public synchronized List<String> queryCurrentDecision() {

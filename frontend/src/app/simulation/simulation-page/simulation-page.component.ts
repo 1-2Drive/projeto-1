@@ -45,7 +45,22 @@ export class SimulationPageComponent implements OnInit, OnDestroy {
   protected readonly scenarios = this.state.scenarios;
 
   protected readonly activeTab = signal<'timeline' | 'memory' | 'explanation' | 'world'>('timeline');
-  protected readonly simulationSeconds = computed(() => ((this.snapshot()?.simulationTimeMillis ?? 0) / 1000).toFixed(1));
+  protected readonly simulationClock = computed(() => {
+    const millis = this.snapshot()?.simulationTimeMillis ?? 0;
+    const mm = Math.floor(millis / 60_000).toString().padStart(2, '0');
+    const ss = Math.floor((millis % 60_000) / 1_000).toString().padStart(2, '0');
+    const mmm = Math.floor(millis % 1_000).toString().padStart(3, '0');
+    return `${mm}:${ss}.${mmm}`;
+  });
+  protected readonly simulationStatus = computed(() => this.vm().connection.simulationStatus);
+  protected readonly isRunning = computed(() => this.simulationStatus() === 'RUNNING');
+  protected readonly isPaused = computed(() => this.simulationStatus() === 'PAUSED');
+  protected readonly canStart = computed(() => !this.vm().loading && this.simulationStatus() === 'STOPPED');
+  protected readonly canPause = computed(() => !this.vm().loading && this.isRunning());
+  protected readonly canResume = computed(() => !this.vm().loading && this.isPaused());
+  protected readonly canStop = computed(() => !this.vm().loading && this.simulationStatus() !== 'STOPPED');
+  protected readonly canReset = computed(() => !this.vm().loading);
+  protected readonly demoPhases = computed(() => this.snapshot()?.demoPhases ?? []);
 
   ngOnInit(): void {
     this.state.initialize();
@@ -79,6 +94,18 @@ export class SimulationPageComponent implements OnInit, OnDestroy {
     this.state.reset();
   }
 
+  protected runPresentationDemo(): void {
+    this.state.runPresentationDemo();
+  }
+
+  protected restartDemo(): void {
+    this.state.runPresentationDemo();
+  }
+
+  protected stopDemo(): void {
+    this.state.stop();
+  }
+
   protected loadScenario(id: string): void {
     this.state.loadScenario(id);
   }
@@ -93,5 +120,9 @@ export class SimulationPageComponent implements OnInit, OnDestroy {
 
   protected updateEnvironment(request: EnvironmentUpdateRequest): void {
     this.state.updateEnvironment(request);
+  }
+
+  protected clearError(): void {
+    this.state.clearError();
   }
 }

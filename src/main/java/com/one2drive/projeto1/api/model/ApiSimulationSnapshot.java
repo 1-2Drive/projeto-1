@@ -17,7 +17,11 @@ public record ApiSimulationSnapshot(
     List<String> recentRules,
     List<String> recentFacts,
     String activeStage,
-    int tickMillis
+    int tickMillis,
+    List<String> detectedObjectIds,
+    List<String> cameraDetectedObjectIds,
+    List<String> radarDetectedObjectIds,
+    List<DemoPhaseView> demoPhases
 ) {
     public record EgoVehicleView(double speedKmh, double positionMeters, String lane, double accelerationMps2) {
     }
@@ -26,5 +30,8 @@ public record ApiSimulationSnapshot(
     }
 
     public record SpeedAdvisorView(double currentKmh, double legalLimitKmh, double recommendedKmh, String action) {
+    }
+
+    public record DemoPhaseView(String id, String label, String status) {
     }
 }

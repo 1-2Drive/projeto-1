@@ -11,19 +11,23 @@ sequenceDiagram
 
     API->>ENG: tick()
     ENG->>PHY: updateWorld(world, dt)
-    ENG->>ENG: advance simTime + clocks
+    ENG->>ENG: advance simTime + simulation clock
+    ENG->>ENG: advance KIE pseudo clock by tickMillis
     ENG->>ENG: flushPendingMutations()
     ENG->>ENG: runTimedActions()
     ENG->>KIE: update VehicleStateFact
     ENG->>SNS: observe(world, simTime)
     SNS-->>ENG: events[]
     loop each event
-        ENG->>KIE: router.insertEvent(event)
+        ENG->>KIE: trace SENSOR entry
+        ENG->>KIE: router.insertEvent(event) via entry point
     end
     ENG->>KIE: fireAllRules()
-    KIE-->>ENG: DecisionContext -> DrivingDecision
+    KIE-->>ENG: agenda + working-memory listener trace entries
+    KIE-->>ENG: DecisionContext proposals -> DrivingDecision
     ENG->>ACT: applyDecision(world, decision)
-    ACT-->>ENG: ego state updated
+    ACT-->>ENG: ego acceleration/lane updated
+    ENG->>KIE: trace DECISION + ACTUATOR entries
     ENG-->>API: SimulationSnapshot
     API->>SSE: publish(snapshot)
     SSE-->>ANG: realtime update

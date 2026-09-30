@@ -22,43 +22,127 @@
 
   <div class="groups">
     <article>
-      <h4>Traffic signs</h4>
+      <h4>Speed limits</h4>
       <div class="btn-grid">
-        <button type="button" (click)="submitSign(30)">30</button>
-        <button data-testid="add-speed-50" type="button" (click)="submitSign(50)">50</button>
-        <button type="button" (click)="submitSign(70)">70</button>
-        <button type="button" (click)="submitSign(90)">90</button>
-        <button type="button" (click)="submitSign(120)">120</button>
-        <button type="button" (click)="submitStop()">STOP</button>
-        <button type="button" (click)="submitYield()">YIELD</button>
+        <button type="button" (click)="quickSpeedLimit(30)">30</button>
+        <button data-testid="add-speed-50" type="button" (click)="quickSpeedLimit(50)">50</button>
+        <button type="button" (click)="quickSpeedLimit(70)">70</button>
+        <button type="button" (click)="quickSpeedLimit(90)">90</button>
+        <button type="button" (click)="quickSpeedLimit(100)">100</button>
+        <button type="button" (click)="quickSpeedLimit(120)">120</button>
+        <button type="button" (click)="openConfig('SPEED_LIMIT')">Custom</button>
       </div>
     </article>
 
     <article>
-      <h4>Traffic control</h4>
+      <h4>Traffic</h4>
       <div class="btn-grid">
-        <button type="button" (click)="submitTrafficLight('RED')">Traffic Light RED</button>
-        <button type="button" (click)="submitTrafficLight('GREEN')">Traffic Light GREEN</button>
-        <button type="button" (click)="submitBarrier(false)">Barrier Closed</button>
-        <button type="button" (click)="submitBarrier(true)">Barrier Open</button>
-        <button type="button" (click)="submitRoundabout()">Roundabout</button>
+        <button type="button" (click)="openConfig('STOP_SIGN')">Stop</button>
+        <button type="button" (click)="openConfig('YIELD_SIGN')">Yield</button>
+        <button type="button" (click)="openConfig('TRAFFIC_LIGHT')">Traffic light</button>
+        <button type="button" (click)="openConfig('ROUNDABOUT')">Roundabout</button>
       </div>
     </article>
 
     <article>
       <h4>Hazards</h4>
       <div class="btn-grid">
-        <button type="button" (click)="submitPothole()">Pothole</button>
-        <button type="button" (click)="submitRoadworks()">Roadworks</button>
+        <button type="button" (click)="openConfig('POTHOLE')">Pothole</button>
+        <button type="button" (click)="openConfig('ROADWORKS')">Roadworks</button>
+        <button type="button" (click)="openConfig('STATIC_OBSTACLE')">Obstacle</button>
+        <button type="button" (click)="openConfig('BARRIER')">Barrier</button>
       </div>
     </article>
 
     <article>
       <h4>Actors</h4>
       <div class="btn-grid">
-        <button data-testid="add-vehicle" type="button" (click)="submitVehicle()">Vehicle</button>
-        <button data-testid="add-pedestrian" type="button" (click)="submitPedestrian()">Pedestrian</button>
+        <button data-testid="add-vehicle" type="button" (click)="openConfig('FRONT_VEHICLE')">Vehicle</button>
+        <button data-testid="add-pedestrian" type="button" (click)="openConfig('PEDESTRIAN')">Pedestrian</button>
       </div>
     </article>
   </div>
+
+  @if (selectedAction(); as action) {
+    <section class="config" data-testid="config-panel">
+      <div class="config-head">
+        <h4>Configure {{ action }}</h4>
+        <button type="button" class="close" (click)="closeConfig()" aria-label="Close configuration">x</button>
+      </div>
+
+      <div class="config-form">
+        <label>
+          Lane
+          <select [ngModel]="lane()" (ngModelChange)="setLane($event)">
+            <option value="LEFT">LEFT</option>
+            <option value="CENTER">CENTER</option>
+            <option value="RIGHT">RIGHT</option>
+          </select>
+        </label>
+
+        <label>
+          Distance ahead (m)
+          <input type="number" min="1" max="1000" [ngModel]="distanceAheadMeters()" (ngModelChange)="setDistance($event)" />
+        </label>
+
+        @if (action === 'SPEED_LIMIT') {
+          <label>
+            Speed limit (km/h)
+            <input type="number" min="20" max="130" [ngModel]="speedLimitKmh()" (ngModelChange)="setSpeedLimit($event)" />
+          </label>
+        }
+
+        @if (action === 'TRAFFIC_LIGHT') {
+          <label>
+            State
+            <select [ngModel]="trafficLightState()" (ngModelChange)="setTrafficLightState($event)">
+              <option value="RED">RED</option>
+              <option value="GREEN">GREEN</option>
+              <option value="YELLOW">YELLOW</option>
+            </select>
+          </label>
+        }
+
+        @if (action === 'POTHOLE' || action === 'ROADWORKS' || action === 'STATIC_OBSTACLE') {
+          <label>
+            Severity
+            <select [ngModel]="hazardSeverity()" (ngModelChange)="setSeverity($event)">
+              <option value="LOW">LOW</option>
+              <option value="MEDIUM">MEDIUM</option>
+              <option value="HIGH">HIGH</option>
+            </select>
+          </label>
+        }
+
+        @if (action === 'BARRIER') {
+          <label>
+            Barrier state
+            <select [ngModel]="barrierOpen() ? 'true' : 'false'" (ngModelChange)="setBarrierOpen($event)">
+              <option value="false">CLOSED</option>
+              <option value="true">OPEN</option>
+            </select>
+          </label>
+        }
+
+        @if (action === 'ROUNDABOUT') {
+          <label>
+            Approach speed (km/h)
+            <input type="number" min="10" max="80" [ngModel]="roundaboutSpeedKmh()" (ngModelChange)="setRoundaboutSpeed($event)" />
+          </label>
+        }
+
+        @if (action === 'FRONT_VEHICLE' || action === 'PEDESTRIAN') {
+          <label>
+            Speed (km/h)
+            <input type="number" min="0" max="180" [ngModel]="actorSpeedKmh()" (ngModelChange)="setActorSpeed($event)" />
+          </label>
+        }
+      </div>
+
+      <div class="config-actions">
+        <button type="button" class="secondary" (click)="closeConfig()">Cancel</button>
+        <button type="button" class="primary" (click)="submitConfiguredAction()">Apply</button>
+      </div>
+    </section>
+  }
 </section>

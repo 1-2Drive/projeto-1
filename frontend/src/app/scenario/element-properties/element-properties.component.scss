@@ -1,37 +1,38 @@
 .panel {
-  background: #101a24;
-  border: 1px solid #223447;
-  border-radius: 0.6rem;
-  padding: 0.85rem;
-  color: #e5edf4;
+  background: var(--ds-bg-elevated);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  padding: 0.9rem;
+  color: var(--ds-text-primary);
   display: grid;
-  gap: 0.65rem;
+  gap: var(--ds-space-3);
 
   h3 {
     margin: 0;
     font-size: 0.8rem;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: #9fb4c8;
+    color: var(--ds-text-secondary);
   }
 
   .controls {
     display: grid;
-    gap: 0.4rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--ds-space-2);
 
     label {
       display: grid;
       gap: 0.2rem;
       font-size: 0.72rem;
-      color: #9ab0c3;
+      color: var(--ds-text-secondary);
     }
 
     select,
     input {
-      background: #142231;
-      border: 1px solid #27455d;
-      color: #e2ecf4;
-      border-radius: 0.35rem;
+      background: var(--ds-bg-muted);
+      border: 1px solid var(--ds-border);
+      color: var(--ds-text-primary);
+      border-radius: var(--ds-radius-sm);
       padding: 0.35rem 0.45rem;
       font-size: 0.75rem;
     }
@@ -42,16 +43,16 @@
     gap: 0.65rem;
 
     article {
-      background: #142231;
-      border: 1px solid #223d54;
-      border-radius: 0.45rem;
-      padding: 0.45rem;
+      background: var(--ds-bg-muted);
+      border: 1px solid var(--ds-border);
+      border-radius: var(--ds-radius-sm);
+      padding: 0.5rem;
     }
 
     h4 {
       margin: 0 0 0.4rem;
-      color: #9cc0dd;
-      font-size: 0.68rem;
+      color: #a9c4da;
+      font-size: 0.7rem;
       text-transform: uppercase;
       letter-spacing: 0.06em;
     }
@@ -63,17 +64,101 @@
     gap: 0.35rem;
 
     button {
-      background: #1c3345;
-      border: 1px solid #3a607d;
-      color: #e8f2fb;
-      border-radius: 0.35rem;
+      background: #1a2d3f;
+      border: 1px solid var(--ds-border-strong);
+      color: var(--ds-text-primary);
+      border-radius: var(--ds-radius-sm);
       padding: 0.35rem 0.45rem;
-      font-size: 0.7rem;
+      font-size: 0.72rem;
       cursor: pointer;
 
       &:hover {
-        background: #25455d;
+        background: #243c53;
       }
     }
+  }
+
+  .config {
+    border: 1px solid var(--ds-border-strong);
+    border-radius: var(--ds-radius-md);
+    background: rgba(17, 34, 48, 0.88);
+    padding: 0.7rem;
+    display: grid;
+    gap: var(--ds-space-3);
+
+    .config-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+
+      h4 {
+        margin: 0;
+        font-size: 0.78rem;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: #b8cfe1;
+      }
+
+      .close {
+        width: 1.5rem;
+        height: 1.5rem;
+        border-radius: 50%;
+        border: 1px solid var(--ds-border);
+        background: var(--ds-bg-muted);
+        color: var(--ds-text-secondary);
+        cursor: pointer;
+      }
+    }
+
+    .config-form {
+      display: grid;
+      gap: var(--ds-space-2);
+
+      label {
+        display: grid;
+        gap: 0.2rem;
+        font-size: 0.73rem;
+        color: var(--ds-text-secondary);
+      }
+
+      select,
+      input {
+        background: #0f1c28;
+        border: 1px solid var(--ds-border);
+        border-radius: var(--ds-radius-sm);
+        color: var(--ds-text-primary);
+        padding: 0.36rem 0.46rem;
+      }
+    }
+
+    .config-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: var(--ds-space-2);
+
+      button {
+        border-radius: var(--ds-radius-sm);
+        padding: 0.33rem 0.6rem;
+        cursor: pointer;
+      }
+
+      .secondary {
+        background: transparent;
+        border: 1px solid var(--ds-border);
+        color: var(--ds-text-secondary);
+      }
+
+      .primary {
+        background: rgba(55, 137, 193, 0.2);
+        border: 1px solid var(--ds-info);
+        color: #ceeaff;
+      }
+    }
+  }
+}
+
+@media (max-width: 1200px) {
+  .panel .controls {
+    grid-template-columns: 1fr;
   }
 }

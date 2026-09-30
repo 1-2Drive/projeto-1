@@ -7,7 +7,10 @@ flowchart LR
     SCENARIO[ScenarioLibrary + JSON] --> ENGINE
     CONFIG[SimulationConfig] --> ENGINE
 
-    ENGINE --> SENSORS[SensorManager]
+    ENGINE --> WORLD[WorldState]
+    WORLD --> PHYSICS[WorldPhysicsEngine]
+    PHYSICS --> WORLD
+    WORLD --> SENSORS[SensorManager]
     SENSORS --> EVENTS[Sensor Events]
     EVENTS --> ROUTER[EventRouter]
 
@@ -25,14 +28,18 @@ flowchart LR
     EP5 --> DROOLS
     EP6 --> DROOLS
 
-    DROOLS --> CTX[DecisionContext]
+    DROOLS --> CTX[DecisionContext priority arbitration]
     CTX --> DECISION[DrivingDecision]
     DECISION --> ACT[DecisionActuator]
-    ACT --> WORLD[WorldState / EgoVehicleState]
+    ACT --> WORLD
     WORLD --> ENGINE
 
     DROOLS --> TRACE[ExplanationTrace + Timeline]
+    DROOLS --> WM[WorkingMemoryInspector]
     TRACE --> API
+    WM --> API
     TRACE --> JAVA_FX
     API --> ANG
+    API --> PUBLISHER[RealtimeSnapshotPublisher]
+    PUBLISHER -->|SSE snapshots| ANG
 ```

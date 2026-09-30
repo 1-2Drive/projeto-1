@@ -134,6 +134,49 @@
     "timedActions": []
   },
   {
+    "id": "S14_PRESENTATION_DEMO",
+    "name": "Presentation demo end-to-end",
+    "initialSpeedKmh": 90,
+    "initialWeather": "CLEAR",
+    "roadElements": [],
+    "actors": [],
+    "timedActions": [
+      {
+        "triggerTimeMillis": 2000,
+        "type": "ADD_ROAD_ELEMENT",
+        "roadElement": {"type": "SPEED_LIMIT", "positionMeters": 170, "lane": "CENTER", "speedLimitKmh": 50}
+      },
+      {
+        "triggerTimeMillis": 14000,
+        "type": "SET_RAIN"
+      },
+      {
+        "triggerTimeMillis": 22000,
+        "type": "ADD_ACTOR",
+        "actor": {"type": "FRONT_VEHICLE", "positionMeters": 60, "lane": "CENTER", "speedKmh": 12}
+      },
+      {
+        "triggerTimeMillis": 34000,
+        "type": "ADD_ROAD_ELEMENT",
+        "roadElement": {"type": "YIELD_SIGN", "positionMeters": 100, "lane": "CENTER"}
+      },
+      {
+        "triggerTimeMillis": 36000,
+        "type": "ADD_ROAD_ELEMENT",
+        "roadElement": {"type": "ROUNDABOUT", "positionMeters": 130, "lane": "CENTER", "roundaboutApproachSpeedKmh": 30}
+      },
+      {
+        "triggerTimeMillis": 47000,
+        "type": "ADD_ACTOR",
+        "actor": {"type": "PEDESTRIAN", "positionMeters": 120, "lane": "CENTER", "speedKmh": 3}
+      },
+      {
+        "triggerTimeMillis": 65000,
+        "type": "CLEAR_WEATHER"
+      }
+    ]
+  },
+  {
     "id": "S12",
     "name": "Complex sequential scenario",
     "initialSpeedKmh": 90,

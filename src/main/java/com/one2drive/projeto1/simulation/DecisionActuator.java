@@ -34,7 +34,7 @@ public class DecisionActuator {
         }
 
         double recommendedSpeed = decision.getRecommendedSpeedKmh();
-        if (!Double.isNaN(recommendedSpeed)) {
+        if (decision.getAction() != DrivingAction.EMERGENCY_BRAKE && !Double.isNaN(recommendedSpeed)) {
             double current = ego.getSpeedKmh();
             if (current > recommendedSpeed + 1) {
                 ego.setAccelerationMps2(-config.getComfortableDecelerationMps2());

@@ -44,4 +44,10 @@ public class PedestrianStateFact {
     public void setTimestamp(long timestamp) {
         this.timestamp = timestamp;
     }
+
+    @Override
+    public String toString() {
+        return "PedestrianStateFact{pedestrianId='" + pedestrianId + "', distanceMeters=" + distanceMeters
+            + ", inPath=" + inPath + "}";
+    }
 }

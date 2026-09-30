@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { ElementPropertiesComponent } from '../element-properties/element-properties.component';
 import { CreateActorRequest, CreateRoadElementRequest, EnvironmentUpdateRequest } from '../../core/models/api.models';
 
@@ -20,12 +20,14 @@ import { CreateActorRequest, CreateRoadElementRequest, EnvironmentUpdateRequest 
         <button type="button" (click)="updateEnvironment.emit({ visibilityFactor: 0.55 })">Low visibility</button>
         <button type="button" (click)="updateEnvironment.emit({ gripFactor: 0.55 })">Low grip</button>
       </div>
+      <p class="hint">Simulation: {{ simulationStatus() }}</p>
     </section>
   `,
   styleUrl: './toolbox.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ToolboxComponent {
+  readonly simulationStatus = input<'RUNNING' | 'PAUSED' | 'STOPPED'>('STOPPED');
   readonly createRoadElement = output<CreateRoadElementRequest>();
   readonly createActor = output<CreateActorRequest>();
   readonly updateEnvironment = output<EnvironmentUpdateRequest>();

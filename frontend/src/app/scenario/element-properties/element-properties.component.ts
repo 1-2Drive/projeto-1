@@ -2,6 +2,19 @@ import { ChangeDetectionStrategy, Component, output, signal } from '@angular/cor
 import { FormsModule } from '@angular/forms';
 import { CreateActorRequest, CreateRoadElementRequest } from '../../core/models/api.models';
 
+type ToolboxAction =
+  | 'SPEED_LIMIT'
+  | 'STOP_SIGN'
+  | 'YIELD_SIGN'
+  | 'TRAFFIC_LIGHT'
+  | 'ROUNDABOUT'
+  | 'POTHOLE'
+  | 'ROADWORKS'
+  | 'STATIC_OBSTACLE'
+  | 'BARRIER'
+  | 'FRONT_VEHICLE'
+  | 'PEDESTRIAN';
+
 @Component({
   selector: 'app-element-properties',
   standalone: true,
@@ -17,6 +30,68 @@ export class ElementPropertiesComponent {
   readonly lane = signal('CENTER');
   readonly distanceAheadMeters = signal(150);
   readonly actorSpeedKmh = signal(30);
+  readonly selectedAction = signal<ToolboxAction | null>(null);
+  readonly speedLimitKmh = signal(50);
+  readonly trafficLightState = signal('RED');
+  readonly hazardSeverity = signal('HIGH');
+  readonly barrierOpen = signal(false);
+  readonly roundaboutSpeedKmh = signal(30);
+
+  protected openConfig(action: ToolboxAction): void {
+    this.selectedAction.set(action);
+  }
+
+  protected closeConfig(): void {
+    this.selectedAction.set(null);
+  }
+
+  protected submitConfiguredAction(): void {
+    const action = this.selectedAction();
+    if (!action) {
+      return;
+    }
+    switch (action) {
+      case 'SPEED_LIMIT':
+        this.submitSign(this.speedLimitKmh());
+        break;
+      case 'STOP_SIGN':
+        this.submitStop();
+        break;
+      case 'YIELD_SIGN':
+        this.submitYield();
+        break;
+      case 'TRAFFIC_LIGHT':
+        this.submitTrafficLight(this.trafficLightState());
+        break;
+      case 'ROUNDABOUT':
+        this.submitRoundabout();
+        break;
+      case 'POTHOLE':
+        this.submitPothole();
+        break;
+      case 'ROADWORKS':
+        this.submitRoadworks();
+        break;
+      case 'STATIC_OBSTACLE':
+        this.submitStaticObstacle();
+        break;
+      case 'BARRIER':
+        this.submitBarrier(this.barrierOpen());
+        break;
+      case 'FRONT_VEHICLE':
+        this.submitVehicle();
+        break;
+      case 'PEDESTRIAN':
+        this.submitPedestrian();
+        break;
+    }
+    this.closeConfig();
+  }
+
+  protected quickSpeedLimit(limit: number): void {
+    this.speedLimitKmh.set(limit);
+    this.submitSign(limit);
+  }
 
   protected submitSign(limit: number): void {
     this.createRoadElement.emit({
@@ -58,7 +133,7 @@ export class ElementPropertiesComponent {
       type: 'POTHOLE',
       lane: this.lane(),
       distanceAheadMeters: this.distanceAheadMeters(),
-      severity: 'HIGH'
+      severity: this.hazardSeverity()
     });
   }
 
@@ -67,7 +142,16 @@ export class ElementPropertiesComponent {
       type: 'ROADWORKS',
       lane: this.lane(),
       distanceAheadMeters: this.distanceAheadMeters(),
-      severity: 'MEDIUM'
+      severity: this.hazardSeverity()
+    });
+  }
+
+  protected submitStaticObstacle(): void {
+    this.createRoadElement.emit({
+      type: 'STATIC_OBSTACLE',
+      lane: this.lane(),
+      distanceAheadMeters: this.distanceAheadMeters(),
+      severity: this.hazardSeverity()
     });
   }
 
@@ -76,7 +160,7 @@ export class ElementPropertiesComponent {
       type: 'ROUNDABOUT',
       lane: this.lane(),
       distanceAheadMeters: this.distanceAheadMeters(),
-      roundaboutApproachSpeedKmh: 30
+      roundaboutApproachSpeedKmh: this.roundaboutSpeedKmh()
     });
   }
 
@@ -94,7 +178,7 @@ export class ElementPropertiesComponent {
       type: 'PEDESTRIAN',
       lane: this.lane(),
       distanceAheadMeters: this.distanceAheadMeters(),
-      speedKmh: 4
+      speedKmh: Math.min(this.actorSpeedKmh(), 10)
     });
   }
 
@@ -108,5 +192,25 @@ export class ElementPropertiesComponent {
 
   protected setActorSpeed(value: string): void {
     this.actorSpeedKmh.set(Math.max(0, Number(value)));
+  }
+
+  protected setSpeedLimit(value: string): void {
+    this.speedLimitKmh.set(Math.max(20, Math.min(130, Number(value))));
+  }
+
+  protected setTrafficLightState(value: string): void {
+    this.trafficLightState.set(value);
+  }
+
+  protected setSeverity(value: string): void {
+    this.hazardSeverity.set(value);
+  }
+
+  protected setBarrierOpen(value: string): void {
+    this.barrierOpen.set(value === 'true');
+  }
+
+  protected setRoundaboutSpeed(value: string): void {
+    this.roundaboutSpeedKmh.set(Math.max(10, Math.min(80, Number(value))));
   }
 }

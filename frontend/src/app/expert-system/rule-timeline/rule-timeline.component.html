@@ -1,11 +1,18 @@
 <section class="panel" data-testid="timeline-panel">
-  <h3>Inference Timeline</h3>
+  <div class="head">
+    <h3>Inference Timeline</h3>
+    <div class="filters" role="tablist" aria-label="Timeline filters">
+      @for (type of eventTypes; track type) {
+         <button type="button" role="tab" [attr.aria-selected]="selectedType === type" [class.active]="selectedType === type" (click)="setType(type)">{{ type }}</button>
+      }
+    </div>
+  </div>
   <div class="timeline">
     @if (snapshot(); as s) {
-      @for (entry of s.recentTimeline; track entry.timestamp + entry.message) {
-        <article>
+       @for (entry of filteredEntries(); track $index) {
+        <article [class]="'entry tag-' + tagFor(entry.type, entry.message).toLowerCase()">
           <time>{{ (entry.timestamp / 1000) | number: '1.3-3' }}s</time>
-          <strong>{{ entry.type }}</strong>
+          <strong>{{ tagFor(entry.type, entry.message) }}</strong>
           <p>{{ entry.message }}</p>
         </article>
       }

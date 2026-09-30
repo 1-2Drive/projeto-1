@@ -17,7 +17,7 @@ public class WorkingMemoryTraceListener extends DefaultRuleRuntimeEventListener 
     @Override
     public void objectInserted(ObjectInsertedEvent event) {
         trace.add(
-            System.currentTimeMillis(),
+            event.getKieRuntime().getSessionClock().getCurrentTime(),
             TimelineEntryType.FACT_INSERTED,
             "FACT INSERTED " + String.valueOf(event.getObject())
         );
@@ -26,7 +26,7 @@ public class WorkingMemoryTraceListener extends DefaultRuleRuntimeEventListener 
     @Override
     public void objectUpdated(ObjectUpdatedEvent event) {
         trace.add(
-            System.currentTimeMillis(),
+            event.getKieRuntime().getSessionClock().getCurrentTime(),
             TimelineEntryType.FACT_UPDATED,
             "FACT UPDATED " + String.valueOf(event.getObject())
         );
@@ -35,7 +35,7 @@ public class WorkingMemoryTraceListener extends DefaultRuleRuntimeEventListener 
     @Override
     public void objectDeleted(ObjectDeletedEvent event) {
         trace.add(
-            System.currentTimeMillis(),
+            event.getKieRuntime().getSessionClock().getCurrentTime(),
             TimelineEntryType.FACT_DELETED,
             "FACT DELETED " + String.valueOf(event.getOldObject())
         );

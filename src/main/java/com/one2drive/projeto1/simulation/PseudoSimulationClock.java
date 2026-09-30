@@ -18,6 +18,11 @@ public class PseudoSimulationClock implements SimulationClock {
     }
 
     @Override
+    public void reset() {
+        this.nowMillis = 0L;
+    }
+
+    @Override
     public boolean isPseudo() {
         return true;
     }

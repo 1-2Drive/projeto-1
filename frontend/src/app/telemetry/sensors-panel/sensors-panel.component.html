@@ -2,9 +2,9 @@
   <h3>Sensors</h3>
   @if (snapshot(); as s) {
     <div class="sensor-list">
-      @for (entry of s.sensorReadings | keyvalue; track entry.key) {
+      @for (entry of sensorRows(); track entry.key) {
         <div class="row">
-          <span>{{ entry.key }}</span>
+          <span>{{ formatLabel(entry.key) }}</span>
           <strong>{{ entry.value }}</strong>
         </div>
       }

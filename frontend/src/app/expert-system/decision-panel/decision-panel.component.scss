@@ -1,42 +1,96 @@
 .panel {
-  background: #101a24;
-  border: 1px solid #223447;
-  border-radius: 0.6rem;
+  background: var(--ds-bg-elevated);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
   padding: 0.85rem;
-  color: #e5edf4;
+  color: var(--ds-text-primary);
 
   h3 {
     margin: 0 0 0.6rem;
     font-size: 0.8rem;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: #9fb4c8;
+    color: var(--ds-text-secondary);
   }
 
   .decision-line {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    border: 1px solid var(--ds-border);
+    border-radius: var(--ds-radius-sm);
+    background: var(--ds-bg-muted);
+    padding: 0.5rem;
 
     strong {
-      font-size: 1.05rem;
+      font-size: 1.02rem;
       color: #f0f5fa;
+      letter-spacing: 0.03em;
     }
 
     .risk {
       font-size: 0.72rem;
-      background: #28425a;
-      border: 1px solid #456888;
+      border: 1px solid;
       border-radius: 999px;
       padding: 0.18rem 0.55rem;
+
+      &.risk-high {
+        background: rgba(129, 52, 52, 0.24);
+        border-color: var(--ds-danger);
+        color: #ffd2d2;
+      }
+
+      &.risk-medium {
+        background: rgba(124, 102, 41, 0.22);
+        border-color: var(--ds-warning);
+        color: #ffe5a5;
+      }
+
+      &.risk-low {
+        background: rgba(53, 127, 82, 0.22);
+        border-color: var(--ds-success);
+        color: #caefda;
+      }
+    }
+
+    &.emergency {
+      border-color: #954646;
+      background: rgba(129, 52, 52, 0.22);
+
+      strong {
+        color: #ffd2d2;
+      }
     }
   }
 
-  .reason,
-  .rule {
+  .kvs {
+    margin-top: 0.5rem;
+    display: grid;
+    gap: 0.3rem;
+
+    p {
+      margin: 0;
+      display: flex;
+      justify-content: space-between;
+      gap: 0.5rem;
+      font-size: 0.75rem;
+
+      span {
+        color: var(--ds-text-secondary);
+      }
+
+      strong {
+        color: var(--ds-text-primary);
+        font-weight: 600;
+        text-align: right;
+      }
+    }
+  }
+
+  .reason {
     margin: 0.5rem 0 0;
     font-size: 0.78rem;
-    color: #c0d0de;
+    color: #c2d2df;
     line-height: 1.35;
   }
 }

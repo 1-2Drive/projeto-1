@@ -1,4 +1,6 @@
 .flow {
+  min-width: 0;
+  max-width: 100%;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -9,15 +11,15 @@
 
   .step {
     padding: 0.2rem 0.44rem;
-    border-radius: 0.35rem;
-    background: #162230;
-    color: #95a8bb;
-    border: 1px solid #1f3142;
+    border-radius: var(--ds-radius-sm);
+    background: var(--ds-bg-muted);
+    color: var(--ds-text-secondary);
+    border: 1px solid var(--ds-border);
 
     &.active {
       color: #f7f9fb;
-      background: #315372;
-      border-color: #5a86b2;
+      background: rgba(49, 83, 114, 0.55);
+      border-color: var(--ds-info);
       box-shadow: 0 0 0.5rem rgba(90, 134, 178, 0.35);
     }
   }

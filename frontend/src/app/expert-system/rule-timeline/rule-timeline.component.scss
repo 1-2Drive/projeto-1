@@ -1,28 +1,57 @@
 .panel {
-  background: #0e1721;
-  border: 1px solid #223447;
-  border-radius: 0.6rem;
+  background: #0f1823;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
   padding: 0.7rem;
-  color: #dbe8f4;
+  color: var(--ds-text-primary);
   height: 100%;
+
+  .head {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--ds-space-2);
+    align-items: center;
+    flex-wrap: wrap;
+  }
 
   h3 {
     margin: 0 0 0.65rem;
     font-size: 0.8rem;
     text-transform: uppercase;
-    color: #9fb4c8;
+    color: var(--ds-text-secondary);
     letter-spacing: 0.06em;
   }
 
+  .filters {
+    display: flex;
+    gap: 0.28rem;
+    flex-wrap: wrap;
+
+    button {
+      border: 1px solid var(--ds-border);
+      border-radius: var(--ds-radius-sm);
+      padding: 0.2rem 0.4rem;
+      font-size: 0.64rem;
+      background: var(--ds-bg-muted);
+      color: var(--ds-text-secondary);
+      cursor: pointer;
+
+      &.active {
+        border-color: var(--ds-info);
+        color: #d0e9ff;
+      }
+    }
+  }
+
   .timeline {
-    max-height: 15.5rem;
+    max-height: 20rem;
     overflow: auto;
     display: grid;
     gap: 0.45rem;
 
-    article {
-      border: 1px solid #1f3142;
-      border-radius: 0.45rem;
+    article.entry {
+      border: 1px solid var(--ds-border);
+      border-radius: var(--ds-radius-sm);
       background: #132233;
       padding: 0.4rem 0.55rem;
       display: grid;
@@ -30,12 +59,14 @@
 
       time {
         font-size: 0.66rem;
-        color: #8ea7bb;
+        color: var(--ds-text-muted);
+        font-family: var(--ds-font-mono);
       }
 
       strong {
         font-size: 0.72rem;
         color: #d7e5f2;
+        letter-spacing: 0.04em;
       }
 
       p {
@@ -43,6 +74,26 @@
         font-size: 0.72rem;
         color: #bacbd9;
         line-height: 1.25;
+      }
+
+      &.tag-sensor {
+        border-left: 3px solid #4e89b4;
+      }
+
+      &.tag-fact {
+        border-left: 3px solid #71a8d1;
+      }
+
+      &.tag-rule {
+        border-left: 3px solid #c8a85d;
+      }
+
+      &.tag-decision {
+        border-left: 3px solid #66b987;
+      }
+
+      &.tag-actuator {
+        border-left: 3px solid #b07db7;
       }
     }
   }

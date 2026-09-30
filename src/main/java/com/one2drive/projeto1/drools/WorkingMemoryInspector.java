@@ -72,8 +72,16 @@ public class WorkingMemoryInspector {
     }
 
     private String inferStream(String type) {
-        if (type.contains("Speed") || type.contains("Acceleration") || type.contains("LaneChangeRequest")) {
-            return "VEHICLE_OR_COMMAND";
+        if (type.contains("SpeedLimit") || type.contains("StopSign") || type.contains("YieldSign")
+            || type.contains("Pothole") || type.contains("Roadworks") || type.contains("Obstacle")
+            || type.contains("Barrier") || type.contains("Roundabout")) {
+            return "ROAD_STREAM";
+        }
+        if (type.contains("VehicleSpeed")) {
+            return "VEHICLE_STREAM";
+        }
+        if (type.contains("Acceleration") || type.contains("LaneChangeRequest")) {
+            return "COMMAND_STREAM";
         }
         if (type.contains("TTC") || type.contains("FrontDistance") || type.contains("RelativeSpeed") || type.contains("LaneOccupancy") || type.contains("Pedestrian")) {
             return "PERCEPTION_STREAM";
@@ -83,9 +91,6 @@ public class WorkingMemoryInspector {
         }
         if (type.contains("TrafficLight")) {
             return "TRAFFIC_STREAM";
-        }
-        if (type.contains("Sign") || type.contains("Pothole") || type.contains("Roadworks") || type.contains("Obstacle") || type.contains("Barrier") || type.contains("Roundabout")) {
-            return "ROAD_STREAM";
         }
         return "-";
     }

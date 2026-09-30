@@ -2,12 +2,13 @@
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  border-radius: 999px;
-  border: 1px solid #5f6f7f;
-  padding: 0.3rem 0.65rem;
+  border-radius: var(--ds-radius-sm);
+  border: 1px solid var(--ds-border);
+  padding: 0.25rem 0.5rem;
   font-size: 0.72rem;
   letter-spacing: 0.05em;
   font-family: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  background: rgba(17, 27, 37, 0.7);
 
   .dot {
     width: 0.52rem;
@@ -17,12 +18,12 @@
   }
 
   .label {
-    color: #5f6f7f;
+    color: var(--ds-text-muted);
     font-weight: 600;
   }
 
   .value {
-    color: #d6dde5;
+    color: var(--ds-text-primary);
     font-weight: 700;
   }
 

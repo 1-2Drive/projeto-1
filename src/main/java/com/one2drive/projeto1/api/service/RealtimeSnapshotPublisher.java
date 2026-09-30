@@ -7,7 +7,6 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -31,14 +30,18 @@ public class RealtimeSnapshotPublisher {
         for (SseEmitter emitter : emitters) {
             try {
                 emitter.send(SseEmitter.event().name("snapshot").data(payload));
-            } catch (IOException ex) {
+            } catch (IOException | IllegalStateException ex) {
                 stale.add(emitter);
             }
         }
 
         for (SseEmitter emitter : stale) {
             emitters.remove(emitter);
-            emitter.completeWithError(new IOException("SSE channel closed"));
+            try {
+                emitter.complete();
+            } catch (IllegalStateException ignored) {
+                // The client may have completed the emitter concurrently.
+            }
         }
     }
 }

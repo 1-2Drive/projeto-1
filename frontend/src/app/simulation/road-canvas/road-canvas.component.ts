@@ -1,17 +1,23 @@
+import { DecimalPipe, NgIf } from '@angular/common';
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { ApiRoadElement, ApiSimulationSnapshot } from '../../core/models/api.models';
 
 interface RenderItem {
   id: string;
   label: string;
+  kind: string;
   typeClass: string;
   x: number;
   y: number;
+  relativeMeters: number;
+  detectedByCamera: boolean;
+  detectedByRadar: boolean;
 }
 
 @Component({
   selector: 'app-road-canvas',
   standalone: true,
+  imports: [NgIf, DecimalPipe],
   templateUrl: './road-canvas.component.html',
   styleUrl: './road-canvas.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -32,10 +38,22 @@ export class RoadCanvasComponent {
       .map((item) => ({
         id: item.id,
         label: this.typeLabel(item),
+        kind: item.type,
         typeClass: this.typeClass(item),
         x: this.toPercentX(item.positionMeters),
-        y: this.toPercentY(item.lane)
+        y: this.toPercentY(item.lane),
+        relativeMeters: item.positionMeters,
+        detectedByCamera: snapshot.cameraDetectedObjectIds.includes(item.id),
+        detectedByRadar: snapshot.radarDetectedObjectIds.includes(item.id)
       }));
+  }
+
+  protected laneGuides(): number[] {
+    return [27, 50, 73];
+  }
+
+  protected shouldUseDetail(item: RenderItem): boolean {
+    return item.typeClass === 'vehicle' || item.typeClass === 'pedestrian';
   }
 
   protected egoLaneY(): number {

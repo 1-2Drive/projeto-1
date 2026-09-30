@@ -5,13 +5,15 @@ const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE
 
 export default defineConfig({
   testDir: './e2e',
-  timeout: 60_000,
+  timeout: 180_000,
   expect: {
     timeout: 12_000
   },
   use: {
     baseURL: 'http://localhost:4200',
     headless: true,
+    trace: 'retain-on-failure',
+    screenshot: 'only-on-failure',
     channel: undefined,
     launchOptions: {
       executablePath

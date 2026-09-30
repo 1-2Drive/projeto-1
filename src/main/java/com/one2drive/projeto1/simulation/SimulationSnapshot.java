@@ -19,7 +19,10 @@ public record SimulationSnapshot(
     String sourceRule,
     Map<String, String> sensorValues,
     List<String> workingMemoryFacts,
-    List<String> timeline
+    List<String> timeline,
+    List<String> detectedObjectIds,
+    List<String> cameraDetectedObjectIds,
+    List<String> radarDetectedObjectIds
 ) {
     public static SimulationSnapshot empty() {
         return new SimulationSnapshot(
@@ -35,6 +38,9 @@ public record SimulationSnapshot(
             "No restrictive condition detected",
             "Default maintain speed baseline",
             Map.of(),
+            List.of(),
+            List.of(),
+            List.of(),
             List.of(),
             List.of()
         );

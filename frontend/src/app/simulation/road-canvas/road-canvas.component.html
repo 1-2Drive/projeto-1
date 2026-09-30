@@ -1,18 +1,40 @@
 <section class="road-shell">
-  <div class="road-grid">
-    <div class="lane lane-top"></div>
-    <div class="lane lane-mid"></div>
-    <div class="lane lane-bottom"></div>
+  <div class="road-grid" aria-hidden="true">
+    <div class="lane-fill"></div>
+    <div class="lane-divider lane-1"></div>
+    <div class="lane-divider lane-2"></div>
+    <div class="direction direction-left">LEFT</div>
+    <div class="direction direction-center">CENTER</div>
+    <div class="direction direction-right">RIGHT</div>
   </div>
 
-  <div class="ego" [style.top.%]="egoLaneY()"></div>
+  <div class="sensor-zone camera-zone" aria-hidden="true"></div>
+  <div class="sensor-zone radar-zone" aria-hidden="true"></div>
+  <div class="sensor-zone blind-left" aria-hidden="true"></div>
+  <div class="sensor-zone blind-right" aria-hidden="true"></div>
+
+  <div class="ego" [style.top.%]="egoLaneY()" data-testid="road-ego">
+    <span>EGO</span>
+  </div>
 
   @for (item of renderItems(); track item.id) {
-    <div class="item" [class]="'item ' + item.typeClass" [style.left.%]="item.x" [style.top.%]="item.y">
-      {{ item.label }}
+    <div
+      class="item"
+      [class]="'item ' + item.typeClass"
+      [class.detected-camera]="item.detectedByCamera"
+      [class.detected-radar]="item.detectedByRadar"
+      [style.left.%]="item.x"
+      [style.top.%]="item.y"
+      [attr.aria-label]="item.kind + ' at ' + item.relativeMeters.toFixed(1) + ' meters'"
+    >
+      <span class="tag">{{ item.label }}</span>
+      <span class="distance" *ngIf="shouldUseDetail(item)">{{ item.relativeMeters | number: '1.0-0' }}m</span>
     </div>
   }
 
-  <div class="sensor sensor-camera"></div>
-  <div class="sensor sensor-radar"></div>
+  <div class="legend">
+    <span><i class="camera"></i> Camera zone</span>
+    <span><i class="radar"></i> Front radar zone</span>
+    <span><i class="blind"></i> Blind spots</span>
+  </div>
 </section>

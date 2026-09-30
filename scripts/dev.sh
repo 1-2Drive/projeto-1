@@ -15,6 +15,20 @@ cleanup() {
   fi
 }
 
+wait_for_url() {
+  local url="$1"
+  local label="$2"
+  for _ in {1..60}; do
+    if curl --silent --fail "${url}" >/dev/null 2>&1; then
+      echo "[dev] ${label} ready"
+      return 0
+    fi
+    sleep 1
+  done
+  echo "[dev] ${label} did not become ready: ${url}" >&2
+  return 1
+}
+
 trap cleanup EXIT INT TERM
 
 echo "[dev] starting backend on http://localhost:8080"
@@ -24,12 +38,16 @@ echo "[dev] starting backend on http://localhost:8080"
 ) &
 BACKEND_PID=$!
 
+wait_for_url "http://localhost:8080/api/simulation/status" "backend"
+
 echo "[dev] starting frontend on http://localhost:4200"
 (
   cd "${ROOT_DIR}/frontend"
   npm start
 ) &
 FRONTEND_PID=$!
+
+wait_for_url "http://localhost:4200" "frontend"
 
 echo "[dev] backend pid=${BACKEND_PID}, frontend pid=${FRONTEND_PID}"
 wait

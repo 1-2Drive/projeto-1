@@ -1,16 +1,16 @@
 .panel {
-  background: #101a24;
-  border: 1px solid #223447;
-  border-radius: 0.6rem;
+  background: var(--ds-bg-elevated);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
   padding: 0.85rem;
-  color: #e5edf4;
+  color: var(--ds-text-primary);
 
   h3 {
     margin: 0 0 0.6rem;
     font-size: 0.8rem;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: #9fb4c8;
+    color: var(--ds-text-secondary);
   }
 
   .kv {
@@ -20,7 +20,7 @@
     font-size: 0.85rem;
 
     span {
-      color: #9fb4c8;
+      color: var(--ds-text-secondary);
     }
   }
 }

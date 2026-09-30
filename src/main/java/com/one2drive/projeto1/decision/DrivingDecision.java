@@ -24,7 +24,7 @@ public class DrivingDecision {
 
     public void reset(long timestamp) {
         this.action = DrivingAction.CONTINUE;
-        this.recommendedSpeedKmh = Double.NaN;
+        this.recommendedSpeedKmh = 0.0;
         this.riskLevel = RiskLevel.LOW;
         this.priority = 0;
         this.reason = "No restrictive condition detected";

@@ -2,10 +2,15 @@
   <h3>Explanation</h3>
   @if (snapshot(); as s) {
     <div class="box">
-      <p><strong>Decision:</strong> {{ s.currentDecision.action }}</p>
-      <p><strong>Why:</strong> {{ s.currentDecision.reason }}</p>
-      <p><strong>Rule:</strong> {{ s.currentDecision.sourceRule }}</p>
+      <div class="line"><span>DECISION</span><strong>{{ s.currentDecision.action }}</strong></div>
+      <div class="line"><span>WHY</span><strong>{{ s.currentDecision.reason }}</strong></div>
+      <div class="line"><span>RULE</span><strong>{{ s.currentDecision.sourceRule }}</strong></div>
+       @if (s.currentDecision.evidence.length > 0) {
+         <div class="line"><span>EVIDENCE</span><strong>{{ s.currentDecision.evidence.length }} observation(s)</strong></div>
+       }
+      <div class="line"><span>RESULT</span><strong>{{ s.currentDecision.action }}</strong></div>
       @if (s.currentDecision.evidence.length > 0) {
+        <h4>Evidence</h4>
         <ul>
           @for (line of s.currentDecision.evidence; track line) {
             <li>{{ line }}</li>

@@ -286,4 +286,71 @@ class SimulationEngineE2ETest {
             assertTrue(snapshot.egoSpeedKmh() < speedBefore);
         }
     }
+
+    @Test
+    @Timeout(12)
+    void emergencyDecisionAppliesEmergencyDecelerationToWorldState() {
+        ScenarioLibrary library = ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json");
+        ScenarioDefinition scenario = library.findById("S1").orElseThrow();
+
+        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {
+        })) {
+            engine.getWorldState().getEgo().setSpeedKmh(95.0);
+
+            ScenarioActorDefinition frontVehicle = new ScenarioActorDefinition();
+            frontVehicle.setType(ScenarioActorType.FRONT_VEHICLE);
+            frontVehicle.setLane(Lane.CENTER);
+            frontVehicle.setPositionMeters(14.0);
+            frontVehicle.setSpeedKmh(0.0);
+            engine.addActorAhead(frontVehicle);
+
+            engine.start();
+
+            boolean emergencyApplied = false;
+            for (int i = 0; i < 80; i++) {
+                SimulationSnapshot snapshot = engine.tick();
+                boolean emergencyTimeline = snapshot.timeline().stream()
+                    .anyMatch(line -> line.contains("DECISION EMERGENCY_BRAKE"));
+                boolean emergencyDecision = DrivingAction.EMERGENCY_BRAKE.name().equals(snapshot.currentDecision());
+                if (emergencyDecision || emergencyTimeline) {
+                    double acceleration = engine.getWorldState().getEgo().getAccelerationMps2();
+                    if (acceleration <= -SimulationConfig.defaultConfig().getEmergencyDecelerationMps2() + 0.001) {
+                        emergencyApplied = true;
+                        break;
+                    }
+                }
+            }
+
+            assertTrue(emergencyApplied, "Emergency brake should apply the configured emergency deceleration to the world");
+        }
+    }
+
+    @Test
+    @Timeout(12)
+    void resetClearsPerceptionStateAndRebuildsKieSession() {
+        ScenarioLibrary library = ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json");
+        ScenarioDefinition empty = library.findById("S1").orElseThrow();
+        ScenarioDefinition signed = library.findById("S2").orElseThrow();
+
+        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), signed, true, d -> {
+        })) {
+            engine.start();
+            for (int i = 0; i < 60; i++) {
+                engine.tick();
+            }
+            boolean sawDetection = engine.getWorkingMemoryFactViews().stream()
+                .anyMatch(view -> view.type().equals("CurrentSpeedLimit") && view.value().contains("limitKmh=50"));
+            assertTrue(sawDetection, "Signed scenario should be perceived during the run");
+            assertFalse(engine.getWorldState().getRoadElements().isEmpty());
+
+            engine.reset(empty);
+
+            assertEquals(0, engine.snapshot().simTimeMillis());
+            assertEquals(0, engine.getWorldState().getRoadElements().size());
+            assertTrue(engine.getWorkingMemoryFactViews().stream()
+                .noneMatch(view -> view.type().equals("CurrentSpeedLimit") && view.value().contains("limitKmh=50")));
+            assertTrue(engine.getWorldState().getActors().isEmpty());
+            assertTrue(engine.getDemoEvidence().isEmpty());
+        }
+    }
 }

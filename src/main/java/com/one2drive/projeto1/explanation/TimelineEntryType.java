@@ -1,6 +1,7 @@
 package com.one2drive.projeto1.explanation;
 
 public enum TimelineEntryType {
+    SENSOR,
     RULE_ACTIVATED,
     RULE_CANCELLED,
     RULE_BEFORE_FIRE,
@@ -9,5 +10,6 @@ public enum TimelineEntryType {
     FACT_UPDATED,
     FACT_DELETED,
     INFO,
-    DECISION
+    DECISION,
+    ACTUATOR
 }

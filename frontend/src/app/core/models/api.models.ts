@@ -61,8 +61,13 @@ export interface ApiSimulationSnapshot {
   egoVehicle: {
     speedKmh: number;
     positionMeters: number;
-    lane: 'LEFT' | 'CENTER' | 'RIGHT';
+    lane: LaneName;
     accelerationMps2: number;
+    /** Authoritative lateral coordinate the road view renders. */
+    lateralPositionMeters: number;
+    targetLane: LaneName;
+    laneChangeState: LaneChangeStateName;
+    laneChangeProgress: number;
   };
   environment: {
     weatherCondition: string;
@@ -95,6 +100,91 @@ export interface ApiSimulationSnapshot {
     radarRateMillis: number;
   };
   demoPhases: { id: string; label: string; status: DemoPhaseStatus }[];
+  maneuver?: ApiManeuverView;
+  sensors?: ApiSensorTelemetryView;
+  inference?: ApiInferenceSummaryView;
+}
+
+export type LaneName = 'LEFT' | 'CENTER' | 'RIGHT';
+export type LaneChangeStateName = 'IDLE' | 'REQUESTED' | 'CHANGING' | 'COMPLETED';
+
+/** Physical execution state of the maneuver Drools selected. */
+export interface ApiManeuverView {
+  state: LaneChangeStateName;
+  fromLane: LaneName;
+  targetLane: LaneName;
+  progress: number;
+  lateralPositionMeters: number;
+  indicatorsLeft: boolean;
+  indicatorsRight: boolean;
+  braking: boolean;
+}
+
+export type SensorStatus = 'CLEAR' | 'TRACKING' | 'DETECTED' | 'WARNING' | 'CRITICAL' | 'OCCUPIED';
+
+export interface ApiRadarTelemetryView {
+  rangeMeters: number;
+  targetId: string;
+  distanceMeters: number;
+  relativeSpeedKmh: number;
+  ttcSeconds: number;
+  status: SensorStatus;
+}
+
+export interface ApiCameraDetectionView {
+  objectId: string;
+  label: string;
+  distanceMeters: number;
+  lane: string;
+}
+
+export interface ApiCameraTelemetryView {
+  rangeMeters: number;
+  detections: ApiCameraDetectionView[];
+  status: SensorStatus;
+}
+
+export interface ApiBlindSpotTelemetryView {
+  rangeMeters: number;
+  occupied: boolean;
+  targetId: string;
+  distanceMeters: number;
+  status: SensorStatus;
+}
+
+export interface ApiEnvironmentTelemetryView {
+  condition: string;
+  effectiveRangeMeters: number;
+  gripPercent: number;
+  rain: boolean;
+}
+
+export interface ApiSensorTelemetryView {
+  frontRadar: ApiRadarTelemetryView;
+  frontCamera: ApiCameraTelemetryView;
+  blindSpotLeft: ApiBlindSpotTelemetryView;
+  blindSpotRight: ApiBlindSpotTelemetryView;
+  environment: ApiEnvironmentTelemetryView;
+}
+
+/**
+ * Presentation summary of the latest inference cycle, produced by the backend from
+ * evidence the engine and Drools already emitted. Angular formats it; it never
+ * derives conclusions from sensor values.
+ */
+export interface ApiInferenceSummaryView {
+  previousDecision: string | null;
+  decisionChangedAtMillis: number;
+  situationSteps: string[];
+  lastImportantEvent: ApiImportantEventView | null;
+  activeRule: string | null;
+}
+
+export interface ApiImportantEventView {
+  timestampMillis: number;
+  category: 'PERCEPTION' | 'MANEUVER' | 'DECISION' | 'RULE' | 'INFO';
+  title: string;
+  detail: string;
 }
 
 export interface ApiSystemStatus {

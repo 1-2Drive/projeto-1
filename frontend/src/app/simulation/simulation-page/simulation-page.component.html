@@ -125,6 +125,7 @@
     </section>
 
     <aside class="workspace__right" aria-label="Decision and telemetry">
+      <app-situation-panel [snapshot]="snapshot()" />
       <app-speed-advisor [snapshot]="snapshot()" />
       <app-decision-panel [snapshot]="snapshot()" />
       <app-sensors-panel [snapshot]="snapshot()" />

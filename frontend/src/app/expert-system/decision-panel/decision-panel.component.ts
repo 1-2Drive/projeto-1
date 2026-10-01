@@ -49,4 +49,16 @@ export class DecisionPanelComponent {
     }
     return Math.round((egoSpeed - decision.recommendedSpeedKmh) * 10) / 10;
   });
+
+  protected readonly previousDecision = computed(() => this.snapshot()?.inference?.previousDecision ?? null);
+  protected readonly decisionChangedAtMillis = computed(() => this.snapshot()?.inference?.decisionChangedAtMillis ?? 0);
+
+  protected readonly decisionAge = computed(() => {
+    const snapshot = this.snapshot();
+    const changedAt = this.decisionChangedAtMillis();
+    if (!snapshot || !changedAt) {
+      return '—';
+    }
+    return `${((snapshot.simulationTimeMillis - changedAt) / 1000).toFixed(3)}s`;
+  });
 }

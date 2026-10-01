@@ -2,6 +2,8 @@ package com.one2drive.projeto1.explanation;
 
 public enum TimelineEntryType {
     SENSOR,
+    /** Significant perception transition: object detected, lost, or changed range state. */
+    PERCEPTION_CHANGE,
     RULE_ACTIVATED,
     RULE_CANCELLED,
     RULE_BEFORE_FIRE,
@@ -11,5 +13,7 @@ public enum TimelineEntryType {
     FACT_DELETED,
     INFO,
     DECISION,
-    ACTUATOR
+    ACTUATOR,
+    /** Maneuver lifecycle: requested, started, completed. */
+    MANEUVER
 }

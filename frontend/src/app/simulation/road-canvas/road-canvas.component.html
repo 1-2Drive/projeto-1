@@ -69,9 +69,18 @@
   </div>
 
   <!-- ============ ego vehicle ============ -->
-  <div class="ego" [style.left.%]="egoXPercent()" [style.top.%]="egoYPercent()" data-testid="road-ego">
+  <div class="ego"
+       [class.ego--braking]="braking()"
+       [class.ego--indicator-left]="indicatorLeft()"
+       [class.ego--indicator-right]="indicatorRight()"
+       [style.left.%]="egoXPercent()"
+       [style.top.%]="egoYPercent()"
+       data-testid="road-ego"
+       [attr.data-lane]="snapshot()?.egoVehicle?.lane"
+       [attr.data-lateral]="snapshot()?.egoVehicle?.lateralPositionMeters?.toFixed(2)"
+       [attr.data-maneuver]="maneuverState()">
     <svg class="car car--ego" viewBox="0 0 120 56" role="img" aria-label="Ego vehicle">
-      <defs>
+       <defs>
         <linearGradient id="egoBody" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stop-color="#ffd98a" />
           <stop offset="45%" stop-color="#f0b95a" />
@@ -118,8 +127,27 @@
         <path d="M6,17 C9,15 12,14 16,13 L16,20 C12,21 9,22 6,23 Z" />
         <path d="M6,39 C9,41 12,42 16,43 L16,36 C12,35 9,34 6,33 Z" />
       </g>
+
+      <!-- Brake lights: lit from the backend maneuver view, not from any UI decision. -->
+      <g class="car__brakelights" data-testid="ego-brake-lights">
+        <rect x="4" y="15" width="9" height="7" rx="2" />
+        <rect x="4" y="34" width="9" height="7" rx="2" />
+      </g>
+
+      <!-- Turn indicators, direction taken from the backend maneuver state. -->
+      <g class="car__indicator car__indicator--left" data-testid="ego-indicator-left">
+        <rect x="96" y="14" width="10" height="6" rx="2" />
+      </g>
+      <g class="car__indicator car__indicator--right" data-testid="ego-indicator-right">
+        <rect x="96" y="36" width="10" height="6" rx="2" />
+      </g>
     </svg>
     <span class="ego__label">EGO</span>
+    @if (maneuverState() === 'CHANGING' || maneuverState() === 'REQUESTED') {
+      <span class="ego__maneuver" data-testid="ego-maneuver">
+        to {{ maneuverTargetLane() }} · {{ (maneuverProgress() * 100).toFixed(0) }}%
+      </span>
+    }
   </div>
 
   <!-- ============ world objects ============ -->

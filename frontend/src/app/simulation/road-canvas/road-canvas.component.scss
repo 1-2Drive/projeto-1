@@ -711,3 +711,60 @@
 .dot--blind {
   background: #c6d6e2;
 }
+
+/* ===================== ego feedback ===================== */
+/* Brake lights and indicators only mirror backend maneuver state; the UI never
+   decides that the vehicle is braking or turning. */
+.car__brakelights rect {
+  fill: #5a2020;
+  opacity: 0.35;
+  transition: opacity 120ms ease, fill 120ms ease;
+}
+
+.ego--braking .car__brakelights rect {
+  fill: #ff3b30;
+  opacity: 1;
+  filter: drop-shadow(0 0 5px rgba(255, 59, 48, 0.8));
+}
+
+.car__indicator rect {
+  fill: #2f3a46;
+  opacity: 0.5;
+  transition: opacity 120ms ease, fill 120ms ease;
+}
+
+.ego--indicator-left .car__indicator--left rect,
+.ego--indicator-right .car__indicator--right rect {
+  fill: #ffc233;
+  opacity: 1;
+  animation: indicator-blink 550ms steps(2, jump-none) infinite;
+}
+
+@keyframes indicator-blink {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.ego__maneuver {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translate(-50%, 0.35rem);
+  padding: 0.12rem 0.4rem;
+  border: 1px solid var(--ds-warning);
+  border-radius: var(--ds-radius-sm);
+  background: rgba(10, 16, 22, 0.9);
+  font-family: var(--ds-font-mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.08em;
+  color: #f2d582;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ego--indicator-left .car__indicator--left rect,
+  .ego--indicator-right .car__indicator--right rect {
+    animation: none;
+  }
+}

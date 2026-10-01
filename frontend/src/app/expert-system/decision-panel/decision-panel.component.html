@@ -10,6 +10,16 @@
       <strong class="decision__action" data-testid="decision-action">{{ d.action }}</strong>
     </div>
 
+    @if (previousDecision() && previousDecision() !== d.action) {
+      <div class="transition" data-testid="decision-transition">
+        <span>Previous</span>
+        <strong>{{ previousDecision() }}</strong>
+        <span class="transition__arrow" aria-hidden="true">→</span>
+        <span>Current</span>
+        <strong class="transition__current">{{ d.action }}</strong>
+      </div>
+    }
+
     <div class="decision__grid">
       <div class="cell">
         <span>Recommended</span>
@@ -27,6 +37,7 @@
 
     <footer class="decision__foot">
       <span class="decision__rule" title="Fired Drools rule">{{ d.sourceRule }}</span>
+      <span class="decision__age">active {{ decisionAge() }}</span>
     </footer>
   </section>
 

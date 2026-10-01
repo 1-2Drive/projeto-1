@@ -194,7 +194,7 @@ class DrivingExpertSystemRulesTest {
             DrivingDecision decision = harness.cycle(
                 1_000,
                 75.0,
-                new PotholeDetectedEvent(1_000, "camera", 25.0, "pth-1", HazardSeverity.HIGH)
+                new PotholeDetectedEvent(1_000, "camera", 25.0, "pth-1", HazardSeverity.HIGH, Lane.CENTER)
             );
             assertEquals(DrivingAction.REDUCE_SPEED, decision.getAction());
             assertTrue(decision.getRecommendedSpeedKmh() <= 30.0);
@@ -279,7 +279,7 @@ class DrivingExpertSystemRulesTest {
                 1_000,
                 95.0,
                 new SpeedLimitDetectedEvent(1_000, "camera", 90, 30, "sign-90"),
-                new PotholeDetectedEvent(1_000, "camera", 22.0, "pth-1", HazardSeverity.HIGH)
+                new PotholeDetectedEvent(1_000, "camera", 22.0, "pth-1", HazardSeverity.HIGH, Lane.CENTER)
             );
             assertEquals(DrivingAction.REDUCE_SPEED, decision.getAction());
             assertTrue(decision.getRecommendedSpeedKmh() <= 30.0);

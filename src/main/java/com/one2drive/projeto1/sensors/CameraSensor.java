@@ -83,13 +83,14 @@ public class CameraSensor extends AbstractSensor<Object> {
             true
         )));
 
-        Optional<Pothole> pothole = worldState.nearestPothole(rangeMeters());
+        Optional<Pothole> pothole = worldState.nearestPotholeAnyLane(rangeMeters());
         pothole.ifPresent(p -> events.add(new PotholeDetectedEvent(
             timestampMillis,
             id(),
             p.getPositionMeters() - egoPos,
             p.getId(),
-            p.getSeverity()
+            p.getSeverity(),
+            p.getLane()
         )));
 
         Optional<Barrier> barrier = worldState.nearestBarrier(rangeMeters());
@@ -120,13 +121,14 @@ public class CameraSensor extends AbstractSensor<Object> {
             r.getSeverity()
         )));
 
-        Optional<StaticObstacle> obstacle = worldState.nearestObstacle(rangeMeters());
+        Optional<StaticObstacle> obstacle = worldState.nearestObstacleAnyLane(rangeMeters());
         obstacle.ifPresent(o -> events.add(new ObstacleDetectedEvent(
             timestampMillis,
             id(),
             o.getPositionMeters() - egoPos,
             o.getId(),
-            o.getSeverity()
+            o.getSeverity(),
+            o.getLane()
         )));
 
         return events;

@@ -195,6 +195,37 @@ public class WorldState {
         return Optional.ofNullable(nearest);
     }
 
+    /**
+     * Nearest hazard of the given type in any lane ahead. A forward camera sees
+     * every lane, so hazards are reported with their lane and the rules decide
+     * whether the one in the vehicle's own lane matters.
+     */
+    @SuppressWarnings("unchecked")
+    private <T extends RoadElement> Optional<T> nearestInAnyLane(Class<T> type, double maxDistance) {
+        double egoPos = ego.getPositionMeters();
+        T nearest = null;
+        double best = Double.MAX_VALUE;
+        for (RoadElement element : roadElements) {
+            if (!type.isInstance(element) || !element.isActive()) {
+                continue;
+            }
+            double d = element.getPositionMeters() - egoPos;
+            if (d >= 0 && d <= maxDistance && d < best) {
+                best = d;
+                nearest = (T) element;
+            }
+        }
+        return Optional.ofNullable(nearest);
+    }
+
+    public Optional<Pothole> nearestPotholeAnyLane(double maxDistance) {
+        return nearestInAnyLane(Pothole.class, maxDistance);
+    }
+
+    public Optional<StaticObstacle> nearestObstacleAnyLane(double maxDistance) {
+        return nearestInAnyLane(StaticObstacle.class, maxDistance);
+    }
+
     public LaneOccupancy nearestLaneOccupancy(Lane lane, double longitudinalRange) {
         double egoPos = ego.getPositionMeters();
         boolean occupied = false;

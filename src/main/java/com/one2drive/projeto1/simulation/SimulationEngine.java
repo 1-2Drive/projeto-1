@@ -6,7 +6,9 @@ import com.one2drive.projeto1.domain.Barrier;
 import com.one2drive.projeto1.domain.DynamicActor;
 import com.one2drive.projeto1.domain.DrivingAction;
 import com.one2drive.projeto1.domain.Lane;
+import com.one2drive.projeto1.domain.EgoVehicleState;
 import com.one2drive.projeto1.domain.LaneChangeDirection;
+import com.one2drive.projeto1.domain.LaneChangeState;
 import com.one2drive.projeto1.domain.Pothole;
 import com.one2drive.projeto1.domain.RoadElement;
 import com.one2drive.projeto1.domain.Roadworks;
@@ -19,6 +21,7 @@ import com.one2drive.projeto1.drools.FactDescription;
 import com.one2drive.projeto1.drools.events.AccelerationRequestEvent;
 import com.one2drive.projeto1.drools.events.BarrierDetectedEvent;
 import com.one2drive.projeto1.drools.events.FrontDistanceEvent;
+import com.one2drive.projeto1.drools.events.LaneOccupancyEvent;
 import com.one2drive.projeto1.drools.KnowledgeSession;
 import com.one2drive.projeto1.drools.WorkingMemoryFactView;
 import com.one2drive.projeto1.drools.events.LaneChangeRequestEvent;
@@ -76,6 +79,14 @@ public class SimulationEngine implements AutoCloseable {
     private final List<ScenarioTimedAction> timedActions;
     private final List<Runnable> pendingWorldMutations;
     private final Map<String, String> lastSensorValues;
+    private final SensorSignificance sensorSignificance;
+    private SensorTelemetry sensorTelemetry;
+    private String previousDecisionAction;
+    private String trackedDecisionAction;
+    private String tracedDecisionSignature;
+    private DrivingAction tracedActuatorAction;
+    private double tracedActuatorAcceleration = Double.NaN;
+    private long decisionChangedAtMillis;
     private final Map<String, Long> detectedObjectTimestamps;
     private final Map<String, Long> cameraDetectedObjectTimestamps;
     private final Map<String, Long> radarDetectedObjectTimestamps;
@@ -104,6 +115,11 @@ public class SimulationEngine implements AutoCloseable {
         this.actuator = new DecisionActuator(config);
         this.pendingWorldMutations = new CopyOnWriteArrayList<>();
         this.lastSensorValues = new HashMap<>();
+        this.sensorSignificance = new SensorSignificance();
+        this.sensorTelemetry = SensorTelemetry.empty(telemetryConfig());
+        this.trackedDecisionAction = null;
+        this.tracedDecisionSignature = null;
+        this.decisionChangedAtMillis = 0L;
         this.detectedObjectTimestamps = new HashMap<>();
         this.cameraDetectedObjectTimestamps = new HashMap<>();
         this.radarDetectedObjectTimestamps = new HashMap<>();
@@ -188,6 +204,14 @@ public class SimulationEngine implements AutoCloseable {
         currentDecision.reset(0);
         sensorManager.reset();
         lastSensorValues.clear();
+        sensorSignificance.reset();
+        sensorTelemetry = SensorTelemetry.empty(telemetryConfig());
+        previousDecisionAction = null;
+        trackedDecisionAction = null;
+        tracedDecisionSignature = null;
+        tracedActuatorAction = null;
+        tracedActuatorAcceleration = Double.NaN;
+        decisionChangedAtMillis = 0L;
         detectedObjectTimestamps.clear();
         cameraDetectedObjectTimestamps.clear();
         radarDetectedObjectTimestamps.clear();
@@ -199,6 +223,10 @@ public class SimulationEngine implements AutoCloseable {
         if (status != SimulationStatus.RUNNING) {
             return snapshot();
         }
+
+        // Keep COMPLETED visible for the snapshot that reports the completion;
+        // the next running tick starts the next lifecycle in IDLE.
+        normalizeCompletedManeuver();
 
         double dtSeconds = config.getTickMillis() / 1000.0;
         physicsEngine.updateWorld(worldState, dtSeconds);
@@ -220,11 +248,17 @@ public class SimulationEngine implements AutoCloseable {
         List<Object> events = sensorManager.observe(worldState, simTimeMillis);
         knowledgeSession.getDecisionContext().beginCycle(simTimeMillis, worldState.getEgo().getSpeedKmh());
         for (Object event : events) {
-            knowledgeSession.getTrace().add(simTimeMillis, TimelineEntryType.SENSOR, "SENSOR " + FactDescription.describe(event));
+            // Raw samples still go to Drools and Working Memory; only meaningful
+            // transitions reach the inference timeline.
+            String significant = sensorSignificance.classify(event);
+            if (significant != null) {
+                knowledgeSession.getTrace().add(simTimeMillis, TimelineEntryType.PERCEPTION_CHANGE, significant);
+            }
             knowledgeSession.getRouter().insertEvent(event);
             updateSensorPanel(event);
             recordDetectedObject(event);
         }
+        refreshSensorTelemetry(events);
 
         knowledgeSession.getKieSession().fireAllRules();
         knowledgeSession.getDecisionContext().applyTo(currentDecision);
@@ -234,25 +268,256 @@ public class SimulationEngine implements AutoCloseable {
             knowledgeSession.getKieSession().update(decisionHandle, currentDecision);
         }
 
-        knowledgeSession.getTrace().addDecision(currentDecision);
+        boolean decisionChanged = trackDecisionTransition();
+        if (decisionChanged) {
+            knowledgeSession.getTrace().addDecision(currentDecision);
+        }
+        LaneChangeState stateBefore = worldState.getEgo().getLaneChangeState();
         actuator.applyDecision(worldState, currentDecision);
-        knowledgeSession.getTrace().add(
-            simTimeMillis,
-            TimelineEntryType.ACTUATOR,
-            "ACTUATOR " + currentDecision.getAction() + " acceleration=" + worldState.getEgo().getAccelerationMps2()
-        );
+        recordManeuverStart(stateBefore);
+        recordActuatorChange();
+        settleManeuver();
         markDemoEvidence(events);
         purgeExpiredDetections();
 
         return snapshot();
     }
 
+    /** Emits the maneuver lifecycle entry the moment Drools' decision starts execution. */
+    private void recordManeuverStart(LaneChangeState stateBefore) {
+        EgoVehicleState ego = worldState.getEgo();
+        if (ego.getLaneChangeState() != LaneChangeState.REQUESTED || stateBefore == LaneChangeState.REQUESTED) {
+            return;
+        }
+        knowledgeSession.getTrace().add(
+            simTimeMillis,
+            TimelineEntryType.MANEUVER,
+            "MANEUVER STARTED " + ego.getLane().name() + " -> " + ego.getTargetLane().name()
+                + " lane (lateral " + String.format("%.2f", ego.getLateralPositionMeters()) + "m)"
+        );
+    }
+
+
+    private SensorTelemetry.SimulationConfigView telemetryConfig() {
+        return new SensorTelemetry.SimulationConfigView(
+            config.getRadarRangeMeters(),
+            config.getCameraRangeMeters(),
+            config.getBlindSpotRangeMeters()
+        );
+    }
+
+    /**
+     * Rebuilds the structured sensor view from the events produced this tick, so the
+     * UI shows the same measurements Drools received instead of parsing text.
+     */
+    private void refreshSensorTelemetry(List<Object> events) {
+        SensorTelemetry previous = sensorTelemetry;
+
+        SensorTelemetry.RadarView radar = previous.frontRadar();
+        if (!"none".equals(radar.targetId())
+            && !radarDetectedObjectTimestamps.containsKey(radar.targetId())) {
+            radar = SensorTelemetry.RadarView.empty(config.getRadarRangeMeters());
+        }
+        boolean radarUpdated = false;
+        for (Object event : events) {
+            if (event instanceof FrontDistanceEvent distance) {
+                radarUpdated = true;
+                radar = new SensorTelemetry.RadarView(
+                    config.getRadarRangeMeters(),
+                    distance.getTargetId(),
+                    distance.getDistanceMeters(),
+                    previous.frontRadar().relativeSpeedKmh(),
+                    previous.frontRadar().ttcSeconds(),
+                    "TRACKING"
+                );
+            } else if (event instanceof RelativeSpeedEvent relative) {
+                radarUpdated = true;
+                radar = new SensorTelemetry.RadarView(
+                    radar.rangeMeters(),
+                    relative.getTargetId(),
+                    radar.distanceMeters(),
+                    relative.getRelativeSpeedMps() * 3.6,
+                    radar.ttcSeconds(),
+                    "TRACKING"
+                );
+            } else if (event instanceof TTCEvent ttc) {
+                radarUpdated = true;
+                radar = new SensorTelemetry.RadarView(
+                    radar.rangeMeters(),
+                    ttc.getTargetId(),
+                    radar.distanceMeters(),
+                    radar.relativeSpeedKmh(),
+                    ttc.getTtcSeconds(),
+                    radarStatus(ttc.getTtcSeconds())
+                );
+            }
+        }
+
+        if (!radarUpdated && previous.frontRadar() == null) {
+            radar = SensorTelemetry.RadarView.empty(config.getRadarRangeMeters());
+        }
+
+        List<SensorTelemetry.CameraDetection> detections = new ArrayList<>(
+            previous.frontCamera().detections().stream()
+                .filter(d -> cameraDetectedObjectTimestamps.containsKey(d.objectId()))
+                .toList()
+        );
+        boolean cameraUpdated = false;
+        for (Object event : events) {
+            if (event instanceof SpeedLimitDetectedEvent e) {
+                cameraUpdated = true;
+                detections.removeIf(d -> d.objectId().equals(e.getSignId()));
+                detections.add(new SensorTelemetry.CameraDetection(
+                    e.getSignId(), "Speed limit " + e.getLimitKmh() + " km/h",
+                    e.getDistanceMeters(), "CAMERA", "camera"));
+            } else if (event instanceof PotholeDetectedEvent e) {
+                cameraUpdated = true;
+                detections.removeIf(d -> d.objectId().equals(e.getPotholeId()));
+                detections.add(new SensorTelemetry.CameraDetection(
+                    e.getPotholeId(), "Pothole", e.getDistanceMeters(), e.getLane().name(), "camera"));
+            } else if (event instanceof ObstacleDetectedEvent e) {
+                cameraUpdated = true;
+                detections.removeIf(d -> d.objectId().equals(e.getObstacleId()));
+                detections.add(new SensorTelemetry.CameraDetection(
+                    e.getObstacleId(), "Obstacle", e.getDistanceMeters(), e.getLane().name(), "camera"));
+            } else if (event instanceof RoadworksDetectedEvent e) {
+                cameraUpdated = true;
+                detections.removeIf(d -> d.objectId().equals(e.getRoadworksId()));
+                detections.add(new SensorTelemetry.CameraDetection(
+                    e.getRoadworksId(), "Roadworks", e.getDistanceMeters(), "CENTER", "camera"));
+            } else if (event instanceof PedestrianDetectedEvent e) {
+                cameraUpdated = true;
+                detections.removeIf(d -> d.objectId().equals(e.getPedestrianId()));
+                detections.add(new SensorTelemetry.CameraDetection(
+                    e.getPedestrianId(), "Pedestrian", e.getDistanceMeters(), "CENTER", "camera"));
+            }
+        }
+        if (!cameraUpdated && detections.isEmpty() && previous.frontCamera().detections().isEmpty()) {
+            detections = new ArrayList<>();
+        }
+        SensorTelemetry.CameraView camera = new SensorTelemetry.CameraView(
+            config.getCameraRangeMeters(), List.copyOf(detections), detections.isEmpty() ? "CLEAR" : "DETECTED");
+
+        SensorTelemetry.BlindSpotView left = previous.blindSpotLeft();
+        SensorTelemetry.BlindSpotView right = previous.blindSpotRight();
+        for (Object event : events) {
+            if (event instanceof LaneOccupancyEvent occupancy) {
+                SensorTelemetry.BlindSpotView view = new SensorTelemetry.BlindSpotView(
+                    config.getBlindSpotRangeMeters(),
+                    occupancy.isOccupied(),
+                    occupancy.isOccupied() ? "occupied" : "none",
+                    occupancy.getNearestDistanceMeters(),
+                    occupancy.isOccupied() ? "OCCUPIED" : "CLEAR"
+                );
+                if (occupancy.getLane() == com.one2drive.projeto1.domain.Lane.LEFT) {
+                    left = view;
+                } else if (occupancy.getLane() == com.one2drive.projeto1.domain.Lane.RIGHT) {
+                    right = view;
+                }
+            }
+        }
+
+        SensorTelemetry.EnvironmentView environment = new SensorTelemetry.EnvironmentView(
+            worldState.getWeatherState().getCondition().name(),
+            config.getCameraRangeMeters() * worldState.getWeatherState().getVisibilityFactor(),
+            worldState.getWeatherState().getGripFactor() * 100.0,
+            worldState.getWeatherState().getCondition() != WeatherCondition.CLEAR
+        );
+
+        sensorTelemetry = new SensorTelemetry(radar, camera, left, right, environment);
+    }
+
+    private void normalizeCompletedManeuver() {
+        if (worldState.getEgo().getLaneChangeState() == LaneChangeState.COMPLETED) {
+            worldState.getEgo().setLaneChangeState(LaneChangeState.IDLE);
+        }
+    }
+
+    private static String radarStatus(double ttcSeconds) {
+        if (!Double.isFinite(ttcSeconds)) {
+            return "TRACKING";
+        }
+        if (ttcSeconds < 2.0) {
+            return "CRITICAL";
+        }
+        if (ttcSeconds < 5.0) {
+            return "WARNING";
+        }
+        return "TRACKING";
+    }
+
+    /** Records when the active decision actually changed so the UI can show a transition. */
+    private boolean trackDecisionTransition() {
+        String action = currentDecision.getAction().name();
+        String signature = action + "|" + currentDecision.getRiskLevel()
+            + "|" + currentDecision.getSourceRule() + "|"
+            + String.format("%.1f", currentDecision.getRecommendedSpeedKmh());
+        if (trackedDecisionAction == null) {
+            trackedDecisionAction = action;
+            previousDecisionAction = null;
+            tracedDecisionSignature = signature;
+            decisionChangedAtMillis = simTimeMillis;
+            return true;
+        }
+        if (!signature.equals(tracedDecisionSignature)) {
+            previousDecisionAction = trackedDecisionAction;
+            trackedDecisionAction = action;
+            tracedDecisionSignature = signature;
+            decisionChangedAtMillis = simTimeMillis;
+            return true;
+        } else if (!action.equals(trackedDecisionAction)) {
+            previousDecisionAction = trackedDecisionAction;
+            trackedDecisionAction = action;
+            decisionChangedAtMillis = simTimeMillis;
+        }
+        return false;
+    }
+
+    /** Keeps one actuation entry per meaningful control change, not one per physics tick. */
+    private void recordActuatorChange() {
+        double acceleration = worldState.getEgo().getAccelerationMps2();
+        boolean actionChanged = currentDecision.getAction() != tracedActuatorAction;
+        boolean accelerationChanged = Double.isNaN(tracedActuatorAcceleration)
+            || Math.abs(acceleration - tracedActuatorAcceleration) >= 0.25;
+        if (!actionChanged && !accelerationChanged) {
+            return;
+        }
+        tracedActuatorAction = currentDecision.getAction();
+        tracedActuatorAcceleration = acceleration;
+        knowledgeSession.getTrace().add(
+            simTimeMillis,
+            TimelineEntryType.ACTUATOR,
+            "ACTUATOR " + currentDecision.getAction() + " acceleration=" + acceleration
+        );
+    }
+
     private void updateVehicleStateFact() {
-        vehicleStateFact.setSpeedKmh(worldState.getEgo().getSpeedKmh());
-        vehicleStateFact.setPositionMeters(worldState.getEgo().getPositionMeters());
-        vehicleStateFact.setLane(worldState.getEgo().getLane());
+        EgoVehicleState ego = worldState.getEgo();
+        vehicleStateFact.setSpeedKmh(ego.getSpeedKmh());
+        vehicleStateFact.setPositionMeters(ego.getPositionMeters());
+        vehicleStateFact.setLane(ego.getLane());
+        vehicleStateFact.setLaneChangeState(ego.getLaneChangeState());
+        vehicleStateFact.setTargetLane(ego.getTargetLane());
         vehicleStateFact.setTimestamp(simTimeMillis);
         knowledgeSession.getKieSession().update(vehicleStateHandle, vehicleStateFact);
+    }
+
+    /**
+     * Settles a finished maneuver: the committed lane becomes the lane the vehicle
+     * physically reached, so sensors and rules reason about where the car actually is.
+     */
+    private void settleManeuver() {
+        EgoVehicleState ego = worldState.getEgo();
+        if (ego.getLaneChangeState() != LaneChangeState.COMPLETED) {
+            return;
+        }
+        ego.setLane(ego.getTargetLane());
+        knowledgeSession.getTrace().add(
+            simTimeMillis,
+            TimelineEntryType.MANEUVER,
+            "MANEUVER COMPLETED " + ego.getLane().name() + " lane at "
+                + String.format("%.2f", ego.getLateralPositionMeters()) + "m lateral"
+        );
     }
 
     private FactHandle findFactHandle(Object object) {
@@ -503,6 +768,18 @@ public class SimulationEngine implements AutoCloseable {
         knowledgeSession.getRouter().insertEvent(new AccelerationRequestEvent(simTimeMillis, "ui", targetSpeedKmh));
     }
 
+    public synchronized SensorTelemetry getSensorTelemetry() {
+        return sensorTelemetry;
+    }
+
+    public synchronized String getPreviousDecisionAction() {
+        return previousDecisionAction;
+    }
+
+    public synchronized long getDecisionChangedAtMillis() {
+        return decisionChangedAtMillis;
+    }
+
     public synchronized SimulationSnapshot snapshot() {
         double legalLimit = 120;
         for (Object obj : knowledgeSession.getKieSession().getObjects(new ClassObjectFilter(CurrentSpeedLimit.class))) {
@@ -522,6 +799,10 @@ public class SimulationEngine implements AutoCloseable {
             worldState.getEgo().getSpeedKmh(),
             worldState.getEgo().getPositionMeters(),
             worldState.getEgo().getLane().name(),
+            worldState.getEgo().getLateralPositionMeters(),
+            worldState.getEgo().getTargetLane().name(),
+            worldState.getEgo().getLaneChangeState().name(),
+            worldState.getEgo().getLaneChangeProgress(),
             legalLimit,
             currentDecision.getRecommendedSpeedKmh(),
             currentDecision.getAction().name(),
@@ -613,6 +894,10 @@ public class SimulationEngine implements AutoCloseable {
 
     public synchronized WorldState getWorldState() {
         return worldState;
+    }
+
+    public synchronized KnowledgeSession getKnowledgeSession() {
+        return knowledgeSession;
     }
 
     public synchronized DrivingDecision getCurrentDecision() {

@@ -1,17 +1,20 @@
 package com.one2drive.projeto1.drools.facts;
 
 import com.one2drive.projeto1.domain.HazardSeverity;
+import com.one2drive.projeto1.domain.Lane;
 
 public class PotholeStateFact {
     private String potholeId;
     private double distanceMeters;
     private HazardSeverity severity;
+    private Lane lane;
     private long timestamp;
 
-    public PotholeStateFact(String potholeId, double distanceMeters, HazardSeverity severity, long timestamp) {
+    public PotholeStateFact(String potholeId, double distanceMeters, HazardSeverity severity, Lane lane, long timestamp) {
         this.potholeId = potholeId;
         this.distanceMeters = distanceMeters;
         this.severity = severity;
+        this.lane = lane;
         this.timestamp = timestamp;
     }
 
@@ -39,6 +42,14 @@ public class PotholeStateFact {
         this.severity = severity;
     }
 
+    public Lane getLane() {
+        return lane;
+    }
+
+    public void setLane(Lane lane) {
+        this.lane = lane;
+    }
+
     public long getTimestamp() {
         return timestamp;
     }
@@ -50,6 +61,6 @@ public class PotholeStateFact {
     @Override
     public String toString() {
         return "PotholeStateFact{potholeId='" + potholeId + "', distanceMeters=" + distanceMeters
-            + ", severity=" + severity + "}";
+            + ", lane=" + lane + ", severity=" + severity + "}";
     }
 }

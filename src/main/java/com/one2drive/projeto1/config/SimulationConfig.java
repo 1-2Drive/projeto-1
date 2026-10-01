@@ -7,6 +7,8 @@ public class SimulationConfig {
     private final double comfortableDecelerationMps2;
     private final double emergencyDecelerationMps2;
     private final double defaultCruiseSpeedKmh;
+    private final double laneChangeSeconds;
+    private final double laneChangeMetersPerSecond;
 
     private final double radarRangeMeters;
     private final double cameraRangeMeters;
@@ -27,6 +29,8 @@ public class SimulationConfig {
                             double comfortableDecelerationMps2,
                             double emergencyDecelerationMps2,
                             double defaultCruiseSpeedKmh,
+                            double laneChangeSeconds,
+                            double laneChangeMetersPerSecond,
                             double radarRangeMeters,
                             double cameraRangeMeters,
                             double blindSpotRangeMeters,
@@ -43,6 +47,8 @@ public class SimulationConfig {
         this.comfortableDecelerationMps2 = comfortableDecelerationMps2;
         this.emergencyDecelerationMps2 = emergencyDecelerationMps2;
         this.defaultCruiseSpeedKmh = defaultCruiseSpeedKmh;
+        this.laneChangeSeconds = laneChangeSeconds;
+        this.laneChangeMetersPerSecond = laneChangeMetersPerSecond;
         this.radarRangeMeters = radarRangeMeters;
         this.cameraRangeMeters = cameraRangeMeters;
         this.blindSpotRangeMeters = blindSpotRangeMeters;
@@ -63,6 +69,8 @@ public class SimulationConfig {
             2.8,
             8.5,
             90,
+            3.0,
+            1.2,
             130,
             120,
             30,
@@ -74,6 +82,14 @@ public class SimulationConfig {
             100,
             0.7
         );
+    }
+
+    public double getLaneChangeSeconds() {
+        return laneChangeSeconds;
+    }
+
+    public double getLaneChangeMetersPerSecond() {
+        return laneChangeMetersPerSecond;
     }
 
     public long getTickMillis() {

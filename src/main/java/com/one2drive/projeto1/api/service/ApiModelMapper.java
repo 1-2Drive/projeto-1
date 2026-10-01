@@ -10,6 +10,8 @@ import com.one2drive.projeto1.decision.DrivingDecision;
 import com.one2drive.projeto1.drools.WorkingMemoryFactView;
 import com.one2drive.projeto1.explanation.TimelineEntry;
 import com.one2drive.projeto1.simulation.RoadRenderItem;
+import com.one2drive.projeto1.domain.LaneChangeState;
+import com.one2drive.projeto1.simulation.SensorTelemetry;
 import com.one2drive.projeto1.simulation.SimulationEngine;
 import com.one2drive.projeto1.simulation.SimulationSnapshot;
 import org.springframework.stereotype.Component;
@@ -63,7 +65,11 @@ public class ApiModelMapper {
                 snapshot.egoSpeedKmh(),
                 snapshot.egoPositionMeters(),
                 snapshot.egoLane(),
-                engine.getWorldState().getEgo().getAccelerationMps2()
+                engine.getWorldState().getEgo().getAccelerationMps2(),
+                snapshot.egoLateralPositionMeters(),
+                snapshot.egoTargetLane(),
+                snapshot.egoLaneChangeState(),
+                snapshot.egoLaneChangeProgress()
             ),
             new ApiSimulationSnapshot.EnvironmentView(
                 engine.getWorldState().getWeatherState().getCondition().name(),
@@ -103,8 +109,65 @@ public class ApiModelMapper {
                 config.getCameraRateMillis(),
                 config.getRadarRateMillis()
             ),
-            demoPhases(engine)
+            demoPhases(engine),
+            maneuver(engine, snapshot),
+            sensors(engine),
+            InferenceNarrator.summarise(engine, snapshot)
         );
+    }
+
+    /** Physical maneuver state; indicators and brake lights are presentation of it, not policy. */
+    private ApiSimulationSnapshot.ManeuverView maneuver(SimulationEngine engine, SimulationSnapshot snapshot) {
+        LaneChangeState state = engine.getWorldState().getEgo().getLaneChangeState();
+        boolean left = state.isActive() && engine.getWorldState().getEgo().getTargetLane().centreMeters()
+            < engine.getWorldState().getEgo().getLateralPositionMeters();
+        boolean right = state.isActive() && !left;
+        double acceleration = engine.getWorldState().getEgo().getAccelerationMps2();
+        return new ApiSimulationSnapshot.ManeuverView(
+            snapshot.egoLaneChangeState(),
+            snapshot.egoLane(),
+            snapshot.egoTargetLane(),
+            snapshot.egoLaneChangeProgress(),
+            snapshot.egoLateralPositionMeters(),
+            left,
+            right,
+            acceleration < -0.1
+        );
+    }
+
+    private ApiSimulationSnapshot.SensorTelemetryView sensors(SimulationEngine engine) {
+        SensorTelemetry telemetry = engine.getSensorTelemetry();
+        return new ApiSimulationSnapshot.SensorTelemetryView(
+            new ApiSimulationSnapshot.RadarTelemetryView(
+                telemetry.frontRadar().rangeMeters(),
+                telemetry.frontRadar().targetId(),
+                telemetry.frontRadar().distanceMeters(),
+                telemetry.frontRadar().relativeSpeedKmh(),
+                telemetry.frontRadar().ttcSeconds(),
+                telemetry.frontRadar().status()
+            ),
+            new ApiSimulationSnapshot.CameraTelemetryView(
+                telemetry.frontCamera().rangeMeters(),
+                telemetry.frontCamera().detections().stream()
+                    .map(d -> new ApiSimulationSnapshot.CameraDetectionView(
+                        d.objectId(), d.label(), d.distanceMeters(), d.lane()))
+                    .toList(),
+                telemetry.frontCamera().status()
+            ),
+            blindSpot(telemetry.blindSpotLeft()),
+            blindSpot(telemetry.blindSpotRight()),
+            new ApiSimulationSnapshot.EnvironmentTelemetryView(
+                telemetry.environment().condition(),
+                telemetry.environment().effectiveRangeMeters(),
+                telemetry.environment().gripPercent(),
+                telemetry.environment().rain()
+            )
+        );
+    }
+
+    private ApiSimulationSnapshot.BlindSpotTelemetryView blindSpot(SensorTelemetry.BlindSpotView view) {
+        return new ApiSimulationSnapshot.BlindSpotTelemetryView(
+            view.rangeMeters(), view.occupied(), view.targetId(), view.distanceMeters(), view.status());
     }
 
     private ApiRoadElement mapRoadItem(RoadRenderItem item) {
@@ -141,6 +204,12 @@ public class ApiModelMapper {
         }
         if (latest.contains("ACTUATOR")) {
             return "ACTUATOR";
+        }
+        if (latest.contains("MANEUVER")) {
+            return "ACTUATOR";
+        }
+        if (latest.contains("PERCEPTION")) {
+            return "SENSORS";
         }
         if (latest.contains("SENSOR")) {
             return "SENSORS";

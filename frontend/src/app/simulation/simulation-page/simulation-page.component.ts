@@ -14,6 +14,7 @@ import { WorkingMemoryComponent } from '../../expert-system/working-memory/worki
 import { ExplanationPanelComponent } from '../../expert-system/explanation-panel/explanation-panel.component';
 import { CreateActorRequest, CreateRoadElementRequest, EnvironmentUpdateRequest } from '../../core/models/api.models';
 import { WorldStateComponent } from '../world-state/world-state.component';
+import { SituationPanelComponent } from '../../telemetry/situation-panel/situation-panel.component';
 
 @Component({
   selector: 'app-simulation-page',
@@ -31,7 +32,8 @@ import { WorldStateComponent } from '../world-state/world-state.component';
     RuleTimelineComponent,
     WorkingMemoryComponent,
     ExplanationPanelComponent,
-    WorldStateComponent
+    WorldStateComponent,
+    SituationPanelComponent
   ],
   templateUrl: './simulation-page.component.html',
   styleUrl: './simulation-page.component.scss',

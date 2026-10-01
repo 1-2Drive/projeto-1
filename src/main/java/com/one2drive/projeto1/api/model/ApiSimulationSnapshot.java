@@ -22,9 +22,92 @@ public record ApiSimulationSnapshot(
     List<String> cameraDetectedObjectIds,
     List<String> radarDetectedObjectIds,
     SensorRangesView sensorRanges,
-    List<DemoPhaseView> demoPhases
+    List<DemoPhaseView> demoPhases,
+    ManeuverView maneuver,
+    SensorTelemetryView sensors,
+    InferenceSummaryView inference
 ) {
-    public record EgoVehicleView(double speedKmh, double positionMeters, String lane, double accelerationMps2) {
+    public record EgoVehicleView(
+        double speedKmh,
+        double positionMeters,
+        String lane,
+        double accelerationMps2,
+        double lateralPositionMeters,
+        String targetLane,
+        String laneChangeState,
+        double laneChangeProgress
+    ) {
+    }
+
+    /** Physical execution state of the maneuver Drools selected. */
+    public record ManeuverView(
+        String state,
+        String fromLane,
+        String targetLane,
+        double progress,
+        double lateralPositionMeters,
+        boolean indicatorsLeft,
+        boolean indicatorsRight,
+        boolean braking
+    ) {
+    }
+
+    public record RadarTelemetryView(
+        double rangeMeters,
+        String targetId,
+        double distanceMeters,
+        double relativeSpeedKmh,
+        double ttcSeconds,
+        String status
+    ) {
+    }
+
+    public record CameraDetectionView(String objectId, String label, double distanceMeters, String lane) {
+    }
+
+    public record CameraTelemetryView(double rangeMeters, List<CameraDetectionView> detections, String status) {
+    }
+
+    public record BlindSpotTelemetryView(
+        double rangeMeters,
+        boolean occupied,
+        String targetId,
+        double distanceMeters,
+        String status
+    ) {
+    }
+
+    public record EnvironmentTelemetryView(
+        String condition,
+        double effectiveRangeMeters,
+        double gripPercent,
+        boolean rain
+    ) {
+    }
+
+    public record SensorTelemetryView(
+        RadarTelemetryView frontRadar,
+        CameraTelemetryView frontCamera,
+        BlindSpotTelemetryView blindSpotLeft,
+        BlindSpotTelemetryView blindSpotRight,
+        EnvironmentTelemetryView environment
+    ) {
+    }
+
+    /**
+     * Presentation summary of the latest inference cycle. It restates evidence the
+     * engine already produced and never derives a conclusion of its own.
+     */
+    public record InferenceSummaryView(
+        String previousDecision,
+        long decisionChangedAtMillis,
+        List<String> situationSteps,
+        ImportantEventView lastImportantEvent,
+        String activeRule
+    ) {
+    }
+
+    public record ImportantEventView(long timestampMillis, String category, String title, String detail) {
     }
 
     public record EnvironmentView(String weatherCondition, double visibilityFactor, double gripFactor) {

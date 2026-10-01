@@ -1,0 +1,40 @@
+<section class="situation" data-testid="situation-panel">
+  <header class="situation__head">
+    <h3>Current situation</h3>
+    @if (!running()) {
+      <span class="situation__idle">waiting for START</span>
+    }
+  </header>
+
+  @if (steps().length > 0) {
+    <ol class="steps">
+      @for (step of steps(); track $index) {
+        <li class="step"
+            [class.step--decision]="isDecisionStep(step)"
+            [class.step--maneuver]="isManeuverStep(step)">
+          {{ step }}
+        </li>
+      }
+    </ol>
+  } @else {
+    <p class="empty">Nothing perceived yet. Press START and the engine will begin reporting.</p>
+  }
+</section>
+
+@if (lastEvent(); as event) {
+  <section class="anchor" data-testid="last-important-event">
+    <header class="anchor__head">
+      <h3>Last important event</h3>
+      <span class="anchor__category" [class]="'anchor__category anchor__category--' + event.category.toLowerCase()">
+        {{ event.category }}
+      </span>
+    </header>
+    <p class="anchor__title" data-testid="last-event-title">{{ event.title }}</p>
+    <p class="anchor__meta">
+      <span class="anchor__time">{{ (event.timestampMillis / 1000) | number: '1.3-3' }}s</span>
+      @if (event.detail !== event.title) {
+        <span class="anchor__detail">{{ event.detail }}</span>
+      }
+    </p>
+  </section>
+}

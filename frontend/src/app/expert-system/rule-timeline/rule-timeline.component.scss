@@ -74,6 +74,12 @@
       border-color: var(--ds-info);
       color: #d2eaff;
     }
+
+    &.freeze {
+      margin-left: 0.25rem;
+      border-color: #6c5a1e;
+      color: #f2d582;
+    }
   }
 }
 
@@ -83,6 +89,13 @@
   max-height: 22rem;
   overflow-y: auto;
   padding-right: 0.2rem;
+}
+
+.stream--frozen {
+  border: 1px solid #6c5a1e;
+  border-radius: var(--ds-radius-sm);
+  padding: 0.2rem;
+  background: rgba(38, 33, 16, 0.18);
 }
 
 .entry {

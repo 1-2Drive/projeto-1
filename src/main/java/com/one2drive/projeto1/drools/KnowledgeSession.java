@@ -9,6 +9,7 @@ import com.one2drive.projeto1.drools.facts.FrontVehicleState;
 import com.one2drive.projeto1.drools.facts.LaneChangeRequestState;
 import com.one2drive.projeto1.drools.facts.LaneOccupancyState;
 import com.one2drive.projeto1.drools.facts.PedestrianStateFact;
+import com.one2drive.projeto1.drools.facts.ObstacleStateFact;
 import com.one2drive.projeto1.drools.facts.PotholeStateFact;
 import com.one2drive.projeto1.drools.facts.RoadworksStateFact;
 import com.one2drive.projeto1.drools.facts.RoundaboutStateFact;
@@ -98,11 +99,15 @@ public class KnowledgeSession implements AutoCloseable {
         kieSession.insert(decision);
         kieSession.insert(new CurrentSpeedLimit(120, "default", 0L));
         kieSession.insert(new WeatherStateFact(com.one2drive.projeto1.domain.WeatherCondition.CLEAR, 1.0, 1.0, 0L));
-        kieSession.insert(new LaneOccupancyState(com.one2drive.projeto1.domain.Lane.LEFT, false, Double.POSITIVE_INFINITY, 0L));
-        kieSession.insert(new LaneOccupancyState(com.one2drive.projeto1.domain.Lane.RIGHT, false, Double.POSITIVE_INFINITY, 0L));
+        // Lane occupancy starts pessimistic: an adjacent lane is treated as occupied
+        // until the blind-spot sensor has actually reported it clear. A vehicle must
+        // never steer into a lane that has simply not been sensed yet.
+        kieSession.insert(new LaneOccupancyState(com.one2drive.projeto1.domain.Lane.LEFT, true, 0.0, 0L));
+        kieSession.insert(new LaneOccupancyState(com.one2drive.projeto1.domain.Lane.RIGHT, true, 0.0, 0L));
         kieSession.insert(new FrontVehicleState("none", Double.POSITIVE_INFINITY, 0.0, Double.POSITIVE_INFINITY, 0L));
         kieSession.insert(new PedestrianStateFact("none", Double.POSITIVE_INFINITY, false, 0L));
-        kieSession.insert(new PotholeStateFact("none", Double.POSITIVE_INFINITY, com.one2drive.projeto1.domain.HazardSeverity.LOW, 0L));
+        kieSession.insert(new PotholeStateFact("none", Double.POSITIVE_INFINITY, com.one2drive.projeto1.domain.HazardSeverity.LOW, com.one2drive.projeto1.domain.Lane.CENTER, 0L));
+        kieSession.insert(new ObstacleStateFact("none", Double.POSITIVE_INFINITY, com.one2drive.projeto1.domain.HazardSeverity.LOW, com.one2drive.projeto1.domain.Lane.CENTER, 0L));
         kieSession.insert(new RoadworksStateFact("none", Double.POSITIVE_INFINITY, com.one2drive.projeto1.domain.HazardSeverity.LOW, 0L));
         kieSession.insert(new BarrierStateFact("none", Double.POSITIVE_INFINITY, true, 0L));
         kieSession.insert(new RoundaboutStateFact("none", Double.POSITIVE_INFINITY, 30, false, 0L));

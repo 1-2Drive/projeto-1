@@ -15,6 +15,9 @@ async function addWorldObject(
   }
   await page.locator('[data-testid="apply-config"]').click();
   await expect(page.locator('[data-testid="config-panel"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="timeline-panel"]')).toContainText(/PERCEPTION|RULE|FACT|ACTUATOR/i, {
+    timeout: 10000
+  });
 }
 
 test.describe('Driving expert simulation UI', () => {
@@ -73,6 +76,51 @@ test.describe('Driving expert simulation UI', () => {
     await page.locator('button:has-text("Inference Timeline")').click();
     await expect(page.locator('[data-testid="timeline-panel"]'))
       .toContainText(/pedestrian/i, { timeout: 20000 });
+  });
+
+  test('pothole avoidance visibly moves the ego vehicle into the left lane', async ({ page }) => {
+    test.setTimeout(90000);
+
+    await page.goto('/');
+    await page.locator('[data-testid="reset-btn"]').click();
+    await page.locator('[data-testid="start-btn"]').click();
+    await expect(page.locator('[data-testid="simulation-status"]')).toContainText('RUNNING');
+
+    await addWorldObject(page, 'add-pothole', { distance: '100' });
+
+    await expect(page.locator('[data-testid="decision-action"]'))
+      .toContainText('CHANGE_LANE_LEFT', { timeout: 45000 });
+    await expect(page.locator('[data-testid="road-ego"]'))
+      .toHaveAttribute('data-maneuver', /REQUESTED|CHANGING/, { timeout: 15000 });
+
+    const lateralAtStart = Number(await page.locator('[data-testid="road-ego"]').getAttribute('data-lateral'));
+    await expect.poll(async () => {
+      const value = await page.locator('[data-testid="road-ego"]').getAttribute('data-lateral');
+      return Number(value);
+    }, { timeout: 15000 }).toBeLessThan(lateralAtStart - 0.1);
+
+    await expect(page.locator('[data-testid="road-ego"]')).toHaveAttribute('data-lane', 'LEFT', { timeout: 20000 });
+    await expect(page.locator('[data-testid="timeline-panel"]'))
+      .toContainText(/MANEUVER STARTED|MANEUVER COMPLETED/i, { timeout: 15000 });
+    await expect(page.locator('[data-testid="situation-panel"]'))
+      .toContainText(/pothole|moving to the LEFT/i, { timeout: 15000 });
+  });
+
+  test('sensor groups show a radar target and a camera sign detection', async ({ page }) => {
+    test.setTimeout(90000);
+
+    await page.goto('/');
+    await page.locator('[data-testid="reset-btn"]').click();
+    await page.locator('[data-testid="start-btn"]').click();
+
+    await addWorldObject(page, 'add-vehicle', { distance: '80' });
+    await expect(page.locator('[data-testid="sensor-radar"]'))
+      .toContainText(/TRACKING|WARNING|CRITICAL/, { timeout: 20000 });
+    await expect(page.locator('[data-testid="sensor-radar"]')).toContainText(/Target|Distance|TTC/);
+
+    await addWorldObject(page, 'add-speed-50', { distance: '100' });
+    await expect(page.locator('[data-testid="sensor-camera"]'))
+      .toContainText(/DETECTED|Speed limit 50/i, { timeout: 30000 });
   });
 
   test('presentation demo progresses across its phases', async ({ page }) => {

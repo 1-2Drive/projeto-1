@@ -1,6 +1,6 @@
 .panel {
   display: grid;
-  gap: 0.45rem;
+  gap: 0.4rem;
   padding: 0.65rem 0.7rem;
   border: 1px solid var(--ds-border);
   border-radius: var(--ds-radius-lg);
@@ -33,129 +33,113 @@
   color: var(--ds-text-muted);
 }
 
-.facts {
+.sensor {
   display: grid;
   gap: 0.22rem;
+  padding: 0.4rem 0.45rem;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-sm);
+  background: rgba(11, 18, 25, 0.55);
 }
 
-.fact {
+.sensor--compact {
+  flex: 1;
+  min-width: 0;
+}
+
+.sensor-pair {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.sensor__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+}
+
+.sensor__name {
+  font-size: 0.6rem;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--ds-text-secondary);
+}
+
+.sensor__state {
+  padding: 0.08rem 0.3rem;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-sm);
+  font-family: var(--ds-font-mono);
+  font-size: 0.52rem;
+  letter-spacing: 0.1em;
+  color: var(--ds-text-secondary);
+
+  &--clear {
+    border-color: #2a6449;
+    background: #10251b;
+    color: #a7dfbc;
+  }
+
+  &--active {
+    border-color: #1f5f77;
+    background: #0d2b36;
+    color: #9fe3f5;
+  }
+
+  &--warning {
+    border-color: #6c5a1e;
+    background: #262110;
+    color: #f2d582;
+  }
+
+  &--critical {
+    border-color: #7d3232;
+    background: #2a1414;
+    color: #ffc9c9;
+  }
+}
+
+.lines {
+  display: grid;
+  gap: 0.1rem;
+  margin: 0;
+}
+
+.line {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 0.4rem;
-  padding: 0.28rem 0.4rem;
-  border-radius: var(--ds-radius-sm);
-  background: rgba(11, 18, 25, 0.65);
-}
 
-.fact__label {
-  font-size: 0.56rem;
-  letter-spacing: 0.08em;
-  color: var(--ds-text-muted);
-  white-space: nowrap;
-}
-
-.fact__value {
-  font-family: var(--ds-font-mono);
-  font-size: 0.68rem;
-  font-weight: 500;
-  text-align: right;
-  color: var(--ds-text-primary);
-  overflow-wrap: anywhere;
-}
-
-.ranges {
-  display: grid;
-  gap: 0.3rem;
-  padding-top: 0.45rem;
-  border-top: 1px dashed var(--ds-border);
-}
-
-.ranges__title {
-  font-size: 0.56rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--ds-text-muted);
-}
-
-.ranges__grid {
-  display: grid;
-  gap: 0.22rem;
-}
-
-.range {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  align-items: baseline;
-  gap: 0.35rem;
-  padding: 0.24rem 0.4rem;
-  border-left: 2px solid var(--ds-border-strong);
-  background: rgba(11, 18, 25, 0.55);
-
-  span {
-    font-size: 0.58rem;
-    color: var(--ds-text-secondary);
-  }
-
-  strong {
-    font-family: var(--ds-font-mono);
-    font-size: 0.68rem;
-    color: var(--ds-text-primary);
-  }
-
-  em {
-    font-family: var(--ds-font-mono);
-    font-style: normal;
+  dt {
     font-size: 0.56rem;
+    letter-spacing: 0.06em;
     color: var(--ds-text-muted);
+    white-space: nowrap;
   }
 
-  &--camera {
-    border-left-color: #d3a12b;
-  }
-
-  &--radar {
-    border-left-color: #46b7e8;
-  }
-
-  &--blind {
-    border-left-color: #a06de0;
+  dd {
+    margin: 0;
+    font-family: var(--ds-font-mono);
+    font-size: 0.64rem;
+    color: var(--ds-text-primary);
+    text-align: right;
+    overflow-wrap: anywhere;
   }
 }
 
-.detections {
-  display: flex;
-  gap: 0.25rem;
-  flex-wrap: wrap;
+.line__warning dd {
+  color: #f2d582;
 }
 
-.detections__tag {
-  padding: 0.1rem 0.34rem;
-  border: 1px solid var(--ds-border);
-  border-radius: var(--ds-radius-sm);
-  font-family: var(--ds-font-mono);
-  font-size: 0.54rem;
-  letter-spacing: 0.08em;
-  color: var(--ds-text-secondary);
-
-  &--camera {
-    border-color: #6c5a1e;
-    color: #f2d582;
-  }
-
-  &--radar {
-    border-color: #1f5f77;
-    color: #9fe3f5;
-  }
-
-  &--all {
-    border-color: #2a6449;
-    color: #a7dfbc;
-  }
+.line__critical dd {
+  color: #ff9b95;
 }
 
-.empty {
+.compact-detail {
   margin: 0;
-  font-size: 0.66rem;
+  font-family: var(--ds-font-mono);
+  font-size: 0.6rem;
   color: var(--ds-text-muted);
 }

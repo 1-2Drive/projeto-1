@@ -1,50 +1,88 @@
 <section class="panel" data-testid="sensors-panel">
   <header class="panel__head">
     <h3>Sensors</h3>
-    <span class="panel__meta">live facts</span>
+    <span class="panel__meta">live telemetry</span>
   </header>
 
-  @if (sensorRows().length > 0) {
-    <div class="facts">
-      @for (row of sensorRows(); track row.key) {
-        <div class="fact">
-          <span class="fact__label">{{ row.label }}</span>
-          <strong class="fact__value">{{ row.value }}</strong>
-        </div>
-      } @empty {
-        <p class="empty">No sensor fact in working memory yet.</p>
-      }
-    </div>
-  } @else {
-    <p class="empty">Awaiting sensor data.</p>
+  @if (radar(); as radar) {
+    <section class="sensor" data-testid="sensor-radar">
+      <header class="sensor__head">
+        <span class="sensor__name">Front radar</span>
+        <span class="sensor__state" [class]="'sensor__state sensor__state--' + statusTone(radar.status)"
+              data-testid="radar-status">{{ radar.status }}</span>
+      </header>
+      <dl class="lines">
+        @for (line of radarLines(); track line.label) {
+          <div class="line">
+            <dt>{{ line.label }}</dt>
+            <dd [class.line__critical]="line.tone === 'critical'"
+                [class.line__warning]="line.tone === 'warning'">{{ line.value }}</dd>
+          </div>
+        }
+      </dl>
+    </section>
   }
 
-  @if (ranges(); as r) {
-    <div class="ranges">
-      <span class="ranges__title">Configured ranges</span>
-      <div class="ranges__grid">
-        <div class="range range--camera">
-          <span>Camera</span>
-          <strong>{{ r.cameraRangeMeters | number: '1.0-0' }} m</strong>
-          <em>{{ r.cameraRateMillis }} ms</em>
-        </div>
-        <div class="range range--radar">
-          <span>Radar</span>
-          <strong>{{ r.radarRangeMeters | number: '1.0-0' }} m</strong>
-          <em>{{ r.radarRateMillis }} ms</em>
-        </div>
-        <div class="range range--blind">
-          <span>Blind spot</span>
-          <strong>{{ r.blindSpotRangeMeters | number: '1.0-0' }} m</strong>
-          <em>side</em>
-        </div>
-      </div>
+  @if (camera(); as camera) {
+    <section class="sensor" data-testid="sensor-camera">
+      <header class="sensor__head">
+        <span class="sensor__name">Front camera</span>
+        <span class="sensor__state" [class]="'sensor__state sensor__state--' + statusTone(camera.status)"
+              data-testid="camera-status">{{ camera.status }}</span>
+      </header>
+      <dl class="lines">
+        @for (line of cameraLines(); track line.label) {
+          <div class="line">
+            <dt>{{ line.label }}</dt>
+            <dd [class.line__warning]="line.tone === 'warning'">{{ line.value }}</dd>
+          </div>
+        }
+      </dl>
+    </section>
+  }
 
-      <div class="detections">
-        <span class="detections__tag detections__tag--camera">CAM {{ cameraDetections().length }}</span>
-        <span class="detections__tag detections__tag--radar">RADAR {{ radarDetections().length }}</span>
-        <span class="detections__tag detections__tag--all">TRACKED {{ trackedDetections().length }}</span>
-      </div>
-    </div>
+  <div class="sensor-pair">
+    @if (blindSpotLeft(); as left) {
+      <section class="sensor sensor--compact" data-testid="sensor-blind-spot-left">
+        <header class="sensor__head">
+          <span class="sensor__name">Blind spot L</span>
+          <span class="sensor__state" [class]="'sensor__state sensor__state--' + statusTone(left.status)"
+                data-testid="blind-left-status">{{ left.status }}</span>
+        </header>
+        <p class="compact-detail">
+          {{ left.occupied ? 'target ' + (left.distanceMeters | number: '1.0-0') + ' m' : 'nothing beside' }}
+        </p>
+      </section>
+    }
+
+    @if (blindSpotRight(); as right) {
+      <section class="sensor sensor--compact" data-testid="sensor-blind-spot-right">
+        <header class="sensor__head">
+          <span class="sensor__name">Blind spot R</span>
+          <span class="sensor__state" [class]="'sensor__state sensor__state--' + statusTone(right.status)"
+                data-testid="blind-right-status">{{ right.status }}</span>
+        </header>
+        <p class="compact-detail">
+          {{ right.occupied ? 'target ' + (right.distanceMeters | number: '1.0-0') + ' m' : 'nothing beside' }}
+        </p>
+      </section>
+    }
+  </div>
+
+  @if (environment(); as env) {
+    <section class="sensor" data-testid="sensor-environment">
+      <header class="sensor__head">
+        <span class="sensor__name">Environment</span>
+        <span class="sensor__state sensor__state--clear">{{ env.condition }}</span>
+      </header>
+      <dl class="lines">
+        @for (line of environmentLines(); track line.label) {
+          <div class="line">
+            <dt>{{ line.label }}</dt>
+            <dd>{{ line.value }}</dd>
+          </div>
+        }
+      </dl>
+    </section>
   }
 </section>

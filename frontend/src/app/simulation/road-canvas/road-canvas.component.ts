@@ -1,6 +1,6 @@
 import { DecimalPipe, NgIf } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
-import { ApiRoadElement, ApiSimulationSnapshot } from '../../core/models/api.models';
+import { ApiRoadElement, ApiSimulationSnapshot, LaneName } from '../../core/models/api.models';
 
 /** Category drives which vector asset is rendered for a world object. */
 export type RoadObjectKind =
@@ -31,7 +31,19 @@ export interface RoadRenderItem {
   detectedByRadar: boolean;
 }
 
-const LANE_CENTER_Y: Record<'LEFT' | 'CENTER' | 'RIGHT', number> = {
+/**
+ * Lane centre offsets in metres, mirroring the backend Lane.centreMeters() contract.
+ * The road view maps this continuously, so a lane change is visible as smooth motion
+ * rather than a jump between discrete bands.
+ */
+const LANE_CENTRE_METRES: Record<LaneName, number> = {
+  LEFT: -3.5,
+  CENTER: 0,
+  RIGHT: 3.5
+};
+
+/** Vertical centre band of each lane, as a percentage of the road height. */
+const LANE_CENTER_Y: Record<LaneName, number> = {
   LEFT: 25,
   CENTER: 50,
   RIGHT: 75
@@ -89,7 +101,7 @@ export class RoadCanvasComponent {
           ariaLabel: `${this.objectIconLabel(kind)} ${state ? state.toLowerCase() + ' ' : ''}at ${item.positionMeters.toFixed(0)} metres`,
           relativeMeters: item.positionMeters,
           xPercent: this.toPercentX(item.positionMeters),
-          yPercent: LANE_CENTER_Y[item.lane] ?? LANE_CENTER_Y.CENTER,
+          yPercent: this.lateralToY(LANE_CENTRE_METRES[item.lane] ?? 0),
           detectedByCamera: snapshot.cameraDetectedObjectIds.includes(item.id),
           detectedByRadar: snapshot.radarDetectedObjectIds.includes(item.id)
         };
@@ -98,13 +110,29 @@ export class RoadCanvasComponent {
 
   /** Ego marker uses the same metric mapping as every other object. */
   protected readonly egoXPercent = computed(() => this.toPercentX(0));
+
+  /**
+   * Vertical position comes straight from the backend lateral coordinate, so during a
+   * lane change the car visibly slides across the road.
+   */
   protected readonly egoYPercent = computed(() => {
     const snapshot = this.snapshot();
     if (!snapshot) {
       return LANE_CENTER_Y.CENTER;
     }
-    return LANE_CENTER_Y[snapshot.egoVehicle.lane] ?? LANE_CENTER_Y.CENTER;
+    const lateral = snapshot.egoVehicle.lateralPositionMeters;
+    if (Number.isFinite(lateral)) {
+      return this.lateralToY(lateral);
+    }
+    return this.lateralToY(LANE_CENTRE_METRES[snapshot.egoVehicle.lane] ?? 0);
   });
+
+  protected readonly maneuverState = computed(() => this.snapshot()?.maneuver?.state ?? 'IDLE');
+  protected readonly maneuverProgress = computed(() => this.snapshot()?.maneuver?.progress ?? 0);
+  protected readonly maneuverTargetLane = computed(() => this.snapshot()?.maneuver?.targetLane ?? 'CENTER');
+  protected readonly indicatorLeft = computed(() => this.snapshot()?.maneuver?.indicatorsLeft ?? false);
+  protected readonly indicatorRight = computed(() => this.snapshot()?.maneuver?.indicatorsRight ?? false);
+  protected readonly braking = computed(() => this.snapshot()?.maneuver?.braking ?? false);
 
   protected readonly cameraEdgePercent = computed(() => this.toPercentX(this.ranges().cameraRangeMeters));
   protected readonly radarEdgePercent = computed(() => this.toPercentX(this.ranges().radarRangeMeters));
@@ -123,6 +151,13 @@ export class RoadCanvasComponent {
 
   protected isVisible(relativeMeters: number): boolean {
     return relativeMeters >= -this.worldBackwardMeters && relativeMeters <= this.worldForwardMeters;
+  }
+
+  /** Maps a lateral offset in metres onto the vertical centre band of the road. */
+  protected lateralToY(lateralMeters: number): number {
+    const clamped = Math.max(LANE_CENTRE_METRES.LEFT, Math.min(LANE_CENTRE_METRES.RIGHT, lateralMeters));
+    return LANE_CENTER_Y.CENTER + (clamped / LANE_CENTRE_METRES.RIGHT)
+      * (LANE_CENTER_Y.RIGHT - LANE_CENTER_Y.CENTER);
   }
 
   protected toPercentX(relativeMeters: number): number {

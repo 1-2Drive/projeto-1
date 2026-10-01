@@ -2,7 +2,7 @@
   <header class="head">
     <div class="head__title">
       <h3>Inference Timeline</h3>
-      <span class="head__hint">sensor → fact → rule → decision → actuator</span>
+      <span class="head__hint">important inference events · raw samples stay in Working Memory</span>
     </div>
 
     <div class="filters" role="tablist" aria-label="Timeline filters">
@@ -15,10 +15,14 @@
           }
         </button>
       }
+      <button type="button" class="freeze" [class.active]="frozen()"
+              [attr.aria-pressed]="frozen()" (click)="toggleFrozen()" data-testid="freeze-evidence-btn">
+        {{ frozen() ? 'UNFREEZE VIEW' : 'FREEZE VIEW' }}
+      </button>
     </div>
   </header>
 
-  <div class="stream">
+  <div class="stream" [class.stream--frozen]="frozen()">
     @for (entry of filteredEntries(); track $index) {
       <article class="entry" [class]="'entry entry--' + tagFor(entry.type).toLowerCase()">
         <div class="entry__rail">
@@ -35,7 +39,7 @@
     } @empty {
       <p class="empty">
         @if (snapshot()) {
-          No {{ selectedType() === 'ALL' ? '' : selectedType() }} entry yet. Press START to run the engine.
+          No {{ selectedType() === 'IMPORTANT' ? 'important' : selectedType() === 'ALL' ? '' : selectedType() }} entry yet. Press START to run the engine.
         } @else {
           Waiting for the first snapshot.
         }

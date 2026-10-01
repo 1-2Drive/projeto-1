@@ -185,6 +185,7 @@ then
     $state.setPotholeId($e.getPotholeId());
     $state.setDistanceMeters($e.getDistanceMeters());
     $state.setSeverity($e.getSeverity());
+    $state.setLane($e.getLane());
     $state.setTimestamp($e.getTimestamp());
     update($state);
 end
@@ -401,6 +402,7 @@ when
 then
     $state.setPotholeId("none");
     $state.setDistanceMeters(Double.POSITIVE_INFINITY);
+    $state.setLane(com.one2drive.projeto1.domain.Lane.CENTER);
     $state.setTimestamp($now);
     update($state);
 end
@@ -445,6 +447,37 @@ then
     $state.setRoundaboutId("none");
     $state.setDistanceMeters(Double.POSITIVE_INFINITY);
     $state.setOccupied(false);
+    $state.setTimestamp($now);
+    update($state);
+end
+
+
+rule "Update obstacle state"
+no-loop true
+when
+    $e : ObstacleDetectedEvent() from entry-point "ROAD_STREAM"
+    $state : ObstacleStateFact()
+    eval($e.getTimestamp() >= $state.getTimestamp())
+then
+    $state.setObstacleId($e.getObstacleId());
+    $state.setDistanceMeters($e.getDistanceMeters());
+    $state.setSeverity($e.getSeverity());
+    $state.setLane($e.getLane());
+    $state.setTimestamp($e.getTimestamp());
+    update($state);
+end
+
+rule "Clear stale obstacle perception"
+no-loop true
+salience -100
+when
+    $state : ObstacleStateFact(obstacleId != "none", $timestamp : timestamp)
+    VehicleStateFact($now : timestamp)
+    eval($now - $timestamp > 600)
+then
+    $state.setObstacleId("none");
+    $state.setDistanceMeters(Double.POSITIVE_INFINITY);
+    $state.setLane(com.one2drive.projeto1.domain.Lane.CENTER);
     $state.setTimestamp($now);
     update($state);
 end

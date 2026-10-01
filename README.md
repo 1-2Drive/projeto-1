@@ -371,7 +371,22 @@ Set-Location ..
 
 ## Quick Start
 
+### First time
+
 ```bash
+cd ~/Documents/learn/projeto-1
+export JAVA_HOME=$(/usr/libexec/java_home -v 17)
+mvn clean test
+cd frontend
+npm ci
+cd ..
+```
+
+### Every time
+
+```bash
+cd ~/Documents/learn/projeto-1
+export JAVA_HOME=$(/usr/libexec/java_home -v 17)
 ./scripts/dev.sh
 ```
 
@@ -392,8 +407,10 @@ shows `Press START to begin` until the first tick, so nothing is simulated befor
 3. Watch the object travel toward the ego vehicle on the road canvas. It is only shown
    with a `CAMERA` or `RADAR` badge once a sensor has actually detected it inside its
    configured range — the ranges are listed in the Sensors panel.
-4. Watch Drools react: the timeline shows `SENSOR -> FACT -> RULE -> DECISION -> ACTUATOR`,
-   and the Decision panel shows the action, risk, recommended speed and fired rule.
+4. Watch Drools react: the default `IMPORTANT` timeline shows meaningful perception,
+   rule, decision, actuation and maneuver transitions; raw numerical samples remain in
+   Sensors and Working Memory. The Decision panel shows the action, risk, recommended
+   speed, decision age and fired rule.
 5. Use **PAUSE** / **RESUME** to step through, and **RESET** to return to the empty road.
 
 ### A two-minute demonstration
@@ -410,6 +427,42 @@ shows `Press START to begin` until the first tick, so nothing is simulated befor
 The **RUN DEMO** button in the top-right corner replays the `S14_PRESENTATION_DEMO`
 scenario end to end with a phase strip. It is optional — manual mode is the default
 path and demo chrome stays hidden unless the demo is running.
+
+## Manual Avoidance Demo
+
+This is the shortest path to seeing the complete perception → reasoning → decision →
+physical-action chain:
+
+1. Start the project and open the Angular UI.
+2. Confirm the header says `STOPPED` and the road shows `Press START to begin`.
+3. Press **START**.
+4. In **Road signs / Hazards**, choose **Pothole**.
+5. Set distance to `100 m`, lane to `Center`, severity to `High`, then press **Add to road**.
+6. Keep the left lane clear. The blind-spot panel must report `CLEAR`.
+7. Watch the camera detect the pothole only when it enters camera range.
+8. Watch **Current situation** list the perception and lane-safety evidence.
+9. Watch Drools select `CHANGE_LANE_LEFT` with the avoidance rule.
+10. Watch the ego vehicle physically move from the center lane to the left lane over
+    approximately three seconds. The road view shows the lateral coordinate, turn
+    indicator and maneuver progress from the backend.
+11. Watch `MANEUVER STARTED` and `MANEUVER COMPLETED` in the important timeline.
+12. Open **Timeline** and **Explanation** to inspect the rule, decision and evidence.
+
+### Unsafe avoidance variant
+
+Add a front vehicle at approximately `20 m` in both the left and right lanes, using the
+same speed as the ego vehicle so both blind spots remain occupied. Add the center-lane
+pothole again. Drools must not select a lane change; the vehicle remains centered and
+uses the existing conservative `REDUCE_SPEED`, `BRAKE` or `STOP` policy as the hazard
+approaches.
+
+### Evidence controls
+
+The default Timeline filter is `IMPORTANT`, which shows perception transitions, fired
+rules, decisions, actuation and maneuver lifecycle events. Continuous radar/speed/TTC
+samples remain available in the Sensors and Working Memory views. Use `FREEZE VIEW` to
+inspect the technical timeline without stopping the simulation; `PAUSE` remains the
+separate control that freezes the simulation itself.
 
 ### Useful URLs
 

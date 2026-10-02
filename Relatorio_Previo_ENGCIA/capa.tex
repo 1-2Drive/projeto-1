@@ -84,11 +84,15 @@
 \begingroup
 \renewcommand{\arraystretch}{1.15}
 \gdef\docentesep{}%
+% Coluna única centrada; o email só aparece se não estiver vazio.
 \renewcommand{\docente}[2]{%
   \docentesep\gdef\docentesep{\\}%
-  #1 & \href{mailto:#2}{\textcolor{corCinza}{\small\nolinkurl{#2}}}%
+  #1%
+  \if\relax\detokenize{#2}\relax\else
+    \hspace{1.4em}\href{mailto:#2}{\textcolor{corCinza}{\small\nolinkurl{#2}}}%
+  \fi
 }%
-\begin{tabular}{@{}l@{\hspace{1.4em}}l@{}}
+\begin{tabular}{@{}c@{}}
 \listadocentes
 \end{tabular}
 \endgroup

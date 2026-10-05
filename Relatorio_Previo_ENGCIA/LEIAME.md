@@ -4,9 +4,6 @@ Fontes LaTeX do relatório prévio de aquisição de conhecimento do projeto
 *Sistema Pericial de Apoio à Decisão em Veículos Autónomos* (implementação
 prevista em Drools).
 
-Adaptado do modelo do relatório de PPROGIA (`../capa_relatorio`): mesma capa,
-paleta, cabeçalhos e scripts de compilação.
-
 ## Antes de compilar
 
 Os dados da capa estão **apenas** em `metadados.tex`. Confirmar:

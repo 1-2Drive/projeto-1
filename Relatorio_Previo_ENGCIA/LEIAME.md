@@ -25,7 +25,6 @@ O `build.sh` avisa enquanto existirem `TODO` em `metadados.tex`.
 
 ```bash
 ./build.sh          # PDF (opções: -w avisos, -c limpar, -h ajuda)
-./build_docx.sh     # Word em build/relatorio.docx (LaTeX -> HTML -> DOCX)
 ```
 
 ## Estrutura

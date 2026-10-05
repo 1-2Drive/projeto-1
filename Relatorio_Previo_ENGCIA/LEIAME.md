@@ -36,7 +36,7 @@ metadados.tex        <- EDITAR: dados da capa
 preambulo.tex        pacotes, cores, estilos, listagens Drools, macros
 capa.tex             página de rosto
 referencias.bib      bibliografia (só aparecem as entradas citadas)
-seccoes/             00-resumo, 01..15 capítulos, A-anexos
+seccoes/             um ficheiro por capítulo (a ordem é a dos \input em relatorio.tex)
 figuras/             figuras em PDF; SVG em figuras/svg/ são convertidos pelo build.sh
 logos/               logotipos do ISEP e do MEIA
 build/               PDF, capa (relatorio_so_capa.pdf), DOCX e auxiliares (gerado; pode ser apagado)

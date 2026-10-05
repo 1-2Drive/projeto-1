@@ -23,7 +23,7 @@
 \pagenumbering{roman}
 \setcounter{page}{1}
 
-\input{seccoes/00-resumo}
+\input{seccoes/resumo}
 
 \tableofcontents
 \clearpage
@@ -34,27 +34,29 @@
 \pagenumbering{arabic}
 \setcounter{page}{1}
 
-\input{seccoes/01-introducao}
-\input{seccoes/02-objetivos}
-\input{seccoes/03-delimitacao}
-\input{seccoes/04-enquadramento}
-\input{seccoes/05-fontes}
-\input{seccoes/06-sessoes}
-\input{seccoes/07-sensores}
-\input{seccoes/08-representacao}
-\input{seccoes/09-casos}
-\input{seccoes/10-explicacao}
-\input{seccoes/11-implementacao}
-\input{seccoes/12-validacao}
-\input{seccoes/13-limitacoes}
-\input{seccoes/14-conclusao}
-\input{seccoes/15-glossario}
+\input{seccoes/introducao}
+\input{seccoes/objetivos}
+% \input{seccoes/problematica}
+\input{seccoes/delimitacao}
+\input{seccoes/enquadramento}
+\input{seccoes/fontes}
+\input{seccoes/sessoes}
+\input{seccoes/sensores}
+\input{seccoes/representacao}
+\input{seccoes/casos}
+\input{seccoes/explicacao}
+\input{seccoes/implementacao}
+\input{seccoes/validacao}
+\input{seccoes/limitacoes}
+\input{seccoes/conclusao}
+\input{seccoes/glossario}
 
 \bibliographystyle{plain}
 \bibliography{referencias}
 \addcontentsline{toc}{chapter}{Bibliografia}
 
 \appendix
-\input{seccoes/A-anexos}
+% Talvez dividir em vários ficheiros
+\input{seccoes/anexos}
 
 \end{document}

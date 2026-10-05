@@ -1,0 +1,175 @@
+\chapter{Terminologia específica}
+\label{cap:glossario}
+
+A \cref{tab:glossario} reúne, por ordem alfabética, os termos técnicos
+usados neste relatório. Quando o termo é habitualmente usado em inglês,
+indica-se o equivalente entre parênteses.
+
+{\small
+\begin{longtable}{@{}L{4.4cm}L{10.0cm}@{}}
+  \caption{Terminologia específica}
+  \label{tab:glossario}\\
+  \toprule
+  \textbf{Termo} & \textbf{Definição} \\
+  \midrule
+  \endfirsthead
+  \toprule
+  \textbf{Termo} & \textbf{Definição} \\
+  \midrule
+  \endhead
+  \bottomrule
+  \endfoot
+  ADAS
+    & Sistemas avançados de assistência à condução (\emph{Advanced Driver
+      Assistance Systems}), como a travagem automática de emergência ou a
+      manutenção na faixa. \\
+  AEB
+    & Travagem automática de emergência (\emph{Autonomous Emergency
+      Braking}): função que trava o veículo quando deteta uma colisão
+      iminente. \\
+  Agenda
+    & Em Drools, conjunto das regras ativadas, cujas condições estão
+      satisfeitas, que aguardam execução. A ordem de execução é
+      determinada pela estratégia de resolução de conflitos. \\
+  Aquisição de conhecimento
+    & Processo de obter, junto de peritos e de outras fontes, o
+      conhecimento necessário para construir a base de conhecimento de um
+      sistema pericial. \\
+  Base de conhecimento
+    & Componente de um sistema pericial que contém o conhecimento do
+      domínio sob a forma de factos, regras, prioridades e exceções. \\
+  Confiança da deteção
+    & Medida do grau de certeza com que um sensor, ou a fusão de vários,
+      identifica um objeto ou uma condição. \\
+  Desempate
+    & Critério aplicado quando duas ou mais ações candidatas têm a mesma
+      prioridade. Neste projeto, escolhe-se a primeira de uma lista
+      ordenada de ações (\cref{sec:alteracoes-bc}). \\
+  Distância de paragem
+    & Distância percorrida pelo veículo desde a deteção de um perigo até à
+      imobilização. Inclui a distância percorrida durante o tempo de
+      reação e a distância de travagem. \\
+  Drools
+    & Motor de regras de produção de código aberto para Java, usado na
+      implementação do sistema. \\
+  Encadeamento progressivo
+    & Estratégia de inferência que parte dos factos conhecidos e aplica as
+      regras cujas condições estão satisfeitas para obter novas conclusões
+      (\emph{forward chaining}). \\
+  Encadeamento regressivo
+    & Estratégia de inferência que parte de uma conclusão a provar e
+      procura os factos e regras que a sustentam (\emph{backward
+      chaining}). \\
+  Explicação \emph{How}
+    & Explicação que mostra a cadeia de factos e regras que conduziu a uma
+      conclusão. \\
+  Explicação \emph{Why}
+    & Explicação que justifica por que motivo uma ação foi escolhida,
+      indicando a regra aplicada e as condições satisfeitas. \\
+  Explicação \emph{Why not}
+    & Explicação que justifica por que motivo uma ação alternativa não foi
+      escolhida, indicando as condições não satisfeitas ou a ação de maior
+      prioridade que prevaleceu. \\
+  Facto
+    & Unidade de informação sobre a situação atual, mantida na memória de
+      trabalho; por exemplo, \facto{obstaculo\_confirmado}. \\
+  Falso positivo
+    & Deteção de um objeto ou condição que não existe na realidade,
+      resultante, por exemplo, de uma leitura atípica de um sensor. \\
+  Fusão sensorial
+    & Combinação de dados de vários sensores para obter uma representação
+      do ambiente mais fiável do que a de cada sensor isolado
+      (\emph{sensor fusion}). \\
+  GNSS
+    & Sistema global de navegação por satélite (\emph{Global Navigation
+      Satellite System}), de que o GPS é um exemplo. \\
+  IMU
+    & Unidade de medição inercial (\emph{Inertial Measurement Unit}):
+      sensor que mede acelerações e velocidades angulares do veículo. \\
+  Intervalo temporal
+    & Tempo que o veículo próprio demora a percorrer a distância que o
+      separa do veículo precedente, à velocidade atual (\emph{time
+      headway}). \\
+  LiDAR
+    & Sensor que mede distâncias através de impulsos laser e produz uma
+      nuvem de pontos do ambiente (\emph{Light Detection and
+      Ranging}). \\
+  Limiar
+    & Valor de referência a partir do qual uma condição de uma regra é
+      considerada satisfeita (\emph{threshold}). \\
+  Memória de trabalho
+    & Componente de um sistema pericial que contém os factos relativos à
+      situação atual, avaliados pelo motor de inferência (\emph{working
+      memory}). \\
+  Módulo de explicação
+    & Componente de um sistema pericial que justifica as conclusões
+      produzidas (\emph{explanation facility}). \\
+  Motor de inferência
+    & Componente de um sistema pericial que avalia as regras da base de
+      conhecimento sobre os factos da memória de trabalho e produz
+      conclusões (\emph{inference engine}). \\
+  Níveis de automação
+    & Classificação da norma SAE J3016, de 0 (sem automação) a 5
+      (automação integral), segundo a parte da tarefa de condução assumida
+      pelo sistema. \\
+  Paragem imediata
+    & Ação de segurança de prioridade máxima, aplicada em caso de falha do
+      veículo ou de dados contraditórios numa situação de nível alto ou
+      crítico (\emph{STOP}). \\
+  Perito
+    & Pessoa com conhecimento especializado do domínio, consultada durante
+      a aquisição de conhecimento. \\
+  Phreak
+    & Algoritmo de correspondência de padrões usado nas versões atuais do
+      Drools, derivado do algoritmo Rete. \\
+  Ponto de não-retorno
+    & Instante a partir do qual a travagem já não permite evitar a
+      colisão. \\
+  Prioridade
+    & Nível de importância associado a uma regra ou ação: baixo, médio,
+      alto ou crítico. \\
+  Radar
+    & Sensor que usa ondas de rádio para medir a distância e a velocidade
+      relativa de objetos. \\
+  Regra de produção
+    & Regra da forma SE condições ENTÃO ações, usada para representar
+      conhecimento num sistema pericial (\emph{production rule}). \\
+  Resolução de conflitos
+    & Processo de escolha entre várias regras ou ações aplicáveis em
+      simultâneo. \\
+  Rete
+    & Algoritmo eficiente de correspondência entre muitos padrões e muitos
+      factos, proposto por Forgy~\cite{forgy1982} e na base de motores de
+      regras como o Drools. \\
+  Saliência
+    & Atributo de uma regra em Drools que define a sua prioridade relativa
+      na agenda (\emph{salience}). \\
+  Sensor exterocetivo
+    & Sensor que observa o ambiente em redor do veículo, como a câmara, o
+      radar ou o LiDAR. \\
+  Sensor propriocetivo
+    & Sensor que mede o estado do próprio veículo, como a velocidade das
+      rodas, as acelerações ou o ângulo da direção. \\
+  Sessão com estado
+    & Sessão do motor de regras que mantém os factos na memória de
+      trabalho entre ciclos de inferência (\emph{stateful session}). \\
+  Sistema pericial
+    & Sistema que representa conhecimento especializado de forma explícita
+      e o utiliza, através de um motor de inferência, para chegar a
+      conclusões justificáveis (\emph{expert system}). \\
+  Tempo até à colisão (TTC)
+    & Tempo que falta para uma colisão se as velocidades se mantiverem:
+      distância ao objeto dividida pela velocidade de aproximação
+      (\emph{time to collision}). \\
+  TTC
+    & Sigla de \emph{time to collision}; ver tempo até à colisão. \\
+  Veículo precedente
+    & Veículo que circula imediatamente à frente do veículo próprio, na
+      mesma faixa (\emph{lead vehicle}). \\
+  Veículo próprio
+    & Veículo controlado pelo sistema (\emph{ego vehicle}). \\
+  Velocidade relativa
+    & Diferença entre a velocidade do veículo próprio e a de outro objeto,
+      medida na mesma direção. \\
+\end{longtable}
+}

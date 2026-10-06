@@ -101,12 +101,13 @@ test.describe('Driving expert simulation UI', () => {
       const value = await page.locator('[data-testid="road-ego"]').getAttribute('data-lateral');
       return Number(value);
     }, { timeout: 15000 }).toBeLessThan(lateralAtStart - 0.1);
+    // The live narration describes the move only while it runs; data-lane switches when it completes.
+    await expect(page.locator('[data-testid="situation-panel"]'))
+      .toContainText(/pothole|moving to the LEFT/i, { timeout: 15000 });
 
     await expect(page.locator('[data-testid="road-ego"]')).toHaveAttribute('data-lane', 'LEFT', { timeout: 20000 });
     await expect(page.locator('[data-testid="timeline-panel"]'))
       .toContainText(/MANEUVER STARTED|MANEUVER COMPLETED/i, { timeout: 15000 });
-    await expect(page.locator('[data-testid="situation-panel"]'))
-      .toContainText(/pothole|moving to the LEFT/i, { timeout: 15000 });
   });
 
   test('blocked left lane forces pothole avoidance to use clear right lane', async ({ page }) => {

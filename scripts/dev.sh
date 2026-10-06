@@ -9,6 +9,19 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BACKEND_PID=""
 FRONTEND_PID=""
 
+if [[ -z "${JAVA_HOME:-}" ]]; then
+  if [[ -d "/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home" ]]; then
+    export JAVA_HOME="/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home"
+    export PATH="${JAVA_HOME}/bin:${PATH}"
+  elif command -v /usr/libexec/java_home >/dev/null 2>&1; then
+    JH="$(/usr/libexec/java_home -v 17 2>/dev/null || true)"
+    if [[ -n "${JH}" ]]; then
+      export JAVA_HOME="${JH}"
+      export PATH="${JAVA_HOME}/bin:${PATH}"
+    fi
+  fi
+fi
+
 stop_group() {
   local pid="$1"
   [[ -z "${pid}" ]] && return 0

@@ -131,6 +131,9 @@ class LaneChangeManeuverE2ETest {
             addVehicleInLane(engine, 22.0, Lane.RIGHT);
 
             for (int i = 0; i < 90; i++) {
+                for (com.one2drive.projeto1.domain.DynamicActor actor : engine.getWorldState().getActors()) {
+                    actor.setSpeedMps(engine.getWorldState().getEgo().getSpeedMps());
+                }
                 engine.tick();
             }
 

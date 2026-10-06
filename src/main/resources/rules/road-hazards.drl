@@ -4,6 +4,7 @@ import com.one2drive.projeto1.decision.DecisionContext
 import com.one2drive.projeto1.decision.DecisionPriority
 import com.one2drive.projeto1.domain.DrivingAction
 import com.one2drive.projeto1.domain.Lane
+import com.one2drive.projeto1.domain.LaneChangeState
 import com.one2drive.projeto1.domain.RiskLevel
 import com.one2drive.projeto1.drools.DroolsSupport
 import com.one2drive.projeto1.drools.facts.LaneOccupancyState
@@ -17,7 +18,15 @@ rule "Pothole ahead reduce speed"
 salience 460
 when
     $ctx : DecisionContext()
+    VehicleStateFact(laneChangeState == LaneChangeState.IDLE)
     PotholeStateFact(potholeId != "none", $distance : distanceMeters > 0, distanceMeters <= 40.0)
+    (
+        (VehicleStateFact(lane == Lane.CENTER) and LaneOccupancyState(lane == Lane.LEFT, occupied == true) and LaneOccupancyState(lane == Lane.RIGHT, occupied == true))
+        or
+        (VehicleStateFact(lane == Lane.LEFT) and LaneOccupancyState(lane == Lane.RIGHT, occupied == true))
+        or
+        (VehicleStateFact(lane == Lane.RIGHT) and LaneOccupancyState(lane == Lane.LEFT, occupied == true))
+    )
 then
     double target = 30.0;
     if ($distance < 15) {

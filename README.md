@@ -687,7 +687,7 @@ Integration tests validate dynamic behavior end-to-end without injecting final d
 - weather mutation impact,
 - reset isolation and KieSession rebuild.
 
-The direct integration suite covers 53 backend tests: 21 rule/CEP tests, 7 fact description tests, 8 SimulationEngine flows, 7 lane change flows, and 10 road map tests. Angular has 19 unit tests. Browser E2E has 6 tests covering startup, runtime speed-limit, pedestrian, pothole avoidance, sensor groups, and presentation-demo paths with the real stack.
+The direct integration suite covers 53 backend tests: 21 rule/CEP tests, 7 fact description tests, 8 SimulationEngine flows, 7 lane change flows, and 10 road map tests. Angular has 19 Karma unit tests. Browser E2E has 7 Playwright tests covering startup, runtime speed-limit, pedestrian, pothole progressive lane change, blocked lane change fallback, sensor groups, and presentation-demo paths with the real stack.
 
 ## Manual Test
 

@@ -23,6 +23,9 @@ global DroolsSupport droolsSupport
 // cannot oscillate. The laneChangeState guard stops a new request while the
 // previous maneuver is still physically moving.
 
+// The maintain rules keep the lane change as the decision while it is moving. They
+// also match a driver-requested lane change, so they propose at MANEUVER_SAFETY: at
+// ROAD_HAZARD they would count as a hold and cancel moving off (defaults.drl).
 rule "Maintain ongoing lane change left avoidance"
 salience 475
 when
@@ -34,7 +37,7 @@ then
         DrivingAction.CHANGE_LANE_LEFT,
         Double.NaN,
         RiskLevel.LOW,
-        DecisionPriority.ROAD_HAZARD,
+        DecisionPriority.MANEUVER_SAFETY,
         "Executing lane change left to avoid road hazard",
         drools.getRule().getName(),
         "maneuver in progress to left lane"
@@ -52,7 +55,7 @@ then
         DrivingAction.CHANGE_LANE_RIGHT,
         Double.NaN,
         RiskLevel.LOW,
-        DecisionPriority.ROAD_HAZARD,
+        DecisionPriority.MANEUVER_SAFETY,
         "Executing lane change right to avoid road hazard",
         drools.getRule().getName(),
         "maneuver in progress to right lane"

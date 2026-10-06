@@ -21,7 +21,6 @@ public class ApiCreateRoadElementRequest {
     private String trafficLightState;
     private String severity;
     private Boolean barrierOpen;
-    private Double roundaboutApproachSpeedKmh;
 
     public String getType() {
         return type;
@@ -77,13 +76,5 @@ public class ApiCreateRoadElementRequest {
 
     public void setBarrierOpen(Boolean barrierOpen) {
         this.barrierOpen = barrierOpen;
-    }
-
-    public Double getRoundaboutApproachSpeedKmh() {
-        return roundaboutApproachSpeedKmh;
-    }
-
-    public void setRoundaboutApproachSpeedKmh(Double roundaboutApproachSpeedKmh) {
-        this.roundaboutApproachSpeedKmh = roundaboutApproachSpeedKmh;
     }
 }

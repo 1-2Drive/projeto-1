@@ -9,7 +9,9 @@ import com.one2drive.projeto1.config.SimulationConfig;
 import com.one2drive.projeto1.decision.DrivingDecision;
 import com.one2drive.projeto1.drools.WorkingMemoryFactView;
 import com.one2drive.projeto1.explanation.TimelineEntry;
+import com.one2drive.projeto1.simulation.RoadMapSnapshot;
 import com.one2drive.projeto1.simulation.RoadRenderItem;
+import com.one2drive.projeto1.domain.Lane;
 import com.one2drive.projeto1.domain.LaneChangeState;
 import com.one2drive.projeto1.simulation.SensorTelemetry;
 import com.one2drive.projeto1.simulation.SimulationEngine;
@@ -17,6 +19,7 @@ import com.one2drive.projeto1.simulation.SimulationSnapshot;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -112,7 +115,23 @@ public class ApiModelMapper {
             demoPhases(engine),
             maneuver(engine, snapshot),
             sensors(engine),
-            InferenceNarrator.summarise(engine, snapshot)
+            InferenceNarrator.summarise(engine, snapshot),
+            roadMap(engine.roadMapSnapshot())
+        );
+    }
+
+    private ApiSimulationSnapshot.RoadMapView roadMap(RoadMapSnapshot map) {
+        return new ApiSimulationSnapshot.RoadMapView(
+            map.cells().length,
+            Arrays.stream(Lane.values()).map(Lane::name).toList(),
+            map.blockLengthMeters(),
+            map.egoRow(),
+            map.lap(),
+            map.cells(),
+            map.legend().stream()
+                .map(entry -> new ApiSimulationSnapshot.MapLegendEntryView(
+                    entry.code(), entry.template().getType().name(), entry.label(), entry.detail()))
+                .toList()
         );
     }
 
@@ -231,7 +250,7 @@ public class ApiModelMapper {
         }
 
         List<String> ids = List.of("normal", "speed-limit", "weather", "ttc", "yield", "pedestrian");
-        List<String> labels = List.of("Normal driving", "Speed limit", "Weather", "TTC safety", "Yield / roundabout", "Pedestrian");
+        List<String> labels = List.of("Normal driving", "Speed limit", "Weather", "TTC safety", "Yield", "Pedestrian");
         Set<String> evidence = engine.getDemoEvidence();
         String activeId = ids.stream().filter(id -> !evidence.contains(id)).findFirst().orElse(null);
 

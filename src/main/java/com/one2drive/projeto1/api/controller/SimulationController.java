@@ -4,8 +4,10 @@ import com.one2drive.projeto1.api.model.ApiCommandResponse;
 import com.one2drive.projeto1.api.model.ApiSimulationSnapshot;
 import com.one2drive.projeto1.api.model.ApiSystemStatus;
 import com.one2drive.projeto1.api.service.SimulationRuntimeService;
+import com.one2drive.projeto1.domain.LaneChangeDirection;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -47,6 +49,13 @@ public class SimulationController {
     public ResponseEntity<ApiCommandResponse> reset() {
         runtime.reset();
         return ResponseEntity.ok(new ApiCommandResponse(true, "Simulation reset to baseline scenario"));
+    }
+
+    @PostMapping("/lane-change/{direction}")
+    public ResponseEntity<ApiCommandResponse> requestLaneChange(@PathVariable("direction") String direction) {
+        LaneChangeDirection parsed = LaneChangeDirection.valueOf(direction.toUpperCase());
+        runtime.requestLaneChange(parsed);
+        return ResponseEntity.ok(new ApiCommandResponse(true, "Lane change " + parsed + " requested"));
     }
 
     @GetMapping("/state")

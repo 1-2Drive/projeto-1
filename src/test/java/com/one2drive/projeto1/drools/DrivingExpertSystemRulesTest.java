@@ -15,7 +15,6 @@ import com.one2drive.projeto1.drools.events.PedestrianDetectedEvent;
 import com.one2drive.projeto1.drools.events.PotholeDetectedEvent;
 import com.one2drive.projeto1.drools.events.ReducedGripEvent;
 import com.one2drive.projeto1.drools.events.ReducedVisibilityEvent;
-import com.one2drive.projeto1.drools.events.RoundaboutDetectedEvent;
 import com.one2drive.projeto1.drools.events.SpeedLimitDetectedEvent;
 import com.one2drive.projeto1.drools.events.StopSignEvent;
 import com.one2drive.projeto1.drools.events.TTCEvent;
@@ -211,20 +210,6 @@ class DrivingExpertSystemRulesTest {
                 new BarrierDetectedEvent(1_000, "camera", 22.0, "bar-1", false)
             );
             assertEquals(DrivingAction.STOP, decision.getAction());
-        }
-    }
-
-    @Test
-    @Timeout(10)
-    void roundaboutApproachAdjustsSpeed() {
-        try (DroolsTestHarness harness = new DroolsTestHarness(85.0)) {
-            DrivingDecision decision = harness.cycle(
-                1_000,
-                85.0,
-                new RoundaboutDetectedEvent(1_000, "camera", 65.0, "rb-1", 30.0, false)
-            );
-            assertEquals(DrivingAction.REDUCE_SPEED, decision.getAction());
-            assertEquals(30.0, decision.getRecommendedSpeedKmh(), 0.01);
         }
     }
 

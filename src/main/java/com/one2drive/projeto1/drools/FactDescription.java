@@ -8,8 +8,6 @@ import com.one2drive.projeto1.drools.facts.FrontVehicleState;
 import com.one2drive.projeto1.drools.facts.LaneOccupancyState;
 import com.one2drive.projeto1.drools.facts.PedestrianStateFact;
 import com.one2drive.projeto1.drools.facts.PotholeStateFact;
-import com.one2drive.projeto1.drools.facts.RoadworksStateFact;
-import com.one2drive.projeto1.drools.facts.RoundaboutStateFact;
 import com.one2drive.projeto1.drools.facts.StopSignState;
 import com.one2drive.projeto1.drools.facts.TrafficLightStateFact;
 import com.one2drive.projeto1.drools.facts.VehicleStateFact;
@@ -26,8 +24,6 @@ import com.one2drive.projeto1.drools.events.ReducedGripEvent;
 import com.one2drive.projeto1.drools.events.ReducedVisibilityEvent;
 import com.one2drive.projeto1.drools.events.RelativeSpeedEvent;
 import com.one2drive.projeto1.drools.events.RoadGripEvent;
-import com.one2drive.projeto1.drools.events.RoadworksDetectedEvent;
-import com.one2drive.projeto1.drools.events.RoundaboutDetectedEvent;
 import com.one2drive.projeto1.drools.events.SpeedLimitDetectedEvent;
 import com.one2drive.projeto1.drools.events.StopSignEvent;
 import com.one2drive.projeto1.drools.events.TTCEvent;
@@ -85,15 +81,6 @@ public final class FactDescription {
             return "Pothole %s: %s m, severity %s".formatted(
                 id(value.getPotholeId()), decimal(value.getDistanceMeters(), 1), value.getSeverity());
         }
-        if (fact instanceof RoadworksStateFact value) {
-            return "Roadworks %s: %s m, severity %s".formatted(
-                id(value.getRoadworksId()), decimal(value.getDistanceMeters(), 1), value.getSeverity());
-        }
-        if (fact instanceof RoundaboutStateFact value) {
-            return "Roundabout %s: %s m, approach %s km/h, occupied %s".formatted(
-                id(value.getRoundaboutId()), decimal(value.getDistanceMeters(), 1),
-                decimal(value.getApproachSpeedKmh(), 1), value.isOccupied());
-        }
         if (fact instanceof BarrierStateFact value) {
             return "Barrier %s: %s, %s m".formatted(
                 id(value.getBarrierId()), value.isOpen() ? "open" : "closed", decimal(value.getDistanceMeters(), 1));
@@ -131,18 +118,9 @@ public final class FactDescription {
             return "Camera read traffic light %s: %s at %s m".formatted(
                 id(value.getLightId()), value.getState(), decimal(value.getDistanceMeters(), 1));
         }
-        if (fact instanceof RoundaboutDetectedEvent value) {
-            return "Camera read roundabout %s: %s m, approach %s km/h, occupied %s".formatted(
-                id(value.getRoundaboutId()), decimal(value.getDistanceMeters(), 1),
-                decimal(value.getApproachSpeedKmh(), 1), value.isOccupied());
-        }
         if (fact instanceof PotholeDetectedEvent value) {
             return "Camera read pothole %s: %s m, severity %s".formatted(
                 id(value.getPotholeId()), decimal(value.getDistanceMeters(), 1), value.getSeverity());
-        }
-        if (fact instanceof RoadworksDetectedEvent value) {
-            return "Camera read roadworks %s: %s m, severity %s".formatted(
-                id(value.getRoadworksId()), decimal(value.getDistanceMeters(), 1), value.getSeverity());
         }
         if (fact instanceof ObstacleDetectedEvent value) {
             return "Camera read obstacle %s: %s m, severity %s".formatted(

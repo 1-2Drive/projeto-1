@@ -1,6 +1,6 @@
 ```mermaid
 flowchart LR
-    RULES[DrivingExpertSystemRulesTest - 22 tests] --> SPEED[speed.drl]
+    RULES[DrivingExpertSystemRulesTest - 21 tests] --> SPEED[speed.drl]
     RULES --> SIGNS[traffic-signs.drl]
     RULES --> LIGHTS[traffic-lights.drl]
     RULES --> HAZARDS[road-hazards.drl]
@@ -8,7 +8,6 @@ flowchart LR
     RULES --> TEMPORAL[temporal.drl]
     RULES --> EMERG[emergency.drl]
     RULES --> LANE[lane-change.drl]
-    RULES --> ROUND[roundabout.drl]
     RULES --> BARRIER[barrier.drl]
     RULES --> PED[pedestrian.drl]
     RULES --> DEFAULTS[defaults.drl]

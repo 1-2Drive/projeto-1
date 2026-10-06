@@ -190,24 +190,6 @@ then
     update($state);
 end
 
-rule "Update roadworks state"
-no-loop true
-when
-    $e : RoadworksDetectedEvent() from entry-point "ROAD_STREAM"
-    $state : RoadworksStateFact()
-    eval($e.getTimestamp() >= $state.getTimestamp()
-        && ($e.getTimestamp() > $state.getTimestamp()
-            || !$e.getRoadworksId().equals($state.getRoadworksId())
-            || Math.abs($state.getDistanceMeters() - $e.getDistanceMeters()) > 0.01
-            || $state.getSeverity() != $e.getSeverity()))
-then
-    $state.setRoadworksId($e.getRoadworksId());
-    $state.setDistanceMeters($e.getDistanceMeters());
-    $state.setSeverity($e.getSeverity());
-    $state.setTimestamp($e.getTimestamp());
-    update($state);
-end
-
 rule "Update barrier state"
 no-loop true
 when
@@ -222,26 +204,6 @@ then
     $state.setBarrierId($e.getBarrierId());
     $state.setDistanceMeters($e.getDistanceMeters());
     $state.setOpen($e.isOpen());
-    $state.setTimestamp($e.getTimestamp());
-    update($state);
-end
-
-rule "Update roundabout state"
-no-loop true
-when
-    $e : RoundaboutDetectedEvent() from entry-point "ROAD_STREAM"
-    $state : RoundaboutStateFact()
-    eval($e.getTimestamp() >= $state.getTimestamp()
-        && ($e.getTimestamp() > $state.getTimestamp()
-            || !$e.getRoundaboutId().equals($state.getRoundaboutId())
-            || Math.abs($state.getDistanceMeters() - $e.getDistanceMeters()) > 0.01
-            || Math.abs($state.getApproachSpeedKmh() - $e.getApproachSpeedKmh()) > 0.01
-            || $state.isOccupied() != $e.isOccupied()))
-then
-    $state.setRoundaboutId($e.getRoundaboutId());
-    $state.setDistanceMeters($e.getDistanceMeters());
-    $state.setApproachSpeedKmh($e.getApproachSpeedKmh());
-    $state.setOccupied($e.isOccupied());
     $state.setTimestamp($e.getTimestamp());
     update($state);
 end
@@ -296,8 +258,10 @@ no-loop true
 when
     $e : LaneChangeRequestEvent() from entry-point "COMMAND_STREAM"
     $state : LaneChangeRequestState()
+    // Only a newer request (or a new direction in the same tick) activates the state. Re-activating on
+    // active == false would fight "Expire lane change request" while the 3s event is still alive.
     eval($e.getTimestamp() >= $state.getTimestamp()
-        && ($e.getTimestamp() > $state.getTimestamp() || $state.getDirection() != $e.getDirection() || $state.isActive() == false))
+        && ($e.getTimestamp() > $state.getTimestamp() || $state.getDirection() != $e.getDirection()))
 then
     $state.setActive(true);
     $state.setDirection($e.getDirection());
@@ -407,20 +371,6 @@ then
     update($state);
 end
 
-rule "Clear stale roadworks perception"
-no-loop true
-salience -100
-when
-    $state : RoadworksStateFact(roadworksId != "none", $timestamp : timestamp)
-    VehicleStateFact($now : timestamp)
-    eval($now - $timestamp > 600)
-then
-    $state.setRoadworksId("none");
-    $state.setDistanceMeters(Double.POSITIVE_INFINITY);
-    $state.setTimestamp($now);
-    update($state);
-end
-
 rule "Clear stale barrier perception"
 no-loop true
 salience -100
@@ -432,21 +382,6 @@ then
     $state.setBarrierId("none");
     $state.setDistanceMeters(Double.POSITIVE_INFINITY);
     $state.setOpen(true);
-    $state.setTimestamp($now);
-    update($state);
-end
-
-rule "Clear stale roundabout perception"
-no-loop true
-salience -100
-when
-    $state : RoundaboutStateFact(roundaboutId != "none", $timestamp : timestamp)
-    VehicleStateFact($now : timestamp)
-    eval($now - $timestamp > 600)
-then
-    $state.setRoundaboutId("none");
-    $state.setDistanceMeters(Double.POSITIVE_INFINITY);
-    $state.setOccupied(false);
     $state.setTimestamp($now);
     update($state);
 end

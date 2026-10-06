@@ -16,11 +16,12 @@ salience 560
 when
     $ctx : DecisionContext()
     WeatherStateFact(condition == WeatherCondition.RAIN)
-    Number( intValue >= 2 ) from accumulate(
-        TTCEvent( ttcSeconds > 0.0, ttcSeconds < 3.0 ) over window:time(2s) from entry-point "PERCEPTION_STREAM",
-        count(1)
+    accumulate(
+        TTCEvent( $sample : ttcSeconds > 0.0, ttcSeconds < 3.0 ) over window:time(2s) from entry-point "PERCEPTION_STREAM";
+        $count : count(1),
+        $ttc : min($sample);
+        $count >= 2
     )
-    TTCEvent( $ttc : ttcSeconds > 0.0, ttcSeconds < 3.0 ) over window:time(2s) from entry-point "PERCEPTION_STREAM"
 then
     droolsSupport.proposeDecision(
         $ctx,
@@ -30,6 +31,6 @@ then
         DecisionPriority.COLLISION_AVOIDANCE,
         "Rain + persistent low TTC => conservative braking",
         drools.getRule().getName(),
-        "latest TTC=" + $ttc + "s"
+        "lowest TTC=" + $ttc + "s"
     );
 end

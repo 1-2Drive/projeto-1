@@ -8,8 +8,6 @@ import com.one2drive.projeto1.domain.Lane;
 import com.one2drive.projeto1.domain.OtherVehicle;
 import com.one2drive.projeto1.domain.Pedestrian;
 import com.one2drive.projeto1.domain.Pothole;
-import com.one2drive.projeto1.domain.Roadworks;
-import com.one2drive.projeto1.domain.Roundabout;
 import com.one2drive.projeto1.domain.SpeedLimitSign;
 import com.one2drive.projeto1.domain.StaticObstacle;
 import com.one2drive.projeto1.domain.StopSign;
@@ -18,6 +16,8 @@ import com.one2drive.projeto1.domain.TrafficLightState;
 import com.one2drive.projeto1.domain.WeatherCondition;
 import com.one2drive.projeto1.domain.WeatherState;
 import com.one2drive.projeto1.domain.YieldSign;
+import com.one2drive.projeto1.simulation.MapLegend;
+import com.one2drive.projeto1.simulation.RoadMap;
 import com.one2drive.projeto1.simulation.WorldState;
 
 public final class ScenarioFactory {
@@ -27,15 +27,25 @@ public final class ScenarioFactory {
     public static WorldState buildWorld(ScenarioDefinition definition, SimulationConfig config) {
         EgoVehicleState ego = new EgoVehicleState(0, definition.getInitialSpeedKmh() / 3.6, 0, Lane.CENTER);
         WeatherState weather = toWeatherState(definition.getInitialWeather());
-        WorldState worldState = new WorldState(ego, weather);
+        WorldState worldState = new WorldState(ego, weather, buildRoadMap(definition, config));
 
-        for (ScenarioRoadElementDefinition element : definition.getRoadElements()) {
-            worldState.addRoadElement(createRoadElement(element));
-        }
         for (ScenarioActorDefinition actor : definition.getActors()) {
             worldState.addActor(createActor(actor));
         }
         return worldState;
+    }
+
+    /** The scenario's matrix with its legend, or an empty road of the default length. */
+    public static RoadMap buildRoadMap(ScenarioDefinition definition, SimulationConfig config) {
+        MapLegend legend = MapLegend.defaults().withOverrides(definition.getMapLegend());
+        if (definition.getMap() == null) {
+            return RoadMap.empty(config.getDefaultMapRows(), config.getMapBlockLengthMeters(), legend);
+        }
+        try {
+            return new RoadMap(definition.getMap(), config.getMapBlockLengthMeters(), legend);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Scenario " + definition.getId() + ": " + e.getMessage(), e);
+        }
     }
 
     public static WeatherState toWeatherState(WeatherCondition condition) {
@@ -61,11 +71,6 @@ public final class ScenarioFactory {
                 lane,
                 definition.getSeverity() == null ? HazardSeverity.MEDIUM : definition.getSeverity()
             );
-            case ROADWORKS -> new Roadworks(
-                definition.getPositionMeters(),
-                lane,
-                definition.getSeverity() == null ? HazardSeverity.MEDIUM : definition.getSeverity()
-            );
             case STATIC_OBSTACLE -> new StaticObstacle(
                 definition.getPositionMeters(),
                 lane,
@@ -75,11 +80,6 @@ public final class ScenarioFactory {
                 definition.getPositionMeters(),
                 lane,
                 definition.getBarrierOpen() == null || definition.getBarrierOpen()
-            );
-            case ROUNDABOUT -> new Roundabout(
-                definition.getPositionMeters(),
-                lane,
-                definition.getRoundaboutApproachSpeedKmh() == null ? 30 : definition.getRoundaboutApproachSpeedKmh()
             );
         };
     }

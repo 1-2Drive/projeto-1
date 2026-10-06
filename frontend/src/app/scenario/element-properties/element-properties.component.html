@@ -104,20 +104,6 @@
         </label>
       }
 
-      @if (def.needsRoundaboutSpeed) {
-        <label class="field">
-          <span>Approach speed</span>
-          <div class="field__control">
-            <input type="number" min="10" max="80" step="5"
-                   [ngModel]="roundaboutSpeedKmh()" (ngModelChange)="setRoundaboutSpeed($event)" />
-            <em>km/h</em>
-          </div>
-        </label>
-        @if (speedError(); as error) {
-          <small class="field__error" role="alert">{{ error }}</small>
-        }
-      }
-
       @if (def.needsSpeedLimit || def.needsActorSpeed) {
         @if (speedError(); as error) {
           <small class="field__error" role="alert">{{ error }}</small>

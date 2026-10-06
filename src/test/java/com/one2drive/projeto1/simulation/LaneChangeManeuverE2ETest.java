@@ -194,4 +194,69 @@ class LaneChangeManeuverE2ETest {
             assertEquals(Lane.LEFT.name(), committedLanes.get(committedLanes.size() - 1));
         }
     }
+
+    @Test
+    @Timeout(30)
+    @DisplayName("driver request to change lane left is executed when the left lane is clear and the car stays there")
+    void driverRequestedLaneChangeLeftIsExecuted() {
+        try (SimulationEngine engine = runningEngine()) {
+            engine.requestLaneChange(com.one2drive.projeto1.domain.LaneChangeDirection.LEFT);
+
+            boolean decisionSeen = false;
+            for (int i = 0; i < 200; i++) {
+                engine.tick();
+                decisionSeen |= DrivingAction.CHANGE_LANE_LEFT == engine.getCurrentDecision().getAction();
+            }
+
+            assertTrue(decisionSeen, "Drools should have selected CHANGE_LANE_LEFT for the driver request");
+            assertEquals(Lane.LEFT, engine.getWorldState().getEgo().getLane(),
+                "Vehicle should have moved to and stayed in the left lane");
+            assertEquals(Lane.LEFT.centreMeters(), engine.getWorldState().getEgo().getLateralPositionMeters(), 0.01);
+        }
+    }
+
+    @Test
+    @Timeout(30)
+    @DisplayName("driver request to change lane is executed while the car is moving off from a standstill")
+    void driverRequestedLaneChangeWhileMovingOff() {
+        try (SimulationEngine engine = runningEngine()) {
+            engine.getWorldState().getEgo().setSpeedKmh(0.0);
+            for (int i = 0; i < 10; i++) {
+                engine.tick();
+            }
+            assertEquals(DrivingAction.CONTINUE, engine.getCurrentDecision().getAction(), "The car should be moving off");
+
+            engine.requestLaneChange(com.one2drive.projeto1.domain.LaneChangeDirection.LEFT);
+            for (int i = 0; i < 150; i++) {
+                engine.tick();
+            }
+
+            assertEquals(Lane.LEFT, engine.getWorldState().getEgo().getLane(),
+                "Moving off must not swallow the driver's lane change request");
+            assertTrue(engine.getWorldState().getEgo().getSpeedKmh() >= 25.0,
+                "The car should keep moving off after the lane change, speed was "
+                    + engine.getWorldState().getEgo().getSpeedKmh());
+        }
+    }
+
+    @Test
+    @Timeout(30)
+    @DisplayName("driver request to change lane right is refused while the right lane is occupied")
+    void driverRequestedLaneChangeIntoOccupiedLaneIsRefused() {
+        try (SimulationEngine engine = runningEngine()) {
+            addVehicleInLane(engine, 20.0, Lane.RIGHT);
+            for (int i = 0; i < 5; i++) {
+                engine.tick();
+            }
+            engine.requestLaneChange(com.one2drive.projeto1.domain.LaneChangeDirection.RIGHT);
+
+            for (int i = 0; i < 60; i++) {
+                engine.tick();
+                assertFalse(DrivingAction.CHANGE_LANE_RIGHT == engine.getCurrentDecision().getAction(),
+                    "Drools must not approve a lane change into an occupied lane");
+            }
+
+            assertEquals(Lane.CENTER, engine.getWorldState().getEgo().getLane());
+        }
+    }
 }

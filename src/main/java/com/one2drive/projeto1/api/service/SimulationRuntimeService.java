@@ -3,6 +3,7 @@ package com.one2drive.projeto1.api.service;
 import com.one2drive.projeto1.api.model.ApiSimulationSnapshot;
 import com.one2drive.projeto1.api.model.ApiSystemStatus;
 import com.one2drive.projeto1.config.SimulationConfig;
+import com.one2drive.projeto1.domain.LaneChangeDirection;
 import com.one2drive.projeto1.scenario.ScenarioDefinition;
 import com.one2drive.projeto1.scenario.ScenarioLibrary;
 import com.one2drive.projeto1.simulation.SimulationEngine;
@@ -94,6 +95,15 @@ public class SimulationRuntimeService {
         ScenarioDefinition baseline = scenarioLibrary.findById("S1")
             .orElseGet(() -> scenarioLibrary.getScenarios().stream().findFirst().orElseThrow());
         simulationEngine.reset(baseline);
+        publisher.publish(snapshot());
+    }
+
+    /**
+     * Forwards a driver lane change request to Drools. The request is only a command:
+     * the rules decide whether the target lane is safe before any maneuver starts.
+     */
+    public synchronized void requestLaneChange(LaneChangeDirection direction) {
+        simulationEngine.requestLaneChange(direction);
         publisher.publish(snapshot());
     }
 

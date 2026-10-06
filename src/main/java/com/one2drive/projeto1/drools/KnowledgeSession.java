@@ -7,12 +7,11 @@ import com.one2drive.projeto1.drools.facts.BarrierStateFact;
 import com.one2drive.projeto1.drools.facts.CurrentSpeedLimit;
 import com.one2drive.projeto1.drools.facts.FrontVehicleState;
 import com.one2drive.projeto1.drools.facts.LaneChangeRequestState;
+import com.one2drive.projeto1.drools.facts.MoveOffState;
 import com.one2drive.projeto1.drools.facts.LaneOccupancyState;
 import com.one2drive.projeto1.drools.facts.PedestrianStateFact;
 import com.one2drive.projeto1.drools.facts.ObstacleStateFact;
 import com.one2drive.projeto1.drools.facts.PotholeStateFact;
-import com.one2drive.projeto1.drools.facts.RoadworksStateFact;
-import com.one2drive.projeto1.drools.facts.RoundaboutStateFact;
 import com.one2drive.projeto1.drools.facts.StopSignState;
 import com.one2drive.projeto1.drools.facts.TrafficLightStateFact;
 import com.one2drive.projeto1.drools.facts.WeatherStateFact;
@@ -24,6 +23,7 @@ import org.kie.api.KieServices;
 import org.kie.api.runtime.KieContainer;
 import org.kie.api.runtime.KieSession;
 import org.kie.api.runtime.conf.ClockTypeOption;
+import org.kie.api.runtime.rule.FactHandle;
 import org.kie.api.runtime.rule.LiveQuery;
 import org.kie.api.runtime.rule.ViewChangedEventListener;
 
@@ -37,6 +37,7 @@ public class KnowledgeSession implements AutoCloseable {
     private final WorkingMemoryInspector inspector;
     private final ExplanationTrace trace;
     private final DecisionContext decisionContext;
+    private final FactHandle decisionContextHandle;
     private final DrivingDecision drivingDecision;
     private final LiveQuery liveQuery;
 
@@ -45,6 +46,7 @@ public class KnowledgeSession implements AutoCloseable {
                              WorkingMemoryInspector inspector,
                              ExplanationTrace trace,
                              DecisionContext decisionContext,
+                             FactHandle decisionContextHandle,
                              DrivingDecision drivingDecision,
                              LiveQuery liveQuery) {
         this.kieSession = kieSession;
@@ -52,6 +54,7 @@ public class KnowledgeSession implements AutoCloseable {
         this.inspector = inspector;
         this.trace = trace;
         this.decisionContext = decisionContext;
+        this.decisionContextHandle = decisionContextHandle;
         this.drivingDecision = drivingDecision;
         this.liveQuery = liveQuery;
     }
@@ -95,7 +98,7 @@ public class KnowledgeSession implements AutoCloseable {
 
         kieSession.setGlobal("droolsSupport", support);
 
-        kieSession.insert(context);
+        FactHandle contextHandle = kieSession.insert(context);
         kieSession.insert(decision);
         kieSession.insert(new CurrentSpeedLimit(120, "default", 0L));
         kieSession.insert(new WeatherStateFact(com.one2drive.projeto1.domain.WeatherCondition.CLEAR, 1.0, 1.0, 0L));
@@ -108,14 +111,13 @@ public class KnowledgeSession implements AutoCloseable {
         kieSession.insert(new PedestrianStateFact("none", Double.POSITIVE_INFINITY, false, 0L));
         kieSession.insert(new PotholeStateFact("none", Double.POSITIVE_INFINITY, com.one2drive.projeto1.domain.HazardSeverity.LOW, com.one2drive.projeto1.domain.Lane.CENTER, 0L));
         kieSession.insert(new ObstacleStateFact("none", Double.POSITIVE_INFINITY, com.one2drive.projeto1.domain.HazardSeverity.LOW, com.one2drive.projeto1.domain.Lane.CENTER, 0L));
-        kieSession.insert(new RoadworksStateFact("none", Double.POSITIVE_INFINITY, com.one2drive.projeto1.domain.HazardSeverity.LOW, 0L));
         kieSession.insert(new BarrierStateFact("none", Double.POSITIVE_INFINITY, true, 0L));
-        kieSession.insert(new RoundaboutStateFact("none", Double.POSITIVE_INFINITY, 30, false, 0L));
         kieSession.insert(new StopSignState("none", Double.POSITIVE_INFINITY, 0L));
         kieSession.insert(new YieldSignState("none", Double.POSITIVE_INFINITY, 0L));
         kieSession.insert(new TrafficLightStateFact("none", com.one2drive.projeto1.domain.TrafficLightState.GREEN, Double.POSITIVE_INFINITY, 0L));
         kieSession.insert(new AccelerationRequestState(0.0, 0L));
-        kieSession.insert(new LaneChangeRequestState(false, com.one2drive.projeto1.domain.LaneChangeDirection.LEFT, 0L));
+        kieSession.insert(new LaneChangeRequestState(false, com.one2drive.projeto1.domain.LaneChangeDirection.LEFT, -1L));
+        kieSession.insert(new MoveOffState(false, 0L));
 
         LiveQuery liveQuery = null;
         if (enableLiveQuery) {
@@ -129,6 +131,7 @@ public class KnowledgeSession implements AutoCloseable {
             new WorkingMemoryInspector(kieSession),
             trace,
             context,
+            contextHandle,
             decision,
             liveQuery
         );
@@ -156,6 +159,17 @@ public class KnowledgeSession implements AutoCloseable {
 
     public DecisionContext getDecisionContext() {
         return decisionContext;
+    }
+
+    /**
+     * Resets the decision context for a new inference cycle and tells Drools it
+     * changed. Without the update only rules that also match a fact refreshed this
+     * tick would fire again, so on ticks without a new camera sample the decision
+     * would fall back to the baseline and flicker.
+     */
+    public void beginDecisionCycle(long timestamp, double currentSpeedKmh) {
+        decisionContext.beginCycle(timestamp, currentSpeedKmh);
+        kieSession.update(decisionContextHandle, decisionContext);
     }
 
     public DrivingDecision getDrivingDecision() {

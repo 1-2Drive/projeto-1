@@ -6,8 +6,6 @@ public enum ScenarioRoadElementType {
     YIELD_SIGN,
     TRAFFIC_LIGHT,
     POTHOLE,
-    ROADWORKS,
     STATIC_OBSTACLE,
-    BARRIER,
-    ROUNDABOUT
+    BARRIER
 }

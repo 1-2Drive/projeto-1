@@ -374,20 +374,12 @@
   width: 1.35rem;
 }
 
-.obj--roundabout {
-  width: 4.2rem;
-}
-
 .obj--barrier {
   width: 3.6rem;
 }
 
 .obj--pothole {
   width: 3.4rem;
-}
-
-.obj--roadworks {
-  width: 2.3rem;
 }
 
 .obj--obstacle {
@@ -523,24 +515,6 @@
   overflow: visible;
 }
 
-.structure--roundabout .structure__ring {
-  fill: rgba(70, 96, 120, 0.28);
-  stroke: rgba(150, 190, 225, 0.75);
-  stroke-width: 3;
-}
-
-.structure--roundabout .structure__inner {
-  fill: rgba(28, 44, 60, 0.7);
-  stroke: rgba(150, 190, 225, 0.45);
-  stroke-width: 2;
-}
-
-.structure--roundabout .structure__arms {
-  stroke: rgba(150, 190, 225, 0.55);
-  stroke-width: 3;
-  stroke-linecap: round;
-}
-
 .structure--barrier .structure__post {
   fill: #3d4854;
 }
@@ -574,17 +548,6 @@
 
 .hazard--pothole .hazard__water {
   fill: rgba(70, 110, 150, 0.5);
-}
-
-.hazard--roadworks .hazard__disc {
-  fill: #e0a12c;
-  stroke: #1d2229;
-  stroke-width: 2;
-  stroke-linejoin: round;
-}
-
-.hazard--roadworks .hazard__figure {
-  fill: #1d2229;
 }
 
 .hazard--obstacle .hazard__box {

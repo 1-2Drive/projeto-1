@@ -85,8 +85,9 @@ final class InferenceNarrator {
                 + round(telemetry.frontRadar().ttcSeconds()) + "s");
         }
 
-        steps.add("Left lane " + telemetry.blindSpotLeft().status().toLowerCase()
-            + ", right lane " + telemetry.blindSpotRight().status().toLowerCase());
+        String left = sideLane("left", telemetry.blindSpotLeft());
+        steps.add(Character.toUpperCase(left.charAt(0)) + left.substring(1)
+            + ", " + sideLane("right", telemetry.blindSpotRight()));
 
         String rule = engine.getCurrentDecision().getSourceRule();
         if (rule != null && !rule.isBlank()) {
@@ -102,14 +103,19 @@ final class InferenceNarrator {
                 + Math.round(snapshot.egoLaneChangeProgress() * 100) + "% complete");
             case "COMPLETED" -> steps.add("Vehicle completed the lane change and is now in the "
                 + snapshot.egoTargetLane() + " lane");
-            default -> {
-                if (isBraking(snapshot)) {
-                    steps.add("Vehicle is braking to " + round(snapshot.recommendedSpeedKmh()) + " km/h");
-                }
-            }
+            // Always emit an execution step so the panel keeps a stable row count between cycles.
+            default -> steps.add(isBraking(snapshot)
+                ? "Vehicle is braking to " + round(snapshot.recommendedSpeedKmh()) + " km/h"
+                : "Vehicle keeps " + round(snapshot.egoSpeedKmh()) + " km/h" + laneSuffix(snapshot.egoLane()));
         }
 
         return List.copyOf(steps);
+    }
+
+    private static String sideLane(String side, SensorTelemetry.BlindSpotView view) {
+        return "NO LANE".equals(view.status())
+            ? "no lane on the " + side
+            : side + " lane " + view.status().toLowerCase();
     }
 
     private static boolean isBraking(SimulationSnapshot snapshot) {

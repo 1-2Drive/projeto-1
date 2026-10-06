@@ -172,9 +172,7 @@ public class DrivingExpertSystemApp extends Application {
         );
 
         VBox road = group("Road",
-            addRoadElementButton("Roundabout", roundabout()),
             addRoadElementButton("Pothole", pothole(HazardSeverity.HIGH)),
-            addRoadElementButton("Roadworks", roadworks()),
             addRoadElementButton("Barrier Closed", barrier(false)),
             addRoadElementButton("Barrier Open", barrier(true)),
             addRoadElementButton("Traffic Light Red", trafficLight(TrafficLightState.RED)),
@@ -373,9 +371,6 @@ public class DrivingExpertSystemApp extends Application {
         if (type.contains("Pothole")) {
             return "PH";
         }
-        if (type.contains("Roundabout")) {
-            return "RB";
-        }
         if (type.contains("Barrier")) {
             return "BR";
         }
@@ -427,7 +422,6 @@ public class DrivingExpertSystemApp extends Application {
         copy.setTrafficLightState(def.getTrafficLightState());
         copy.setSeverity(def.getSeverity());
         copy.setBarrierOpen(def.getBarrierOpen());
-        copy.setRoundaboutApproachSpeedKmh(def.getRoundaboutApproachSpeedKmh());
         return copy;
     }
 
@@ -475,30 +469,12 @@ public class DrivingExpertSystemApp extends Application {
         return d;
     }
 
-    private ScenarioRoadElementDefinition roundabout() {
-        ScenarioRoadElementDefinition d = new ScenarioRoadElementDefinition();
-        d.setType(ScenarioRoadElementType.ROUNDABOUT);
-        d.setLane(Lane.CENTER);
-        d.setPositionMeters(120);
-        d.setRoundaboutApproachSpeedKmh(30.0);
-        return d;
-    }
-
     private ScenarioRoadElementDefinition pothole(HazardSeverity severity) {
         ScenarioRoadElementDefinition d = new ScenarioRoadElementDefinition();
         d.setType(ScenarioRoadElementType.POTHOLE);
         d.setLane(Lane.CENTER);
         d.setPositionMeters(60);
         d.setSeverity(severity);
-        return d;
-    }
-
-    private ScenarioRoadElementDefinition roadworks() {
-        ScenarioRoadElementDefinition d = new ScenarioRoadElementDefinition();
-        d.setType(ScenarioRoadElementType.ROADWORKS);
-        d.setLane(Lane.CENTER);
-        d.setPositionMeters(90);
-        d.setSeverity(HazardSeverity.MEDIUM);
         return d;
     }
 

@@ -10,7 +10,8 @@
   </header>
 
   <p class="toolbox__lead">
-    Add road objects to the world while driving. Drools only reacts once a sensor
+    Signs, lights, barriers and hazards are written into the road map, snapped to its
+    blocks; vehicles and pedestrians move freely. Drools only reacts once a sensor
     detects them inside its range.
   </p>
 
@@ -58,13 +59,6 @@
         </svg>
         <span>Light</span>
       </button>
-      <button type="button" class="tile" data-testid="add-roundabout" (click)="add('ROUNDABOUT')">
-        <svg viewBox="0 0 24 24" class="tile__icon" aria-hidden="true">
-          <circle cx="12" cy="12" r="9" fill="none" stroke="#8fc0e6" stroke-width="2.2" />
-          <circle cx="12" cy="12" r="4" fill="none" stroke="#8fc0e6" stroke-width="1.6" />
-        </svg>
-        <span>Roundabout</span>
-      </button>
       <button type="button" class="tile" data-testid="add-barrier" (click)="add('BARRIER')">
         <svg viewBox="0 0 24 24" class="tile__icon" aria-hidden="true">
           <rect x="2" y="9" width="20" height="4.5" rx="1.4" fill="#d8483f" />
@@ -108,14 +102,6 @@
           <ellipse cx="12" cy="12" rx="8" ry="5" fill="#0a0e12" stroke="#6c7683" stroke-width="1.6" stroke-dasharray="3 2" />
         </svg>
         <span>Pothole</span>
-      </button>
-      <button type="button" class="tile" data-testid="add-roadworks" (click)="add('ROADWORKS')">
-        <svg viewBox="0 0 24 24" class="tile__icon" aria-hidden="true">
-          <polygon points="12,2 22,20 2,20" fill="#e0a12c" stroke="#1d2229" stroke-width="1.6" />
-          <rect x="11" y="10" width="2.4" height="6" rx="1" fill="#1d2229" />
-          <circle cx="12.2" cy="8.4" r="1.5" fill="#1d2229" />
-        </svg>
-        <span>Roadworks</span>
       </button>
       <button type="button" class="tile" data-testid="add-obstacle" (click)="add('STATIC_OBSTACLE')">
         <svg viewBox="0 0 24 24" class="tile__icon" aria-hidden="true">

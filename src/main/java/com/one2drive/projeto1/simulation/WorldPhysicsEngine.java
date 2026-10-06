@@ -19,13 +19,9 @@ public class WorldPhysicsEngine {
 
     public void updateWorld(WorldState worldState, double dtSeconds) {
         EgoVehicleState ego = worldState.getEgo();
+        // No end of road: the map is a loop, so position keeps counting metres travelled.
         ego.advance(dtSeconds);
         advanceLaneChange(ego, dtSeconds);
-        if (ego.getPositionMeters() > config.getRoadLengthMeters()) {
-            ego.setPositionMeters(config.getRoadLengthMeters());
-            ego.setSpeedMps(0);
-            ego.setAccelerationMps2(0);
-        }
 
         for (DynamicActor actor : worldState.getActors()) {
             if (!actor.isActive()) {

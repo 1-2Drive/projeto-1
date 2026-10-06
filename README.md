@@ -142,14 +142,54 @@ Reset (used by `RESET` and scenario load) clears pending mutations, disposes and
 rebuilds the KieSession, resets the clock, clears sensor cadence state and the
 explanation trace, so no perception state leaks between runs.
 
+Every tick starts a fresh decision cycle: the `DecisionContext` is reset and updated in
+the KieSession, so all rules re-evaluate against the current state facts on every tick.
+Rules that read raw stream events use sliding windows, so only recent samples count.
+
+### Road map
+
+The road is a matrix, defined per scenario in `scenarios.json` (`map`): one row per
+5 m block along the road and one column per lane (`LEFT`, `CENTER`, `RIGHT`). A 100x3
+map is a 500 m road. After the last row the car continues at row 0, so the road loops
+and every distance (sensors, road view) is measured around the loop. A scenario
+without `map` gets an empty 100x3 road (`SimulationConfig`: block length and rows).
+
+`0` is a free cell; any other number is a legend code:
+
+| Code | Element |
+|---|---|
+| 1 | Obstacle (high severity) |
+| 2 | Pothole (high severity) |
+| 3 | Closed barrier |
+| 4 | Stop sign |
+| 5 | Yield sign |
+| 6 / 7 | Red / green traffic light |
+| 8 - 13 | Speed limit 30 / 50 / 70 / 90 / 100 / 120 km/h |
+
+A scenario can add or replace codes with `mapLegend`, for example
+`"mapLegend": {"14": {"type": "SPEED_LIMIT", "speedLimitKmh": 40}}`. Elements added
+from the toolbox with other parameters get a new code automatically. Each occupied
+cell becomes an ordinary road element at the start of its block, named after the cell
+(`r24-CENTER`), so sensors and rules work on it like on any other element. Vehicles
+and pedestrians are not part of the matrix: they move freely on the same loop.
+
+The **Road map** panel under the road view shows the whole matrix and the car's block.
+Pick a value in the palette and click or drag over cells to paint them, also while the
+simulation runs (`PUT /api/world/map/cells`).
+
+When an obstacle blocks the car's lane and neither side lane is free,
+`Stop before obstacle when no lane is free` stops it 10 m short. Once a lane opens the
+car steers through it and `Move off when stopped and nothing holds the vehicle` takes it
+back up to 30 km/h (or the speed limit, if lower).
+
 ### Sensors
 
 | Sensor | Rate | Range | Produces |
 |---|---|---|---|
 | Speed | 100 ms | - | `VehicleSpeedEvent` |
 | Front radar | 100 ms | 130 m | `FrontDistanceEvent`, `RelativeSpeedEvent`, `TTCEvent` |
-| Camera | 200 ms | 120 m | signs, lights, pedestrian, pothole, barrier, roundabout, roadworks, obstacle |
-| Blind spot | 200 ms | 30 m | `LaneOccupancyEvent` (left/right) |
+| Camera | 200 ms | 120 m | signs, lights, pedestrian, pothole, barrier, obstacle |
+| Blind spot | 200 ms | 30 m | `LaneOccupancyEvent` per side of the car: vehicles alongside, fixed hazards up to 60 m ahead in that lane; past the road edge the side is occupied |
 | Environment | 400 ms | 200 m | weather, visibility, grip |
 
 Radar distance uses a small deterministic measurement noise (seeded), while
@@ -164,7 +204,7 @@ relative speed and TTC are derived from real world state.
 |---|---|
 | `VEHICLE_STREAM` | `VehicleSpeedEvent` |
 | `PERCEPTION_STREAM` | `FrontDistanceEvent`, `RelativeSpeedEvent`, `TTCEvent`, `PedestrianDetectedEvent`, `LaneOccupancyEvent` |
-| `ROAD_STREAM` | speed/stop/yield sign, obstacle, pothole, barrier, roundabout, roadworks events |
+| `ROAD_STREAM` | speed/stop/yield sign, obstacle, pothole, barrier events |
 | `TRAFFIC_STREAM` | `TrafficLightEvent` |
 | `ENVIRONMENT_STREAM` | weather, visibility, grip, reduced visibility, reduced grip |
 | `COMMAND_STREAM` | `AccelerationRequestEvent`, `LaneChangeRequestEvent` |
@@ -209,6 +249,7 @@ The API can add road objects and actors while the simulation is running. Mutatio
 - `POST /api/simulation/resume`
 - `POST /api/simulation/stop`
 - `POST /api/simulation/reset`
+- `POST /api/simulation/lane-change/{LEFT|RIGHT}` (driver request; Drools decides whether it is safe)
 
 ### Simulation/state
 
@@ -222,7 +263,8 @@ The API can add road objects and actors while the simulation is running. Mutatio
 
 ### World mutation
 
-- `POST /api/world/elements`
+- `PUT /api/world/map/cells` with `{"row": 24, "lane": "CENTER", "code": 1}` (`0` frees the cell)
+- `POST /api/world/elements` (written into the map cell `distanceAheadMeters` ahead)
 - `PUT /api/world/elements/{id}`
 - `DELETE /api/world/elements/{id}`
 - `POST /api/world/actors`
@@ -522,6 +564,18 @@ The helper waits for the backend status endpoint and the Angular root page befor
 reporting readiness. Press `Ctrl-C` to stop both services; it terminates each service
 process group, so the forked JVM and the Angular dev server are both stopped.
 
+Windows (one command, from the project root in PowerShell or cmd):
+
+```powershell
+scripts\dev.cmd
+```
+
+`dev.cmd` launches `scripts/dev.ps1` with `-ExecutionPolicy Bypass`, so it works even
+when PowerShell scripts are disabled. It runs `npm ci` if `frontend/node_modules` is
+missing, starts both services in hidden consoles, streams their output prefixed with
+`[backend]` / `[frontend]` (full logs in `.dev-logs/`), and kills both process trees
+on `Ctrl+C`.
+
 ### Two-terminal alternative
 
 Terminal A:
@@ -600,11 +654,11 @@ It is no longer the primary UI, but core simulation and Drools remain shared.
 
 ## Scenario Editor
 
-The left Toolbox supports speed limits, stop/yield signs, traffic lights, roundabouts, potholes, roadworks, obstacles, barriers, front vehicles, pedestrians, rain, low visibility, and low grip. Configurable actions collect the supported lane, distance, state, severity, speed, and approach-speed fields before calling the REST API.
+The left Toolbox supports speed limits, stop/yield signs, traffic lights, potholes, obstacles, barriers, front vehicles, pedestrians, rain, low visibility, and low grip. Configurable actions collect the supported lane, distance, state, severity, and speed fields before calling the REST API.
 
 ## Presentation Demo
 
-`S14_PRESENTATION_DEMO` is a backend timed scenario for a 90-second classroom walkthrough. It schedules world mutations only: a speed sign, rain, a slower front vehicle, yield/roundabout elements, a pedestrian, and weather recovery. The backend marks phases from observed sensor/rule/decision evidence; Angular only displays those statuses.
+`S14_PRESENTATION_DEMO` is a backend timed scenario for a 90-second classroom walkthrough. It schedules world mutations only: a speed sign, rain, a slower front vehicle, a yield sign, a pedestrian, and weather recovery. The backend marks phases from observed sensor/rule/decision evidence; Angular only displays those statuses.
 
 ## Predefined Scenarios
 
@@ -614,7 +668,6 @@ Defined in `src/main/resources/scenarios/scenarios.json`.
 - `S2` 90 to 50 speed limit
 - `S3` Red traffic light
 - `S4` Stop sign
-- `S5` Roundabout
 - `S6` Pothole
 - `S7` Closed barrier
 - `S8` Pedestrian crossing
@@ -634,7 +687,7 @@ Integration tests validate dynamic behavior end-to-end without injecting final d
 - weather mutation impact,
 - reset isolation and KieSession rebuild.
 
-The direct integration suite covers 30 backend tests: 22 rule/CEP tests and 8 SimulationEngine flows. Angular has 11 unit tests. Browser E2E has 3 tests covering runtime speed-limit, pedestrian, and presentation-demo paths with the real stack.
+The direct integration suite covers 53 backend tests: 21 rule/CEP tests, 7 fact description tests, 8 SimulationEngine flows, 7 lane change flows, and 10 road map tests. Angular has 19 unit tests. Browser E2E has 6 tests covering startup, runtime speed-limit, pedestrian, pothole avoidance, sensor groups, and presentation-demo paths with the real stack.
 
 ## Manual Test
 
@@ -659,7 +712,7 @@ The direct integration suite covers 30 backend tests: 22 rule/CEP tests and 8 Si
 ## Known limitations
 
 - SSE is used for realtime state streaming; WebSocket can be added later if bidirectional stream semantics are needed.
-- World model remains simplified (1D longitudinal movement + lane abstraction) for academic clarity.
+- World model remains simplified for academic clarity: a looping road map of 5 m blocks and three lanes, with continuous longitudinal movement.
 - JavaFX interaction is still manual in GUI environments; automated UI acceptance targets Angular.
 - The world is an in-memory single-simulation academic model with simplified one-dimensional physics and lane abstraction; it is not a production ADAS controller.
 - Angular production assets use Google Fonts when network access is available and fall back to system fonts otherwise.
@@ -667,6 +720,7 @@ The direct integration suite covers 30 backend tests: 22 rule/CEP tests and 8 Si
 - `S11B` Yield sign approach
 - `S12` Complex sequential scenario
 - `S14_PRESENTATION_DEMO` Presentation demo end-to-end
+- `S15_MATRIX_COURSE` Matrix obstacle course: a slalom through obstacles and a pothole that repeats every lap
 
 ## Adding Rules
 
@@ -698,7 +752,8 @@ Do not decide vehicle behaviour outside Drools: the actuator only reacts to the
 ## Adding Scenarios
 
 1. Add an entry to `src/main/resources/scenarios/scenarios.json` with `id`, `name`,
-   `initialSpeedKmh`, `initialWeather`, `roadElements`, `actors`, and `timedActions`.
+   `initialSpeedKmh`, `initialWeather`, `map` (rows of `[LEFT, CENTER, RIGHT]` codes, see
+   [Road map](#road-map)), optional `mapLegend`, `actors`, and `timedActions`.
 2. Use existing enums for element/actor types (`ScenarioRoadElementType`,
    `ScenarioActorType`, `ScenarioTimedActionType`) so invalid values fail fast.
 3. Reload the scenario from the Scenario Library panel or `POST

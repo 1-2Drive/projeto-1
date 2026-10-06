@@ -138,6 +138,7 @@
 }
 
 .controls__primary,
+.controls__driver,
 .controls__demo {
   display: flex;
   align-items: center;
@@ -145,6 +146,7 @@
   flex-wrap: wrap;
 }
 
+.controls__driver,
 .controls__demo {
   padding-left: var(--ds-space-3);
   border-left: 1px dashed var(--ds-border);

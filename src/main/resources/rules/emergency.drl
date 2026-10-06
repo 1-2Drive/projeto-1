@@ -8,17 +8,22 @@ import com.one2drive.projeto1.drools.DroolsSupport
 import com.one2drive.projeto1.drools.events.ObstacleDetectedEvent
 import com.one2drive.projeto1.drools.events.TTCEvent
 import com.one2drive.projeto1.drools.facts.PedestrianStateFact
+import com.one2drive.projeto1.drools.facts.VehicleStateFact
 global DroolsSupport droolsSupport
 
+// Every rule here is re-evaluated each decision cycle, so stream patterns are bounded
+// by sliding windows: only recent samples count, and an accumulate yields one match
+// per cycle instead of one per event still alive in the stream.
 rule "Emergency brake when persistent TTC is critical"
 salience 900
 when
     $ctx : DecisionContext()
-    $count : Number( intValue >= 3 ) from accumulate(
-        TTCEvent( ttcSeconds > 0.0, ttcSeconds < 2.5 ) over window:time(2s) from entry-point "PERCEPTION_STREAM",
-        count(1)
+    accumulate(
+        TTCEvent( $sample : ttcSeconds > 0.0, ttcSeconds < 2.5 ) over window:time(2s) from entry-point "PERCEPTION_STREAM";
+        $count : count(1),
+        $ttc : min($sample);
+        $count >= 3
     )
-    $latest : TTCEvent( $ttc : ttcSeconds > 0.0, ttcSeconds < 2.5 ) over window:time(2s) from entry-point "PERCEPTION_STREAM"
 then
     droolsSupport.proposeDecision(
         $ctx,
@@ -28,7 +33,7 @@ then
         DecisionPriority.EMERGENCY_SAFETY,
         "Persistent TTC critical across recent samples",
         drools.getRule().getName(),
-        "count=" + $count + ", latest TTC=" + $ttc + " s, target=" + $latest.getTargetId()
+        "count=" + $count + ", lowest TTC=" + $ttc + " s"
     );
 end
 
@@ -36,7 +41,7 @@ rule "Emergency brake when TTC is immediately critical"
 salience 890
 when
     $ctx : DecisionContext()
-    $e : TTCEvent( ttcSeconds > 0.0, $ttc : ttcSeconds < 1.3 ) from entry-point "PERCEPTION_STREAM"
+    $e : TTCEvent( ttcSeconds > 0.0, $ttc : ttcSeconds < 1.3 ) over window:time(200ms) from entry-point "PERCEPTION_STREAM"
 then
     droolsSupport.proposeDecision(
         $ctx,
@@ -72,7 +77,9 @@ rule "Emergency braking for high severity obstacle at critical distance"
 salience 870
 when
     $ctx : DecisionContext()
-    $obs : ObstacleDetectedEvent( distanceMeters > 0, $d : distanceMeters <= 8.0, severity.toString() == "HIGH" ) from entry-point "ROAD_STREAM"
+    VehicleStateFact( $lane : lane )
+    $obs : ObstacleDetectedEvent( lane == $lane, distanceMeters > 0, $d : distanceMeters <= 8.0, severity.toString() == "HIGH" )
+        over window:time(300ms) from entry-point "ROAD_STREAM"
 then
     droolsSupport.proposeDecision(
         $ctx,

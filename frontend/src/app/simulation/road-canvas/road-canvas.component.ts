@@ -8,10 +8,8 @@ export type RoadObjectKind =
   | 'stopSign'
   | 'yieldSign'
   | 'trafficLight'
-  | 'roundabout'
   | 'barrier'
   | 'pothole'
-  | 'roadworks'
   | 'obstacle'
   | 'vehicle'
   | 'pedestrian';
@@ -176,14 +174,10 @@ export class RoadCanvasComponent {
         return 'Yield sign';
       case 'trafficLight':
         return 'Traffic light';
-      case 'roundabout':
-        return 'Roundabout';
       case 'barrier':
         return 'Barrier';
       case 'pothole':
         return 'Pothole';
-      case 'roadworks':
-        return 'Roadworks';
       case 'obstacle':
         return 'Obstacle';
       case 'vehicle':
@@ -212,10 +206,8 @@ export class RoadCanvasComponent {
     if (type.includes('StopSign')) return 'stopSign';
     if (type.includes('YieldSign')) return 'yieldSign';
     if (type.includes('TrafficLight')) return 'trafficLight';
-    if (type.includes('Roundabout')) return 'roundabout';
     if (type.includes('Barrier')) return 'barrier';
     if (type.includes('Pothole')) return 'pothole';
-    if (type.includes('Roadworks')) return 'roadworks';
     if (type.includes('Obstacle')) return 'obstacle';
     if (type.includes('Pedestrian')) return 'pedestrian';
     if (type.includes('Vehicle')) return 'vehicle';

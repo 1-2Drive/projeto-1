@@ -3,12 +3,13 @@ package rules
 import com.one2drive.projeto1.decision.DecisionContext
 import com.one2drive.projeto1.decision.DecisionPriority
 import com.one2drive.projeto1.domain.DrivingAction
-import com.one2drive.projeto1.domain.HazardSeverity
+import com.one2drive.projeto1.domain.Lane
 import com.one2drive.projeto1.domain.RiskLevel
 import com.one2drive.projeto1.drools.DroolsSupport
 import com.one2drive.projeto1.drools.facts.LaneOccupancyState
+import com.one2drive.projeto1.drools.facts.ObstacleStateFact
 import com.one2drive.projeto1.drools.facts.PotholeStateFact
-import com.one2drive.projeto1.drools.facts.RoadworksStateFact
+import com.one2drive.projeto1.drools.facts.VehicleStateFact
 
 global DroolsSupport droolsSupport
 
@@ -34,24 +35,41 @@ then
     );
 end
 
-rule "Roadworks ahead reduce speed"
-salience 450
+// An obstacle in the vehicle's own lane with no free lane on either side (another
+// hazard, a vehicle alongside or the road edge) cannot be avoided, so the car must
+// come to rest before it, 10 m short: outside the 8 m emergency zone, so it can steer
+// away once a lane opens. The car follows the speed from which comfortable braking
+// (2.8 m/s2, as the actuator applies) stops in the room left; when the deceleration
+// needed (v^2 / 2d) is more than comfortable braking gives, it brakes hard instead.
+rule "Stop before obstacle when no lane is free"
+salience 465
 when
     $ctx : DecisionContext()
-    RoadworksStateFact(roadworksId != "none", $distance : distanceMeters > 0, distanceMeters <= 60.0, $severity : severity)
+    VehicleStateFact($lane : lane, $speed : speedKmh)
+    ObstacleStateFact(obstacleId != "none", lane == $lane,
+                      $distance : distanceMeters > 0, distanceMeters <= 60.0)
+    LaneOccupancyState(lane == Lane.LEFT, occupied == true)
+    LaneOccupancyState(lane == Lane.RIGHT, occupied == true)
 then
-    double target = 40.0;
-    if ($severity == HazardSeverity.HIGH) {
-        target = 25.0;
+    double room = Math.max(0.0, $distance - 10.0);
+    double speedMps = $speed / 3.6;
+    DrivingAction action = DrivingAction.BRAKE;
+    double target = Math.sqrt(2.0 * 2.8 * room) * 3.6;
+    if (room <= 0.5) {
+        action = DrivingAction.STOP;
+        target = 0.0;
+    } else if (speedMps * speedMps / (2.0 * room) > 2.8 * 1.1) {
+        action = DrivingAction.EMERGENCY_BRAKE;
+        target = 0.0;
     }
     droolsSupport.proposeDecision(
         $ctx,
-        DrivingAction.REDUCE_SPEED,
+        action,
         target,
-        RiskLevel.MODERATE,
-        DecisionPriority.ROAD_HAZARD,
-        "Roadworks zone ahead",
+        RiskLevel.HIGH,
+        DecisionPriority.COLLISION_AVOIDANCE,
+        "Obstacle ahead and no free lane to avoid it",
         drools.getRule().getName(),
-        "distance=" + $distance + "m, severity=" + $severity
+        "obstacle " + $distance + "m ahead in own lane, both sides blocked"
     );
 end

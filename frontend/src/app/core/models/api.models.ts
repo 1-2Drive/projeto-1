@@ -103,6 +103,35 @@ export interface ApiSimulationSnapshot {
   maneuver?: ApiManeuverView;
   sensors?: ApiSensorTelemetryView;
   inference?: ApiInferenceSummaryView;
+  roadMap?: ApiRoadMapView;
+}
+
+/**
+ * The road as a matrix: cells[row][lane], rows going forward along a looping road and
+ * lanes in the `lanes` order. 0 is a free cell, any other number is a legend code.
+ */
+export interface ApiRoadMapView {
+  rows: number;
+  lanes: LaneName[];
+  blockLengthMeters: number;
+  egoRow: number;
+  lap: number;
+  cells: number[][];
+  legend: ApiMapLegendEntry[];
+}
+
+/** Meaning of one map code; detail is the limit, light colour, severity or barrier state. */
+export interface ApiMapLegendEntry {
+  code: number;
+  type: string;
+  label: string;
+  detail: string;
+}
+
+export interface MapCellRequest {
+  row: number;
+  lane: LaneName;
+  code: number;
 }
 
 export type LaneName = 'LEFT' | 'CENTER' | 'RIGHT';
@@ -120,7 +149,8 @@ export interface ApiManeuverView {
   braking: boolean;
 }
 
-export type SensorStatus = 'CLEAR' | 'TRACKING' | 'DETECTED' | 'WARNING' | 'CRITICAL' | 'OCCUPIED';
+/** NO LANE: a blind-spot side past the road edge. */
+export type SensorStatus = 'CLEAR' | 'TRACKING' | 'DETECTED' | 'WARNING' | 'CRITICAL' | 'OCCUPIED' | 'NO LANE';
 
 export interface ApiRadarTelemetryView {
   rangeMeters: number;
@@ -206,7 +236,6 @@ export interface CreateRoadElementRequest {
   trafficLightState?: string;
   severity?: string;
   barrierOpen?: boolean;
-  roundaboutApproachSpeedKmh?: number;
 }
 
 export interface CreateActorRequest {

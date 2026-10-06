@@ -1,6 +1,9 @@
-import { ChangeDetectionStrategy, Component, computed, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, input, signal, untracked } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
-import { ApiSimulationSnapshot } from '../../core/models/api.models';
+import { ApiSimulationSnapshot, ApiTimelineEntry } from '../../core/models/api.models';
+
+/** Snapshots arrive every engine tick; the panel only repaints at this cadence so it stays readable. */
+const REFRESH_INTERVAL_MS = 1000;
 
 type TimelineTag = 'PERCEPTION' | 'RULE' | 'DECISION' | 'ACTUATOR' | 'FACT' | 'SENSOR' | 'MANEUVER';
 type TimelineFilter = 'IMPORTANT' | 'ALL' | TimelineTag;
@@ -24,6 +27,24 @@ export class RuleTimelineComponent {
   protected readonly selectedType = signal<TimelineFilter>('IMPORTANT');
   protected readonly frozen = signal(false);
 
+  private readonly flushTick = signal(0);
+  private readonly hasEntries = computed(() => (this.snapshot()?.recentTimeline.length ?? 0) > 0);
+
+  /**
+   * Timeline flushed to the view: every entry is kept, only the repaint is batched once per interval.
+   * The first entries (and a reset back to empty) still show immediately via hasEntries.
+   */
+  private readonly displayedTimeline = computed<ApiTimelineEntry[]>(() => {
+    this.flushTick();
+    this.hasEntries();
+    return untracked(() => this.snapshot()?.recentTimeline ?? []);
+  });
+
+  constructor() {
+    const timer = setInterval(() => this.flushTick.update((tick) => tick + 1), REFRESH_INTERVAL_MS);
+    inject(DestroyRef).onDestroy(() => clearInterval(timer));
+  }
+
   protected setType(type: TimelineFilter): void {
     this.selectedType.set(type);
   }
@@ -43,7 +64,7 @@ export class RuleTimelineComponent {
       MANEUVER: 0,
       ACTUATOR: 0
     };
-    for (const entry of this.snapshot()?.recentTimeline ?? []) {
+    for (const entry of this.displayedTimeline()) {
       const tag = this.tagFor(entry.type);
       tally[tag] += 1;
       if (this.isImportant(entry.type)) {
@@ -54,7 +75,7 @@ export class RuleTimelineComponent {
   });
 
   protected readonly filteredEntries = computed(() => {
-    const entries = this.snapshot()?.recentTimeline ?? [];
+    const entries = this.displayedTimeline();
     const selected = this.selectedType();
     if (selected === 'ALL') {
       return entries;

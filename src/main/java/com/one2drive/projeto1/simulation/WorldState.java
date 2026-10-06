@@ -4,12 +4,11 @@ import com.one2drive.projeto1.domain.Barrier;
 import com.one2drive.projeto1.domain.DynamicActor;
 import com.one2drive.projeto1.domain.EgoVehicleState;
 import com.one2drive.projeto1.domain.Lane;
+import com.one2drive.projeto1.domain.LaneChangeDirection;
 import com.one2drive.projeto1.domain.OtherVehicle;
 import com.one2drive.projeto1.domain.Pedestrian;
 import com.one2drive.projeto1.domain.Pothole;
 import com.one2drive.projeto1.domain.RoadElement;
-import com.one2drive.projeto1.domain.Roundabout;
-import com.one2drive.projeto1.domain.Roadworks;
 import com.one2drive.projeto1.domain.SpeedLimitSign;
 import com.one2drive.projeto1.domain.StaticObstacle;
 import com.one2drive.projeto1.domain.StopSign;
@@ -21,19 +20,38 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Everything the simulated sensors can observe. Fixed road elements live in the
+ * {@link RoadMap} matrix; vehicles and pedestrians move freely on the same looping
+ * road, so every distance is measured around the loop.
+ */
 public class WorldState {
     private final EgoVehicleState ego;
     private final WeatherState weatherState;
-    private final List<RoadElement> roadElements;
+    private final RoadMap roadMap;
     private final List<DynamicActor> actors;
     private long simTimeMillis;
 
-    public WorldState(EgoVehicleState ego, WeatherState weatherState) {
+    public WorldState(EgoVehicleState ego, WeatherState weatherState, RoadMap roadMap) {
         this.ego = ego;
         this.weatherState = weatherState;
-        this.roadElements = new ArrayList<>();
+        this.roadMap = roadMap;
         this.actors = new ArrayList<>();
         this.simTimeMillis = 0L;
+    }
+
+    public RoadMap getRoadMap() {
+        return roadMap;
+    }
+
+    /** Distance from the ego forward to the next occurrence of a position on the loop. */
+    public double distanceAhead(double positionMeters) {
+        return roadMap.distanceAhead(ego.getPositionMeters(), positionMeters);
+    }
+
+    /** Shortest signed distance from the ego to a position on the loop; negative is behind. */
+    public double signedDistance(double positionMeters) {
+        return roadMap.signedDistance(ego.getPositionMeters(), positionMeters);
     }
 
     public EgoVehicleState getEgo() {
@@ -52,16 +70,12 @@ public class WorldState {
         this.simTimeMillis = simTimeMillis;
     }
 
-    public void addRoadElement(RoadElement element) {
-        roadElements.add(element);
-    }
-
     public void addActor(DynamicActor actor) {
         actors.add(actor);
     }
 
     public Optional<RoadElement> findRoadElementById(String id) {
-        return roadElements.stream().filter(e -> e.getId().equals(id)).findFirst();
+        return roadMap.findElement(id);
     }
 
     public Optional<DynamicActor> findActorById(String id) {
@@ -69,15 +83,16 @@ public class WorldState {
     }
 
     public boolean removeRoadElementById(String id) {
-        return roadElements.removeIf(e -> e.getId().equals(id));
+        return roadMap.clear(id);
     }
 
     public boolean removeActorById(String id) {
         return actors.removeIf(a -> a.getId().equals(id));
     }
 
+    /** Road elements of every occupied map cell. */
     public List<RoadElement> getRoadElements() {
-        return Collections.unmodifiableList(roadElements);
+        return roadMap.elements();
     }
 
     public List<DynamicActor> getActors() {
@@ -85,7 +100,6 @@ public class WorldState {
     }
 
     public Optional<OtherVehicle> nearestFrontVehicleInLane(double maxDistance) {
-        double egoPos = ego.getPositionMeters();
         Lane egoLane = ego.getLane();
         OtherVehicle nearest = null;
         double best = Double.MAX_VALUE;
@@ -96,7 +110,7 @@ public class WorldState {
             if (vehicle.getLane() != egoLane) {
                 continue;
             }
-            double d = vehicle.getPositionMeters() - egoPos;
+            double d = distanceAhead(vehicle.getPositionMeters());
             if (d > 0 && d <= maxDistance && d < best) {
                 best = d;
                 nearest = vehicle;
@@ -106,7 +120,6 @@ public class WorldState {
     }
 
     public Optional<Pedestrian> nearestPedestrianInLane(double maxDistance) {
-        double egoPos = ego.getPositionMeters();
         Lane egoLane = ego.getLane();
         Pedestrian nearest = null;
         double best = Double.MAX_VALUE;
@@ -117,7 +130,7 @@ public class WorldState {
             if (pedestrian.getLane() != egoLane) {
                 continue;
             }
-            double d = pedestrian.getPositionMeters() - egoPos;
+            double d = distanceAhead(pedestrian.getPositionMeters());
             if (d > 0 && d <= maxDistance && d < best) {
                 best = d;
                 nearest = pedestrian;
@@ -127,13 +140,12 @@ public class WorldState {
     }
 
     public List<RoadElement> activeRoadElementsInFront(double maxDistance) {
-        double egoPos = ego.getPositionMeters();
         List<RoadElement> result = new ArrayList<>();
-        for (RoadElement element : roadElements) {
+        for (RoadElement element : getRoadElements()) {
             if (!element.isActive()) {
                 continue;
             }
-            double d = element.getPositionMeters() - egoPos;
+            double d = distanceAhead(element.getPositionMeters());
             if (d >= 0 && d <= maxDistance) {
                 result.add(element);
             }
@@ -161,32 +173,23 @@ public class WorldState {
         return nearestByType(Barrier.class, maxDistance);
     }
 
-    public Optional<Roundabout> nearestRoundabout(double maxDistance) {
-        return nearestByType(Roundabout.class, maxDistance);
-    }
-
     public Optional<StaticObstacle> nearestObstacle(double maxDistance) {
         return nearestByType(StaticObstacle.class, maxDistance);
     }
 
-    public Optional<Roadworks> nearestRoadworks(double maxDistance) {
-        return nearestByType(Roadworks.class, maxDistance);
-    }
-
     @SuppressWarnings("unchecked")
     private <T extends RoadElement> Optional<T> nearestByType(Class<T> type, double maxDistance) {
-        double egoPos = ego.getPositionMeters();
         Lane egoLane = ego.getLane();
         T nearest = null;
         double best = Double.MAX_VALUE;
-        for (RoadElement element : roadElements) {
+        for (RoadElement element : getRoadElements()) {
             if (!type.isInstance(element) || !element.isActive()) {
                 continue;
             }
             if (element.getLane() != egoLane) {
                 continue;
             }
-            double d = element.getPositionMeters() - egoPos;
+            double d = distanceAhead(element.getPositionMeters());
             if (d >= 0 && d <= maxDistance && d < best) {
                 best = d;
                 nearest = (T) element;
@@ -196,56 +199,90 @@ public class WorldState {
     }
 
     /**
-     * Nearest hazard of the given type in any lane ahead. A forward camera sees
-     * every lane, so hazards are reported with their lane and the rules decide
-     * whether the one in the vehicle's own lane matters.
+     * Nearest hazard of the given type ahead, preferring the vehicle's own lane. A
+     * forward camera sees every lane and reports the lane with the hazard, but with a
+     * map full of hazards the one in the vehicle's path is the one the rules must see.
      */
     @SuppressWarnings("unchecked")
-    private <T extends RoadElement> Optional<T> nearestInAnyLane(Class<T> type, double maxDistance) {
-        double egoPos = ego.getPositionMeters();
-        T nearest = null;
-        double best = Double.MAX_VALUE;
-        for (RoadElement element : roadElements) {
+    private <T extends RoadElement> Optional<T> nearestHazardAhead(Class<T> type, double maxDistance) {
+        T nearestOwnLane = null;
+        T nearestAnyLane = null;
+        double bestOwnLane = Double.MAX_VALUE;
+        double bestAnyLane = Double.MAX_VALUE;
+        for (RoadElement element : getRoadElements()) {
             if (!type.isInstance(element) || !element.isActive()) {
                 continue;
             }
-            double d = element.getPositionMeters() - egoPos;
-            if (d >= 0 && d <= maxDistance && d < best) {
-                best = d;
-                nearest = (T) element;
-            }
-        }
-        return Optional.ofNullable(nearest);
-    }
-
-    public Optional<Pothole> nearestPotholeAnyLane(double maxDistance) {
-        return nearestInAnyLane(Pothole.class, maxDistance);
-    }
-
-    public Optional<StaticObstacle> nearestObstacleAnyLane(double maxDistance) {
-        return nearestInAnyLane(StaticObstacle.class, maxDistance);
-    }
-
-    public LaneOccupancy nearestLaneOccupancy(Lane lane, double longitudinalRange) {
-        double egoPos = ego.getPositionMeters();
-        boolean occupied = false;
-        double best = Double.POSITIVE_INFINITY;
-        for (DynamicActor actor : actors) {
-            if (!actor.isActive() || actor.getLane() != lane) {
+            double d = distanceAhead(element.getPositionMeters());
+            if (d > maxDistance) {
                 continue;
             }
-            double d = actor.getPositionMeters() - egoPos;
-            if (Math.abs(d) <= longitudinalRange) {
-                occupied = true;
+            if (d < bestAnyLane) {
+                bestAnyLane = d;
+                nearestAnyLane = (T) element;
+            }
+            if (element.getLane() == ego.getLane() && d < bestOwnLane) {
+                bestOwnLane = d;
+                nearestOwnLane = (T) element;
+            }
+        }
+        return Optional.ofNullable(nearestOwnLane != null ? nearestOwnLane : nearestAnyLane);
+    }
+
+    public Optional<Pothole> nearestPotholeAhead(double maxDistance) {
+        return nearestHazardAhead(Pothole.class, maxDistance);
+    }
+
+    public Optional<StaticObstacle> nearestObstacleAhead(double maxDistance) {
+        return nearestHazardAhead(StaticObstacle.class, maxDistance);
+    }
+
+    /**
+     * Whether the lane on one side of the vehicle can be moved into. Past the road edge
+     * there is no lane, so that side always reports occupied. Otherwise a vehicle or
+     * pedestrian alongside within {@code actorRange}, or a fixed hazard (obstacle,
+     * pothole, closed barrier) in that lane from alongside up to {@code hazardLookahead}
+     * ahead, occupies it.
+     *
+     * @return occupancy whose {@code lane} is the side (LEFT or RIGHT), as the rules read it
+     */
+    public LaneOccupancy sideLaneOccupancy(LaneChangeDirection side, double actorRange, double hazardLookahead) {
+        Lane sideName = side == LaneChangeDirection.LEFT ? Lane.LEFT : Lane.RIGHT;
+        Lane target = side == LaneChangeDirection.LEFT ? ego.getLane().left() : ego.getLane().right();
+        if (target == ego.getLane()) {
+            return new LaneOccupancy(sideName, true, 0.0, true);
+        }
+
+        double best = Double.POSITIVE_INFINITY;
+        for (DynamicActor actor : actors) {
+            if (!actor.isActive() || actor.getLane() != target) {
+                continue;
+            }
+            double d = Math.abs(signedDistance(actor.getPositionMeters()));
+            if (d <= actorRange) {
+                best = Math.min(best, d);
+            }
+        }
+        for (RoadElement element : getRoadElements()) {
+            if (!element.isActive() || element.getLane() != target || !blocksLane(element)) {
+                continue;
+            }
+            // Elements sit at the start of their block, so one still alongside is up to a block behind.
+            double d = signedDistance(element.getPositionMeters());
+            if (d >= -roadMap.blockLengthMeters() && d <= hazardLookahead) {
                 best = Math.min(best, Math.abs(d));
             }
         }
-        if (!occupied) {
-            best = Double.POSITIVE_INFINITY;
-        }
-        return new LaneOccupancy(lane, occupied, best);
+        return new LaneOccupancy(sideName, Double.isFinite(best), best, false);
     }
 
-    public record LaneOccupancy(Lane lane, boolean occupied, double nearestDistanceMeters) {
+    private static boolean blocksLane(RoadElement element) {
+        return element instanceof StaticObstacle
+            || element instanceof Pothole
+            || (element instanceof Barrier barrier && !barrier.isOpen());
+    }
+
+    /** {@code roadEdge} marks a side with no lane at all, which is why it is occupied. */
+    public record LaneOccupancy(Lane lane, boolean occupied, double nearestDistanceMeters, boolean roadEdge) {
     }
 }

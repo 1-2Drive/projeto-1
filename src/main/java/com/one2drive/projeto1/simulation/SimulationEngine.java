@@ -2,20 +2,13 @@ package com.one2drive.projeto1.simulation;
 
 import com.one2drive.projeto1.config.SimulationConfig;
 import com.one2drive.projeto1.decision.DrivingDecision;
-import com.one2drive.projeto1.domain.Barrier;
 import com.one2drive.projeto1.domain.DynamicActor;
 import com.one2drive.projeto1.domain.DrivingAction;
 import com.one2drive.projeto1.domain.Lane;
 import com.one2drive.projeto1.domain.EgoVehicleState;
 import com.one2drive.projeto1.domain.LaneChangeDirection;
 import com.one2drive.projeto1.domain.LaneChangeState;
-import com.one2drive.projeto1.domain.Pothole;
 import com.one2drive.projeto1.domain.RoadElement;
-import com.one2drive.projeto1.domain.Roadworks;
-import com.one2drive.projeto1.domain.Roundabout;
-import com.one2drive.projeto1.domain.SpeedLimitSign;
-import com.one2drive.projeto1.domain.StaticObstacle;
-import com.one2drive.projeto1.domain.TrafficLight;
 import com.one2drive.projeto1.domain.WeatherCondition;
 import com.one2drive.projeto1.drools.FactDescription;
 import com.one2drive.projeto1.drools.events.AccelerationRequestEvent;
@@ -28,8 +21,6 @@ import com.one2drive.projeto1.drools.events.LaneChangeRequestEvent;
 import com.one2drive.projeto1.drools.events.ObstacleDetectedEvent;
 import com.one2drive.projeto1.drools.events.PedestrianDetectedEvent;
 import com.one2drive.projeto1.drools.events.PotholeDetectedEvent;
-import com.one2drive.projeto1.drools.events.RoadworksDetectedEvent;
-import com.one2drive.projeto1.drools.events.RoundaboutDetectedEvent;
 import com.one2drive.projeto1.drools.events.RelativeSpeedEvent;
 import com.one2drive.projeto1.drools.events.SpeedLimitDetectedEvent;
 import com.one2drive.projeto1.drools.events.StopSignEvent;
@@ -70,6 +61,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 public class SimulationEngine implements AutoCloseable {
+    /** Objects closer than this behind the car are drawn behind it; anything further back is drawn as coming up. */
+    private static final double RENDER_BEHIND_METERS = 50.0;
+
     private final SimulationConfig config;
     private final SimulationClock simulationClock;
     private KnowledgeSession knowledgeSession;
@@ -246,7 +240,7 @@ public class SimulationEngine implements AutoCloseable {
         updateVehicleStateFact();
 
         List<Object> events = sensorManager.observe(worldState, simTimeMillis);
-        knowledgeSession.getDecisionContext().beginCycle(simTimeMillis, worldState.getEgo().getSpeedKmh());
+        knowledgeSession.beginDecisionCycle(simTimeMillis, worldState.getEgo().getSpeedKmh());
         for (Object event : events) {
             // Raw samples still go to Drools and Working Memory; only meaningful
             // transitions reach the inference timeline.
@@ -380,11 +374,6 @@ public class SimulationEngine implements AutoCloseable {
                 detections.removeIf(d -> d.objectId().equals(e.getObstacleId()));
                 detections.add(new SensorTelemetry.CameraDetection(
                     e.getObstacleId(), "Obstacle", e.getDistanceMeters(), e.getLane().name(), "camera"));
-            } else if (event instanceof RoadworksDetectedEvent e) {
-                cameraUpdated = true;
-                detections.removeIf(d -> d.objectId().equals(e.getRoadworksId()));
-                detections.add(new SensorTelemetry.CameraDetection(
-                    e.getRoadworksId(), "Roadworks", e.getDistanceMeters(), "CENTER", "camera"));
             } else if (event instanceof PedestrianDetectedEvent e) {
                 cameraUpdated = true;
                 detections.removeIf(d -> d.objectId().equals(e.getPedestrianId()));
@@ -402,12 +391,15 @@ public class SimulationEngine implements AutoCloseable {
         SensorTelemetry.BlindSpotView right = previous.blindSpotRight();
         for (Object event : events) {
             if (event instanceof LaneOccupancyEvent occupancy) {
+                // Events are keyed by side; a side matching the ego's own outer lane is the road edge.
+                boolean roadEdge = occupancy.getLane() == worldState.getEgo().getLane()
+                    && occupancy.getLane() != com.one2drive.projeto1.domain.Lane.CENTER;
                 SensorTelemetry.BlindSpotView view = new SensorTelemetry.BlindSpotView(
                     config.getBlindSpotRangeMeters(),
                     occupancy.isOccupied(),
                     occupancy.isOccupied() ? "occupied" : "none",
                     occupancy.getNearestDistanceMeters(),
-                    occupancy.isOccupied() ? "OCCUPIED" : "CLEAR"
+                    roadEdge ? "NO LANE" : occupancy.isOccupied() ? "OCCUPIED" : "CLEAR"
                 );
                 if (occupancy.getLane() == com.one2drive.projeto1.domain.Lane.LEFT) {
                     left = view;
@@ -581,8 +573,6 @@ public class SimulationEngine implements AutoCloseable {
         else if (event instanceof PedestrianDetectedEvent e) objectId = e.getPedestrianId();
         else if (event instanceof PotholeDetectedEvent e) objectId = e.getPotholeId();
         else if (event instanceof BarrierDetectedEvent e) objectId = e.getBarrierId();
-        else if (event instanceof RoundaboutDetectedEvent e) objectId = e.getRoundaboutId();
-        else if (event instanceof RoadworksDetectedEvent e) objectId = e.getRoadworksId();
         else if (event instanceof ObstacleDetectedEvent e) objectId = e.getObstacleId();
         else if (event instanceof FrontDistanceEvent e) objectId = e.getTargetId();
         else if (event instanceof RelativeSpeedEvent e) objectId = e.getTargetId();
@@ -612,7 +602,7 @@ public class SimulationEngine implements AutoCloseable {
         boolean hasReducedWeather = events.stream().anyMatch(event -> event instanceof com.one2drive.projeto1.drools.events.ReducedVisibilityEvent
             || event instanceof com.one2drive.projeto1.drools.events.ReducedGripEvent);
         boolean hasTtc = events.stream().anyMatch(TTCEvent.class::isInstance);
-        boolean hasYieldOrRoundabout = events.stream().anyMatch(event -> event instanceof YieldSignEvent || event instanceof RoundaboutDetectedEvent);
+        boolean hasYield = events.stream().anyMatch(YieldSignEvent.class::isInstance);
         boolean hasPedestrian = events.stream().anyMatch(PedestrianDetectedEvent.class::isInstance);
         DrivingAction action = currentDecision.getAction();
 
@@ -625,7 +615,7 @@ public class SimulationEngine implements AutoCloseable {
         if (hasTtc && action == DrivingAction.EMERGENCY_BRAKE) {
             demoEvidence.add("ttc");
         }
-        if (hasYieldOrRoundabout && (action == DrivingAction.REDUCE_SPEED || action == DrivingAction.WAIT
+        if (hasYield && (action == DrivingAction.REDUCE_SPEED || action == DrivingAction.WAIT
             || action == DrivingAction.CONTINUE)) {
             demoEvidence.add("yield");
         }
@@ -644,19 +634,40 @@ public class SimulationEngine implements AutoCloseable {
     }
 
     public synchronized void addRoadElementAhead(ScenarioRoadElementDefinition definition) {
-        double base = worldState.getEgo().getPositionMeters();
-        ScenarioRoadElementDefinition d = cloneRoadElement(definition);
-        d.setPositionMeters(base + definition.getPositionMeters());
-        enqueueWorldMutation(() -> worldState.addRoadElement(ScenarioFactory.createRoadElement(d)));
+        addRoadElementAheadAndGetId(definition);
     }
 
+    /**
+     * Writes the element into the road map cell {@code positionMeters} ahead of the
+     * vehicle, snapped to the block containing it.
+     *
+     * @return the id of the map cell the element occupies
+     */
     public synchronized String addRoadElementAheadAndGetId(ScenarioRoadElementDefinition definition) {
-        double base = worldState.getEgo().getPositionMeters();
-        ScenarioRoadElementDefinition d = cloneRoadElement(definition);
-        d.setPositionMeters(base + definition.getPositionMeters());
-        RoadElement element = ScenarioFactory.createRoadElement(d);
-        enqueueWorldMutation(() -> worldState.addRoadElement(element));
-        return element.getId();
+        return writeRoadElementAhead(definition, null);
+    }
+
+    /** Resolves the cell and legend code now, so invalid input fails the request instead of a later tick. */
+    private String writeRoadElementAhead(ScenarioRoadElementDefinition definition, String replacedId) {
+        RoadMap map = worldState.getRoadMap();
+        double position = worldState.getEgo().getPositionMeters() + definition.getPositionMeters();
+        Lane lane = definition.getLane() == null ? Lane.CENTER : definition.getLane();
+        int row = map.rowAt(position);
+        int code = map.legend().codeFor(definition);
+        enqueueWorldMutation(() -> {
+            if (replacedId != null) {
+                map.clear(replacedId);
+            }
+            map.set(row, lane, code);
+        });
+        return RoadMap.cellId(row, lane);
+    }
+
+    /** Sets one road map cell to a legend code (0 frees it). */
+    public synchronized void setMapCell(int row, Lane lane, int code) {
+        RoadMap map = worldState.getRoadMap();
+        map.checkCell(row, code);
+        enqueueWorldMutation(() -> map.set(row, lane, code));
     }
 
     public synchronized void addActorAhead(ScenarioActorDefinition definition) {
@@ -675,14 +686,22 @@ public class SimulationEngine implements AutoCloseable {
         return actor.getId();
     }
 
-    public synchronized boolean updateRoadElementById(String id, ScenarioRoadElementDefinition definition) {
-        Optional<RoadElement> maybeElement = worldState.findRoadElementById(id);
-        if (maybeElement.isEmpty()) {
-            return false;
+    /**
+     * Rewrites a road element. Elements are named after their map cell, so moving one
+     * gives it a new id.
+     *
+     * @return the id of the cell the element occupies after the update
+     */
+    public synchronized Optional<String> updateRoadElementById(String id, ScenarioRoadElementDefinition definition) {
+        Optional<RoadElement> existing = worldState.findRoadElementById(id);
+        if (existing.isEmpty()) {
+            return Optional.empty();
         }
-        RoadElement element = maybeElement.get();
-        enqueueWorldMutation(() -> applyRoadElementUpdate(element, definition));
-        return true;
+        ScenarioRoadElementDefinition update = definition.copy();
+        if (update.getLane() == null) {
+            update.setLane(existing.get().getLane());
+        }
+        return Optional.of(writeRoadElementAhead(update, id));
     }
 
     public synchronized boolean updateActorById(String id, ScenarioActorDefinition definition) {
@@ -710,19 +729,6 @@ public class SimulationEngine implements AutoCloseable {
             }
         });
         return true;
-    }
-
-    private ScenarioRoadElementDefinition cloneRoadElement(ScenarioRoadElementDefinition src) {
-        ScenarioRoadElementDefinition d = new ScenarioRoadElementDefinition();
-        d.setType(src.getType());
-        d.setPositionMeters(src.getPositionMeters());
-        d.setLane(src.getLane());
-        d.setSpeedLimitKmh(src.getSpeedLimitKmh());
-        d.setTrafficLightState(src.getTrafficLightState());
-        d.setSeverity(src.getSeverity());
-        d.setBarrierOpen(src.getBarrierOpen());
-        d.setRoundaboutApproachSpeedKmh(src.getRoundaboutApproachSpeedKmh());
-        return d;
     }
 
     private ScenarioActorDefinition cloneActor(ScenarioActorDefinition src) {
@@ -818,36 +824,6 @@ public class SimulationEngine implements AutoCloseable {
         );
     }
 
-    private void applyRoadElementUpdate(RoadElement element, ScenarioRoadElementDefinition definition) {
-        if (definition.getLane() != null) {
-            element.setLane(definition.getLane());
-        }
-        double base = worldState.getEgo().getPositionMeters();
-        element.setPositionMeters(base + definition.getPositionMeters());
-
-        if (element instanceof SpeedLimitSign sign && definition.getSpeedLimitKmh() != null) {
-            sign.setLimitKmh(definition.getSpeedLimitKmh());
-        }
-        if (element instanceof Pothole pothole && definition.getSeverity() != null) {
-            pothole.setSeverity(definition.getSeverity());
-        }
-        if (element instanceof Roadworks roadworks && definition.getSeverity() != null) {
-            roadworks.setSeverity(definition.getSeverity());
-        }
-        if (element instanceof StaticObstacle obstacle && definition.getSeverity() != null) {
-            obstacle.setSeverity(definition.getSeverity());
-        }
-        if (element instanceof TrafficLight trafficLight && definition.getTrafficLightState() != null) {
-            trafficLight.setState(definition.getTrafficLightState());
-        }
-        if (element instanceof Barrier barrier && definition.getBarrierOpen() != null) {
-            barrier.setOpen(definition.getBarrierOpen());
-        }
-        if (element instanceof Roundabout roundabout && definition.getRoundaboutApproachSpeedKmh() != null) {
-            roundabout.setRecommendedApproachSpeedKmh(definition.getRoundaboutApproachSpeedKmh());
-        }
-    }
-
     private void applyActorUpdate(DynamicActor actor, ScenarioActorDefinition definition) {
         if (definition.getLane() != null) {
             actor.setLane(definition.getLane());
@@ -870,26 +846,20 @@ public class SimulationEngine implements AutoCloseable {
     }
 
     public synchronized List<RoadRenderItem> getAllRoadItemsRelativeToEgo() {
-        double egoPos = worldState.getEgo().getPositionMeters();
-        List<RoadRenderItem> items = new ArrayList<>();
+        return roadItems(RENDER_BEHIND_METERS, Double.POSITIVE_INFINITY);
+    }
 
-        worldState.getRoadElements().forEach(element -> items.add(new RoadRenderItem(
-            element.getClass().getSimpleName(),
-            element.getId(),
-            element.getPositionMeters() - egoPos,
-            element.getLane().name(),
-            element.toString()
-        )));
-
-        worldState.getActors().forEach(actor -> items.add(new RoadRenderItem(
-            actor.getClass().getSimpleName(),
-            actor.getId(),
-            actor.getPositionMeters() - egoPos,
-            actor.getLane().name(),
-            actor.toString()
-        )));
-
-        return items;
+    /** Matrix, legend and where the ego is on it, copied so the API never reads a cell mid-write. */
+    public synchronized RoadMapSnapshot roadMapSnapshot() {
+        RoadMap map = worldState.getRoadMap();
+        double position = worldState.getEgo().getPositionMeters();
+        return new RoadMapSnapshot(
+            map.cellsCopy(),
+            map.blockLengthMeters(),
+            map.rowAt(position),
+            map.lapAt(position),
+            map.legend().entries()
+        );
     }
 
     public synchronized WorldState getWorldState() {
@@ -926,36 +896,33 @@ public class SimulationEngine implements AutoCloseable {
     }
 
     public synchronized List<RoadRenderItem> visibleRoadItems(double forwardMeters, double backwardMeters) {
-        double egoPos = worldState.getEgo().getPositionMeters();
+        return roadItems(backwardMeters, forwardMeters);
+    }
+
+    /**
+     * World objects positioned relative to the ego. The road loops, so an object is
+     * drawn ahead of the car unless it lies within {@code backwardMeters} behind it.
+     */
+    private List<RoadRenderItem> roadItems(double backwardMeters, double forwardMeters) {
+        double length = worldState.getRoadMap().lengthMeters();
+        double behindWindow = Math.min(backwardMeters, length / 2);
         List<RoadRenderItem> items = new ArrayList<>();
-
-        worldState.getRoadElements().forEach(element -> {
-            double rel = element.getPositionMeters() - egoPos;
-            if (rel >= -backwardMeters && rel <= forwardMeters) {
-                items.add(new RoadRenderItem(
-                    element.getClass().getSimpleName(),
-                    element.getId(),
-                    rel,
-                    element.getLane().name(),
-                    element.toString()
-                ));
-            }
-        });
-
-        worldState.getActors().forEach(actor -> {
-            double rel = actor.getPositionMeters() - egoPos;
-            if (rel >= -backwardMeters && rel <= forwardMeters) {
-                items.add(new RoadRenderItem(
-                    actor.getClass().getSimpleName(),
-                    actor.getId(),
-                    rel,
-                    actor.getLane().name(),
-                    actor.toString()
-                ));
-            }
-        });
-
+        worldState.getRoadElements().forEach(element -> addRoadItem(items, element.getClass().getSimpleName(),
+            element.getId(), element.getPositionMeters(), element.getLane(), element.toString(),
+            length, behindWindow, forwardMeters));
+        worldState.getActors().forEach(actor -> addRoadItem(items, actor.getClass().getSimpleName(),
+            actor.getId(), actor.getPositionMeters(), actor.getLane(), actor.toString(),
+            length, behindWindow, forwardMeters));
         return items;
+    }
+
+    private void addRoadItem(List<RoadRenderItem> items, String type, String id, double positionMeters, Lane lane,
+                             String details, double length, double behindWindow, double forwardMeters) {
+        double ahead = worldState.distanceAhead(positionMeters);
+        double relative = ahead > length - behindWindow ? ahead - length : ahead;
+        if (relative >= -behindWindow && relative <= forwardMeters) {
+            items.add(new RoadRenderItem(type, id, relative, lane.name(), details));
+        }
     }
 
     @Override

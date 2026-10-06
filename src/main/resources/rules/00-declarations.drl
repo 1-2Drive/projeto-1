@@ -10,8 +10,6 @@ import com.one2drive.projeto1.drools.events.PedestrianDetectedEvent
 import com.one2drive.projeto1.drools.events.PotholeDetectedEvent
 import com.one2drive.projeto1.drools.events.RelativeSpeedEvent
 import com.one2drive.projeto1.drools.events.RoadGripEvent
-import com.one2drive.projeto1.drools.events.RoadworksDetectedEvent
-import com.one2drive.projeto1.drools.events.RoundaboutDetectedEvent
 import com.one2drive.projeto1.drools.events.ReducedGripEvent
 import com.one2drive.projeto1.drools.events.ReducedVisibilityEvent
 import com.one2drive.projeto1.drools.events.SpeedLimitDetectedEvent
@@ -89,19 +87,7 @@ declare PotholeDetectedEvent
     @expires( 20s )
 end
 
-declare RoadworksDetectedEvent
-    @role( event )
-    @timestamp( timestamp )
-    @expires( 20s )
-end
-
 declare BarrierDetectedEvent
-    @role( event )
-    @timestamp( timestamp )
-    @expires( 20s )
-end
-
-declare RoundaboutDetectedEvent
     @role( event )
     @timestamp( timestamp )
     @expires( 20s )

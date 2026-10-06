@@ -38,7 +38,7 @@ rule "Low visibility requires stronger speed reduction"
 salience 350
 when
     $ctx : DecisionContext()
-    $event : ReducedVisibilityEvent($visibility : visibilityFactor) from entry-point "ENVIRONMENT_STREAM"
+    $event : ReducedVisibilityEvent($visibility : visibilityFactor) over window:time(500ms) from entry-point "ENVIRONMENT_STREAM"
 then
     double target = Math.max(30.0, 75.0 * $visibility);
     droolsSupport.proposeDecision(
@@ -57,7 +57,7 @@ rule "Low road grip requires stronger speed reduction"
 salience 350
 when
     $ctx : DecisionContext()
-    $event : ReducedGripEvent($grip : gripFactor) from entry-point "ENVIRONMENT_STREAM"
+    $event : ReducedGripEvent($grip : gripFactor) over window:time(500ms) from entry-point "ENVIRONMENT_STREAM"
 then
     double target = Math.max(25.0, 80.0 * $grip);
     droolsSupport.proposeDecision(

@@ -58,6 +58,20 @@
       </button>
     </div>
 
+    <div class="controls__driver">
+      <span class="controls__demo-label">Driver</span>
+      <button data-testid="lane-left-btn" type="button" class="btn"
+              [disabled]="!canChangeLaneLeft()" (click)="requestLaneChange('LEFT')"
+              title="Ask Drools to change to the left lane; it only executes if the lane is clear">
+        <span class="btn__glyph" aria-hidden="true">◀</span>LANE LEFT
+      </button>
+      <button data-testid="lane-right-btn" type="button" class="btn"
+              [disabled]="!canChangeLaneRight()" (click)="requestLaneChange('RIGHT')"
+              title="Ask Drools to change to the right lane; it only executes if the lane is clear">
+        LANE RIGHT<span class="btn__glyph" aria-hidden="true">▶</span>
+      </button>
+    </div>
+
     <div class="controls__demo">
       <span class="controls__demo-label">Automated demo</span>
       <button data-testid="run-demo-btn" type="button" class="btn btn--ghost"
@@ -122,6 +136,7 @@
 
     <section class="workspace__center">
       <app-road-canvas [snapshot]="snapshot()" />
+      <app-road-map [snapshot]="snapshot()" (paint)="setMapCell($event)" />
     </section>
 
     <aside class="workspace__right" aria-label="Decision and telemetry">

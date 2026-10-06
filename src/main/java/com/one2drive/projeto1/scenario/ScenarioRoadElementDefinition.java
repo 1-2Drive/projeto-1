@@ -12,7 +12,6 @@ public class ScenarioRoadElementDefinition {
     private TrafficLightState trafficLightState;
     private HazardSeverity severity;
     private Boolean barrierOpen;
-    private Double roundaboutApproachSpeedKmh;
 
     public ScenarioRoadElementType getType() {
         return type;
@@ -70,11 +69,15 @@ public class ScenarioRoadElementDefinition {
         this.barrierOpen = barrierOpen;
     }
 
-    public Double getRoundaboutApproachSpeedKmh() {
-        return roundaboutApproachSpeedKmh;
-    }
-
-    public void setRoundaboutApproachSpeedKmh(Double roundaboutApproachSpeedKmh) {
-        this.roundaboutApproachSpeedKmh = roundaboutApproachSpeedKmh;
+    public ScenarioRoadElementDefinition copy() {
+        ScenarioRoadElementDefinition copy = new ScenarioRoadElementDefinition();
+        copy.setType(type);
+        copy.setPositionMeters(positionMeters);
+        copy.setLane(lane);
+        copy.setSpeedLimitKmh(speedLimitKmh);
+        copy.setTrafficLightState(trafficLightState);
+        copy.setSeverity(severity);
+        copy.setBarrierOpen(barrierOpen);
+        return copy;
     }
 }

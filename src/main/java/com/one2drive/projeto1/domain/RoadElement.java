@@ -3,7 +3,7 @@ package com.one2drive.projeto1.domain;
 import java.util.UUID;
 
 public abstract class RoadElement {
-    private final String id;
+    private String id;
     private double positionMeters;
     private Lane lane;
     private boolean active;
@@ -17,6 +17,11 @@ public abstract class RoadElement {
 
     public String getId() {
         return id;
+    }
+
+    /** Lets the road map name an element after the cell it occupies. */
+    public void setId(String id) {
+        this.id = id;
     }
 
     public double getPositionMeters() {

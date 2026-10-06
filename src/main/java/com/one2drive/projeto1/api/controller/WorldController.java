@@ -2,9 +2,12 @@ package com.one2drive.projeto1.api.controller;
 
 import com.one2drive.projeto1.api.model.ApiCreateActorRequest;
 import com.one2drive.projeto1.api.model.ApiCreateRoadElementRequest;
+import com.one2drive.projeto1.api.model.ApiMapCellRequest;
 import com.one2drive.projeto1.api.model.ApiWorldMutationResponse;
 import com.one2drive.projeto1.api.service.ApiRequestMapper;
 import com.one2drive.projeto1.api.service.SimulationRuntimeService;
+import com.one2drive.projeto1.domain.Lane;
+import com.one2drive.projeto1.simulation.RoadMap;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -14,6 +17,8 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/world")
@@ -36,12 +41,22 @@ public class WorldController {
     @PutMapping("/elements/{id}")
     public ResponseEntity<ApiWorldMutationResponse> updateElement(@PathVariable String id,
                                                                   @Valid @RequestBody ApiCreateRoadElementRequest request) {
-        boolean updated = runtime.engine().updateRoadElementById(id, mapper.toRoadElement(request));
-        if (!updated) {
+        Optional<String> newId = runtime.engine().updateRoadElementById(id, mapper.toRoadElement(request));
+        if (newId.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
         runtime.broadcastSnapshot();
-        return ResponseEntity.ok(new ApiWorldMutationResponse(true, id, "Road element updated"));
+        return ResponseEntity.ok(new ApiWorldMutationResponse(true, newId.get(), "Road element updated"));
+    }
+
+    /** Paints one road map cell with a legend code; 0 frees it. */
+    @PutMapping("/map/cells")
+    public ResponseEntity<ApiWorldMutationResponse> setMapCell(@Valid @RequestBody ApiMapCellRequest request) {
+        Lane lane = Lane.valueOf(request.lane().trim().toUpperCase());
+        runtime.engine().setMapCell(request.row(), lane, request.code());
+        runtime.broadcastSnapshot();
+        return ResponseEntity.ok(new ApiWorldMutationResponse(true, RoadMap.cellId(request.row(), lane),
+            "Map cell set to " + request.code()));
     }
 
     @DeleteMapping("/elements/{id}")

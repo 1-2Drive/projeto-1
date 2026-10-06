@@ -17,7 +17,7 @@ flowchart TD
     LANE_OCC[LaneOccupancyEvent] --> PERCEPTION_STREAM
 
     SIGNS[SpeedLimitDetectedEvent / StopSignEvent / YieldSignEvent] --> ROAD_STREAM
-    HAZARDS[Pothole / Roadworks / Obstacle / Barrier / Roundabout] --> ROAD_STREAM
+    HAZARDS[Pothole / Obstacle / Barrier] --> ROAD_STREAM
 
     TL[TrafficLightEvent] --> TRAFFIC_STREAM
 

@@ -146,7 +146,7 @@ flowchart TD
     PISCA -- Não --> CORRIGIR["Alertar condutor<br/>Corrigir trajetória suavemente"]
     FAIXA -- Sim --> CRUZAMENTO
 
-    MUDAR --> CRUZAMENTO{Aproxima-se um cruzamento ou rotunda?}
+    MUDAR --> CRUZAMENTO{Aproxima-se um cruzamento?}
     MANTER --> CRUZAMENTO
     CORRIGIR --> CRUZAMENTO
 

@@ -7,9 +7,7 @@ export type ToolboxAction =
   | 'STOP_SIGN'
   | 'YIELD_SIGN'
   | 'TRAFFIC_LIGHT'
-  | 'ROUNDABOUT'
   | 'POTHOLE'
-  | 'ROADWORKS'
   | 'STATIC_OBSTACLE'
   | 'BARRIER'
   | 'FRONT_VEHICLE'
@@ -23,7 +21,6 @@ interface ActionDefinition {
   needsSpeedLimit: boolean;
   needsLightState: boolean;
   needsBarrierState: boolean;
-  needsRoundaboutSpeed: boolean;
   needsActorSpeed: boolean;
 }
 
@@ -31,57 +28,47 @@ const ACTIONS: Record<ToolboxAction, ActionDefinition> = {
   SPEED_LIMIT: {
     title: 'Add speed limit', hint: 'Camera detects the sign only inside its range.',
     needsLane: true, needsSeverity: false, needsSpeedLimit: true,
-    needsLightState: false, needsBarrierState: false, needsRoundaboutSpeed: false, needsActorSpeed: false
+    needsLightState: false, needsBarrierState: false, needsActorSpeed: false
   },
   STOP_SIGN: {
     title: 'Add stop sign', hint: 'Vehicle must decelerate, stop and hold before proceeding.',
     needsLane: true, needsSeverity: false, needsSpeedLimit: false,
-    needsLightState: false, needsBarrierState: false, needsRoundaboutSpeed: false, needsActorSpeed: false
+    needsLightState: false, needsBarrierState: false, needsActorSpeed: false
   },
   YIELD_SIGN: {
     title: 'Add yield sign', hint: 'Approach cautiously and give way when safe.',
     needsLane: true, needsSeverity: false, needsSpeedLimit: false,
-    needsLightState: false, needsBarrierState: false, needsRoundaboutSpeed: false, needsActorSpeed: false
+    needsLightState: false, needsBarrierState: false, needsActorSpeed: false
   },
   TRAFFIC_LIGHT: {
     title: 'Add traffic light', hint: 'Red requires a stop, yellow decelerates, green allows progress.',
     needsLane: true, needsSeverity: false, needsSpeedLimit: false,
-    needsLightState: true, needsBarrierState: false, needsRoundaboutSpeed: false, needsActorSpeed: false
-  },
-  ROUNDABOUT: {
-    title: 'Add roundabout', hint: 'Approach speed is recommended by the Drools rule base.',
-    needsLane: true, needsSeverity: false, needsSpeedLimit: false,
-    needsLightState: false, needsBarrierState: false, needsRoundaboutSpeed: true, needsActorSpeed: false
+    needsLightState: true, needsBarrierState: false, needsActorSpeed: false
   },
   POTHOLE: {
     title: 'Add pothole', hint: 'Camera detects the defect once the vehicle reaches it.',
     needsLane: true, needsSeverity: true, needsSpeedLimit: false,
-    needsLightState: false, needsBarrierState: false, needsRoundaboutSpeed: false, needsActorSpeed: false
-  },
-  ROADWORKS: {
-    title: 'Add roadworks', hint: 'Triggers the road-hazard knowledge base rules.',
-    needsLane: true, needsSeverity: true, needsSpeedLimit: false,
-    needsLightState: false, needsBarrierState: false, needsRoundaboutSpeed: false, needsActorSpeed: false
+    needsLightState: false, needsBarrierState: false, needsActorSpeed: false
   },
   STATIC_OBSTACLE: {
     title: 'Add obstacle', hint: 'Detected by the front camera, treated as a road hazard.',
     needsLane: true, needsSeverity: true, needsSpeedLimit: false,
-    needsLightState: false, needsBarrierState: false, needsRoundaboutSpeed: false, needsActorSpeed: false
+    needsLightState: false, needsBarrierState: false, needsActorSpeed: false
   },
   BARRIER: {
     title: 'Add barrier', hint: 'A closed barrier produces a mandatory stop decision.',
     needsLane: true, needsSeverity: false, needsSpeedLimit: false,
-    needsLightState: false, needsBarrierState: true, needsRoundaboutSpeed: false, needsActorSpeed: false
+    needsLightState: false, needsBarrierState: true, needsActorSpeed: false
   },
   FRONT_VEHICLE: {
     title: 'Add vehicle', hint: 'Radar measures distance, relative speed and time-to-collision.',
     needsLane: true, needsSeverity: false, needsSpeedLimit: false,
-    needsLightState: false, needsBarrierState: false, needsRoundaboutSpeed: false, needsActorSpeed: true
+    needsLightState: false, needsBarrierState: false, needsActorSpeed: true
   },
   PEDESTRIAN: {
     title: 'Add pedestrian', hint: 'Camera detects the pedestrian inside its range only.',
     needsLane: true, needsSeverity: false, needsSpeedLimit: false,
-    needsLightState: false, needsBarrierState: false, needsRoundaboutSpeed: false, needsActorSpeed: true
+    needsLightState: false, needsBarrierState: false, needsActorSpeed: true
   }
 };
 
@@ -108,7 +95,6 @@ export class ElementPropertiesComponent {
   readonly trafficLightState = signal('RED');
   readonly barrierOpen = signal(false);
   readonly hazardSeverity = signal('HIGH');
-  readonly roundaboutSpeedKmh = signal(30);
   readonly actorSpeedKmh = signal(30);
   readonly submitted = signal(false);
 
@@ -144,10 +130,6 @@ export class ElementPropertiesComponent {
     if (definition.needsActorSpeed) {
       const value = this.actorSpeedKmh();
       return value >= 0 && value <= 180 ? null : 'Speed must be between 0 and 180 km/h.';
-    }
-    if (definition.needsRoundaboutSpeed) {
-      const value = this.roundaboutSpeedKmh();
-      return value >= 10 && value <= 80 ? null : 'Approach speed must be between 10 and 80 km/h.';
     }
     return null;
   });
@@ -200,17 +182,8 @@ export class ElementPropertiesComponent {
           trafficLightState: this.trafficLightState()
         });
         break;
-      case 'ROUNDABOUT':
-        this.createRoadElement.emit({
-          ...this.simpleElement('ROUNDABOUT'),
-          roundaboutApproachSpeedKmh: this.roundaboutSpeedKmh()
-        });
-        break;
       case 'POTHOLE':
         this.createRoadElement.emit({ ...this.simpleElement('POTHOLE'), severity: this.hazardSeverity() });
-        break;
-      case 'ROADWORKS':
-        this.createRoadElement.emit({ ...this.simpleElement('ROADWORKS'), severity: this.hazardSeverity() });
         break;
       case 'STATIC_OBSTACLE':
         this.createRoadElement.emit({ ...this.simpleElement('STATIC_OBSTACLE'), severity: this.hazardSeverity() });
@@ -261,10 +234,6 @@ export class ElementPropertiesComponent {
 
   protected setSeverity(value: string): void {
     this.hazardSeverity.set(value);
-  }
-
-  protected setRoundaboutSpeed(value: string): void {
-    this.roundaboutSpeedKmh.set(Number(value));
   }
 
   protected setActorSpeed(value: string): void {

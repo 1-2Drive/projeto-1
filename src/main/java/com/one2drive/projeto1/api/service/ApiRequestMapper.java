@@ -27,7 +27,6 @@ public class ApiRequestMapper {
             definition.setSeverity(HazardSeverity.valueOf(request.getSeverity().trim().toUpperCase()));
         }
         definition.setBarrierOpen(request.getBarrierOpen());
-        definition.setRoundaboutApproachSpeedKmh(request.getRoundaboutApproachSpeedKmh());
         return definition;
     }
 

@@ -31,7 +31,7 @@ public class FrontRadarSensor extends AbstractSensor<Object> {
         }
 
         OtherVehicle vehicle = front.get();
-        double trueDistance = vehicle.getPositionMeters() - worldState.getEgo().getPositionMeters();
+        double trueDistance = worldState.distanceAhead(vehicle.getPositionMeters());
         double measuredDistance = Math.max(0, trueDistance + random.nextGaussian() * config.getDistanceNoiseStdMeters());
         double relativeSpeed = worldState.getEgo().getSpeedMps() - vehicle.getSpeedMps();
         double ttc = relativeSpeed > 0.05 ? measuredDistance / relativeSpeed : Double.POSITIVE_INFINITY;

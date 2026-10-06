@@ -50,7 +50,7 @@
                 data-testid="blind-left-status">{{ left.status }}</span>
         </header>
         <p class="compact-detail">
-          {{ left.occupied ? 'target ' + (left.distanceMeters | number: '1.0-0') + ' m' : 'nothing beside' }}
+          {{ left.status === 'NO LANE' ? 'road edge' : left.occupied ? 'target ' + (left.distanceMeters | number: '1.0-0') + ' m' : 'nothing beside' }}
         </p>
       </section>
     }
@@ -63,7 +63,7 @@
                 data-testid="blind-right-status">{{ right.status }}</span>
         </header>
         <p class="compact-detail">
-          {{ right.occupied ? 'target ' + (right.distanceMeters | number: '1.0-0') + ' m' : 'nothing beside' }}
+          {{ right.status === 'NO LANE' ? 'road edge' : right.occupied ? 'target ' + (right.distanceMeters | number: '1.0-0') + ' m' : 'nothing beside' }}
         </p>
       </section>
     }

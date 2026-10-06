@@ -6,6 +6,7 @@ import {
   CreateActorRequest,
   CreateRoadElementRequest,
   EnvironmentUpdateRequest,
+  MapCellRequest,
   ScenarioSummary,
   UiModel,
   UiStatus
@@ -92,6 +93,11 @@ export class SimulationStateService {
     this.runCommand(this.api.resetSimulation(), 'Unable to reset simulation.', 'STOPPED');
   }
 
+  /** Driver request only; Drools decides whether the target lane is safe. */
+  requestLaneChange(direction: 'LEFT' | 'RIGHT'): void {
+    this.runCommand(this.api.requestLaneChange(direction), `Unable to request lane change ${direction.toLowerCase()}.`);
+  }
+
   loadScenario(id: string): void {
     this.api.loadScenario(id).subscribe({
       next: (response) => {
@@ -105,6 +111,16 @@ export class SimulationStateService {
     this.api.loadScenario(scenarioId).subscribe({
       next: (response) => response.success ? this.start() : this.patch({ error: response.message }),
       error: (err) => this.patch({ error: this.errorMessage(err, `Unable to run demo scenario ${scenarioId}.`) })
+    });
+  }
+
+  /** Paints one road map cell; the new matrix arrives with the next snapshot. */
+  setMapCell(request: MapCellRequest): void {
+    this.api.setMapCell(request).subscribe({
+      next: (response) => {
+        if (!response.success) this.patch({ error: response.message });
+      },
+      error: (err) => this.patch({ error: this.errorMessage(err, 'Failed to update the road map.') })
     });
   }
 

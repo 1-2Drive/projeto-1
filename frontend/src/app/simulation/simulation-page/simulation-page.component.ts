@@ -5,6 +5,7 @@ import { FlowStageComponent } from '../../shared/flow-stage/flow-stage.component
 import { ToolboxComponent } from '../../scenario/toolbox/toolbox.component';
 import { ScenarioLibraryComponent } from '../../scenario/scenario-library/scenario-library.component';
 import { RoadCanvasComponent } from '../road-canvas/road-canvas.component';
+import { RoadMapComponent } from '../road-map/road-map.component';
 import { VehicleStateComponent } from '../../telemetry/vehicle-state/vehicle-state.component';
 import { SpeedAdvisorComponent } from '../../telemetry/speed-advisor/speed-advisor.component';
 import { SensorsPanelComponent } from '../../telemetry/sensors-panel/sensors-panel.component';
@@ -12,7 +13,7 @@ import { DecisionPanelComponent } from '../../expert-system/decision-panel/decis
 import { RuleTimelineComponent } from '../../expert-system/rule-timeline/rule-timeline.component';
 import { WorkingMemoryComponent } from '../../expert-system/working-memory/working-memory.component';
 import { ExplanationPanelComponent } from '../../expert-system/explanation-panel/explanation-panel.component';
-import { CreateActorRequest, CreateRoadElementRequest, EnvironmentUpdateRequest } from '../../core/models/api.models';
+import { CreateActorRequest, CreateRoadElementRequest, EnvironmentUpdateRequest, MapCellRequest } from '../../core/models/api.models';
 import { WorldStateComponent } from '../world-state/world-state.component';
 import { SituationPanelComponent } from '../../telemetry/situation-panel/situation-panel.component';
 
@@ -25,6 +26,7 @@ import { SituationPanelComponent } from '../../telemetry/situation-panel/situati
     ToolboxComponent,
     ScenarioLibraryComponent,
     RoadCanvasComponent,
+    RoadMapComponent,
     VehicleStateComponent,
     SpeedAdvisorComponent,
     SensorsPanelComponent,
@@ -62,6 +64,15 @@ export class SimulationPageComponent implements OnInit, OnDestroy {
   protected readonly canResume = computed(() => !this.vm().loading && this.isPaused());
   protected readonly canStop = computed(() => !this.vm().loading && this.simulationStatus() !== 'STOPPED');
   protected readonly canReset = computed(() => !this.vm().loading);
+  /** Lane requests are offered while driving and no maneuver is already in progress. */
+  private readonly canRequestLaneChange = computed(() => {
+    const state = this.snapshot()?.egoVehicle.laneChangeState;
+    return this.canPause() && state !== 'REQUESTED' && state !== 'CHANGING';
+  });
+  protected readonly canChangeLaneLeft = computed(() =>
+    this.canRequestLaneChange() && this.snapshot()?.egoVehicle.lane !== 'LEFT');
+  protected readonly canChangeLaneRight = computed(() =>
+    this.canRequestLaneChange() && this.snapshot()?.egoVehicle.lane !== 'RIGHT');
 
   /** Backend only publishes demo phases while the scripted scenario is loaded. */
   protected readonly demoPhases = computed(() => this.snapshot()?.demoPhases ?? []);
@@ -105,6 +116,10 @@ export class SimulationPageComponent implements OnInit, OnDestroy {
     this.state.reset();
   }
 
+  protected requestLaneChange(direction: 'LEFT' | 'RIGHT'): void {
+    this.state.requestLaneChange(direction);
+  }
+
   protected runPresentationDemo(): void {
     this.state.runPresentationDemo();
   }
@@ -119,6 +134,10 @@ export class SimulationPageComponent implements OnInit, OnDestroy {
 
   protected loadScenario(id: string): void {
     this.state.loadScenario(id);
+  }
+
+  protected setMapCell(request: MapCellRequest): void {
+    this.state.setMapCell(request);
   }
 
   protected addRoadElement(request: CreateRoadElementRequest): void {

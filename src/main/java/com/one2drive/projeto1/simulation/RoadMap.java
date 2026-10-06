@@ -1,0 +1,191 @@
+package com.one2drive.projeto1.simulation;
+
+import com.one2drive.projeto1.domain.Lane;
+import com.one2drive.projeto1.domain.RoadElement;
+import com.one2drive.projeto1.scenario.ScenarioFactory;
+import com.one2drive.projeto1.scenario.ScenarioRoadElementDefinition;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+/**
+ * The road as a matrix: one row per block along the road and one column per lane
+ * (LEFT, CENTER, RIGHT). Each cell holds a {@link MapLegend} code, 0 meaning free.
+ *
+ * <p>The road is a loop: driving past the last row continues at row 0. Positions stay
+ * as metres travelled, so every distance on the map is measured modulo
+ * {@link #lengthMeters()}. Each occupied cell is backed by one road element placed at
+ * the start of its block and named after the cell ({@code r12-CENTER}), so sensors and
+ * rules keep working with ordinary road elements.
+ */
+public class RoadMap {
+    private static final Lane[] LANES = Lane.values();
+
+    private final int[][] cells;
+    private final RoadElement[][] elements;
+    private final double blockLengthMeters;
+    private final MapLegend legend;
+
+    public RoadMap(int[][] cells, double blockLengthMeters, MapLegend legend) {
+        if (cells == null || cells.length == 0) {
+            throw new IllegalArgumentException("The road map needs at least one row");
+        }
+        if (blockLengthMeters <= 0) {
+            throw new IllegalArgumentException("Road map blocks must be longer than 0 m");
+        }
+        this.blockLengthMeters = blockLengthMeters;
+        this.legend = legend;
+        this.cells = new int[cells.length][LANES.length];
+        this.elements = new RoadElement[cells.length][LANES.length];
+        for (int row = 0; row < cells.length; row++) {
+            if (cells[row] == null || cells[row].length != LANES.length) {
+                throw new IllegalArgumentException("Road map row " + row + " must have "
+                    + LANES.length + " values (LEFT, CENTER, RIGHT)");
+            }
+            for (Lane lane : LANES) {
+                set(row, lane, cells[row][lane.ordinal()]);
+            }
+        }
+    }
+
+    public static RoadMap empty(int rows, double blockLengthMeters, MapLegend legend) {
+        return new RoadMap(new int[rows][LANES.length], blockLengthMeters, legend);
+    }
+
+    public int rows() {
+        return cells.length;
+    }
+
+    public double blockLengthMeters() {
+        return blockLengthMeters;
+    }
+
+    public double lengthMeters() {
+        return cells.length * blockLengthMeters;
+    }
+
+    public MapLegend legend() {
+        return legend;
+    }
+
+    public int get(int row, Lane lane) {
+        return cells[checkRow(row)][lane.ordinal()];
+    }
+
+    /** Writes a legend code into a cell and rebuilds the road element it stands for. */
+    public void set(int row, Lane lane, int code) {
+        checkCell(row, code);
+        cells[row][lane.ordinal()] = code;
+        elements[row][lane.ordinal()] = code == MapLegend.FREE
+            ? null
+            : createElement(row, lane, legend.entry(code).orElseThrow());
+    }
+
+    /**
+     * Writes an element definition at an absolute position, snapped to the block that
+     * contains it.
+     *
+     * @return the id of the cell it now occupies
+     */
+    public String place(ScenarioRoadElementDefinition definition, double positionMeters) {
+        Lane lane = definition.getLane() == null ? Lane.CENTER : definition.getLane();
+        int row = rowAt(positionMeters);
+        set(row, lane, legend.codeFor(definition));
+        return cellId(row, lane);
+    }
+
+    /** Frees the cell backing the given element id. */
+    public boolean clear(String elementId) {
+        for (int row = 0; row < cells.length; row++) {
+            for (Lane lane : LANES) {
+                RoadElement element = elements[row][lane.ordinal()];
+                if (element != null && element.getId().equals(elementId)) {
+                    set(row, lane, MapLegend.FREE);
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    public Optional<RoadElement> findElement(String elementId) {
+        return elements().stream().filter(e -> e.getId().equals(elementId)).findFirst();
+    }
+
+    /** Road elements of every occupied cell, in row order. */
+    public List<RoadElement> elements() {
+        List<RoadElement> result = new ArrayList<>();
+        for (RoadElement[] row : elements) {
+            for (RoadElement element : row) {
+                if (element != null) {
+                    result.add(element);
+                }
+            }
+        }
+        return result;
+    }
+
+    public int[][] cellsCopy() {
+        int[][] copy = new int[cells.length][];
+        for (int row = 0; row < cells.length; row++) {
+            copy[row] = cells[row].clone();
+        }
+        return copy;
+    }
+
+    /** Row of the block containing the given position. */
+    public int rowAt(double positionMeters) {
+        return Math.min(rows() - 1, (int) Math.floor(wrap(positionMeters) / blockLengthMeters));
+    }
+
+    /** Completed laps at the given position (0 on the first pass). */
+    public long lapAt(double positionMeters) {
+        return (long) Math.floor(positionMeters / lengthMeters());
+    }
+
+    /** Distance driving forward from one position to the next occurrence of another, in [0, length). */
+    public double distanceAhead(double fromMeters, double toMeters) {
+        return wrap(toMeters - fromMeters);
+    }
+
+    /** Shortest signed distance around the loop, in [-length/2, length/2). Negative is behind. */
+    public double signedDistance(double fromMeters, double toMeters) {
+        double ahead = distanceAhead(fromMeters, toMeters);
+        return ahead >= lengthMeters() / 2 ? ahead - lengthMeters() : ahead;
+    }
+
+    public static String cellId(int row, Lane lane) {
+        return "r" + row + "-" + lane.name();
+    }
+
+    private RoadElement createElement(int row, Lane lane, MapLegend.Entry entry) {
+        ScenarioRoadElementDefinition definition = entry.template().copy();
+        definition.setLane(lane);
+        definition.setPositionMeters(row * blockLengthMeters);
+        RoadElement element = ScenarioFactory.createRoadElement(definition);
+        element.setId(cellId(row, lane));
+        return element;
+    }
+
+    /** Rejects a row outside the map or a code the legend does not define. */
+    public void checkCell(int row, int code) {
+        checkRow(row);
+        if (code != MapLegend.FREE && legend.entry(code).isEmpty()) {
+            throw new IllegalArgumentException("Unknown road map code " + code + " at row " + row);
+        }
+    }
+
+    private int checkRow(int row) {
+        if (row < 0 || row >= cells.length) {
+            throw new IllegalArgumentException("Road map row " + row + " is outside 0.." + (cells.length - 1));
+        }
+        return row;
+    }
+
+    private double wrap(double meters) {
+        double length = lengthMeters();
+        double wrapped = meters - length * Math.floor(meters / length);
+        return wrapped >= length ? 0.0 : wrapped;
+    }
+}

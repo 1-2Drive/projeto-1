@@ -33,7 +33,7 @@ public class ScenarioController {
                     s.getName(),
                     s.getInitialSpeedKmh(),
                     s.getInitialWeather().name(),
-                    s.getRoadElements().size(),
+                    s.occupiedCellCount(),
                     s.getActors().size(),
                     s.getTimedActions().size()
                 ))

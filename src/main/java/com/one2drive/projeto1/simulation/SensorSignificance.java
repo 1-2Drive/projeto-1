@@ -6,7 +6,6 @@ import com.one2drive.projeto1.drools.events.PedestrianDetectedEvent;
 import com.one2drive.projeto1.drools.events.PotholeDetectedEvent;
 import com.one2drive.projeto1.drools.events.ObstacleDetectedEvent;
 import com.one2drive.projeto1.drools.events.RelativeSpeedEvent;
-import com.one2drive.projeto1.drools.events.RoadworksDetectedEvent;
 import com.one2drive.projeto1.drools.events.SpeedLimitDetectedEvent;
 import com.one2drive.projeto1.drools.events.TTCEvent;
 
@@ -65,10 +64,6 @@ public class SensorSignificance {
         }
         if (event instanceof ObstacleDetectedEvent e) {
             return transition("obstacle:" + e.getObstacleId(), true, describeObstacle(e));
-        }
-        if (event instanceof RoadworksDetectedEvent e) {
-            return transition("roadworks:" + e.getRoadworksId(), true,
-                "Roadworks detected " + round(e.getDistanceMeters()) + "m ahead in " + e.getRoadworksId());
         }
         if (event instanceof PedestrianDetectedEvent e) {
             return transition("pedestrian:" + e.getPedestrianId(), true,

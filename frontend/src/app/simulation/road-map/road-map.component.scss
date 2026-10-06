@@ -1,0 +1,221 @@
+:host {
+  display: block;
+  margin-top: var(--ds-space-3);
+}
+
+.road-map {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.65rem 0.7rem;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-lg);
+  background: rgba(15, 23, 32, 0.82);
+}
+
+.road-map__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--ds-border);
+
+  h3 {
+    margin: 0;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ds-text-primary);
+  }
+}
+
+.road-map__meta,
+.road-map__hint {
+  font-family: var(--ds-font-mono);
+  font-size: 0.6rem;
+  color: var(--ds-text-muted);
+}
+
+.road-map__hint {
+  margin: 0;
+}
+
+/* ===================== palette ===================== */
+.palette {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.brush {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.45rem;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-bg-muted);
+  color: var(--ds-text-secondary);
+  font-size: 0.62rem;
+  cursor: pointer;
+
+  b {
+    font-family: var(--ds-font-mono);
+    color: var(--ds-text-primary);
+  }
+
+  &:hover {
+    border-color: var(--ds-border-strong);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ds-accent);
+    outline-offset: 1px;
+  }
+}
+
+.brush--active {
+  border-color: var(--ds-accent);
+  background: var(--ds-accent-soft);
+  color: var(--ds-text-primary);
+}
+
+.swatch {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+/* ===================== matrix ===================== */
+.matrix {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.4rem;
+}
+
+.matrix__lanes {
+  display: grid;
+  grid-auto-rows: 0.9rem;
+  gap: 1px;
+  padding: 1px 0;
+  font-family: var(--ds-font-mono);
+  font-size: 0.52rem;
+  letter-spacing: 0.08em;
+  color: var(--ds-text-muted);
+
+  span {
+    display: flex;
+    align-items: center;
+  }
+}
+
+.matrix__body {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.grid {
+  position: relative;
+  display: grid;
+  grid-auto-rows: 0.9rem;
+  gap: 1px;
+  min-width: 36rem;
+  padding: 1px;
+  border-radius: var(--ds-radius-sm);
+  background: rgba(58, 80, 104, 0.45);
+  touch-action: none;
+  user-select: none;
+}
+
+.cell {
+  cursor: crosshair;
+  background: #121c26;
+
+  &:hover {
+    outline: 1px solid var(--ds-text-secondary);
+    outline-offset: -1px;
+  }
+}
+
+.cell--ego-row {
+  box-shadow: inset 0 0 0 1px rgba(240, 185, 90, 0.55);
+}
+
+.axis {
+  position: relative;
+  min-width: 36rem;
+  height: 0.9rem;
+  font-family: var(--ds-font-mono);
+  font-size: 0.5rem;
+  color: var(--ds-text-muted);
+
+  span {
+    position: absolute;
+    top: 0.15rem;
+  }
+}
+
+.ego {
+  position: absolute;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: #f0b95a;
+  box-shadow: 0 0 0 2px rgba(11, 17, 24, 0.9), 0 0 8px rgba(240, 185, 90, 0.9);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+/* ===================== tones (cells and swatches share them) ===================== */
+.cell--free,
+.swatch--free {
+  background: #121c26;
+}
+
+.cell--obstacle,
+.swatch--obstacle {
+  background: var(--ds-danger);
+}
+
+.cell--pothole,
+.swatch--pothole {
+  background: #8b6a3e;
+}
+
+.cell--barrier,
+.swatch--barrier {
+  background: repeating-linear-gradient(135deg, #d8483f 0 3px, #f5f7f9 3px 6px);
+}
+
+.cell--stop,
+.swatch--stop {
+  background: #a3241f;
+}
+
+.cell--yield,
+.swatch--yield {
+  background: #e7dfcc;
+}
+
+.cell--light-red,
+.swatch--light-red {
+  background: radial-gradient(circle, #ff5a4f 0 35%, #2a1414 40%);
+}
+
+.cell--light-yellow,
+.swatch--light-yellow {
+  background: radial-gradient(circle, var(--ds-warning) 0 35%, #2a2414 40%);
+}
+
+.cell--light-green,
+.swatch--light-green {
+  background: radial-gradient(circle, #3ec472 0 35%, #142a1c 40%);
+}
+
+.cell--limit,
+.swatch--limit {
+  background: #5ba6d9;
+}

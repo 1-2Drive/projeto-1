@@ -2,7 +2,10 @@ package com.one2drive.projeto1.config;
 
 public class SimulationConfig {
     private final long tickMillis;
-    private final double roadLengthMeters;
+    /** Length of one road map block (one matrix row). */
+    private final double mapBlockLengthMeters;
+    /** Rows of the empty map used when a scenario does not define one. */
+    private final int defaultMapRows;
     private final double maxAccelerationMps2;
     private final double comfortableDecelerationMps2;
     private final double emergencyDecelerationMps2;
@@ -24,7 +27,8 @@ public class SimulationConfig {
     private final double distanceNoiseStdMeters;
 
     public SimulationConfig(long tickMillis,
-                            double roadLengthMeters,
+                            double mapBlockLengthMeters,
+                            int defaultMapRows,
                             double maxAccelerationMps2,
                             double comfortableDecelerationMps2,
                             double emergencyDecelerationMps2,
@@ -42,7 +46,8 @@ public class SimulationConfig {
                             long speedSensorRateMillis,
                             double distanceNoiseStdMeters) {
         this.tickMillis = tickMillis;
-        this.roadLengthMeters = roadLengthMeters;
+        this.mapBlockLengthMeters = mapBlockLengthMeters;
+        this.defaultMapRows = defaultMapRows;
         this.maxAccelerationMps2 = maxAccelerationMps2;
         this.comfortableDecelerationMps2 = comfortableDecelerationMps2;
         this.emergencyDecelerationMps2 = emergencyDecelerationMps2;
@@ -64,7 +69,8 @@ public class SimulationConfig {
     public static SimulationConfig defaultConfig() {
         return new SimulationConfig(
             100,
-            5000,
+            5.0,
+            100,
             1.6,
             2.8,
             8.5,
@@ -96,8 +102,12 @@ public class SimulationConfig {
         return tickMillis;
     }
 
-    public double getRoadLengthMeters() {
-        return roadLengthMeters;
+    public double getMapBlockLengthMeters() {
+        return mapBlockLengthMeters;
+    }
+
+    public int getDefaultMapRows() {
+        return defaultMapRows;
     }
 
     public double getMaxAccelerationMps2() {

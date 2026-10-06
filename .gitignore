@@ -8,3 +8,4 @@ frontend/dist/
 playwright-report/
 frontend/test-results/
 .playwright-mcp/
+.dev-logs/

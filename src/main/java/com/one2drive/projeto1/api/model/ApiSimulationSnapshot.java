@@ -25,8 +25,28 @@ public record ApiSimulationSnapshot(
     List<DemoPhaseView> demoPhases,
     ManeuverView maneuver,
     SensorTelemetryView sensors,
-    InferenceSummaryView inference
+    InferenceSummaryView inference,
+    RoadMapView roadMap
 ) {
+    /**
+     * The road as a matrix: {@code cells[row][lane]}, rows going forward along the
+     * looping road and lanes in {@code lanes} order. 0 is free, other codes are in the legend.
+     */
+    public record RoadMapView(
+        int rows,
+        List<String> lanes,
+        double blockLengthMeters,
+        int egoRow,
+        long lap,
+        int[][] cells,
+        List<MapLegendEntryView> legend
+    ) {
+    }
+
+    /** Meaning of one map code; {@code detail} is the limit, light colour, severity or barrier state. */
+    public record MapLegendEntryView(int code, String type, String label, String detail) {
+    }
+
     public record EgoVehicleView(
         double speedKmh,
         double positionMeters,

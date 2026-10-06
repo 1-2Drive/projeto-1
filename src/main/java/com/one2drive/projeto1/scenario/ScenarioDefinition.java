@@ -3,14 +3,23 @@ package com.one2drive.projeto1.scenario;
 import com.one2drive.projeto1.domain.WeatherCondition;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 public class ScenarioDefinition {
     private String id;
     private String name;
     private double initialSpeedKmh;
     private WeatherCondition initialWeather;
-    private List<ScenarioRoadElementDefinition> roadElements = new ArrayList<>();
+    /**
+     * Road map: one row per block (rows go forward along the road), one column per lane
+     * (LEFT, CENTER, RIGHT). 0 is free, any other number is a code from the map legend.
+     * Null means an empty road of the configured default length.
+     */
+    private int[][] map;
+    /** Extra or replaced legend codes for this scenario, on top of the default legend. */
+    private Map<Integer, ScenarioRoadElementDefinition> mapLegend = new LinkedHashMap<>();
     private List<ScenarioActorDefinition> actors = new ArrayList<>();
     private List<ScenarioTimedAction> timedActions = new ArrayList<>();
 
@@ -46,12 +55,36 @@ public class ScenarioDefinition {
         this.initialWeather = initialWeather;
     }
 
-    public List<ScenarioRoadElementDefinition> getRoadElements() {
-        return roadElements;
+    public int[][] getMap() {
+        return map;
     }
 
-    public void setRoadElements(List<ScenarioRoadElementDefinition> roadElements) {
-        this.roadElements = roadElements;
+    public void setMap(int[][] map) {
+        this.map = map;
+    }
+
+    public Map<Integer, ScenarioRoadElementDefinition> getMapLegend() {
+        return mapLegend;
+    }
+
+    public void setMapLegend(Map<Integer, ScenarioRoadElementDefinition> mapLegend) {
+        this.mapLegend = mapLegend;
+    }
+
+    /** Number of map cells holding a road element. */
+    public int occupiedCellCount() {
+        if (map == null) {
+            return 0;
+        }
+        int count = 0;
+        for (int[] row : map) {
+            for (int code : row) {
+                if (code != 0) {
+                    count++;
+                }
+            }
+        }
+        return count;
     }
 
     public List<ScenarioActorDefinition> getActors() {

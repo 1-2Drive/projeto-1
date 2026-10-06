@@ -23,6 +23,42 @@ global DroolsSupport droolsSupport
 // cannot oscillate. The laneChangeState guard stops a new request while the
 // previous maneuver is still physically moving.
 
+rule "Maintain ongoing lane change left avoidance"
+salience 475
+when
+    $ctx : DecisionContext()
+    VehicleStateFact(laneChangeState == LaneChangeState.REQUESTED || laneChangeState == LaneChangeState.CHANGING, targetLane == Lane.LEFT)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.CHANGE_LANE_LEFT,
+        Double.NaN,
+        RiskLevel.LOW,
+        DecisionPriority.ROAD_HAZARD,
+        "Executing lane change left to avoid road hazard",
+        drools.getRule().getName(),
+        "maneuver in progress to left lane"
+    );
+end
+
+rule "Maintain ongoing lane change right avoidance"
+salience 475
+when
+    $ctx : DecisionContext()
+    VehicleStateFact(laneChangeState == LaneChangeState.REQUESTED || laneChangeState == LaneChangeState.CHANGING, targetLane == Lane.RIGHT)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.CHANGE_LANE_RIGHT,
+        Double.NaN,
+        RiskLevel.LOW,
+        DecisionPriority.ROAD_HAZARD,
+        "Executing lane change right to avoid road hazard",
+        drools.getRule().getName(),
+        "maneuver in progress to right lane"
+    );
+end
+
 rule "Avoid pothole in centre lane by changing left"
 salience 470
 when

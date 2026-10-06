@@ -6,12 +6,15 @@ const TITLE = /Sistema Inteligente de Apoio . Decis.o de Condu..o/;
 async function addWorldObject(
   page: import('@playwright/test').Page,
   trigger: string,
-  options: { distance?: string } = {}
+  options: { distance?: string; lane?: string } = {}
 ): Promise<void> {
   await page.locator(`[data-testid="${trigger}"]`).click();
   await expect(page.locator('[data-testid="config-panel"]')).toBeVisible();
   if (options.distance !== undefined) {
     await page.locator('[data-testid="drawer-distance-input"]').fill(options.distance);
+  }
+  if (options.lane !== undefined) {
+    await page.locator('[data-testid="lane-select"]').selectOption(options.lane);
   }
   await page.locator('[data-testid="apply-config"]').click();
   await expect(page.locator('[data-testid="config-panel"]')).toHaveCount(0);
@@ -104,6 +107,23 @@ test.describe('Driving expert simulation UI', () => {
       .toContainText(/MANEUVER STARTED|MANEUVER COMPLETED/i, { timeout: 15000 });
     await expect(page.locator('[data-testid="situation-panel"]'))
       .toContainText(/pothole|moving to the LEFT/i, { timeout: 15000 });
+  });
+
+  test('blocked left lane forces pothole avoidance to use clear right lane', async ({ page }) => {
+    test.setTimeout(90000);
+
+    await page.goto('/');
+    await page.locator('[data-testid="reset-btn"]').click();
+    await page.locator('[data-testid="start-btn"]').click();
+    await expect(page.locator('[data-testid="simulation-status"]')).toContainText('RUNNING');
+
+    await addWorldObject(page, 'add-vehicle', { distance: '20', lane: 'LEFT' });
+    await addWorldObject(page, 'add-pothole', { distance: '90', lane: 'CENTER' });
+
+    await expect(page.locator('[data-testid="decision-action"]'))
+      .toContainText('CHANGE_LANE_RIGHT', { timeout: 45000 });
+    await expect(page.locator('[data-testid="road-ego"]'))
+      .toHaveAttribute('data-lane', 'RIGHT', { timeout: 35000 });
   });
 
   test('sensor groups show a radar target and a camera sign detection', async ({ page }) => {

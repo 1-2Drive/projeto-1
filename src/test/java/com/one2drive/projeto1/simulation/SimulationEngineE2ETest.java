@@ -208,7 +208,8 @@ class SimulationEngineE2ETest {
             for (int i = 0; i < 40; i++) {
                 SimulationSnapshot snapshot = engine.tick();
                 detected = detected || snapshot.timeline().stream().anyMatch(line -> line.contains("Camera read pothole"));
-                reacted = reacted || snapshot.currentDecision().equals(DrivingAction.REDUCE_SPEED.name())
+                reacted = reacted || snapshot.currentDecision().equals(DrivingAction.CHANGE_LANE_LEFT.name())
+                    || snapshot.currentDecision().equals(DrivingAction.REDUCE_SPEED.name())
                     || snapshot.currentDecision().equals(DrivingAction.BRAKE.name());
                 if (detected && reacted) {
                     break;

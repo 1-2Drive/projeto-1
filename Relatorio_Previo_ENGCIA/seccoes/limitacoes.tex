@@ -89,6 +89,13 @@ em análise o tratamento explícito da incerteza na base de conhecimento, por
 exemplo através de fatores de certeza associados às regras ou de lógica
 difusa para grandezas como a intensidade da chuva ou a visibilidade.
 
+Está também prevista a paragem perante a falha de um sensor, como indicado
+pelo perito (R8 na \cref{tab:regras}). Esta funcionalidade exige que o
+sistema represente explicitamente o estado de cada sensor e distinga uma
+ausência temporária de observações de uma falha efetiva
+(\cref{sec:sensores-qualidade}), pelo que, nesta fase, foi dada prioridade ao
+fluxo principal de perceção, inferência e ação.
+
 A componente que dá resposta ao \emph{Why Not} necessita de ser desenvolvida
 com mais pormenor e atenção. Para cada alternativa não escolhida poderá ser
 registado o respetivo motivo, como uma prioridade inferior ou uma condição não
@@ -112,6 +119,7 @@ preservar o objetivo principal do projeto.
 Assim, as limitações identificadas não dizem respeito apenas às
 funcionalidades ainda incompletas, mas também ajudam a definir as etapas
 seguintes do desenvolvimento. A continuação do contacto com o perito, a
-revisão das regras, a conclusão do \emph{Why Not} e do Prolog e a introdução
+revisão das regras, a conclusão do \emph{Why Not} e do Prolog, a deteção de
+falhas nos sensores e a introdução
 de novos cenários permitirão aproximar progressivamente o protótipo do modelo
 conceptual.

@@ -46,8 +46,8 @@ correspondem a uma cópia completa do \texttt{WorldState}, ou seja,
 representam apenas a informação que foi percecionada e considerada relevante
 para o processo de inferência. Assim, mantém-se a distinção entre aquilo que
 existe no ambiente simulado e aquilo que o motor de inferência conhece num
-determinado momento. De uma forma simplificada, os principais componentes
-presentes na arquitetura do sistema são:
+determinado momento. De uma forma simplificada, a \cref{tab:componentes}
+apresenta os principais componentes presentes na arquitetura do sistema.
 
 \begin{table}[H]
   \centering
@@ -114,7 +114,7 @@ acordo com a responsabilidade de cada componente do sistema. Neste sentido,
 apresentam-se as principais tecnologias utilizadas na versão atual
 (\cref{tab:tecnologias}).
 
-\begin{table}[tbp]
+\begin{table}[H]
   \centering
   \caption{Principais tecnologias utilizadas na implementação do sistema}
   \label{tab:tecnologias}
@@ -174,12 +174,12 @@ sinais de trânsito ou obstáculos são encaminhados para o fluxo associado à
 estrada.
 
 O \texttt{EventRouter} organiza estes eventos, como referido, em seis
-\emph{entry points} (\cref{tab:entry-points}), o que permite separar os diferentes tipos de informação
-antes de ser utilizada pelas regras. Esta divisão facilita a identificação da
+\emph{entry points} (\cref{tab:entry-points}), o que permite separar os
+diferentes tipos de informação antes de ser utilizada pelas regras. Esta divisão facilita a identificação da
 origem semântica dos eventos e permite que as regras utilizem apenas os
 fluxos que são relevantes para cada situação.
 
-\begin{table}[tbp]
+\begin{table}[H]
   \centering
   \caption{\emph{Entry points} utilizados para encaminhar os eventos para o
     Drools}
@@ -250,10 +250,8 @@ função é feita através do \texttt{DecisionContext}. No início de cada ciclo
 definida uma decisão base e, à medida que as regras levam a novas propostas,
 estas são comparadas através da respetiva prioridade. Uma proposta substitui a
 anteriormente considerada quando apresenta uma prioridade superior. Em
-situações de igualdade de prioridade, a implementação utiliza um critério de
-desempate conservador: quando existe uma velocidade recomendada associada às
-propostas, é favorecida a opção correspondente à velocidade mais reduzida.
-Depois de concluída esta comparação, a proposta selecionada é aplicada a um
+situações de igualdade de prioridade, aplica-se o critério de desempate
+descrito na \cref{sec:prioridades}. Depois de concluída esta comparação, a proposta selecionada é aplicada a um
 objeto \texttt{DrivingDecision}, que guarda a informação associada à decisão
 final, nomeadamente a ação, a velocidade recomendada, o nível de risco, a
 prioridade, a razão apresentada, a regra que lhe deu origem, o instante da
@@ -280,8 +278,8 @@ observações mais recentes para analisar a informação associada à distância
 frontal. Desta forma, as regras podem considerar não apenas o valor atual, mas
 também a persistência ou evolução recente de uma determinada condição. A
 título de exemplo, relativamente ao TTC, considera-se que uma das regras
-procura pelo menos três observações com um valor inferior a 2,5 segundos numa
-janela temporal de dois segundos. Assim, ter apenas uma observação reduzida
+procura pelo menos duas observações com um valor inferior a 2,5 segundos numa
+janela temporal de dois segundos (\cref{sec:raciocinio-temporal}). Assim, ter apenas uma observação reduzida
 não é o suficiente para caracterizar, por si só, uma situação como
 persistente. Por outro lado, quando o TTC apresenta um valor inferior a 1,3
 segundos, existe uma condição de reação imediata, uma vez que aguardar por

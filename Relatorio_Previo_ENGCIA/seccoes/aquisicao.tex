@@ -105,10 +105,12 @@ decisão, que exceções deveriam ser previstas e de que forma situações de
 conflito ou maior risco deveriam ser tratadas.
 
 Assim, a aquisição de conhecimento junto do perito decorreu em duas sessões.
-A primeira (S1) foi uma reunião via Teams e permitiu apresentar o projeto,
+A primeira (S1) foi uma reunião via Teams (\cref{tab:sessao1}) e permitiu
+apresentar o projeto,
 discutir a representação do ambiente, os factos considerados, os cenários
 previstos e algumas opções de implementação. A segunda (S2), para facilitar a
-comunicação com o perito, foi um questionário escrito, enviado por
+comunicação com o perito, foi um questionário escrito (\cref{tab:sessao2}),
+enviado por
 \emph{email}, com perguntas preparadas pela equipa a partir das questões que
 tinham ficado em aberto durante a construção da base de conhecimento.
 
@@ -167,7 +169,7 @@ motor de inferência. Sempre que possível, procurou-se manter uma relação ent
 o conhecimento adquirido, a respetiva representação através de factos e
 regras e os cenários utilizados para testar o comportamento resultante. Neste
 sentido, o processo de aquisição e evolução do conhecimento pode ser
-representado da seguinte forma:
+representado pela \cref{fig:aquisicao}, da seguinte forma:
 
 \begin{figure}[H]
   \centering
@@ -212,7 +214,7 @@ representado da seguinte forma:
 
 A \cref{tab:sintese-perito} resume as indicações do perito e a forma como se
 refletem no sistema, distinguindo o que já está implementado no protótipo do
-que está apenas previsto ou ainda em análise pela equipa. As perguntas e
+que está apenas previsto. As perguntas e
 respostas completas encontram-se no Anexo~\ref{anx:sessoes}.
 
 \begin{table}[H]
@@ -248,15 +250,16 @@ respostas completas encontram-se no Anexo~\ref{anx:sessoes}.
       & Previsto \\ \linhasep
     Número de leituras
       & Uma leitura numa situação crítica; duas numa situação normal
-      & Janelas temporais de leituras recentes; a regra de TTC persistente
-        exige três leituras
-      & Em análise \\ \linhasep
+      & Uma leitura com TTC inferior a 1,3~s; duas leituras nas regras de TTC
+        persistente (\cref{sec:raciocinio-temporal})
+      & Implementado \\ \linhasep
     Prioridades e desempate
       & Quatro níveis (baixo, médio, alto e crítico); desempate aleatório ou
         pela primeira opção de uma lista ordenada
       & Quatro níveis de risco e sete categorias de prioridade; desempate pela
-        menor velocidade recomendada
-      & Em análise \\ \linhasep
+        menor velocidade recomendada (ambos justificados na
+        \cref{sec:prioridades})
+      & Implementado \\ \linhasep
     Memória de trabalho
       & Esquecer os eventos que saem do campo de deteção; os sinais alteram um
         estado

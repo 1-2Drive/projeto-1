@@ -45,10 +45,9 @@ equivalente entre parênteses.
       representação explícita encontra-se prevista como evolução futura do
       protótipo. \\ \linhasep
   Desempate
-    & Critério utilizado quando duas propostas apresentam a mesma
-      prioridade. Na implementação atual, quando ambas possuem uma
-      velocidade recomendada, é favorecida a proposta correspondente à
-      velocidade mais reduzida. \\ \linhasep
+    & Critério determinístico utilizado quando duas propostas apresentam a
+      mesma prioridade. Na implementação atual, é favorecida a proposta
+      correspondente à velocidade recomendada mais reduzida. \\ \linhasep
   Distância de paragem
     & Distância percorrida pelo veículo desde a deteção de um perigo até à
       imobilização. Inclui a distância percorrida durante o tempo de
@@ -122,6 +121,11 @@ equivalente entre parênteses.
     & Classificação da norma SAE J3016, de 0 (sem automação) a 5
       (automação integral), segundo a parte da tarefa de condução assumida
       pelo sistema. \\ \linhasep
+  Nível de risco
+    & Gravidade de uma situação identificada, classificada em quatro níveis:
+      baixo, moderado, alto e crítico. Acompanha a decisão final e é usado
+      na sua explicação, mas não intervém na seleção entre propostas, que
+      depende da prioridade. \\ \linhasep
   Paragem imediata
     & Ação de segurança de prioridade máxima, aplicada em caso de falha do
       veículo ou de dados contraditórios numa situação de nível alto ou
@@ -129,15 +133,14 @@ equivalente entre parênteses.
   Perito
     & Pessoa com conhecimento especializado do domínio, consultada durante
       a aquisição de conhecimento. \\ \linhasep
-  Phreak
-    & Algoritmo de correspondência de padrões usado nas versões atuais do
-      Drools, derivado do algoritmo Rete. \\ \linhasep
   Ponto de não-retorno
     & Instante a partir do qual a travagem já não permite evitar a
       colisão. \\ \linhasep
   Prioridade
-    & Importância semântica atribuída a uma proposta de decisão e utilizada
-      pelo \texttt{DecisionContext} para comparar propostas concorrentes. \\ \linhasep
+    & Importância semântica atribuída a uma proposta de decisão, organizada
+      em sete categorias e utilizada pelo \texttt{DecisionContext} para
+      comparar propostas concorrentes. É distinta do nível de
+      risco. \\ \linhasep
   Radar
     & Sensor que usa ondas de rádio para medir a distância e a velocidade
       relativa de objetos. \\ \linhasep
@@ -147,10 +150,6 @@ equivalente entre parênteses.
   Resolução de conflitos
     & Processo de escolha entre várias regras ou ações aplicáveis em
       simultâneo. \\ \linhasep
-  Rete
-    & Algoritmo eficiente de correspondência entre muitos padrões e muitos
-      factos, proposto por Forgy~\cite{forgy1982} e na base de motores de
-      regras como o Drools. \\ \linhasep
   Saliência
     & Atributo de uma regra em Drools que define a sua prioridade relativa
       na agenda (\emph{salience}). \\ \linhasep

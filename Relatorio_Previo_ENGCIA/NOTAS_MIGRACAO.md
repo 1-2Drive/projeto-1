@@ -60,23 +60,27 @@ Foram retirados os capítulos e anexos vazios do esqueleto (Delimitação, Enqua
 
 **Obrigatório**
 
-1. **Resumo**: ainda não está escrito (aparece «[Resumo por redigir]»).
+1. ~~**Resumo**~~ **resolvido**: escrito em `seccoes/resumo.tex`.
 2. **Divergências com o perito**: o sistema faz algumas coisas de forma diferente do que o perito indicou e o texto não o justifica. Para cada uma, decidir se se altera o sistema ou se se explica a escolha:
-   - desempate pela menor velocidade, quando o perito indicou aleatório ou a primeira opção de uma lista ordenada (afeta os caps. 6 e 8, a Tabela 8.4 e o glossário);
-   - quatro níveis de risco e sete categorias de prioridade, quando o perito falou em quatro níveis de prioridade;
-   - regra de TTC persistente com 3 leituras, quando o perito indicou 2;
-   - paragem perante falha de sensor ainda por implementar.
+   - ~~desempate pela menor velocidade~~ **resolvido**: justificado no cap. 6 (secção 6.2) como a segunda opção do perito (primeira de uma ordenação definida); o cap. 8 remete para lá, e o glossário e a Tabela da secção 3.3 foram atualizados;
+   - ~~quatro níveis de risco e sete categorias de prioridade~~ **resolvido**: justificado no cap. 6 (secção 6.2) — os quatro níveis do perito passaram a representar o risco («médio» → «moderado») e a prioridade passou a ser uma segunda dimensão com sete categorias; acrescentada a entrada «Nível de risco» ao glossário;
+   - ~~regra de TTC persistente com 3 leituras~~ **resolvido no relatório**: passa a 2 leituras, como o perito indicou (caps. 6 e 8 e tabela da secção 3.3). **Falta alterar o código** (ver `ALTERACOES_CODIGO.md`);
+   - ~~paragem perante falha de sensor~~ **resolvido no relatório**: assumido como trabalho futuro (secção 10.2), com remissão para a R8 e a secção 4.x. **Falta implementar no código** (ver `ALTERACOES_CODIGO.md`).
 3. **Prolog**: perguntar ao professor se fica no relatório. Se sair, tem de sair dos Objetivos, dos critérios de aceitação (9.2), da secção 8.4, das Limitações e da Conclusão.
 4. **Figura 8.1**: manter a imagem atual ou substituí-la por um diagrama próprio (basta trocar `figuras/arquitetura-sistema.png`).
 
 **A validar**
-5. **Secção 3.3**: reativar ou não. Está em `seccoes/aquisicao.tex` entre `\iffalse` e `\fi`. Se a reativarem, revejam o estado «em análise» das divergências do ponto 2.
-6. **Secção 5.3** (regras representativas) e **secção 8.5** (estado do protótipo): confirmar que concordam com o conteúdo.
-7. **Objetivo do A\***: não volta a aparecer no relatório. Retirar ou explicar.
-8. **Glossário**: manter ou retirar Rete e Phreak (não são usados no texto) e os 5 termos novos.
+5. ~~**Secção 3.3**~~ **resolvido**: fica desativada (entre `\iffalse` e `\fi` em `seccoes/aquisicao.tex`). O conteúdo foi atualizado com as decisões do ponto 2 e já não tem linhas «em análise», caso venha a ser reativada.
+6. ~~**Secção 5.3** e **secção 8.5**~~ **resolvido**: a equipa concorda com o conteúdo.
+7. **Objetivo do A\***: fica para mais tarde; por agora não se mexe.
+8. ~~**Glossário**~~ **resolvido**: Rete e Phreak retirados (não eram usados no texto; saiu também a referência `forgy1982`, só citada no glossário). Os 5 termos novos ficam, porque são todos usados no texto.
 
 **Opcional, se houver tempo**
-9. Acrescentar à Tabela 9.1 os cenários sugeridos pelo perito: passadeira com peão e objetos inseridos pelo utilizador (este já existe na aplicação).
-10. Ligar os exemplos de *Why* e *Why Not* (cap. 7) às regras da Tabela 5.2.
-11. Na Conclusão, suavizar «demonstre de forma clara», porque o *Why Not* e o Prolog ainda não estão completos.
+9. ~~Acrescentar à Tabela 9.1 os cenários sugeridos pelo perito~~: não se vai fazer.
+10. ~~Ligar os exemplos de *Why* e *Why Not* às regras da Tabela 5.2~~: não se vai fazer.
+11. ~~Na Conclusão, suavizar «demonstre de forma clara»~~: fica como está.
 12. Acrescentar citações nos capítulos que não têm nenhuma (por exemplo, Giarratano e Jackson nas definições de sistema pericial).
+
+## Alterações a fazer no código
+
+Ver `ALTERACOES_CODIGO.md`.

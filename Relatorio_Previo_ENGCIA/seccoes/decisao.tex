@@ -31,12 +31,13 @@ condições normais, pode ser considerada uma segunda leitura para reduzir a
 influência de um possível falso positivo. Numa situação crítica, pelo
 contrário, esperar por uma nova confirmação pode atrasar uma ação necessária,
 ou seja, a decisão poderá ter de ser tomada à primeira indicação de perigo. Na
-implementação atual, este princípio encontra-se representado, nomeadamente,
-no tratamento temporal do TTC. O sistema consegue ter em conta várias
-ocorrências recentes numa determinada janela temporal e, assim, identificar
-situações persistentes. Em simultâneo, existem condições de maior criticidade
-que podem desencadear uma reação imediata, sem aguardar por novas
-observações.
+implementação atual, este princípio encontra-se representado no tratamento
+temporal do TTC. Quando o TTC é inferior a 1,3~s, a situação é considerada
+crítica e a travagem de emergência é proposta logo à primeira leitura. Para
+valores inferiores a 2,5~s, o sistema exige duas observações numa janela de
+dois segundos antes de identificar uma situação persistente, reduzindo a
+influência de um valor atípico. O mesmo critério de duas leituras é aplicado
+na travagem preventiva com chuva (R3).
 
 A utilização de uma sessão com estado, em conjunto com mecanismos de
 processamento temporal, permite ainda manter informação relevante entre
@@ -55,7 +56,7 @@ necessariamente que a ação proposta corresponda à decisão final. No mesmo
 ciclo de inferência podem existir várias situações relevantes e,
 consequentemente, várias regras capazes de encontrar propostas de tomada de
 decisão diferentes. Para caracterizar a gravidade das situações, são
-considerados quatro níveis de risco:
+considerados quatro níveis de risco, representados na \cref{fig:niveis-risco}.
 
 \begin{figure}[H]
   \centering
@@ -76,21 +77,35 @@ considerados quatro níveis de risco:
   \label{fig:niveis-risco}
 \end{figure}
 
-Estes níveis permitem distinguir, de forma geral, situações de menor gravidade
-de situações que exigem uma resposta mais urgente. Uma situação classificada
-como crítica representa, assim, um contexto de maior risco do que uma situação
-classificada como alta, moderada ou baixa. Contudo, o nível de risco não
-corresponde diretamente à prioridade utilizada para selecionar a decisão
-final. Na implementação atual, as propostas resultantes da aplicação das
-regras possuem também uma prioridade associada ao tipo de decisão. Esta
-separação permite distinguir a gravidade de uma situação da importância
-atribuída à ação durante o processo de seleção. Por exemplo, uma regra
-relacionada com a progressão normal do veículo pode ser aplicada no mesmo
-momento que uma regra destinada a evitar uma colisão. Mesmo que ambas sejam
-propostas válidas, a proposta associada à segurança deverá prevalecer. Foram
-definidas sete categorias de prioridade, apresentadas na tabela seguinte. Os
-valores associados a cada categoria são utilizados apenas para comparar a
-importância das propostas durante a tomada de decisão.
+Numa das sessões com o perito foi colocada a questão de quais os níveis de
+prioridade a definir, com o objetivo de evitar um número excessivo de
+categorias, demasiado abstrato ou difícil de gerir face aos cenários de
+simulação. O perito sugeriu quatro níveis: baixo, médio, alto e crítico
+(\cref{tab:perguntas-perito}). No entanto, durante a implementação, e dada a
+complexidade do domínio, foi necessário distinguir dois conceitos que
+inicialmente eram considerados em conjunto: risco e prioridade. Embora
+interligados, estes conceitos não significam o mesmo no contexto deste
+trabalho. Os quatro níveis sugeridos passaram a representar o risco, isto é, a
+gravidade de cada situação identificada, sendo o nível «médio» designado por
+«moderado». Uma situação classificada como crítica representa, assim, um
+contexto de maior risco do que uma situação classificada como alta, moderada
+ou baixa.
+
+Contudo, à medida que a base de conhecimento e o mecanismo de resolução de
+conflitos foram desenvolvidos, verificou-se que esta classificação não era
+suficiente, por si só, para ordenar diferentes tipos de decisão propostos em
+simultâneo. Por exemplo, uma regra relacionada com a progressão normal do
+veículo pode ser aplicada no mesmo momento que uma regra destinada a evitar
+uma colisão. Mesmo que ambas sejam propostas válidas, a proposta associada à
+segurança deverá prevalecer. Foi, por isso, introduzida uma segunda dimensão,
+a prioridade semântica da decisão, organizada nas sete categorias
+apresentadas na \cref{tab:prioridades}. Desta forma, os quatro níveis
+continuam a caracterizar a gravidade da situação, como sugerido pelo perito,
+enquanto as sete categorias determinam a precedência das ações durante a
+resolução de conflitos. O nível de risco acompanha a decisão final e é usado
+na sua explicação, mas não intervém na seleção. Os valores associados a cada
+categoria são utilizados apenas para comparar a importância das propostas
+durante a tomada de decisão.
 
 \begin{table}[H]
   \centering
@@ -130,15 +145,35 @@ A resolução de conflitos encontra-se implementada através do
 \texttt{DecisionContext}, que recebe as propostas sugeridas durante o processo
 de inferência e compara as respetivas prioridades. Quando uma nova proposta
 tem uma prioridade superior à atualmente considerada, esta passa a assumir
-precedência na decisão. Quando duas propostas apresentam a mesma prioridade, a
-implementação atual utiliza ainda um critério de desempate conservador. Nos
-casos em que existe uma velocidade recomendada associada às duas propostas, é
-favorecida a opção que recomenda uma velocidade inferior. Desta forma, a
-decisão final não depende simplesmente da primeira regra executada, mas sim da
-comparação entre as propostas encontradas no mesmo ciclo de inferência. Este
-mecanismo permite que situações relacionadas com a segurança possam
-prevalecer sobre objetivos de menor importância, como a progressão normal ou o
-conforto.
+precedência na decisão. Desta forma, a decisão final não depende simplesmente
+da primeira regra executada, mas sim da comparação entre as propostas
+encontradas no mesmo ciclo de inferência. Este mecanismo permite que situações
+relacionadas com a segurança possam prevalecer sobre objetivos de menor
+importância, como a progressão normal ou o conforto.
+
+Relativamente às situações em que duas propostas de decisão têm a mesma
+prioridade, o perito sugeriu duas possibilidades: a seleção aleatória entre as
+alternativas ou a escolha da primeira opção segundo uma ordenação previamente
+definida (\cref{tab:perguntas-perito}). Na implementação atual, optou-se pela
+segunda abordagem, ordenando as propostas pela velocidade recomendada. Assim,
+em caso de empate, é favorecida a alternativa correspondente à velocidade mais
+reduzida. A escolha da velocidade como critério tem uma justificação de
+segurança: perante duas propostas com a mesma importância, a mais lenta é a
+mais conservadora, o que está de acordo com a indicação do perito de que, em
+caso de dúvida com risco elevado, «é melhor o STOP». Por outro lado, um
+critério determinístico evita que a decisão resulte de uma seleção puramente
+aleatória, que poderia dar origem a comportamentos diferentes face a situações
+idênticas. Tendo em conta que uma das características do sistema é a
+explicabilidade, permite também justificar, de forma clara, o motivo pelo qual
+uma proposta prevaleceu sobre outra e assim relacionar a decisão final com a
+prioridade atribuída e, em caso de empate, com a velocidade recomendada por
+cada alternativa.
+
+Algumas propostas, como a mudança de via, não definem uma velocidade
+recomendada. Nesses casos, em igualdade de prioridade, prevalece a proposta que
+indica uma velocidade. Se nenhuma das propostas indicar uma velocidade, ou se
+ambas recomendarem a mesma, mantém-se a que foi registada em primeiro lugar no
+ciclo de inferência.
 
 Importa ainda distinguir a prioridade atribuída às propostas de decisão da
 ordem de execução das regras pelo motor de inferência. No Drools, a saliência

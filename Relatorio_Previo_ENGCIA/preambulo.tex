@@ -89,6 +89,13 @@
 \titleformat{\subsection}
   {\normalfont\normalsize\bfseries\color{corEscura}}{\thesubsection}{0.8em}{}
 
+% Uma secção não começa no fundo da página: se restar pouco espaço,
+% passa para a página seguinte (no máximo ~1/5 da página fica em branco).
+\usepackage{needspace}
+\usepackage{etoolbox}
+\pretocmd{\section}{\Needspace{10\baselineskip}}{}{}
+\pretocmd{\subsection}{\Needspace{6\baselineskip}}{}{}
+
 % --- Legendas --------------------------------------------------
 \captionsetup{font=small,labelfont={bf,color=corEscura},skip=6pt}
 

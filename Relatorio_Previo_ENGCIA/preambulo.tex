@@ -24,7 +24,15 @@
 \usepackage{caption}
 \usepackage{float}
 \usepackage{listings}
+% Bibliografia no índice, com a página e a ligação corretas (no início da
+% bibliografia), sem acrescentar o próprio índice nem as listas.
+\usepackage[nottoc,notlof,notlot]{tocbibind}
 \usepackage{csquotes}
+% Aspas: \enquote{texto} produz “texto” (aspas duplas tipográficas).
+\setquotestyle{english}
+% O babel-portuguese torna " um atalho que «come» o carácter seguinte;
+% desativa-se, para que aspas escritas diretamente não estraguem o texto.
+\AtBeginDocument{\shorthandoff{"}}
 \usepackage{icomma}        % vírgula decimal em modo matemático: $1,5$
 \usepackage[most]{tcolorbox}
 \usetikzlibrary{positioning}  % diagramas TikZ (o tcolorbox já carrega o tikz)

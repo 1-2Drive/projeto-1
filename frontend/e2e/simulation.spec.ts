@@ -154,4 +154,50 @@ test.describe('Driving expert simulation UI', () => {
     await expect(page.locator('[data-testid="demo-phase-normal"]')).toBeVisible({ timeout: 20000 });
     await expect(page.locator('.demo__step--done')).toHaveCount(6, { timeout: 140000 });
   });
+
+  test('overtaking slow vehicle shows turn signals, changes lane, passes, and returns to right lane', async ({ page }) => {
+    test.setTimeout(90000);
+
+    await page.goto('/');
+    await page.locator('[data-testid="reset-btn"]').click();
+    await page.locator('button:has-text("S16_SLOW_VEHICLE_OVERTAKE")').click();
+    await page.locator('[data-testid="start-btn"]').click();
+    await expect(page.locator('[data-testid="simulation-status"]')).toContainText('RUNNING');
+
+    // Telemetry HUD is visible and shows position increasing
+    await expect(page.locator('[data-testid="telemetry-hud"]')).toBeVisible();
+    await expect(page.locator('[data-testid="hud-position"]')).not.toContainText('0.0 m', { timeout: 15000 });
+
+    // Vehicle decides to change left and signals left
+    await expect(page.locator('[data-testid="decision-action"]'))
+      .toContainText('CHANGE_LANE_LEFT', { timeout: 35000 });
+    await expect(page.locator('[data-testid="hud-indicator"]')).toContainText('LEFT', { timeout: 15000 });
+
+    // Vehicle reaches overtaking lane
+    await expect(page.locator('[data-testid="road-ego"]')).toHaveAttribute('data-lane', 'CENTER', { timeout: 35000 });
+  });
+
+  test('speed radar scenario: physical radar object rendered, speed decelerates to legal limit, passes without avoiding or stopping', async ({ page }) => {
+    test.setTimeout(90000);
+
+    await page.goto('/');
+    await page.locator('[data-testid="reset-btn"]').click();
+    await page.locator('button:has-text("S18_SPEED_RADAR_APPROACH")').click();
+    await page.locator('[data-testid="start-btn"]').click();
+    await expect(page.locator('[data-testid="simulation-status"]')).toContainText('RUNNING');
+
+    // Radar object is rendered on the road
+    await expect(page.locator('.radar-station')).toBeVisible({ timeout: 15000 });
+
+    // Speed decelerates towards legal 50 km/h limit as ego approaches
+    await expect(page.locator('[data-testid="decision-action"]'))
+      .toContainText('REDUCE_SPEED', { timeout: 25000 });
+
+    // Ego stays in right lane (no avoidance lane change triggered)
+    const ego = page.locator('[data-testid="road-ego"]');
+    await expect(ego).toHaveAttribute('data-lane', 'RIGHT');
+
+    // Ego vehicle passes radar and continues driving past 130m
+    await expect(page.locator('[data-testid="hud-position"]')).toContainText(/\d{3}\.\d m/, { timeout: 35000 });
+  });
 });

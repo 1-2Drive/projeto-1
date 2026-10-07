@@ -22,10 +22,12 @@ public record SensorTelemetry(
         double distanceMeters,
         double relativeSpeedKmh,
         double ttcSeconds,
-        String status
+        String status,
+        double speedRadarDistanceMeters,
+        double speedRadarLimitKmh
     ) {
         public static RadarView empty(double rangeMeters) {
-            return new RadarView(rangeMeters, "none", Double.POSITIVE_INFINITY, 0.0, Double.POSITIVE_INFINITY, "CLEAR");
+            return new RadarView(rangeMeters, "none", Double.POSITIVE_INFINITY, 0.0, Double.POSITIVE_INFINITY, "CLEAR", Double.POSITIVE_INFINITY, 0.0);
         }
     }
 

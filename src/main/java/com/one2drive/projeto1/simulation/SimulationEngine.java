@@ -271,10 +271,28 @@ public class SimulationEngine implements AutoCloseable {
         recordManeuverStart(stateBefore);
         recordActuatorChange();
         settleManeuver();
+        recordRadarPassage();
         markDemoEvidence(events);
         purgeExpiredDetections();
 
         return snapshot();
+    }
+
+    private void recordRadarPassage() {
+        for (RoadElement element : worldState.getRoadElements()) {
+            if (element instanceof com.one2drive.projeto1.domain.SpeedRadar radar && !radar.isPassedRecorded()) {
+                double signedDist = worldState.signedDistance(radar.getPositionMeters());
+                if (signedDist <= 0 && signedDist > -15.0) {
+                    radar.setPassedRecorded(true);
+                    knowledgeSession.getTrace().add(
+                        simTimeMillis,
+                        TimelineEntryType.INFO,
+                        "Speed radar passed at " + Math.round(worldState.getEgo().getSpeedKmh())
+                            + " km/h — legal limit " + Math.round(radar.getSpeedLimitKmh()) + " km/h"
+                    );
+                }
+            }
+        }
     }
 
     /** Emits the maneuver lifecycle entry the moment Drools' decision starts execution. */
@@ -307,6 +325,15 @@ public class SimulationEngine implements AutoCloseable {
     private void refreshSensorTelemetry(List<Object> events) {
         SensorTelemetry previous = sensorTelemetry;
 
+        double speedRadarDist = Double.POSITIVE_INFINITY;
+        double speedRadarLimit = 0.0;
+        for (Object event : events) {
+            if (event instanceof com.one2drive.projeto1.drools.events.SpeedRadarEvent sre) {
+                speedRadarDist = sre.getDistanceMeters();
+                speedRadarLimit = sre.getSpeedLimitKmh();
+            }
+        }
+
         SensorTelemetry.RadarView radar = previous.frontRadar();
         if (!"none".equals(radar.targetId())
             && !radarDetectedObjectTimestamps.containsKey(radar.targetId())) {
@@ -322,7 +349,9 @@ public class SimulationEngine implements AutoCloseable {
                     distance.getDistanceMeters(),
                     previous.frontRadar().relativeSpeedKmh(),
                     previous.frontRadar().ttcSeconds(),
-                    "TRACKING"
+                    "TRACKING",
+                    speedRadarDist,
+                    speedRadarLimit
                 );
             } else if (event instanceof RelativeSpeedEvent relative) {
                 radarUpdated = true;
@@ -332,7 +361,9 @@ public class SimulationEngine implements AutoCloseable {
                     radar.distanceMeters(),
                     relative.getRelativeSpeedMps() * 3.6,
                     radar.ttcSeconds(),
-                    "TRACKING"
+                    "TRACKING",
+                    speedRadarDist,
+                    speedRadarLimit
                 );
             } else if (event instanceof TTCEvent ttc) {
                 radarUpdated = true;
@@ -342,13 +373,24 @@ public class SimulationEngine implements AutoCloseable {
                     radar.distanceMeters(),
                     radar.relativeSpeedKmh(),
                     ttc.getTtcSeconds(),
-                    radarStatus(ttc.getTtcSeconds())
+                    radarStatus(ttc.getTtcSeconds()),
+                    speedRadarDist,
+                    speedRadarLimit
                 );
             }
         }
 
-        if (!radarUpdated && previous.frontRadar() == null) {
-            radar = SensorTelemetry.RadarView.empty(config.getRadarRangeMeters());
+        if (!radarUpdated) {
+            radar = new SensorTelemetry.RadarView(
+                radar.rangeMeters(),
+                radar.targetId(),
+                radar.distanceMeters(),
+                radar.relativeSpeedKmh(),
+                radar.ttcSeconds(),
+                radar.status(),
+                speedRadarDist,
+                speedRadarLimit
+            );
         }
 
         List<SensorTelemetry.CameraDetection> detections = new ArrayList<>(
@@ -491,6 +533,11 @@ public class SimulationEngine implements AutoCloseable {
         vehicleStateFact.setLaneChangeState(ego.getLaneChangeState());
         vehicleStateFact.setTargetLane(ego.getTargetLane());
         vehicleStateFact.setTimestamp(simTimeMillis);
+        vehicleStateFact.setDrivingState(ego.getDrivingState());
+        vehicleStateFact.setIndicatorState(ego.getIndicatorState());
+        vehicleStateFact.setLateralPositionMeters(ego.getLateralPositionMeters());
+        vehicleStateFact.setLeftMarking(worldState.getLeftMarking());
+        vehicleStateFact.setRightMarking(worldState.getRightMarking());
         knowledgeSession.getKieSession().update(vehicleStateHandle, vehicleStateFact);
     }
 

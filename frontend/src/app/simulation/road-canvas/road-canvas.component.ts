@@ -12,7 +12,8 @@ export type RoadObjectKind =
   | 'pothole'
   | 'obstacle'
   | 'vehicle'
-  | 'pedestrian';
+  | 'pedestrian'
+  | 'speedRadar';
 
 export interface RoadRenderItem {
   id: string;
@@ -75,6 +76,70 @@ export class RoadCanvasComponent {
   /** Distance ticks drawn on the road so scale is always readable. */
   protected readonly distanceTicks = [0, 40, 80, 120, 160, 200];
 
+  protected readonly egoPosition = computed(() => this.snapshot()?.egoVehicle?.positionMeters ?? 0);
+  protected readonly egoSpeed = computed(() => this.snapshot()?.egoVehicle?.speedKmh ?? 0);
+  protected readonly egoAcceleration = computed(() => this.snapshot()?.egoVehicle?.accelerationMps2 ?? 0);
+  protected readonly currentLane = computed(() => this.snapshot()?.egoVehicle?.lane ?? 'CENTER');
+  protected readonly drivingState = computed(() => this.snapshot()?.egoVehicle?.drivingState ?? (this.egoSpeed() > 0.5 ? 'CRUISING' : 'STOPPED'));
+  protected readonly indicatorName = computed(() => {
+    const ego = this.snapshot()?.egoVehicle;
+    if (ego?.indicatorState && ego.indicatorState !== 'OFF') {
+      return ego.indicatorState;
+    }
+    const m = this.snapshot()?.maneuver;
+    if (m?.indicatorsLeft) return 'LEFT';
+    if (m?.indicatorsRight) return 'RIGHT';
+    return 'OFF';
+  });
+  protected readonly steeringName = computed(() => {
+    return this.snapshot()?.egoVehicle?.steeringState ?? this.snapshot()?.maneuver?.steering ?? 'STRAIGHT';
+  });
+  protected readonly leftMarking = computed(() => this.snapshot()?.roadMarks?.leftMarking ?? 'DASHED');
+  protected readonly rightMarking = computed(() => this.snapshot()?.roadMarks?.rightMarking ?? 'DASHED');
+
+  protected readonly wheelSteerAngle = computed(() => {
+    const st = this.steeringName();
+    if (st === 'LEFT') return -12;
+    if (st === 'RIGHT') return 12;
+    return 0;
+  });
+
+  protected readonly indicatorHazard = computed(() => this.indicatorName() === 'HAZARD');
+
+  protected readonly speedRadarDist = computed(() => {
+    const d = this.snapshot()?.sensors?.frontRadar?.speedRadarDistanceMeters;
+    return (d != null && Number.isFinite(d) && d > 0) ? d : null;
+  });
+
+  protected readonly speedRadarLimit = computed(() => {
+    return this.snapshot()?.sensors?.frontRadar?.speedRadarLimitKmh ?? null;
+  });
+
+  /** Dynamic ticks in world metres that scroll past smoothly as the ego moves forward */
+  protected readonly dynamicTicks = computed(() => {
+    const egoPos = this.egoPosition();
+    const minM = egoPos - this.worldBackwardMeters;
+    const maxM = egoPos + this.worldForwardMeters;
+    const step = 40;
+    const first = Math.ceil(minM / step) * step;
+    const ticks: { worldMeters: number; percent: number }[] = [];
+    for (let m = first; m <= maxM; m += step) {
+      ticks.push({
+        worldMeters: m,
+        percent: this.toPercentX(m - egoPos)
+      });
+    }
+    return ticks;
+  });
+
+  /** Dash offset in percent for streaming lane line animation */
+  protected readonly dashOffsetPercent = computed(() => {
+    const span = this.worldForwardMeters + this.worldBackwardMeters;
+    // Repeat every 16m
+    const mod = this.egoPosition() % 16;
+    return -(mod / span) * 100;
+  });
+
   protected readonly laneLabels = [
     { lane: 'LEFT' as const, y: LANE_CENTER_Y.LEFT },
     { lane: 'CENTER' as const, y: LANE_CENTER_Y.CENTER },
@@ -128,9 +193,21 @@ export class RoadCanvasComponent {
   protected readonly maneuverState = computed(() => this.snapshot()?.maneuver?.state ?? 'IDLE');
   protected readonly maneuverProgress = computed(() => this.snapshot()?.maneuver?.progress ?? 0);
   protected readonly maneuverTargetLane = computed(() => this.snapshot()?.maneuver?.targetLane ?? 'CENTER');
-  protected readonly indicatorLeft = computed(() => this.snapshot()?.maneuver?.indicatorsLeft ?? false);
-  protected readonly indicatorRight = computed(() => this.snapshot()?.maneuver?.indicatorsRight ?? false);
-  protected readonly braking = computed(() => this.snapshot()?.maneuver?.braking ?? false);
+  protected readonly indicatorLeft = computed(() => {
+    const ego = this.snapshot()?.egoVehicle;
+    if (ego?.indicatorState === 'LEFT') return true;
+    return this.snapshot()?.maneuver?.indicatorsLeft ?? false;
+  });
+  protected readonly indicatorRight = computed(() => {
+    const ego = this.snapshot()?.egoVehicle;
+    if (ego?.indicatorState === 'RIGHT') return true;
+    return this.snapshot()?.maneuver?.indicatorsRight ?? false;
+  });
+  protected readonly braking = computed(() => {
+    const ego = this.snapshot()?.egoVehicle;
+    if (ego?.drivingState === 'BRAKING' || (ego?.accelerationMps2 ?? 0) < -0.8) return true;
+    return this.snapshot()?.maneuver?.braking ?? false;
+  });
 
   protected readonly cameraEdgePercent = computed(() => this.toPercentX(this.ranges().cameraRangeMeters));
   protected readonly radarEdgePercent = computed(() => this.toPercentX(this.ranges().radarRangeMeters));
@@ -184,6 +261,8 @@ export class RoadCanvasComponent {
         return 'Vehicle';
       case 'pedestrian':
         return 'Pedestrian';
+      case 'speedRadar':
+        return 'Speed radar';
     }
   }
 
@@ -202,6 +281,7 @@ export class RoadCanvasComponent {
 
   private kindOf(item: ApiRoadElement): RoadObjectKind {
     const type = item.type;
+    if (type.includes('SpeedRadar')) return 'speedRadar';
     if (type.includes('SpeedLimit')) return 'speedLimit';
     if (type.includes('StopSign')) return 'stopSign';
     if (type.includes('YieldSign')) return 'yieldSign';
@@ -216,6 +296,9 @@ export class RoadCanvasComponent {
 
   private labelOf(item: ApiRoadElement): string {
     const details = item.details ?? '';
+    if (item.type.includes('SpeedRadar')) {
+      return details.match(/speedLimitKmh=([\d.]+)/)?.[1] ?? '50';
+    }
     if (item.type.includes('SpeedLimit')) {
       return details.match(/limitKmh=(\d+)/)?.[1] ?? '';
     }

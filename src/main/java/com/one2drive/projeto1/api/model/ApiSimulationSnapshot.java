@@ -26,7 +26,8 @@ public record ApiSimulationSnapshot(
     ManeuverView maneuver,
     SensorTelemetryView sensors,
     InferenceSummaryView inference,
-    RoadMapView roadMap
+    RoadMapView roadMap,
+    RoadMarksView roadMarks
 ) {
     /**
      * The road as a matrix: {@code cells[row][lane]}, rows going forward along the
@@ -55,7 +56,11 @@ public record ApiSimulationSnapshot(
         double lateralPositionMeters,
         String targetLane,
         String laneChangeState,
-        double laneChangeProgress
+        double laneChangeProgress,
+        String drivingState,
+        String indicatorState,
+        String steeringState,
+        double headingDegrees
     ) {
     }
 
@@ -68,7 +73,14 @@ public record ApiSimulationSnapshot(
         double lateralPositionMeters,
         boolean indicatorsLeft,
         boolean indicatorsRight,
-        boolean braking
+        boolean braking,
+        String steering
+    ) {
+    }
+
+    public record RoadMarksView(
+        String leftMarking,
+        String rightMarking
     ) {
     }
 
@@ -78,7 +90,9 @@ public record ApiSimulationSnapshot(
         double distanceMeters,
         double relativeSpeedKmh,
         double ttcSeconds,
-        String status
+        String status,
+        double speedRadarDistanceMeters,
+        double speedRadarLimitKmh
     ) {
     }
 

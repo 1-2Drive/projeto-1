@@ -68,6 +68,10 @@ export interface ApiSimulationSnapshot {
     targetLane: LaneName;
     laneChangeState: LaneChangeStateName;
     laneChangeProgress: number;
+    drivingState?: string;
+    indicatorState?: string;
+    steeringState?: string;
+    headingDegrees?: number;
   };
   environment: {
     weatherCondition: string;
@@ -104,6 +108,10 @@ export interface ApiSimulationSnapshot {
   sensors?: ApiSensorTelemetryView;
   inference?: ApiInferenceSummaryView;
   roadMap?: ApiRoadMapView;
+  roadMarks?: {
+    leftMarking: 'DASHED' | 'CONTINUOUS' | string;
+    rightMarking: 'DASHED' | 'CONTINUOUS' | string;
+  };
 }
 
 /**
@@ -147,6 +155,7 @@ export interface ApiManeuverView {
   indicatorsLeft: boolean;
   indicatorsRight: boolean;
   braking: boolean;
+  steering?: string;
 }
 
 /** NO LANE: a blind-spot side past the road edge. */
@@ -159,6 +168,8 @@ export interface ApiRadarTelemetryView {
   relativeSpeedKmh: number;
   ttcSeconds: number;
   status: SensorStatus;
+  speedRadarDistanceMeters?: number;
+  speedRadarLimitKmh?: number;
 }
 
 export interface ApiCameraDetectionView {

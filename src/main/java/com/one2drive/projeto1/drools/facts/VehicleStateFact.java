@@ -1,7 +1,10 @@
 package com.one2drive.projeto1.drools.facts;
 
+import com.one2drive.projeto1.domain.DrivingState;
+import com.one2drive.projeto1.domain.IndicatorState;
 import com.one2drive.projeto1.domain.Lane;
 import com.one2drive.projeto1.domain.LaneChangeState;
+import com.one2drive.projeto1.domain.RoadMarkingType;
 
 public class VehicleStateFact {
     private double speedKmh;
@@ -10,6 +13,11 @@ public class VehicleStateFact {
     private LaneChangeState laneChangeState;
     private Lane targetLane;
     private long timestamp;
+    private DrivingState drivingState;
+    private IndicatorState indicatorState;
+    private double lateralPositionMeters;
+    private RoadMarkingType leftMarking;
+    private RoadMarkingType rightMarking;
 
     public VehicleStateFact(double speedKmh, double positionMeters, Lane lane, long timestamp) {
         this.speedKmh = speedKmh;
@@ -18,6 +26,11 @@ public class VehicleStateFact {
         this.laneChangeState = LaneChangeState.IDLE;
         this.targetLane = lane;
         this.timestamp = timestamp;
+        this.drivingState = speedKmh > 0.1 ? DrivingState.CRUISING : DrivingState.STOPPED;
+        this.indicatorState = IndicatorState.OFF;
+        this.lateralPositionMeters = lane != null ? lane.centreMeters() : 0.0;
+        this.leftMarking = RoadMarkingType.DASHED;
+        this.rightMarking = RoadMarkingType.DASHED;
     }
 
     public double getSpeedKmh() {
@@ -68,12 +81,54 @@ public class VehicleStateFact {
         this.timestamp = timestamp;
     }
 
+    public DrivingState getDrivingState() {
+        return drivingState;
+    }
+
+    public void setDrivingState(DrivingState drivingState) {
+        this.drivingState = drivingState;
+    }
+
+    public IndicatorState getIndicatorState() {
+        return indicatorState;
+    }
+
+    public void setIndicatorState(IndicatorState indicatorState) {
+        this.indicatorState = indicatorState;
+    }
+
+    public double getLateralPositionMeters() {
+        return lateralPositionMeters;
+    }
+
+    public void setLateralPositionMeters(double lateralPositionMeters) {
+        this.lateralPositionMeters = lateralPositionMeters;
+    }
+
+    public RoadMarkingType getLeftMarking() {
+        return leftMarking;
+    }
+
+    public void setLeftMarking(RoadMarkingType leftMarking) {
+        this.leftMarking = leftMarking;
+    }
+
+    public RoadMarkingType getRightMarking() {
+        return rightMarking;
+    }
+
+    public void setRightMarking(RoadMarkingType rightMarking) {
+        this.rightMarking = rightMarking;
+    }
+
     @Override
     public String toString() {
         return "VehicleStateFact{speedKmh=" + speedKmh +
             ", positionMeters=" + positionMeters +
             ", lane=" + lane +
             ", laneChangeState=" + laneChangeState +
-            ", targetLane=" + targetLane + "}";
+            ", targetLane=" + targetLane +
+            ", drivingState=" + drivingState +
+            ", indicator=" + indicatorState + "}";
     }
 }

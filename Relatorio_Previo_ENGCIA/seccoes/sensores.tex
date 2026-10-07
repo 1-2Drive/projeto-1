@@ -1,0 +1,228 @@
+\chapter{Sensores e dados do veículo}
+\label{cap:sensores}
+
+% --- CABEÇA ------------------------------------------------------
+Um sistema pericial não decide sobre imagens nem sobre sinais de rádio:
+decide sobre factos, como «há um peão na passadeira» ou «a distância ao
+veículo da frente é insegura». Num veículo, esses factos nascem de medições através de dados provenientes dos sensores.
+Estes sensores não tomam decisões e limitam-se a medir e a detetar dados específicos, e cabe à
+base de conhecimento interpretar o que medem e transformá-lo em factos.
+
+Este capítulo acaba por
+responder a três perguntas essenciais para o desenvolvimento do sistema:
+que sensores fornecem a informação de que o sistema precisa para decidir
+(\cref{sec:sensores-considerados}), como é que as suas leituras se
+transformam em factos (\cref{sec:sensores-dados}) e em que condições se
+pode confiar nesses factos (\cref{sec:sensores-qualidade}). Nesta fase do
+projeto, os sensores são simulados, o que permite reproduzir cada cenário
+de forma controlada e repetível.
+
+% --- TRONCO 1 ----------------------------------------------------
+\section{Sensores considerados}
+\label{sec:sensores-considerados}
+
+Os sensores de um veículo autónomo costumam dividir-se em dois grupos: os
+exterocetivos, que observam o ambiente em redor, e os propriocetivos, que
+medem o estado do próprio veículo, como a velocidade das rodas, as
+acelerações ou o ângulo da direção~\cite{yeong2021}. Entre os primeiros,
+três sensores assumem um papel fulcral e complementam-se precisamente por
+responderem a perguntas diferentes sobre o mesmo objeto: a câmara permite
+saber \emph{o que} é (um peão, um sinal, a cor de um semáforo ou uma marca
+da faixa), o radar indica \emph{a que distância} está e \emph{a que
+velocidade} se aproxima, e o LiDAR descreve a sua \emph{forma} com maior
+precisão. O número de sensores que um veículo utiliza depende, contudo, do
+nível de automação, crescendo à medida que o veículo assume mais
+responsabilidade pela condução. A \cref{tab:sensores} sintetiza os sensores
+considerados para este sistema, indicando, para cada um, a grandeza que
+mede, a sua principal vantagem e limitação e a utilização que lhe é dada.
+
+\begin{table}[H]
+  \centering
+  \caption{Sensores considerados para o sistema}
+  \label{tab:sensores}
+  \footnotesize
+  \renewcommand{\arraystretch}{1.1}
+  \begin{tabularx}{\textwidth}{@{}L{2.3cm}
+      >{\raggedright\arraybackslash}X
+      >{\raggedright\arraybackslash}X
+      >{\raggedright\arraybackslash}X
+      >{\raggedright\arraybackslash}X@{}}
+    \toprule
+    \textbf{Sensor} & \textbf{Grandeza medida} & \textbf{Principal vantagem}
+      & \textbf{Principal limitação} & \textbf{Utilização no sistema} \\
+    \midrule
+    Radar frontal
+      & Distância e velocidade relativa
+      & Funciona de noite, com chuva e nevoeiro
+      & Fraca capacidade de classificação
+      & Risco de colisão e distância de segurança \\
+    Câmara frontal
+      & Tipo de objeto, sinais e marcas da faixa
+      & Única fonte semântica e de cor
+      & Sensível à iluminação e ao nevoeiro
+      & Peões, obstáculos, sinalização e faixa \\
+    LiDAR
+      & Forma e distância dos objetos em 3D
+      & Geometria precisa, sem depender da luz
+      & Degrada-se com nevoeiro e chuva; custo
+      & Confirmação de obstáculos e desempate \\
+    Radares de canto
+      & Ocupação das faixas adjacentes
+      & Cobertura do ângulo morto
+      & Dificuldade com objetos parados
+      & Mudança de faixa \\
+    Sensor de chuva
+      & Intensidade da chuva
+      & Baixo custo e uso generalizado
+      & Não mede a aderência
+      & Velocidade adequada à chuva \\
+    Sensor de luminosidade
+      & Luz ambiente
+      & Deteta a noite e a entrada em túneis
+      & Não mede a visibilidade
+      & Fiabilidade da câmara \\
+    Sensores de velocidade das rodas
+      & Velocidade própria e patinagem
+      & Robustez
+      & Afetados pela patinagem
+      & Todas as decisões; aderência \\
+    Sensor de ângulo da direção
+      & Ângulo do volante
+      & Revela a intenção do condutor
+      & Insuficiente de forma isolada
+      & Saída da faixa \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+No sistema, estes três sensores trabalham em conjunto. A câmara e o radar
+formam a base, porque se complementam (a câmara reconhece o objeto, mas
+estima mal a distância, enquanto o radar mede a distância e a velocidade
+relativa com precisão, mesmo de noite ou com chuva, mas distingue mal o tipo
+de objeto~\cite{wei2022}) e porque é neles que assentam, na prática, as
+funções de segurança hoje obrigatórias nos automóveis novos da União
+Europeia, como a travagem autónoma de emergência~\cite{ue2019_2144}. O
+LiDAR completa esta base com a forma precisa de obstáculos e peões e serve
+de terceira fonte quando a câmara e o radar divergem. Perante um obstáculo
+à frente, por exemplo, a câmara confirma a sua presença na
+trajetória, o radar indica com que rapidez o veículo se aproxima dele e o
+LiDAR delimita a sua posição e dimensão. Os sensores do próprio veículo,
+de velocidade das rodas e de ângulo da direção, dão o contexto de que todas
+as regras precisam. Ficam de fora os sensores ultrassónicos, cujo alcance de
+poucos metros serve sobretudo as manobras de estacionamento, e o conjunto
+GNSS e unidade de medição inercial, porque a localização global não é
+necessária nas situações tratadas pelo sistema.
+
+Estes sensores fornecem medições, mas as regras precisam de factos. A
+secção seguinte mostra essa passagem.
+
+% --- TRONCO 2 ----------------------------------------------------
+\section{Medições diretas e dados derivados}
+\label{sec:sensores-dados}
+
+A informação chega às regras em três níveis: as \emph{medições diretas},
+lidas de um sensor, como a distância ao objeto da frente, a velocidade
+própria ou o ângulo da direção; os \emph{dados derivados}, calculados a
+partir de várias medições, como o tempo até à colisão, o intervalo
+temporal ao veículo da frente ou a aderência estimada; e os \emph{factos
+semânticos}, como «o risco de colisão é crítico» ou «o piso está
+escorregadio», que resultam da comparação de um dado derivado com um limiar. Esse limiar,
+ou a regra que o calcula, é conhecimento do perito, e é
+precisamente neste ponto que a aquisição de conhecimento se liga aos
+sensores.
+
+Para avaliar a distância ao objeto da frente usam-se dois indicadores,
+ambos calculados a partir da distância $d$ medida pelo radar. O tempo até à
+colisão (TTC) indica quantos segundos faltam para o embate se as velocidades
+se mantiverem, e obtém-se dividindo $d$ pela velocidade relativa
+$v_{\mathrm{rel}}$, como define o Regulamento UNECE n.º~152~\cite{unr152};
+o intervalo temporal (THW) indica quanto tempo o veículo demora a chegar ao
+ponto onde o objeto está agora, e obtém-se dividindo $d$ pela velocidade
+própria $v$:
+\begin{equation}
+  \mathit{TTC} = \frac{d}{v_{\mathrm{rel}}} \quad (v_{\mathrm{rel}} > 0),
+  \qquad\qquad
+  \mathit{THW} = \frac{d}{v}.
+  \label{eq:ttc-thw}
+\end{equation}
+Os dois indicadores são complementares: o THW mede o perigo potencial de
+seguir demasiado perto, e o TTC mede o perigo real de uma
+aproximação~\cite{vogel2003}. Para a saída involuntária da faixa usa-se um
+indicador análogo, o tempo até transpor a marca da faixa
+(TLC)~\cite{mammar2006}.
+
+Para distinguir uma situação normal de uma situação crítica, o perito
+indicou que não basta fixar um valor de TTC: a criticidade deve resultar de
+uma equação que relacione a velocidade atual, a distância ao objeto e a
+capacidade de travagem, sem nunca considerar arranques ou travagens
+instantâneas. O sistema compara, por isso, a distância
+$d$ ao objeto com a distância de que precisa para anular a velocidade
+relativa, tendo em conta o tempo de reação $t_r$ e a desaceleração máxima
+$a$, que depende da aderência, e admitindo que o objeto mantém a sua
+velocidade:
+\begin{equation}
+  d_{\mathrm{trav}} = v_{\mathrm{rel}}\,t_r + \frac{v_{\mathrm{rel}}^{2}}{2a}.
+  \label{eq:dtrav}
+\end{equation}
+Enquanto $d$ excede claramente $d_{\mathrm{trav}}$, a situação é normal;
+quando a margem se aproxima de zero, torna-se crítica, embora ainda seja
+possível travar ou mudar de faixa; e, abaixo de $d_{\mathrm{trav}}$, o
+veículo ultrapassa o ponto de não-retorno da travagem, restando o desvio,
+se a faixa adjacente estiver livre, ou a travagem de emergência para reduzir
+a gravidade do impacto. O TTC continua a ser útil, mas passa a ser
+comparado com o tempo necessário para reagir e travar, em vez de um valor
+fixo. Os critérios resultam assim da sessão com o perito, ao passo que os
+valores de $t_r$ e de $a$ são definidos pela equipa e verificados nos
+testes, garantindo que o aviso ao condutor surge pelo menos $0,8$~s antes
+de uma travagem de emergência, como exige o Regulamento UNECE
+n.º~152~\cite{unr152}. Já o intervalo mínimo de segurança parte das
+recomendações nacionais, que apontam para 3~s e para 4 a 5~s com chuva ou
+nevoeiro~\cite{prp2025}.
+
+A mesma equação determina o alcance de que os sensores precisam. O Código
+da Estrada exige que a velocidade permita parar no espaço livre e visível à
+frente~\cite{codigoestrada}, o que, num sistema automatizado, significa parar
+dentro do alcance \emph{efetivo} dos sensores. Como esse alcance diminui
+com o nevoeiro e a chuva e a distância de travagem aumenta
+com o piso molhado, a velocidade tem de baixar quando a visibilidade ou a
+aderência descem.
+
+Estes factos, porém, só são úteis se forem fiáveis, o que leva à qualidade
+dos dados.
+
+% --- PERNAS ------------------------------------------------------
+\section{Qualidade e fusão de dados}
+\label{sec:sensores-qualidade}
+
+Para que essa fiabilidade possa ser avaliada, cada facto de origem sensorial
+guarda, além do valor, o sensor que o produziu, o instante da leitura e um
+nível de confiança, informação que serve também para explicar cada decisão.
+Seguindo a indicação do perito, uma perceção só é válida enquanto o objeto
+se mantém no alcance dos sensores, e os sinais de trânsito não são
+memorizados como objetos, limitando-se a alterar o estado do veículo. A
+falta de dados de um sensor tem ainda de ser representada explicitamente,
+porque, num sistema de regras, a ausência de um facto seria interpretada
+como estrada livre, quando na verdade o estado é \emph{desconhecido}.
+
+A confiança numa deteção aumenta quando esta é confirmada, e o número de
+leituras exigido depende da criticidade calculada pela \cref{eq:dtrav}: numa
+situação normal, o sistema aguarda uma segunda leitura para excluir valores
+anómalos, enquanto numa situação crítica age logo à primeira, porque esperar
+poderia custar o momento de agir. A confirmação pode também vir de sensores
+diferentes, já que a câmara e o radar, sendo complementares por medirem
+aspetos diferentes da cena, tornam a deteção mais fiável quando observam o
+mesmo objeto~\cite{castanedo2013}. Num sistema pericial, esta fusão faz-se
+ao nível da decisão, através de regras que combinam as conclusões de cada
+sensor.
+
+Mesmo sem avaria, as condições podem levar os sensores a contradizer-se.
+Nesse caso, o LiDAR serve de terceira fonte e, se também ele não permitir
+decidir, aplica-se uma regra de desempate, parando o veículo se o nível de
+risco for alto ou crítico. A falha de um sensor conduz igualmente à
+paragem, sempre de forma controlada, já que nenhuma travagem é instantânea.
+
+% --- FECHO -------------------------------------------------------
+Em síntese, o sistema assenta na câmara, no radar e no LiDAR, complementados
+pelos sensores do próprio veículo, cujas leituras se transformam em factos
+através de critérios definidos com o perito e transportam a informação
+necessária para avaliar a sua confiança.

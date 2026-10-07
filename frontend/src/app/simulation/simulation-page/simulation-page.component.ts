@@ -59,7 +59,7 @@ export class SimulationPageComponent implements OnInit, OnDestroy {
   protected readonly simulationStatus = computed(() => this.vm().connection.simulationStatus);
   protected readonly isRunning = computed(() => this.simulationStatus() === 'RUNNING');
   protected readonly isPaused = computed(() => this.simulationStatus() === 'PAUSED');
-  protected readonly canStart = computed(() => !this.vm().loading && this.simulationStatus() === 'STOPPED');
+  protected readonly canStart = computed(() => !this.vm().loading && (this.simulationStatus() === 'STOPPED' || this.isPaused()));
   protected readonly canPause = computed(() => !this.vm().loading && this.isRunning());
   protected readonly canResume = computed(() => !this.vm().loading && this.isPaused());
   protected readonly canStop = computed(() => !this.vm().loading && this.simulationStatus() !== 'STOPPED');
@@ -97,7 +97,11 @@ export class SimulationPageComponent implements OnInit, OnDestroy {
   }
 
   protected start(): void {
-    this.state.start();
+    if (this.isPaused()) {
+      this.resume();
+    } else {
+      this.state.start();
+    }
   }
 
   protected pause(): void {

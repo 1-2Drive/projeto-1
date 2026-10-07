@@ -6,6 +6,7 @@ import com.one2drive.projeto1.domain.DrivingAction
 import com.one2drive.projeto1.domain.Lane
 import com.one2drive.projeto1.domain.LaneChangeState
 import com.one2drive.projeto1.domain.RiskLevel
+import com.one2drive.projeto1.domain.RoadMarkingType
 import com.one2drive.projeto1.drools.DroolsSupport
 import com.one2drive.projeto1.drools.facts.LaneOccupancyState
 import com.one2drive.projeto1.drools.facts.ObstacleStateFact
@@ -80,5 +81,37 @@ then
         "Obstacle ahead and no free lane to avoid it",
         drools.getRule().getName(),
         "obstacle " + $distance + "m ahead in own lane, both sides blocked"
+    );
+end
+
+rule "Stop before obstacle when lane change prohibited by continuous line"
+salience 466
+when
+    $ctx : DecisionContext()
+    VehicleStateFact($lane : lane, $speed : speedKmh, leftMarking == RoadMarkingType.CONTINUOUS)
+    ObstacleStateFact(obstacleId != "none", lane == $lane,
+                      $distance : distanceMeters > 0, distanceMeters <= 60.0)
+    (
+        LaneOccupancyState(lane == Lane.RIGHT, occupied == true)
+        or
+        VehicleStateFact(lane == Lane.RIGHT)
+    )
+then
+    double room = Math.max(0.0, $distance - 10.0);
+    DrivingAction action = DrivingAction.BRAKE;
+    double target = Math.sqrt(2.0 * 2.8 * room) * 3.6;
+    if (room <= 0.5) {
+        action = DrivingAction.STOP;
+        target = 0.0;
+    }
+    droolsSupport.proposeDecision(
+        $ctx,
+        action,
+        target,
+        RiskLevel.HIGH,
+        DecisionPriority.COLLISION_AVOIDANCE,
+        "Continuous line prohibits lane change left; stopping before obstacle",
+        drools.getRule().getName(),
+        "continuous line left, obstacle " + $distance + "m ahead"
     );
 end

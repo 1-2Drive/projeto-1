@@ -18,6 +18,7 @@ public class WorldPhysicsEngine {
     }
 
     public void updateWorld(WorldState worldState, double dtSeconds) {
+        // State representation vector: [x, y, vx, vy] for ego followed by active actors
         EgoVehicleState ego = worldState.getEgo();
         // No end of road: the map is a loop, so position keeps counting metres travelled.
         ego.advance(dtSeconds);
@@ -32,12 +33,41 @@ public class WorldPhysicsEngine {
     }
 
     /**
+     * Extracts a state representation vector for analysis / matrix modeling:
+     * [ego_x, ego_y, ego_vx, ego_vy, actor1_x, actor1_y, actor1_vx, actor1_vy, ...]
+     */
+    public double[] extractStateVector(WorldState worldState) {
+        EgoVehicleState ego = worldState.getEgo();
+        java.util.List<DynamicActor> actors = worldState.getActors();
+        double[] state = new double[4 + actors.size() * 4];
+        state[0] = ego.getPositionMeters();
+        state[1] = ego.getLateralPositionMeters();
+        state[2] = ego.getSpeedMps();
+        state[3] = ego.getSpeedMps() * Math.sin(Math.toRadians(ego.getHeadingDegrees()));
+
+        for (int i = 0; i < actors.size(); i++) {
+            DynamicActor a = actors.get(i);
+            int base = 4 + i * 4;
+            state[base] = a.getPositionMeters();
+            state[base + 1] = (a instanceof com.one2drive.projeto1.domain.Pedestrian p)
+                ? p.getLateralPositionMeters()
+                : (a.getLane() != null ? a.getLane().centreMeters() : 0.0);
+            state[base + 2] = a.getSpeedMps();
+            state[base + 3] = (a instanceof com.one2drive.projeto1.domain.Pedestrian p)
+                ? (p.isCrossing() ? p.getLateralSpeedMps() : 0.0)
+                : 0.0;
+        }
+        return state;
+    }
+
+    /**
      * Moves the vehicle toward the centre line of its target lane.
      *
      * @return true when the maneuver reached its target on this tick
      */
     public boolean advanceLaneChange(EgoVehicleState ego, double dtSeconds) {
         if (ego.getLaneChangeState() == LaneChangeState.IDLE) {
+            ego.setHeadingDegrees(0.0);
             return false;
         }
 
@@ -50,6 +80,7 @@ public class WorldPhysicsEngine {
             ego.setLateralPositionMeters(target);
             ego.setLaneChangeProgress(1.0);
             ego.setLaneChangeState(LaneChangeState.COMPLETED);
+            ego.setHeadingDegrees(0.0);
             return true;
         }
 
@@ -58,11 +89,19 @@ public class WorldPhysicsEngine {
         double step = Math.max(config.getLaneChangeMetersPerSecond(), 0.1) * dtSeconds;
         double progress = Math.min(1.0, ego.getLaneChangeProgress() + step / distance);
         ego.setLaneChangeProgress(progress);
-        ego.setLateralPositionMeters(origin + (target - origin) * smoothstep(progress));
+        double prevLateral = ego.getLateralPositionMeters();
+        double newLateral = origin + (target - origin) * smoothstep(progress);
+        ego.setLateralPositionMeters(newLateral);
+
+        double forwardSpeed = Math.max(ego.getSpeedMps(), 2.0);
+        double lateralVelocity = (newLateral - prevLateral) / dtSeconds;
+        double heading = Math.toDegrees(Math.atan2(lateralVelocity, forwardSpeed));
+        ego.setHeadingDegrees(Math.max(-15.0, Math.min(15.0, heading)));
 
         if (progress >= 1.0) {
             ego.setLateralPositionMeters(target);
             ego.setLaneChangeState(LaneChangeState.COMPLETED);
+            ego.setHeadingDegrees(0.0);
             return true;
         }
         return false;

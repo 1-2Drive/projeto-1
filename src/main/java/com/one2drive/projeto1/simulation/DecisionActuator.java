@@ -3,9 +3,13 @@ package com.one2drive.projeto1.simulation;
 import com.one2drive.projeto1.config.SimulationConfig;
 import com.one2drive.projeto1.decision.DrivingDecision;
 import com.one2drive.projeto1.domain.DrivingAction;
+import com.one2drive.projeto1.domain.DrivingState;
 import com.one2drive.projeto1.domain.EgoVehicleState;
+import com.one2drive.projeto1.domain.IndicatorState;
 import com.one2drive.projeto1.domain.Lane;
 import com.one2drive.projeto1.domain.LaneChangeState;
+import com.one2drive.projeto1.domain.RoadMarkingType;
+import com.one2drive.projeto1.domain.SteeringState;
 
 /**
  * Executes the maneuver Drools selected.
@@ -27,12 +31,31 @@ public class DecisionActuator {
         EgoVehicleState ego = worldState.getEgo();
 
         switch (decision.getAction()) {
-            case EMERGENCY_BRAKE -> ego.setAccelerationMps2(-config.getEmergencyDecelerationMps2());
+            case EMERGENCY_BRAKE -> {
+                ego.setAccelerationMps2(-config.getEmergencyDecelerationMps2());
+                ego.setIndicatorState(IndicatorState.HAZARD);
+            }
             case BRAKE, STOP, WAIT -> ego.setAccelerationMps2(-config.getComfortableDecelerationMps2());
             case REDUCE_SPEED -> ego.setAccelerationMps2(-config.getComfortableDecelerationMps2());
-            case ACCELERATE -> ego.setAccelerationMps2(config.getMaxAccelerationMps2());
-            case CHANGE_LANE_LEFT -> requestLaneChange(ego, ego.getLane().left());
-            case CHANGE_LANE_RIGHT -> requestLaneChange(ego, ego.getLane().right());
+            case ACCELERATE, RESUME -> ego.setAccelerationMps2(config.getMaxAccelerationMps2());
+            case CHANGE_LANE_LEFT -> {
+                if (worldState.getMarkingBetween(ego.getLane(), ego.getLane().left()) != RoadMarkingType.CONTINUOUS) {
+                    requestLaneChange(ego, ego.getLane().left());
+                    ego.setIndicatorState(IndicatorState.LEFT);
+                    ego.setSteeringState(SteeringState.LEFT);
+                } else {
+                    ego.setAccelerationMps2(-config.getComfortableDecelerationMps2());
+                }
+            }
+            case CHANGE_LANE_RIGHT, RETURN_RIGHT -> {
+                if (worldState.getMarkingBetween(ego.getLane(), ego.getLane().right()) != RoadMarkingType.CONTINUOUS) {
+                    requestLaneChange(ego, ego.getLane().right());
+                    ego.setIndicatorState(IndicatorState.RIGHT);
+                    ego.setSteeringState(SteeringState.RIGHT);
+                } else {
+                    ego.setAccelerationMps2(-config.getComfortableDecelerationMps2());
+                }
+            }
             case KEEP_LANE -> ego.setAccelerationMps2(0);
             case MAINTAIN_SPEED, CONTINUE -> ego.setAccelerationMps2(0);
         }
@@ -43,7 +66,10 @@ public class DecisionActuator {
             if (current > recommendedSpeed + 1) {
                 ego.setAccelerationMps2(-config.getComfortableDecelerationMps2());
             } else if (current < recommendedSpeed - 1) {
-                ego.setAccelerationMps2(config.getMaxAccelerationMps2() * 0.5);
+                double accel = (decision.getAction() == DrivingAction.RESUME || decision.getAction() == DrivingAction.ACCELERATE || current < 5.0)
+                    ? config.getMaxAccelerationMps2()
+                    : config.getMaxAccelerationMps2() * 0.5;
+                ego.setAccelerationMps2(accel);
             } else if (decision.getAction() == DrivingAction.MAINTAIN_SPEED || decision.getAction() == DrivingAction.CONTINUE) {
                 ego.setAccelerationMps2(0);
             }
@@ -55,6 +81,24 @@ public class DecisionActuator {
                 ego.setAccelerationMps2(0);
             }
         }
+
+        // Maintain turn signal and steering indicator while lane change is in progress
+        if (ego.getLaneChangeState() == LaneChangeState.REQUESTED || ego.getLaneChangeState() == LaneChangeState.CHANGING) {
+            if (ego.getTargetLane().centreMeters() < ego.getLateralPositionMeters()) {
+                ego.setIndicatorState(IndicatorState.LEFT);
+                ego.setSteeringState(SteeringState.LEFT);
+            } else if (ego.getTargetLane().centreMeters() > ego.getLateralPositionMeters()) {
+                ego.setIndicatorState(IndicatorState.RIGHT);
+                ego.setSteeringState(SteeringState.RIGHT);
+            }
+        } else if (ego.getLaneChangeState() == LaneChangeState.COMPLETED || ego.getLaneChangeState() == LaneChangeState.IDLE) {
+            if (decision.getAction() != DrivingAction.EMERGENCY_BRAKE) {
+                ego.setIndicatorState(IndicatorState.OFF);
+            }
+            ego.setSteeringState(SteeringState.STRAIGHT);
+        }
+
+        ego.updateDrivingState(decision.getAction(), recommendedSpeed);
     }
 
     /**

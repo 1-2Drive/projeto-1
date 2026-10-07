@@ -41,8 +41,8 @@
   <nav class="controls" aria-label="Simulation controls">
     <div class="controls__primary">
       <button data-testid="start-btn" type="button" class="btn btn--primary"
-              [disabled]="!canStart()" (click)="start()" title="Start the simulation (START)">
-        <span class="btn__glyph" aria-hidden="true">▶</span>START
+              [disabled]="!canStart()" (click)="start()" [title]="isPaused() ? 'Resume simulation' : 'Start the simulation (START)'">
+        <span class="btn__glyph" aria-hidden="true">▶</span>{{ isPaused() ? 'RESUME' : 'START' }}
       </button>
       <button data-testid="pause-btn" type="button" class="btn"
               [disabled]="!canPause()" (click)="pause()" title="Freeze the simulation to inspect evidence">

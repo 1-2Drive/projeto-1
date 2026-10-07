@@ -22,6 +22,33 @@ public class ScenarioDefinition {
     private Map<Integer, ScenarioRoadElementDefinition> mapLegend = new LinkedHashMap<>();
     private List<ScenarioActorDefinition> actors = new ArrayList<>();
     private List<ScenarioTimedAction> timedActions = new ArrayList<>();
+    private com.one2drive.projeto1.domain.Lane initialLane;
+    private com.one2drive.projeto1.domain.RoadMarkingType leftMarking = com.one2drive.projeto1.domain.RoadMarkingType.DASHED;
+    private com.one2drive.projeto1.domain.RoadMarkingType rightMarking = com.one2drive.projeto1.domain.RoadMarkingType.DASHED;
+
+    public com.one2drive.projeto1.domain.Lane getInitialLane() {
+        return initialLane;
+    }
+
+    public void setInitialLane(com.one2drive.projeto1.domain.Lane initialLane) {
+        this.initialLane = initialLane;
+    }
+
+    public com.one2drive.projeto1.domain.RoadMarkingType getLeftMarking() {
+        return leftMarking;
+    }
+
+    public void setLeftMarking(com.one2drive.projeto1.domain.RoadMarkingType leftMarking) {
+        this.leftMarking = leftMarking;
+    }
+
+    public com.one2drive.projeto1.domain.RoadMarkingType getRightMarking() {
+        return rightMarking;
+    }
+
+    public void setRightMarking(com.one2drive.projeto1.domain.RoadMarkingType rightMarking) {
+        this.rightMarking = rightMarking;
+    }
 
     public String getId() {
         return id;

@@ -6,9 +6,12 @@ import com.one2drive.projeto1.domain.DrivingAction
 import com.one2drive.projeto1.domain.Lane
 import com.one2drive.projeto1.domain.LaneChangeState
 import com.one2drive.projeto1.domain.RiskLevel
+import com.one2drive.projeto1.domain.RoadMarkingType
 import com.one2drive.projeto1.drools.DroolsSupport
+import com.one2drive.projeto1.drools.facts.FrontVehicleState
 import com.one2drive.projeto1.drools.facts.LaneOccupancyState
 import com.one2drive.projeto1.drools.facts.ObstacleStateFact
+import com.one2drive.projeto1.drools.facts.OvertakingStateFact
 import com.one2drive.projeto1.drools.facts.PotholeStateFact
 import com.one2drive.projeto1.drools.facts.VehicleStateFact
 

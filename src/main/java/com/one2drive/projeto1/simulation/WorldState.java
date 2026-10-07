@@ -15,6 +15,8 @@ import com.one2drive.projeto1.domain.StopSign;
 import com.one2drive.projeto1.domain.TrafficLight;
 import com.one2drive.projeto1.domain.WeatherState;
 
+import com.one2drive.projeto1.domain.RoadMarkingType;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -31,6 +33,8 @@ public class WorldState {
     private final RoadMap roadMap;
     private final List<DynamicActor> actors;
     private long simTimeMillis;
+    private RoadMarkingType leftMarking = RoadMarkingType.DASHED;
+    private RoadMarkingType rightMarking = RoadMarkingType.DASHED;
 
     public WorldState(EgoVehicleState ego, WeatherState weatherState, RoadMap roadMap) {
         this.ego = ego;
@@ -68,6 +72,32 @@ public class WorldState {
 
     public void setSimTimeMillis(long simTimeMillis) {
         this.simTimeMillis = simTimeMillis;
+    }
+
+    public RoadMarkingType getLeftMarking() {
+        return leftMarking;
+    }
+
+    public void setLeftMarking(RoadMarkingType leftMarking) {
+        this.leftMarking = leftMarking;
+    }
+
+    public RoadMarkingType getRightMarking() {
+        return rightMarking;
+    }
+
+    public void setRightMarking(RoadMarkingType rightMarking) {
+        this.rightMarking = rightMarking;
+    }
+
+    public RoadMarkingType getMarkingBetween(Lane from, Lane to) {
+        if ((from == Lane.CENTER && to == Lane.LEFT) || (from == Lane.LEFT && to == Lane.CENTER)) {
+            return leftMarking;
+        }
+        if ((from == Lane.CENTER && to == Lane.RIGHT) || (from == Lane.RIGHT && to == Lane.CENTER)) {
+            return rightMarking;
+        }
+        return RoadMarkingType.DASHED;
     }
 
     public void addActor(DynamicActor actor) {
@@ -120,18 +150,21 @@ public class WorldState {
     }
 
     public Optional<Pedestrian> nearestPedestrianInLane(double maxDistance) {
-        Lane egoLane = ego.getLane();
+        double egoLateral = ego.getLateralPositionMeters();
         Pedestrian nearest = null;
         double best = Double.MAX_VALUE;
         for (DynamicActor actor : actors) {
             if (!(actor instanceof Pedestrian pedestrian) || !pedestrian.isActive()) {
                 continue;
             }
-            if (pedestrian.getLane() != egoLane) {
+            if (!pedestrian.isInRoadway()) {
                 continue;
             }
             double d = distanceAhead(pedestrian.getPositionMeters());
-            if (d > 0 && d <= maxDistance && d < best) {
+            boolean inPath = (pedestrian.getLane() == ego.getLane())
+                || pedestrian.isCrossing()
+                || Math.abs(pedestrian.getLateralPositionMeters() - egoLateral) <= 3.5;
+            if (inPath && d > 0 && d <= maxDistance && d < best) {
                 best = d;
                 nearest = pedestrian;
             }
@@ -227,6 +260,10 @@ public class WorldState {
             }
         }
         return Optional.ofNullable(nearestOwnLane != null ? nearestOwnLane : nearestAnyLane);
+    }
+
+    public Optional<com.one2drive.projeto1.domain.SpeedRadar> findNearestSpeedRadarAhead(double maxDistance) {
+        return nearestHazardAhead(com.one2drive.projeto1.domain.SpeedRadar.class, maxDistance);
     }
 
     public Optional<Pothole> nearestPotholeAhead(double maxDistance) {

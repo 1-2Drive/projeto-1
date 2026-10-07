@@ -1,0 +1,62 @@
+% ===============================================================
+%  Relatório Prévio de Aquisição de Conhecimento
+%  ENGCIA — Engenharia do Conhecimento
+%
+%  Compilação:  ./build.sh
+%          ou:  latexmk -pdf relatorio.tex
+%          ou:  pdflatex relatorio && bibtex relatorio && pdflatex relatorio x2
+% ===============================================================
+
+\documentclass[11pt,a4paper,oneside]{report}
+
+\input{metadados}
+\input{preambulo}
+
+\title{\tituloprincipal}
+\author{\autoresmeta}
+\date{\datarelatorio}
+
+\begin{document}
+
+\input{capa}
+
+\pagenumbering{roman}
+\setcounter{page}{1}
+
+\input{seccoes/resumo}
+
+\tableofcontents
+\clearpage
+\listoffigures
+\listoftables
+\clearpage
+
+\pagenumbering{arabic}
+\setcounter{page}{1}
+
+\input{seccoes/introducao}
+\input{seccoes/objetivos}
+% \input{seccoes/problematica}
+\input{seccoes/delimitacao}
+\input{seccoes/enquadramento}
+\input{seccoes/fontes}
+\input{seccoes/sessoes}
+\input{seccoes/sensores}
+\input{seccoes/representacao}
+\input{seccoes/casos}
+\input{seccoes/explicacao}
+\input{seccoes/implementacao}
+\input{seccoes/validacao}
+\input{seccoes/limitacoes}
+\input{seccoes/conclusao}
+\input{seccoes/glossario}
+
+\bibliographystyle{plain}
+\bibliography{referencias}
+\addcontentsline{toc}{chapter}{Bibliografia}
+
+\appendix
+% Talvez dividir em vários ficheiros
+\input{seccoes/anexos}
+
+\end{document}

@@ -2,8 +2,10 @@ package com.one2drive.projeto1.sensors;
 
 import com.one2drive.projeto1.config.SimulationConfig;
 import com.one2drive.projeto1.domain.OtherVehicle;
+import com.one2drive.projeto1.domain.SpeedRadar;
 import com.one2drive.projeto1.drools.events.FrontDistanceEvent;
 import com.one2drive.projeto1.drools.events.RelativeSpeedEvent;
+import com.one2drive.projeto1.drools.events.SpeedRadarEvent;
 import com.one2drive.projeto1.drools.events.TTCEvent;
 import com.one2drive.projeto1.simulation.WorldState;
 
@@ -25,20 +27,27 @@ public class FrontRadarSensor extends AbstractSensor<Object> {
     @Override
     public List<Object> observe(WorldState worldState, long timestampMillis) {
         List<Object> events = new ArrayList<>();
-        Optional<OtherVehicle> front = worldState.nearestFrontVehicleInLane(rangeMeters());
-        if (front.isEmpty()) {
-            return events;
+
+        Optional<SpeedRadar> speedRadar = worldState.findNearestSpeedRadarAhead(rangeMeters());
+        if (speedRadar.isPresent()) {
+            SpeedRadar radar = speedRadar.get();
+            double distanceToRadar = worldState.distanceAhead(radar.getPositionMeters());
+            events.add(new SpeedRadarEvent(timestampMillis, radar.getId(), distanceToRadar, radar.getSpeedLimitKmh()));
         }
 
-        OtherVehicle vehicle = front.get();
-        double trueDistance = worldState.distanceAhead(vehicle.getPositionMeters());
-        double measuredDistance = Math.max(0, trueDistance + random.nextGaussian() * config.getDistanceNoiseStdMeters());
-        double relativeSpeed = worldState.getEgo().getSpeedMps() - vehicle.getSpeedMps();
-        double ttc = relativeSpeed > 0.05 ? measuredDistance / relativeSpeed : Double.POSITIVE_INFINITY;
+        Optional<OtherVehicle> front = worldState.nearestFrontVehicleInLane(rangeMeters());
+        if (front.isPresent()) {
+            OtherVehicle vehicle = front.get();
+            double trueDistance = worldState.distanceAhead(vehicle.getPositionMeters());
+            double measuredDistance = Math.max(0, trueDistance + random.nextGaussian() * config.getDistanceNoiseStdMeters());
+            double relativeSpeed = worldState.getEgo().getSpeedMps() - vehicle.getSpeedMps();
+            double ttc = relativeSpeed > 0.05 ? measuredDistance / relativeSpeed : Double.POSITIVE_INFINITY;
 
-        events.add(new FrontDistanceEvent(timestampMillis, id(), measuredDistance, vehicle.getId()));
-        events.add(new RelativeSpeedEvent(timestampMillis, id(), relativeSpeed, vehicle.getId()));
-        events.add(new TTCEvent(timestampMillis, id(), ttc, vehicle.getId()));
+            events.add(new FrontDistanceEvent(timestampMillis, id(), measuredDistance, vehicle.getId()));
+            events.add(new RelativeSpeedEvent(timestampMillis, id(), relativeSpeed, vehicle.getId()));
+            events.add(new TTCEvent(timestampMillis, id(), ttc, vehicle.getId()));
+        }
+
         return events;
     }
 }

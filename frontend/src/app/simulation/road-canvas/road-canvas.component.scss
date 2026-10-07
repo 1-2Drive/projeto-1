@@ -80,13 +80,22 @@
   bottom: 0;
 }
 
-/* dashed lane dividers */
+/* lane dividers */
 .surface__lane {
   position: absolute;
   left: 0;
   right: 0;
-  height: 0;
-  border-top: 2px dashed rgba(216, 226, 236, 0.4);
+  height: 2px;
+}
+
+.surface__lane--dashed {
+  background: repeating-linear-gradient(90deg, rgba(216, 226, 236, 0.55) 0px, rgba(216, 226, 236, 0.55) 18px, transparent 18px, transparent 36px);
+}
+
+.surface__lane--continuous {
+  background: rgba(255, 255, 255, 0.9) !important;
+  height: 3px;
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.5);
 }
 
 .surface__lane--1 {
@@ -697,10 +706,88 @@
 }
 
 .ego--indicator-left .car__indicator--left rect,
-.ego--indicator-right .car__indicator--right rect {
+.ego--indicator-right .car__indicator--right rect,
+.ego--indicator-hazard .car__indicator--left rect,
+.ego--indicator-hazard .car__indicator--right rect {
   fill: #ffc233;
   opacity: 1;
   animation: indicator-blink 550ms steps(2, jump-none) infinite;
+}
+
+.car__wheels rect,
+.car__wheels g {
+  transition: none !important;
+}
+
+/* ===================== Telemetry HUD Ribbon ===================== */
+.telemetry-hud {
+  position: absolute;
+  bottom: 0.45rem;
+  left: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: var(--ds-radius-sm);
+  background: rgba(10, 16, 24, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(4px);
+  z-index: 10;
+  font-family: var(--ds-font-mono);
+  font-size: 0.68rem;
+
+  .hud-item {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+
+  .hud-label {
+    color: rgba(226, 235, 244, 0.5);
+    font-size: 0.58rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+  }
+
+  .hud-val {
+    color: #e2e8f0;
+    font-weight: 700;
+  }
+
+  .hud-badge {
+    padding: 0.08rem 0.3rem;
+    border-radius: 3px;
+    font-size: 0.62rem;
+
+    &[data-state='ACCELERATING'],
+    &[data-state='RESUMING'] {
+      background: rgba(52, 211, 153, 0.2);
+      color: #34d399;
+    }
+
+    &[data-state='CRUISING'] {
+      background: rgba(56, 189, 248, 0.2);
+      color: #38bdf8;
+    }
+
+    &[data-state='BRAKING'],
+    &[data-state='STOPPED_FOR_HAZARD'] {
+      background: rgba(248, 113, 113, 0.25);
+      color: #f87171;
+    }
+
+    &[data-state='DECELERATING'] {
+      background: rgba(251, 191, 36, 0.2);
+      color: #fbbf24;
+    }
+
+    &[data-indicator='LEFT'],
+    &[data-indicator='RIGHT'],
+    &[data-indicator='HAZARD'] {
+      background: rgba(255, 194, 51, 0.25);
+      color: #ffc233;
+    }
+  }
 }
 
 @keyframes indicator-blink {
@@ -723,6 +810,31 @@
   letter-spacing: 0.08em;
   color: #f2d582;
   white-space: nowrap;
+}
+
+.radar-station {
+  width: 2.8rem;
+  height: 4.2rem;
+  overflow: visible;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.6));
+}
+
+@keyframes radar-beam-pulse {
+  0%, 100% { opacity: 0.35; stroke-width: 1.2; }
+  50% { opacity: 0.95; stroke-width: 2.2; }
+}
+
+.radar-station__beam {
+  animation: radar-beam-pulse 900ms ease-in-out infinite;
+}
+
+.hud-item--radar {
+  border-left: 1px solid rgba(56, 189, 248, 0.4);
+  padding-left: 0.5rem;
+}
+
+.text-sky {
+  color: #38bdf8 !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

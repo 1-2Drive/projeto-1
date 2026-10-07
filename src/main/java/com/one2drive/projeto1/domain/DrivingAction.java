@@ -11,5 +11,7 @@ public enum DrivingAction {
     WAIT,
     KEEP_LANE,
     CHANGE_LANE_LEFT,
-    CHANGE_LANE_RIGHT
+    CHANGE_LANE_RIGHT,
+    RETURN_RIGHT,
+    RESUME
 }

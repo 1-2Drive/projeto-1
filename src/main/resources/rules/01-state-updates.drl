@@ -296,6 +296,37 @@ then
     update($state);
 end
 
+rule "Update speed radar perception"
+no-loop true
+when
+    $e : SpeedRadarEvent() from entry-point "PERCEPTION_STREAM"
+    $state : SpeedRadarFact()
+    eval($e.getTimestamp() >= $state.getTimestamp()
+        && ($e.getTimestamp() > $state.getTimestamp()
+            || !$e.getRadarId().equals($state.getRadarId())
+            || Math.abs($state.getDistanceMeters() - $e.getDistanceMeters()) > 0.01))
+then
+    $state.setRadarId($e.getRadarId());
+    $state.setDistanceMeters($e.getDistanceMeters());
+    $state.setSpeedLimitKmh($e.getSpeedLimitKmh());
+    $state.setTimestamp($e.getTimestamp());
+    update($state);
+end
+
+rule "Clear stale speed radar perception"
+no-loop true
+salience -100
+when
+    $state : SpeedRadarFact(radarId != "none", $timestamp : timestamp)
+    VehicleStateFact($now : timestamp)
+    eval($now - $timestamp > 600)
+then
+    $state.setRadarId("none");
+    $state.setDistanceMeters(Double.POSITIVE_INFINITY);
+    $state.setTimestamp($now);
+    update($state);
+end
+
 rule "Clear stale pedestrian perception"
 no-loop true
 salience -100

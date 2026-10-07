@@ -25,9 +25,16 @@ public final class ScenarioFactory {
     }
 
     public static WorldState buildWorld(ScenarioDefinition definition, SimulationConfig config) {
-        EgoVehicleState ego = new EgoVehicleState(0, definition.getInitialSpeedKmh() / 3.6, 0, Lane.CENTER);
+        Lane lane = definition.getInitialLane() == null ? Lane.CENTER : definition.getInitialLane();
+        EgoVehicleState ego = new EgoVehicleState(0, definition.getInitialSpeedKmh() / 3.6, 0, lane);
         WeatherState weather = toWeatherState(definition.getInitialWeather());
         WorldState worldState = new WorldState(ego, weather, buildRoadMap(definition, config));
+        if (definition.getLeftMarking() != null) {
+            worldState.setLeftMarking(definition.getLeftMarking());
+        }
+        if (definition.getRightMarking() != null) {
+            worldState.setRightMarking(definition.getRightMarking());
+        }
 
         for (ScenarioActorDefinition actor : definition.getActors()) {
             worldState.addActor(createActor(actor));
@@ -80,6 +87,11 @@ public final class ScenarioFactory {
                 definition.getPositionMeters(),
                 lane,
                 definition.getBarrierOpen() == null || definition.getBarrierOpen()
+            );
+            case SPEED_RADAR -> new com.one2drive.projeto1.domain.SpeedRadar(
+                definition.getPositionMeters(),
+                lane,
+                definition.getSpeedLimitKmh() > 0 ? definition.getSpeedLimitKmh() : 50.0
             );
         };
     }

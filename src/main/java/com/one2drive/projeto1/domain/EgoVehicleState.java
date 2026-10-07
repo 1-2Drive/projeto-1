@@ -18,6 +18,11 @@ public class EgoVehicleState {
     private LaneChangeState laneChangeState;
     private double laneChangeProgress;
     private double laneChangeOriginLateralMeters;
+    private DrivingState drivingState;
+    private IndicatorState indicatorState;
+    private SteeringState steeringState;
+    private double targetSpeedKmh;
+    private double headingDegrees;
 
     public EgoVehicleState(double positionMeters, double speedMps, double accelerationMps2, Lane lane) {
         this.positionMeters = positionMeters;
@@ -29,6 +34,11 @@ public class EgoVehicleState {
         this.laneChangeState = LaneChangeState.IDLE;
         this.laneChangeProgress = 0.0;
         this.laneChangeOriginLateralMeters = this.lateralPositionMeters;
+        this.drivingState = speedMps > 0.1 ? DrivingState.CRUISING : DrivingState.STOPPED;
+        this.indicatorState = IndicatorState.OFF;
+        this.steeringState = SteeringState.STRAIGHT;
+        this.targetSpeedKmh = speedMps * 3.6;
+        this.headingDegrees = 0.0;
     }
 
     public double getPositionMeters() {
@@ -115,5 +125,74 @@ public class EgoVehicleState {
     public void advance(double dtSeconds) {
         speedMps = Math.max(0, speedMps + accelerationMps2 * dtSeconds);
         positionMeters += speedMps * dtSeconds;
+    }
+
+    public DrivingState getDrivingState() {
+        return drivingState;
+    }
+
+    public void setDrivingState(DrivingState drivingState) {
+        this.drivingState = drivingState;
+    }
+
+    public IndicatorState getIndicatorState() {
+        return indicatorState;
+    }
+
+    public void setIndicatorState(IndicatorState indicatorState) {
+        this.indicatorState = indicatorState;
+    }
+
+    public SteeringState getSteeringState() {
+        return steeringState;
+    }
+
+    public void setSteeringState(SteeringState steeringState) {
+        this.steeringState = steeringState;
+    }
+
+    public double getTargetSpeedKmh() {
+        return targetSpeedKmh;
+    }
+
+    public void setTargetSpeedKmh(double targetSpeedKmh) {
+        this.targetSpeedKmh = targetSpeedKmh;
+    }
+
+    public double getHeadingDegrees() {
+        return headingDegrees;
+    }
+
+    public void setHeadingDegrees(double headingDegrees) {
+        this.headingDegrees = headingDegrees;
+    }
+
+    public void updateDrivingState(DrivingAction action, double recommendedSpeedKmh) {
+        if (action == DrivingAction.STOP || action == DrivingAction.EMERGENCY_BRAKE || action == DrivingAction.WAIT) {
+            if (speedMps < 0.1) {
+                drivingState = DrivingState.STOPPED_FOR_HAZARD;
+                return;
+            }
+        }
+        if (speedMps < 0.05) {
+            if (action == DrivingAction.ACCELERATE || action == DrivingAction.RESUME) {
+                drivingState = DrivingState.RESUMING;
+            } else if (drivingState != DrivingState.STOPPED_FOR_HAZARD) {
+                drivingState = DrivingState.STOPPED;
+            }
+            return;
+        }
+
+        if (action == DrivingAction.EMERGENCY_BRAKE || (accelerationMps2 < -3.0)) {
+            drivingState = DrivingState.BRAKING;
+        } else if (action == DrivingAction.BRAKE || (accelerationMps2 < -1.0)) {
+            drivingState = DrivingState.BRAKING;
+        } else if (action == DrivingAction.REDUCE_SPEED || (accelerationMps2 < -0.2)) {
+            drivingState = DrivingState.DECELERATING;
+        } else if (action == DrivingAction.ACCELERATE || action == DrivingAction.RESUME || (accelerationMps2 > 0.2)) {
+            drivingState = DrivingState.ACCELERATING;
+        } else {
+            drivingState = DrivingState.CRUISING;
+        }
     }
 }

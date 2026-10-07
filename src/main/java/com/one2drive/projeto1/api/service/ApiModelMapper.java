@@ -11,6 +11,7 @@ import com.one2drive.projeto1.drools.WorkingMemoryFactView;
 import com.one2drive.projeto1.explanation.TimelineEntry;
 import com.one2drive.projeto1.simulation.RoadMapSnapshot;
 import com.one2drive.projeto1.simulation.RoadRenderItem;
+import com.one2drive.projeto1.domain.EgoVehicleState;
 import com.one2drive.projeto1.domain.Lane;
 import com.one2drive.projeto1.domain.LaneChangeState;
 import com.one2drive.projeto1.simulation.SensorTelemetry;
@@ -72,7 +73,11 @@ public class ApiModelMapper {
                 snapshot.egoLateralPositionMeters(),
                 snapshot.egoTargetLane(),
                 snapshot.egoLaneChangeState(),
-                snapshot.egoLaneChangeProgress()
+                snapshot.egoLaneChangeProgress(),
+                engine.getWorldState().getEgo().getDrivingState().name(),
+                engine.getWorldState().getEgo().getIndicatorState().name(),
+                engine.getWorldState().getEgo().getSteeringState().name(),
+                engine.getWorldState().getEgo().getHeadingDegrees()
             ),
             new ApiSimulationSnapshot.EnvironmentView(
                 engine.getWorldState().getWeatherState().getCondition().name(),
@@ -116,7 +121,11 @@ public class ApiModelMapper {
             maneuver(engine, snapshot),
             sensors(engine),
             InferenceNarrator.summarise(engine, snapshot),
-            roadMap(engine.roadMapSnapshot())
+            roadMap(engine.roadMapSnapshot()),
+            new ApiSimulationSnapshot.RoadMarksView(
+                engine.getWorldState().getLeftMarking().name(),
+                engine.getWorldState().getRightMarking().name()
+            )
         );
     }
 
@@ -137,11 +146,13 @@ public class ApiModelMapper {
 
     /** Physical maneuver state; indicators and brake lights are presentation of it, not policy. */
     private ApiSimulationSnapshot.ManeuverView maneuver(SimulationEngine engine, SimulationSnapshot snapshot) {
-        LaneChangeState state = engine.getWorldState().getEgo().getLaneChangeState();
-        boolean left = state.isActive() && engine.getWorldState().getEgo().getTargetLane().centreMeters()
-            < engine.getWorldState().getEgo().getLateralPositionMeters();
-        boolean right = state.isActive() && !left;
-        double acceleration = engine.getWorldState().getEgo().getAccelerationMps2();
+        EgoVehicleState ego = engine.getWorldState().getEgo();
+        LaneChangeState state = ego.getLaneChangeState();
+        boolean left = ego.getIndicatorState() == com.one2drive.projeto1.domain.IndicatorState.LEFT
+            || (state.isActive() && ego.getTargetLane().centreMeters() < ego.getLateralPositionMeters());
+        boolean right = ego.getIndicatorState() == com.one2drive.projeto1.domain.IndicatorState.RIGHT
+            || (state.isActive() && ego.getTargetLane().centreMeters() > ego.getLateralPositionMeters());
+        double acceleration = ego.getAccelerationMps2();
         return new ApiSimulationSnapshot.ManeuverView(
             snapshot.egoLaneChangeState(),
             snapshot.egoLane(),
@@ -150,7 +161,8 @@ public class ApiModelMapper {
             snapshot.egoLateralPositionMeters(),
             left,
             right,
-            acceleration < -0.1
+            acceleration < -0.1,
+            ego.getSteeringState().name()
         );
     }
 
@@ -163,7 +175,9 @@ public class ApiModelMapper {
                 telemetry.frontRadar().distanceMeters(),
                 telemetry.frontRadar().relativeSpeedKmh(),
                 telemetry.frontRadar().ttcSeconds(),
-                telemetry.frontRadar().status()
+                telemetry.frontRadar().status(),
+                telemetry.frontRadar().speedRadarDistanceMeters(),
+                telemetry.frontRadar().speedRadarLimitKmh()
             ),
             new ApiSimulationSnapshot.CameraTelemetryView(
                 telemetry.frontCamera().rangeMeters(),

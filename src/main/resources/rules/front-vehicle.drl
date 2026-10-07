@@ -3,9 +3,14 @@ package rules
 import com.one2drive.projeto1.decision.DecisionContext
 import com.one2drive.projeto1.decision.DecisionPriority
 import com.one2drive.projeto1.domain.DrivingAction
+import com.one2drive.projeto1.domain.Lane
+import com.one2drive.projeto1.domain.LaneChangeState
 import com.one2drive.projeto1.domain.RiskLevel
+import com.one2drive.projeto1.domain.RoadMarkingType
 import com.one2drive.projeto1.drools.DroolsSupport
 import com.one2drive.projeto1.drools.facts.FrontVehicleState
+import com.one2drive.projeto1.drools.facts.LaneOccupancyState
+import com.one2drive.projeto1.drools.facts.OvertakingStateFact
 import com.one2drive.projeto1.drools.facts.VehicleStateFact
 import com.one2drive.projeto1.drools.events.FrontDistanceEvent
 
@@ -76,4 +81,70 @@ then
         drools.getRule().getName(),
         "samples=" + $count + ", max=" + $max + "m, min=" + $min + "m"
     );
+end
+
+rule "Overtake slow front vehicle via left lane"
+salience 485
+no-loop true
+when
+    $ctx : DecisionContext()
+    $state : OvertakingStateFact(active == false)
+    VehicleStateFact(lane == Lane.RIGHT || lane == Lane.CENTER, laneChangeState == LaneChangeState.IDLE, leftMarking != RoadMarkingType.CONTINUOUS, $now : timestamp)
+    FrontVehicleState(targetId != "none", $distance : distanceMeters > 15.0, distanceMeters <= 50.0, $relative : relativeSpeedMps > 0.5)
+    LaneOccupancyState(lane == Lane.LEFT, occupied == false)
+then
+    modify($state) { setActive(true), setOriginalLane(Lane.RIGHT), setPassedTarget(false), setTimestamp($now) }
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.CHANGE_LANE_LEFT,
+        Double.NaN,
+        RiskLevel.LOW,
+        DecisionPriority.MANEUVER_SAFETY,
+        "Overtaking slower vehicle via clear left lane (Art. 35/36 CE)",
+        drools.getRule().getName(),
+        "slower vehicle at " + $distance + "m, left lane clear"
+    );
+end
+
+rule "Mark front vehicle passed once it is behind or cleared"
+salience 480
+no-loop true
+when
+    $state : OvertakingStateFact(active == true, passedTarget == false)
+    VehicleStateFact(lane != Lane.RIGHT, laneChangeState == LaneChangeState.IDLE)
+    LaneOccupancyState(lane == Lane.RIGHT, occupied == false)
+    FrontVehicleState(targetId == "none" || distanceMeters > 30.0)
+then
+    modify($state) { setPassedTarget(true) }
+end
+
+rule "Return to right lane after overtaking slow vehicle"
+salience 480
+no-loop true
+when
+    $ctx : DecisionContext()
+    $state : OvertakingStateFact(active == true, passedTarget == true)
+    VehicleStateFact(lane != Lane.RIGHT, laneChangeState == LaneChangeState.IDLE, rightMarking != RoadMarkingType.CONTINUOUS)
+    LaneOccupancyState(lane == Lane.RIGHT, occupied == false)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.RETURN_RIGHT,
+        Double.NaN,
+        RiskLevel.LOW,
+        DecisionPriority.MANEUVER_SAFETY,
+        "Portuguese Highway Code Art. 38: return to rightmost lane after overtaking",
+        drools.getRule().getName(),
+        "overtaken vehicle passed, right lane clear, returning right"
+    );
+end
+
+rule "Deactivate overtaking state once return right completes"
+salience 200
+no-loop true
+when
+    $state : OvertakingStateFact(active == true, passedTarget == true)
+    VehicleStateFact(lane == Lane.RIGHT, laneChangeState == LaneChangeState.IDLE)
+then
+    modify($state) { setActive(false), setPassedTarget(false) }
 end

@@ -7,9 +7,30 @@ import com.one2drive.projeto1.domain.RiskLevel
 import com.one2drive.projeto1.drools.DroolsSupport
 import com.one2drive.projeto1.drools.facts.AccelerationRequestState
 import com.one2drive.projeto1.drools.facts.CurrentSpeedLimit
+import com.one2drive.projeto1.drools.facts.SpeedRadarFact
 import com.one2drive.projeto1.drools.facts.VehicleStateFact
 
 global DroolsSupport droolsSupport
+
+rule "Decelerate approaching speed radar to comply with legal limit"
+salience 320
+no-loop true
+when
+    $ctx : DecisionContext()
+    $radar : SpeedRadarFact(radarId != "none", $distance : distanceMeters > 0, distanceMeters <= 120.0, $limit : speedLimitKmh)
+    VehicleStateFact( $speed : speedKmh > ($limit + 1.0) )
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.REDUCE_SPEED,
+        $limit,
+        RiskLevel.MODERATE,
+        DecisionPriority.SPEED_COMPLIANCE,
+        "Approaching speed radar; reducing speed to legal limit " + Math.round($limit) + " km/h",
+        drools.getRule().getName(),
+        "radar at " + Math.round($distance) + "m, limit " + Math.round($limit) + " km/h, current " + Math.round($speed) + " km/h"
+    );
+end
 
 rule "Reduce speed when exceeding detected limit"
 salience 300

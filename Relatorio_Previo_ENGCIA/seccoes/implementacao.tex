@@ -54,29 +54,29 @@ presentes na arquitetura do sistema são:
   \caption{Principais componentes da arquitetura do sistema}
   \label{tab:componentes}
   \small
-  \begin{tabularx}{\textwidth}{@{}L{5.4cm}X@{}}
+  \begin{tabularx}{\textwidth}{@{}L{5.4cm}VX@{}}
     \toprule
     \textbf{Componente} & \textbf{Função no sistema} \\
     \midrule
     Ambiente / \texttt{WorldState} & Representa o estado do veículo e dos
-      restantes elementos presentes no cenário. \\
+      restantes elementos presentes no cenário. \\ \linhasep
     \texttt{SimulationEngine} & Coordena os diferentes ciclos da simulação e a
-      interação entre os principais componentes. \\
-    \texttt{SensorManager} & Recolhe a leitura dos sensores. \\
-    \texttt{EventRouter} & Encaminha os dados para o motor de inferência. \\
+      interação entre os principais componentes. \\ \linhasep
+    \texttt{SensorManager} & Recolhe a leitura dos sensores. \\ \linhasep
+    \texttt{EventRouter} & Encaminha os dados para o motor de inferência. \\ \linhasep
     Memória de trabalho / \texttt{KieSession} & Mantém os factos e eventos
       conhecidos pelo sistema e permite a avaliação das regras nos diferentes
-      ciclos de inferência. \\
+      ciclos de inferência. \\ \linhasep
     Base de conhecimento & Contém as regras utilizadas para interpretar os
-      factos e produzir propostas de decisão. \\
+      factos e produzir propostas de decisão. \\ \linhasep
     \texttt{DecisionContext} & Recebe as diferentes propostas de decisão
-      resultantes do processo de inferência. \\
+      resultantes do processo de inferência. \\ \linhasep
     \texttt{DecisionActuator} & A decisão escolhida é atribuída à ação do
-      veículo. \\
+      veículo. \\ \linhasep
     Interface & Permite acompanhar a simulação, interagir com o sistema e
-      visualizar a informação produzida. \\
+      visualizar a informação produzida. \\ \linhasep
     \texttt{WorldPhysicsEngine} & Atualiza a evolução física simplificada do
-      veículo, nomeadamente, a respetiva posição e velocidade. \\
+      veículo, nomeadamente, a respetiva posição e velocidade. \\ \linhasep
     \texttt{ExplanationTrace} / \texttt{WorkingMemoryInspector} & Permitem
       acompanhar a execução das regras, as alterações na memória de trabalho e
       a informação utilizada para reconstruir o processo de decisão. \\
@@ -119,20 +119,20 @@ apresentam-se as principais tecnologias utilizadas na versão atual
   \caption{Principais tecnologias utilizadas na implementação do sistema}
   \label{tab:tecnologias}
   \small
-  \begin{tabularx}{\textwidth}{@{}L{3.3cm}L{4.1cm}X@{}}
+  \begin{tabularx}{\textwidth}{@{}L{3.3cm}VL{4.1cm}VX@{}}
     \toprule
     \textbf{Componente} & \textbf{Tecnologia} & \textbf{Utilização no projeto} \\
     \midrule
     \emph{Backend} & Java 17 e Spring Boot 3.3.4 & Simulação, sensores,
-      integração com o motor de inferência e API \\
+      integração com o motor de inferência e API \\ \linhasep
     Motor de inferência & Drools/KIE 8.44 & Memória de trabalho, regras DRL e
-      \emph{forward chaining} \\
+      \emph{forward chaining} \\ \linhasep
     \emph{Frontend} & Angular 18 e RxJS & Visualização e interação com o
-      utilizador e apresentação do estado e das decisões \\
+      utilizador e apresentação do estado e das decisões \\ \linhasep
     Comunicação & REST e \emph{Server-Sent Events} (SSE) & Atualização
-      contínua da interface e envio de comandos para o \emph{backend} \\
+      contínua da interface e envio de comandos para o \emph{backend} \\ \linhasep
     Testes \emph{backend} & JUnit 5 & Testes para as regras e integração dos
-      componentes utilizados \\
+      componentes utilizados \\ \linhasep
     Testes \emph{frontend} & Jasmine/Karma e Playwright & Testes unitários da
       interface e testes \emph{end-to-end} \\
     \bottomrule
@@ -185,16 +185,16 @@ fluxos que são relevantes para cada situação.
     Drools}
   \label{tab:entry-points}
   \small
-  \begin{tabularx}{\textwidth}{@{}L{4.6cm}X@{}}
+  \begin{tabularx}{\textwidth}{@{}L{4.6cm}VX@{}}
     \toprule
     \textbf{\emph{Entry point}} & \textbf{Exemplos de informação} \\
     \midrule
-    \texttt{VEHICLE\_STREAM} & velocidade e estado do veículo \\
+    \texttt{VEHICLE\_STREAM} & velocidade e estado do veículo \\ \linhasep
     \texttt{PERCEPTION\_STREAM} & distância frontal, velocidade relativa, TTC,
-      ocupação de via e presença de peões \\
-    \texttt{ROAD\_STREAM} & limites de velocidade, sinais STOP, obstáculos \\
-    \texttt{TRAFFIC\_STREAM} & estado dos semáforos \\
-    \texttt{ENVIRONMENT\_STREAM} & meteorologia, visibilidade e aderência \\
+      ocupação de via e presença de peões \\ \linhasep
+    \texttt{ROAD\_STREAM} & limites de velocidade, sinais STOP, obstáculos \\ \linhasep
+    \texttt{TRAFFIC\_STREAM} & estado dos semáforos \\ \linhasep
+    \texttt{ENVIRONMENT\_STREAM} & meteorologia, visibilidade e aderência \\ \linhasep
     \texttt{COMMAND\_STREAM} & pedidos de aceleração e mudança de via \\
     \bottomrule
   \end{tabularx}
@@ -335,38 +335,38 @@ implementados dos que estão apenas previstos.
   \caption{Estado atual do protótipo}
   \label{tab:estado-prototipo}
   \small
-  \begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}X
-      L{2.3cm}L{6.2cm}@{}}
+  \begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}XV
+      L{2.3cm}VL{6.2cm}@{}}
     \toprule
     \textbf{Mecanismo} & \textbf{Estado} & \textbf{Observação} \\
     \midrule
     Radar frontal, câmara, radares de canto, velocidade e sensor de ambiente
-      & Implementado & Sensores simulados \\
+      & Implementado & Sensores simulados \\ \linhasep
     LiDAR, sensor de ângulo da direção e sensor de luminosidade
-      & Previsto & -- \\
+      & Previsto & -- \\ \linhasep
     Raciocínio temporal (janelas CEP)
-      & Implementado & TTC e distância ao veículo da frente \\
+      & Implementado & TTC e distância ao veículo da frente \\ \linhasep
     Validade das perceções
-      & Implementado & Expiram ao fim de cerca de 600~ms sem atualização \\
+      & Implementado & Expiram ao fim de cerca de 600~ms sem atualização \\ \linhasep
     Níveis de risco e categorias de prioridade
-      & Implementado & Quatro níveis de risco e sete categorias \\
+      & Implementado & Quatro níveis de risco e sete categorias \\ \linhasep
     Resolução de conflitos e desempate
-      & Implementado & Desempate pela menor velocidade recomendada \\
+      & Implementado & Desempate pela menor velocidade recomendada \\ \linhasep
     Criticidade pela distância de travagem (\cref{eq:dtrav})
-      & Previsto & O protótipo usa limiares fixos de TTC e de distância \\
+      & Previsto & O protótipo usa limiares fixos de TTC e de distância \\ \linhasep
     Intervalo temporal (THW) e tempo até transpor a marca rodoviária (TLC)
-      & Previsto & -- \\
+      & Previsto & -- \\ \linhasep
     Nível de confiança das deteções
-      & Previsto & -- \\
+      & Previsto & -- \\ \linhasep
     Confirmação entre sensores e LiDAR como terceira fonte
-      & Previsto & -- \\
+      & Previsto & -- \\ \linhasep
     Paragem perante a falha de um sensor
-      & Previsto & -- \\
+      & Previsto & -- \\ \linhasep
     Explicações \emph{Why} e \emph{How}
       & Implementado & Regra de origem, razão, evidência e registo da
-        execução \\
+        execução \\ \linhasep
     Explicação \emph{Why Not}
-      & Parcial & As propostas não selecionadas ainda não são guardadas \\
+      & Parcial & As propostas não selecionadas ainda não são guardadas \\ \linhasep
     Implementação em Prolog
       & Previsto & Em fase inicial \\
     \bottomrule

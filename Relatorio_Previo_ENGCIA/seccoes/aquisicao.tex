@@ -117,13 +117,13 @@ tinham ficado em aberto durante a construção da base de conhecimento.
   \caption{Sessão 1 com o perito}
   \label{tab:sessao1}
   \small
-  \begin{tabularx}{\textwidth}{@{}L{3.2cm}X@{}}
+  \begin{tabularx}{\textwidth}{@{}L{3.2cm}VX@{}}
     \toprule
     \multicolumn{2}{@{}l}{\textbf{Sessão 1 via Teams -- Reunião inicial}} \\
     \midrule
-    \textbf{Data e hora} & 1 de outubro de 2026 -- 20h10 \\
+    \textbf{Data e hora} & 1 de outubro de 2026 -- 20h10 \\ \linhasep
     \textbf{Objetivo} & Apresentar o projeto ao perito e discutir a respetiva
-      implementação. \\
+      implementação. \\ \linhasep
     \textbf{Aspetos abordados} & Foram discutidos aspetos relacionados com a
       estrutura geral do sistema, a representação do ambiente de condução, a
       definição dos factos da base de conhecimento e a influência desses
@@ -137,14 +137,14 @@ tinham ficado em aberto durante a construção da base de conhecimento.
   \caption{Sessão 2 com o perito}
   \label{tab:sessao2}
   \small
-  \begin{tabularx}{\textwidth}{@{}L{3.2cm}X@{}}
+  \begin{tabularx}{\textwidth}{@{}L{3.2cm}VX@{}}
     \toprule
     \multicolumn{2}{@{}l}{\textbf{Sessão 2 via \emph{email} -- Esclarecimento de dúvidas}} \\
     \midrule
-    \textbf{Data} & 2 de outubro de 2026 \\
+    \textbf{Data} & 2 de outubro de 2026 \\ \linhasep
     \textbf{Objetivo} & Esclarecer as questões em aberto sobre falhas,
       critérios de criticidade, confirmação de leituras, prioridades, memória
-      de trabalho, dados contraditórios, cenários e explicações. \\
+      de trabalho, dados contraditórios, cenários e explicações. \\ \linhasep
     \textbf{Aspetos abordados} & Neste segundo momento, foram abordados
       aspetos relacionados com a falha do veículo, relevância dos sensores,
       definição de situações críticas através de variáveis como velocidade,
@@ -221,9 +221,9 @@ respostas completas encontram-se no Anexo~\ref{anx:sessoes}.
   \label{tab:sintese-perito}
   \footnotesize
   \renewcommand{\arraystretch}{1.15}
-  \begin{tabularx}{\textwidth}{@{}L{2.3cm}
-      >{\raggedright\arraybackslash}X
-      >{\raggedright\arraybackslash}X
+  \begin{tabularx}{\textwidth}{@{}L{2.3cm}V
+      >{\raggedright\arraybackslash}XV
+      >{\raggedright\arraybackslash}XV
       L{2.05cm}@{}}
     \toprule
     \textbf{Tema} & \textbf{Indicação do perito} & \textbf{Reflexo no sistema}
@@ -233,56 +233,56 @@ respostas completas encontram-se no Anexo~\ref{anx:sessoes}.
       & Paragem imediata (STOP)
       & Paragem com a prioridade máxima perante uma falha; o protótipo ainda
         não deteta falhas
-      & Previsto \\
+      & Previsto \\ \linhasep
     Relevância dos sensores
       & Os dados considerados são suficientes; cada sensor é necessário na
         situação para a qual contribui
       & Sensores descritos no \cref{cap:sensores}; cinco são simulados no
         protótipo
-      & Parcial \\
+      & Parcial \\ \linhasep
     Criticidade
       & Equação com a velocidade, a distância e a capacidade de travagem, sem
         travagens instantâneas e com um ponto de não-retorno
       & Comparação da distância ao objeto com a distância de travagem; o
         protótipo usa ainda limiares fixos de TTC e de distância
-      & Previsto \\
+      & Previsto \\ \linhasep
     Número de leituras
       & Uma leitura numa situação crítica; duas numa situação normal
       & Janelas temporais de leituras recentes; a regra de TTC persistente
         exige três leituras
-      & Em análise \\
+      & Em análise \\ \linhasep
     Prioridades e desempate
       & Quatro níveis (baixo, médio, alto e crítico); desempate aleatório ou
         pela primeira opção de uma lista ordenada
       & Quatro níveis de risco e sete categorias de prioridade; desempate pela
         menor velocidade recomendada
-      & Em análise \\
+      & Em análise \\ \linhasep
     Memória de trabalho
       & Esquecer os eventos que saem do campo de deteção; os sinais alteram um
         estado
       & As perceções deixam de ser consideradas sem atualização durante cerca
         de 600~ms; os sinais atualizam estados, como o limite de velocidade
-      & Implementado \\
+      & Implementado \\ \linhasep
     Dados contraditórios
       & Sem terceira fonte, aplica-se o desempate; com risco alto ou crítico,
         paragem
       & LiDAR como terceira fonte e regra de desempate
-      & Previsto \\
+      & Previsto \\ \linhasep
     Cenários
       & Os cenários da S1, a passadeira com peão e objetos inseridos pelo
         utilizador
       & Catorze cenários e inserção de elementos pelo utilizador; a passadeira
         ainda não existe
-      & Parcial \\
+      & Parcial \\ \linhasep
     Explicações
       & As explicações devem seguir as regras
       & Cada decisão guarda a regra de origem, a razão e a evidência
-      & Implementado \\
+      & Implementado \\ \linhasep
     Representação do ambiente (S1)
       & Representar o percurso através de uma matriz
       & Elementos do ambiente posicionados por via e por posição ao longo do
         percurso
-      & Implementado \\
+      & Implementado \\ \linhasep
     Teoria dos Jogos (S1)
       & Abordagem para situações de interação entre veículos
       & Considerada para trabalho futuro

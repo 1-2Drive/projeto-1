@@ -25,20 +25,20 @@ conhecimento considerado no projeto pode ser representada da seguinte forma:
   \caption{Tipo de conhecimento e exemplos utilizados}
   \label{tab:tipos-conhecimento}
   \small
-  \begin{tabularx}{\textwidth}{@{}L{3.6cm}X@{}}
+  \begin{tabularx}{\textwidth}{@{}L{3.6cm}VX@{}}
     \toprule
     \textbf{Tipo de conhecimento} & \textbf{Exemplos} \\
     \midrule
-    Entidades & veículo, peão, obstáculo, via de trânsito, sinal de trânsito \\
-    Propriedades & velocidade, distância, meteorologia, velocidade relativa \\
+    Entidades & veículo, peão, obstáculo, via de trânsito, sinal de trânsito \\ \linhasep
+    Propriedades & velocidade, distância, meteorologia, velocidade relativa \\ \linhasep
     Estados & veículo em movimento, via ocupada, semáforo vermelho, chuva
-      presente \\
+      presente \\ \linhasep
     Dados derivados & TTC e outros indicadores calculados a partir das leituras
-      disponíveis \\
-    Factos semânticos & risco alto, situação crítica, distância insegura \\
+      disponíveis \\ \linhasep
+    Factos semânticos & risco alto, situação crítica, distância insegura \\ \linhasep
     Ações & manter velocidade, acelerar, desacelerar, travar, travar em
-      emergência, parar, manter a via, mudar de via \\
-    Níveis de risco & baixo, moderado, alto e crítico \\
+      emergência, parar, manter a via, mudar de via \\ \linhasep
+    Níveis de risco & baixo, moderado, alto e crítico \\ \linhasep
     Prioridades na decisão & progressão e conforto, cumprimento da velocidade,
       segurança na manobra, perigo rodoviário, prevenção da colisão, paragem
       legal obrigatória e segurança e emergência \\
@@ -125,31 +125,31 @@ critérios discutidos com o perito (\cref{cap:sensores}).
   \label{tab:regras}
   \footnotesize
   \renewcommand{\arraystretch}{1.12}
-  \begin{tabularx}{\textwidth}{@{}L{0.5cm}
-      >{\raggedright\arraybackslash}X
-      >{\raggedright\arraybackslash}p{3.1cm}
-      L{1.4cm} C{0.95cm} L{1.75cm} L{1.95cm}@{}}
+  \begin{tabularx}{\textwidth}{@{}L{0.5cm}V
+      >{\raggedright\arraybackslash}XV
+      >{\raggedright\arraybackslash}p{3.1cm}V
+      L{1.4cm}V C{0.95cm}V L{1.75cm}V L{1.95cm}@{}}
     \toprule
     \textbf{ID} & \textbf{SE} & \textbf{ENTÃO} & \textbf{Risco}
       & \textbf{Prior.} & \textbf{Tipo} & \textbf{Estado} \\
     \midrule
     R1 & velocidade acima do limite detetado
-       & reduzir para o limite & moderado & 20 & normativo & implementada \\
+       & reduzir para o limite & moderado & 20 & normativo & implementada \\ \linhasep
     R2 & chuva
        & reduzir a velocidade, mais ainda se a visibilidade ou a aderência
-         forem reduzidas & moderado & 20 & heurístico & implementada \\
+         forem reduzidas & moderado & 20 & heurístico & implementada \\ \linhasep
     R3 & chuva e TTC inferior a 3~s em pelo menos 2 leituras nos últimos 2~s
-       & travar até 15~km/h & alto & 50 & temporal & implementada \\
+       & travar até 15~km/h & alto & 50 & temporal & implementada \\ \linhasep
     R4 & peão na trajetória entre 6 e 24~m
-       & parar & alto & 50 & heurístico & implementada \\
+       & parar & alto & 50 & heurístico & implementada \\ \linhasep
     R5 & peão na trajetória a 6~m ou menos
-       & travagem de emergência & crítico & 70 & heurístico & implementada \\
+       & travagem de emergência & crítico & 70 & heurístico & implementada \\ \linhasep
     R6 & semáforo vermelho a 45~m ou menos
-       & parar & alto & 60 & normativo & implementada \\
+       & parar & alto & 60 & normativo & implementada \\ \linhasep
     R7 & pedido de mudança de via e via de destino ocupada
-       & manter a via & moderado & 30 & normativo & implementada \\
+       & manter a via & moderado & 30 & normativo & implementada \\ \linhasep
     R8 & falha de um sensor (ausência de dados)
-       & paragem controlada & crítico & 70 & heurístico & prevista \\
+       & paragem controlada & crítico & 70 & heurístico & prevista \\ \linhasep
     R9 & distância ao objeto inferior à distância de travagem
          (\cref{eq:dtrav})
        & desvio, se a via adjacente estiver livre, ou travagem de emergência

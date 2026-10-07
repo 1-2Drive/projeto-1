@@ -92,6 +92,7 @@
 % Uma secção não começa no fundo da página: se restar pouco espaço,
 % passa para a página seguinte (no máximo ~1/5 da página fica em branco).
 \usepackage{needspace}
+\usepackage{placeins}  % \FloatBarrier: impede uma figura de passar para a secção seguinte
 \usepackage{etoolbox}
 \pretocmd{\section}{\Needspace{10\baselineskip}}{}{}
 \pretocmd{\subsection}{\Needspace{6\baselineskip}}{}{}

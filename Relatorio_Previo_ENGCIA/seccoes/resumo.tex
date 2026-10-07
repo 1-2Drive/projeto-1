@@ -1,7 +1,33 @@
 \chapter*{Resumo}
 \markboth{Resumo}{Resumo}
 
-\preencher{Resumo por redigir}
+A tomada de decisão em veículos autónomos exige que a informação de
+sensores heterogéneos seja interpretada continuamente e que as ações
+escolhidas possam ser justificadas pelo sistema. Este relatório descreve a
+aquisição e a representação de conhecimento para um sistema pericial baseado
+em regras que, a partir de sensores simulados, avalia o risco de cada situação
+e propõe a ação mais adequada em cenários controlados de condução. O
+conhecimento foi obtido sobretudo pela análise da equipa, complementada por
+duas sessões com um perito em robótica inteligente e por pesquisa
+bibliográfica. Destas fontes resultaram critérios para a criticidade, assente
+na relação entre velocidade, distância e capacidade de travagem, para o número
+de leituras a confirmar antes de cada ação e para a permanência dos factos na
+memória de trabalho. As leituras dos sensores dão origem a dados derivados, como
+o tempo até à colisão (TTC), e a factos semânticos, num modelo que integra
+conhecimento factual, temporal, normativo e heurístico. A gravidade das situações,
+expressa em quatro níveis de risco, é separada da importância das ações,
+ordenada em sete categorias de prioridade, e os conflitos entre propostas
+são resolvidos explicitamente, sem depender da ordem de execução das
+regras. O protótipo, desenvolvido em Drools, utiliza uma sessão com estado
+e processamento de eventos complexos com janelas temporais, e reúne atualmente
+77 regras, avaliadas em catorze cenários simulados e por 64
+testes automatizados. As explicações \emph{How} e \emph{Why} estão
+implementadas; a explicação \emph{Why Not}, a criticidade baseada na
+distância de travagem, a confiança das deteções e a fusão sensorial estão
+previstas. O tratamento explícito da incerteza encontra-se em análise.
+O trabalho mostra que a separação entre ambiente, perceção e conhecimento,
+aliada a prioridades explícitas, torna a decisão rastreável e passível de
+validação, e prepara uma implementação conceptualmente equivalente em Prolog.
 
 \vspace{0.8cm}
 \noindent\textbf{Palavras-chave:} sistemas periciais; aquisição de

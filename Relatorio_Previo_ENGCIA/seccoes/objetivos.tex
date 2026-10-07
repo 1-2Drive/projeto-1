@@ -1,11 +1,36 @@
 \chapter{Objetivos}
 \label{cap:objetivos}
 
-\section{Objetivo geral}
-
-\preencher{Secção por redigir}
-
-\section{Objetivos específicos}
-
-\preencher{Secção por redigir}
-
+O principal objetivo do projeto diz respeito ao desenvolvimento de um sistema
+pericial capaz de utilizar os dados dos sensores simulados de um veículo
+autónomo para avaliar situações de risco e apoiar a tomada de decisão mais
+adequada em cenários controlados. Neste sentido, foram definidos os seguintes
+objetivos específicos:
+\begin{itemize}
+  \item Identificar os sensores e os dados necessários para apoiar o processo
+    de inferência;
+  \item Modelar e considerar cenários e elementos rodoviários suficientes para
+    dar suporte à tomada de decisão;
+  \item Adquirir conhecimento do domínio através da pesquisa e da interação
+    com o perito;
+  \item Representar o conhecimento através de factos, regras, estados e
+    prioridades;
+  \item Apresentar uma representação conceptual do funcionamento e do
+    processo de decisão do sistema;
+  \item Desenvolver, inicialmente, a solução em Drools e preservar a
+    equivalência conceptual para a posterior implementação em Prolog;
+  \item Permitir a rastreabilidade e explicabilidade das decisões sugeridas e
+    descartadas (\emph{How}, \emph{Why}, \emph{Why Not});
+  \item Analisar abordagens alternativas ou complementares, como o A* e a
+    Teoria dos Jogos;
+  \item Explorar a forma como os dados provenientes dos sensores devem ser
+    processados e considerados, nos diferentes ciclos de inferência;
+  \item Implementar mecanismos de prioridade e de resolução de conflitos
+    quando diferentes regras sugerem propostas de ação distintas, em
+    simultâneo;
+  \item Avaliar situações de risco, através da combinação dos diferentes
+    factos e dados disponíveis;
+  \item Construir uma base de conhecimento capaz de representar diferentes
+    tipos de factos, relações, condições, prioridades e situações relevantes
+    para o domínio.
+\end{itemize}

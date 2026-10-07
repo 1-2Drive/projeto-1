@@ -1,27 +1,160 @@
 \chapter{Representação do conhecimento}
 \label{cap:representacao}
 
-\section{Modelo conceptual}
+\section{Tipos de conhecimento}
+\label{sec:tipos-conhecimento}
 
-\preencher{Secção por redigir}
+A base de conhecimento reúne as regras e relações necessárias para
+interpretar a informação disponível sobre o estado atual do veículo e do
+ambiente e determinar as condições que podem conduzir a diferentes propostas
+de decisão. No projeto são considerados diferentes tipos de conhecimento.
+Alguns correspondem diretamente à situação observada, como a velocidade
+atual, a presença de um veículo à frente, a distância a um obstáculo, o
+estado de um semáforo ou a ocupação de uma via de trânsito. Outros resultam
+da interpretação ou combinação dessa informação, como o TTC ou a
+classificação de uma situação segundo o respetivo nível de risco.
+
+Importa distinguir a base de conhecimento da memória de trabalho. A primeira
+contém as regras utilizadas pelo motor de inferência, enquanto a memória de
+trabalho mantém os factos e estados que representam aquilo que o sistema
+conhece num determinado momento. Neste sentido, a organização do
+conhecimento considerado no projeto pode ser representada da seguinte forma:
+
+\begin{table}[H]
+  \centering
+  \caption{Tipo de conhecimento e exemplos utilizados}
+  \label{tab:tipos-conhecimento}
+  \small
+  \begin{tabularx}{\textwidth}{@{}L{3.6cm}X@{}}
+    \toprule
+    \textbf{Tipo de conhecimento} & \textbf{Exemplos} \\
+    \midrule
+    Entidades & veículo, peão, obstáculo, via de trânsito, sinal de trânsito \\
+    Propriedades & velocidade, distância, meteorologia, velocidade relativa \\
+    Estados & veículo em movimento, via ocupada, semáforo vermelho, chuva
+      presente \\
+    Dados derivados & TTC e outros indicadores calculados a partir das leituras
+      disponíveis \\
+    Factos semânticos & risco alto, situação crítica, distância insegura \\
+    Ações & manter velocidade, acelerar, desacelerar, travar, travar em
+      emergência, parar, manter a via, mudar de via \\
+    Níveis de risco & baixo, moderado, alto e crítico \\
+    Prioridades na decisão & progressão e conforto, cumprimento da velocidade,
+      segurança na manobra, perigo rodoviário, prevenção da colisão, paragem
+      legal obrigatória e segurança e emergência \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+Para além desta organização, há diferença na natureza da informação
+utilizada, nomeadamente:
+\begin{itemize}
+  \item conhecimento factual, associado ao estado atual do veículo e do
+    ambiente;
+  \item conhecimento temporal, relacionado com os eventos e a evolução de
+    determinadas observações;
+  \item conhecimento normativo, associado às regras como, por exemplo, a
+    obrigação de parar tendo em conta determinados sinais;
+  \item conhecimento heurístico, utilizado em situações de avaliação de risco;
+  \item metaconhecimento, com o objetivo de definir uma ordem nas propostas de
+    decisão.
+\end{itemize}
+
+A informação associada à razão apresentada, à regra de origem e à evidência
+utilizada na tomada de decisão é, igualmente, conhecimento a considerar
+aquando da explicação do processo de inferência.
 
 \section{Estrutura das regras}
+\label{sec:estrutura-regras}
 
-\preencher{Secção por redigir}
+Esta distinção permite separar aquilo que é diretamente observado daquilo que
+é concluído pelo sistema. Por exemplo, a distância a um veículo da frente e a
+respetiva velocidade relativa constituem informação disponível para a
+inferência, enquanto a conclusão de que existe uma situação de risco elevado
+resulta da análise desses elementos através das regras definidas na base de
+conhecimento. Depois de representada sob a forma de factos, estados e
+eventos, esta informação é utilizada pelo motor de inferência. De forma
+simplificada, uma regra pode ser representada através da seguinte estrutura:
 
-\section{Hierarquia de ações e resolução de conflitos}
+\begin{tcolorbox}[enhanced, colback=corFundo, colframe=corEscura,
+    boxrule=0pt, leftrule=1.2pt, arc=0pt, outer arc=0pt,
+    left=8pt, right=8pt, top=4pt, bottom=4pt,
+    width=0.6\textwidth, center, fontupper=\ttfamily\small]
+  SE condição 1\\
+  E condição 2\\
+  E condição 3\\
+  ENTÃO ação proposta\\
+  NÍVEL DE RISCO = nível\\
+  PRIORIDADE DA DECISÃO = categoria
+\end{tcolorbox}
 
-\preencher{Secção por redigir}
+Neste sentido, uma regra pode depender de vários factos em simultâneo. A
+título de exemplo, detetar um peão não conduz, necessariamente, à mesma ação
+em todas as situações, uma vez que também podem ser relevantes a distância, a
+velocidade do veículo e o nível de risco identificado. Outro exemplo é a
+mudança de via, que poderá ser impedida caso a via de trânsito adjacente
+esteja ocupada ou exista uma decisão de segurança com prioridade superior.
+Assim, uma decisão pode resultar da combinação de diferentes factos, dados
+calculados e regras aplicáveis a uma situação concreta. Esta forma de
+representação permite manter o conhecimento do domínio explícito e separado
+da restante implementação.
 
-\section{Gestão de incerteza}
+Ficam fora do âmbito da aquisição de conhecimento e da respetiva
+representação aspetos como o planeamento do percurso do veículo, o uso de
+dados de sensores reais, o controlo detalhado da dinâmica do veículo, as
+regras que permitam a cobertura de todas as situações rodoviárias possíveis e
+a certificação necessária para a utilização num veículo real, uma vez que o
+foco do trabalho está na aquisição, representação, inferência e explicação do
+conhecimento.
 
-\preencher{Secção por redigir}
+\section{Regras representativas}
+\label{sec:regras-representativas}
 
-\section{Conclusões possíveis}
+A \cref{tab:regras} apresenta algumas das regras mais representativas da
+base de conhecimento, descritas em linguagem natural a partir das regras
+implementadas no protótipo e das indicações do perito ainda por implementar.
+Para cada regra, indicam-se as condições, a ação proposta, o nível de risco,
+o valor da categoria de prioridade (\cref{sec:prioridades}), o tipo de
+conhecimento que representa e o seu estado. Os limiares indicados são valores
+provisórios definidos pela equipa, que deverão ser substituídos pelos
+critérios discutidos com o perito (\cref{cap:sensores}).
 
-\preencher{Secção por redigir}
-
-\section{Fluxograma geral}
-
-\preencher{Secção por redigir}
+\begin{table}[H]
+  \centering
+  \caption{Regras representativas da base de conhecimento}
+  \label{tab:regras}
+  \footnotesize
+  \renewcommand{\arraystretch}{1.12}
+  \begin{tabularx}{\textwidth}{@{}L{0.5cm}
+      >{\raggedright\arraybackslash}X
+      >{\raggedright\arraybackslash}p{3.1cm}
+      L{1.4cm} C{0.95cm} L{1.75cm} L{1.95cm}@{}}
+    \toprule
+    \textbf{ID} & \textbf{SE} & \textbf{ENTÃO} & \textbf{Risco}
+      & \textbf{Prior.} & \textbf{Tipo} & \textbf{Estado} \\
+    \midrule
+    R1 & velocidade acima do limite detetado
+       & reduzir para o limite & moderado & 20 & normativo & implementada \\
+    R2 & chuva
+       & reduzir a velocidade, mais ainda se a visibilidade ou a aderência
+         forem reduzidas & moderado & 20 & heurístico & implementada \\
+    R3 & chuva e TTC inferior a 3~s em pelo menos 2 leituras nos últimos 2~s
+       & travar até 15~km/h & alto & 50 & temporal & implementada \\
+    R4 & peão na trajetória entre 6 e 24~m
+       & parar & alto & 50 & heurístico & implementada \\
+    R5 & peão na trajetória a 6~m ou menos
+       & travagem de emergência & crítico & 70 & heurístico & implementada \\
+    R6 & semáforo vermelho a 45~m ou menos
+       & parar & alto & 60 & normativo & implementada \\
+    R7 & pedido de mudança de via e via de destino ocupada
+       & manter a via & moderado & 30 & normativo & implementada \\
+    R8 & falha de um sensor (ausência de dados)
+       & paragem controlada & crítico & 70 & heurístico & prevista \\
+    R9 & distância ao objeto inferior à distância de travagem
+         (\cref{eq:dtrav})
+       & desvio, se a via adjacente estiver livre, ou travagem de emergência
+       & crítico & 70 & heurístico & prevista \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
 

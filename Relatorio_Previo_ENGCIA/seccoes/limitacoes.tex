@@ -1,11 +1,114 @@
 \chapter{Limitações e trabalho futuro}
 \label{cap:limitacoes}
 
-\section{Limitações}
+O desenvolvimento do presente projeto permitiu construir uma base funcional
+para a representação e utilização de conhecimento para o apoio à tomada de
+decisão em veículos autónomos. No entanto, no momento atual e tendo em conta
+o estado de desenvolvimento do projeto, existem limitações que devem ser
+consideradas na análise dos resultados obtidos, até à data. Estas limitações
+estão relacionadas tanto com o processo de aquisição do conhecimento como com
+as funcionalidades que ainda não se encontram totalmente implementadas.
 
-\preencher{Secção por redigir}
+\section{Limitações}
+\label{sec:limitacoes}
+
+Uma das principais limitações foi o momento em que foi possível ter o
+primeiro contacto com o perito. Uma parte significativa do trabalho já se
+encontrava em desenvolvimento quando foram realizadas as primeiras reuniões.
+Até esse momento, as decisões relativas à representação do ambiente, aos
+factos, às regras e aos possíveis cenários tinham sido definidas
+principalmente com base na pesquisa realizada e no conhecimento desenvolvido
+de cada elemento do grupo. Neste sentido, algumas opções foram, inicialmente,
+decididas em grupo, sem existir qualquer validação especializada para
+confirmar se o caminho que o grupo estava a seguir era o mais adequado. O
+contacto posterior com o perito permitiu esclarecer algumas destas questões e
+identificar aspetos que deveriam ser revistos, nomeadamente a importância da
+relação entre velocidade, distância e capacidade de travagem, o número de
+leituras a considerar, as prioridades nas decisões e a permanência dos factos
+na memória de trabalho. Contudo, como apenas se realizaram duas reuniões com
+o perito, algumas decisões atualmente presentes no projeto são ainda soluções
+em evolução, passíveis de análise e validação futuras.
+
+Outra limitação está relacionada com a própria evolução da base de
+conhecimento. À medida que são introduzidas novas situações, exceções e
+relações entre diferentes elementos do domínio, aumenta também o número de
+regras que é necessário manter e articular. Embora a organização dos
+ficheiros DRL, por áreas de conhecimento, facilite este processo, com o
+crescimento da base de regras pode ser mais difícil identificar sobreposições,
+conflitos ou condições não previstas. A revisão sistemática das regras, o
+recurso aos cenários de teste e a continuação da validação com o perito serão,
+por isso, importantes à medida que o sistema evoluir.
+
+Relativamente à própria natureza da simulação, existem também algumas
+limitações. O objetivo do sistema não é reproduzir de forma completa a
+dinâmica de um veículo autónomo real. O ambiente, a movimentação do veículo,
+as vias de circulação e os restantes elementos rodoviários estão
+representados de uma maneira simplificada, uma vez que o foco do trabalho é o
+desenvolvimento do motor de inferência e da base de conhecimento. Neste
+sentido, questões como o comportamento real dos pneus ou outras condições mais
+complexas não serão representadas com o mesmo nível de detalhe que seria
+necessário, caso o sistema fosse para utilização real. Também os sensores são
+simulados e recebem informação estruturada a partir do ambiente de simulação.
+Desta forma, o projeto não aborda problemas associados à perceção real como,
+por exemplo, o processamento de imagem.
+
+A explicação das decisões carece de complexidade. O \emph{Why} e o \emph{How}
+estão mais desenvolvidos, uma vez que o sistema consegue associar uma decisão
+à regra que lhe deu origem, à razão apresentada e à evidência utilizada, bem
+como acompanhar alterações na memória de trabalho e a execução das regras. O
+\emph{Why Not}, pelo contrário, necessita ainda de ser aperfeiçoado. Uma vez
+que o objetivo é explicar por que motivo uma determinada alternativa não foi
+escolhida, é necessário conservar as propostas concorrentes que não foram
+selecionadas e, quando aplicável, identificar as condições que impediram
+determinada regra de resultar numa proposta.
+
+A componente em Prolog é outra limitação do estado atual do trabalho, por
+enquanto, uma vez que foi dada prioridade inicial à implementação em Drools.
+Apesar de esta decisão permitir consolidar primeiro a arquitetura, os factos,
+os eventos e as regras, a comparação entre os dois paradigmas ainda não se
+encontra definida.
 
 \section{Trabalho futuro}
+\label{sec:trabalho-futuro}
 
-\preencher{Secção por redigir}
+Uma das prioridades futuras será continuar a revisão da base de conhecimento
+com o apoio do perito. Uma vez que o primeiro contacto se deu numa fase já
+relativamente avançada do desenvolvimento, será necessário verificar se as
+condições, prioridades e ações representam, adequadamente, o conhecimento do
+domínio que temos vindo a ter em conta. Neste contexto, um dos aspetos
+relevantes a aprofundar é a forma como a criticidade é determinada. A
+integração explícita da velocidade, da distância ao objeto, da velocidade
+relativa, do tempo de reação e da capacidade de travagem poderá permitir
+substituir alguns limiares fixos por critérios mais dependentes do contexto
+observado. Ao nível da informação sensorial, uma evolução importante consiste
+na introdução de níveis de confiança associados às deteções e na definição de
+regras de confirmação entre diferentes fontes. Desta forma, o sistema poderá
+distinguir não só o valor de uma determinada observação, como também o grau
+de confiança da mesma.
 
+A componente que dá resposta ao \emph{Why Not} necessita de ser desenvolvida
+com mais pormenor e atenção. Para cada alternativa não escolhida poderá ser
+registado o respetivo motivo, como uma prioridade inferior ou uma condição não
+satisfeita. Esta informação permitirá apresentar explicações construtivas,
+mais claras e mais úteis para a análise e validação da base de conhecimento.
+
+Para além da implementação em Prolog, podem ainda ser introduzidas situações
+com maior interação entre veículos, obstáculos inesperados, diferentes
+condições meteorológicas e combinações mais complexas de sinalização, com o
+objetivo de acrescer complexidade à simulação apresentada. A Teoria dos Jogos
+poderá também ser explorada como abordagem complementar em situações onde a
+decisão depende do comportamento esperado de outros intervenientes,
+nomeadamente nas mudanças de via. Neste caso, as regras de segurança do
+sistema pericial continuariam a funcionar como restrições, enquanto uma
+componente adicional seria responsável por apoiar a escolha entre as
+diferentes manobras consideradas seguras e possíveis. Posteriormente, poderá
+ainda ser considerado um ambiente de simulação mais detalhado ou a utilização
+de dados provenientes de sensores reais. No entanto, essa evolução deverá
+preservar o objetivo principal do projeto.
+
+Assim, as limitações identificadas não dizem respeito apenas às
+funcionalidades ainda incompletas, mas também ajudam a definir as etapas
+seguintes do desenvolvimento. A continuação do contacto com o perito, a
+revisão das regras, a conclusão do \emph{Why Not} e do Prolog e a introdução
+de novos cenários permitirão aproximar progressivamente o protótipo do modelo
+conceptual.

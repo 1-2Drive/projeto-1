@@ -1,0 +1,293 @@
+\chapter{Aquisição de conhecimento}
+\label{cap:aquisicao}
+
+Num sistema pericial, a qualidade das decisões depende, maioritariamente, da
+forma como o conhecimento do domínio é identificado, organizado e
+representado. No presente projeto, a construção da base de conhecimento
+acompanhou a própria evolução do sistema, ou seja, as regras foram definidas a
+partir da identificação de situações relevantes na condução, dos dados
+necessários para as analisar e das possíveis ações associadas a cada
+situação.
+
+À medida que o trabalho foi progredindo, algumas das regras definidas
+inicialmente foram adaptadas com base na pesquisa realizada, na análise de
+cenários e no conhecimento partilhado pelo perito. Neste sentido, a base de
+conhecimento é uma estrutura em evolução, que pode ser atualizada sempre que
+sejam identificadas novas condições, exceções ou relações relevantes para o
+processo de decisão.
+
+\section{Fontes de conhecimento}
+\label{sec:fontes}
+
+A primeira fonte considerada corresponde à pesquisa bibliográfica e técnica,
+utilizada para aprofundar conceitos relacionados com os sistemas periciais,
+sensores, segurança rodoviária e a avaliação de situações de risco. Esta
+pesquisa permitiu também compreender melhor determinados indicadores
+relevantes para o sistema, como o TTC, utilizado
+para relacionar a distância a um objeto com a velocidade de aproximação.
+
+A segunda fonte diz respeito ao conhecimento desenvolvido pelo grupo,
+nomeadamente à identificação de elementos considerados importantes para a
+tomada de decisão, às possíveis relações entre estes elementos e às ações que
+o sistema poderia propor. Este conhecimento foi utilizado para construir uma
+primeira versão das regras a aplicar e, simultaneamente, permitiu identificar
+dúvidas a esclarecer com o perito.
+
+Por último, tivemos o contributo do perito, não só para adquirir novas
+informações e conhecimento, mas também para rever e questionar algumas
+decisões inicialmente definidas pelo grupo. Esta fonte de conhecimento
+permitiu esclarecer aspetos do domínio relacionados, por exemplo, com
+critérios de criticidade, prioridades e número de leituras a considerar.
+Desta forma, a base de conhecimento é o resultado da combinação entre
+pesquisa, conhecimento desenvolvido pelo grupo e conhecimento especializado.
+
+\section{O perito e a partilha de conhecimento}
+\label{sec:perito}
+
+Para apoiar o trabalho desenvolvido, foram realizadas reuniões com o
+Professor Doutor Agostinho Gil Teixeira Lopes, Professor Auxiliar do
+Departamento de Engenharia Informática (DEI) do ISEP, doutorado na área de
+robótica inteligente. A primeira reunião, realizada no dia 1 de outubro de
+2026, teve como principal objetivo apresentar o problema em desenvolvimento,
+esclarecer algumas das dificuldades identificadas pelo grupo e reter
+informação especializada sobre o domínio. Um dos aspetos discutidos esteve
+relacionado com a representação do ambiente, no qual o veículo circula. Até ao
+momento da reunião, uma parte significativa do trabalho estava organizada
+numa árvore com diferentes caminhos possíveis, o que dificultava a definição e
+a articulação das situações a reproduzir nos possíveis cenários. Durante a
+reunião foi sugerida, como alternativa, a possibilidade de representar o
+percurso através de uma matriz, na qual o veículo e os diferentes elementos do
+ambiente pudessem ser posicionados nas vias de circulação.
+
+Nesta nova perspetiva, as posições da matriz permitiriam representar, de
+forma simplificada, diferentes elementos do ambiente, ou seja, o objeto
+presente na estrada seria colocado numa determinada posição, enquanto os
+sinais de trânsito, por exemplo, poderiam ser associados a uma coluna ou
+localização específica, ao longo do percurso. Deste modo, a matriz
+funcionaria como uma representação simplificada do cenário onde irá ocorrer a
+simulação, através da qual se estabelece uma relação da posição do veículo
+com os elementos que têm influência na tomada de decisão. Esta primeira
+reunião permitiu também reforçar a importância das variáveis como a
+velocidade e a distância, relativamente aos objetos, principalmente em
+situações relacionadas com o risco de colisão. Deste ponto de vista, um dos
+aspetos a ter em atenção no desenvolvimento do trabalho é perceber de que
+forma a evolução da relação entre o veículo e o objeto pode alterar o nível de
+risco e, consequentemente, influenciar a decisão proposta pelo sistema.
+
+Outro ponto abordado esteve relacionado com a definição da informação
+utilizada durante o processo de inferência, tendo em conta que nem todos os
+elementos existentes no ambiente apresentam a mesma relevância para uma
+determinada decisão. Para além desta chamada de atenção por parte do perito,
+foi ainda sugerida a análise da Teoria dos Jogos, como possível abordagem para
+determinadas situações de interação. Esta possibilidade foi considerada
+particularmente interessante para cenários em que a decisão de um veículo
+pode depender do comportamento de outros intervenientes. No entanto, nesta
+fase, a Teoria dos Jogos é considerada apenas como uma possível abordagem
+complementar para desenvolvimento futuro. De uma forma geral, o contributo do
+perito focou-se nas seguintes questões:
+\begin{itemize}
+  \item o comportamento do veículo em caso de falha;
+  \item a relevância dos dados de cada sensor para a tomada de decisão;
+  \item critérios utilizados para distinguir a criticidade do cenário e
+    ambiente;
+  \item a relação entre velocidade, distância e capacidade de travagem;
+  \item o número de leituras a considerar antes de tomar uma decisão;
+  \item os níveis de prioridade e os possíveis critérios de desempate;
+  \item o tempo de permanência dos factos na memória de trabalho.
+\end{itemize}
+
+As questões colocadas ao perito foram preparadas com o objetivo de adquirir
+conhecimento que pudesse, posteriormente, ser utilizado na representação e
+nas regras a utilizar pelo sistema. Neste sentido, procurou-se não só
+confirmar se determinadas decisões eram adequadas, mas também perceber quais
+as variáveis que deviam ser avaliadas, que condições poderiam alterar uma
+decisão, que exceções deveriam ser previstas e de que forma situações de
+conflito ou maior risco deveriam ser tratadas.
+
+Assim, a aquisição de conhecimento junto do perito decorreu em duas sessões.
+A primeira (S1) foi uma reunião via Teams e permitiu apresentar o projeto,
+discutir a representação do ambiente, os factos considerados, os cenários
+previstos e algumas opções de implementação. A segunda (S2), para facilitar a
+comunicação com o perito, foi um questionário escrito, enviado por
+\emph{email}, com perguntas preparadas pela equipa a partir das questões que
+tinham ficado em aberto durante a construção da base de conhecimento.
+
+\begin{table}[H]
+  \centering
+  \caption{Sessão 1 com o perito}
+  \label{tab:sessao1}
+  \small
+  \begin{tabularx}{\textwidth}{@{}L{3.2cm}X@{}}
+    \toprule
+    \multicolumn{2}{@{}l}{\textbf{Sessão 1 via Teams -- Reunião inicial}} \\
+    \midrule
+    \textbf{Data e hora} & 1 de outubro de 2026 -- 20h10 \\
+    \textbf{Objetivo} & Apresentar o projeto ao perito e discutir a respetiva
+      implementação. \\
+    \textbf{Aspetos abordados} & Foram discutidos aspetos relacionados com a
+      estrutura geral do sistema, a representação do ambiente de condução, a
+      definição dos factos da base de conhecimento e a influência desses
+      factos no processo de inferência e na tomada de decisão. \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\begin{table}[H]
+  \centering
+  \caption{Sessão 2 com o perito}
+  \label{tab:sessao2}
+  \small
+  \begin{tabularx}{\textwidth}{@{}L{3.2cm}X@{}}
+    \toprule
+    \multicolumn{2}{@{}l}{\textbf{Sessão 2 via \emph{email} -- Esclarecimento de dúvidas}} \\
+    \midrule
+    \textbf{Data} & 2 de outubro de 2026 \\
+    \textbf{Objetivo} & Esclarecer as questões em aberto sobre falhas,
+      critérios de criticidade, confirmação de leituras, prioridades, memória
+      de trabalho, dados contraditórios, cenários e explicações. \\
+    \textbf{Aspetos abordados} & Neste segundo momento, foram abordados
+      aspetos relacionados com a falha do veículo, relevância dos sensores,
+      definição de situações críticas através de variáveis como velocidade,
+      distância e TTC, número de leituras necessárias para a tomada de
+      decisão, prioridades entre ações, gestão da memória de trabalho,
+      tratamento de dados contraditórios, definição dos cenários de simulação
+      e mecanismos de explicação \emph{Why} e \emph{Why Not}. As perguntas e
+      respostas encontram-se no Anexo~\ref{anx:sessoes}. \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+O conhecimento obtido durante estas sessões contribuiu para a base de suporte
+da estrutura do sistema. Alguns dos aspetos discutidos encontram-se já
+refletidos no trabalho desenvolvido, nomeadamente a utilização da informação
+temporal, a consideração de várias leituras em determinadas situações, a
+gestão da informação presente na memória de trabalho, as prioridades nas
+propostas de decisão e as explicações associadas às regras consideradas pelo
+motor de inferência. Sempre que possível, procurou-se manter uma relação entre
+o conhecimento adquirido, a respetiva representação através de factos e
+regras e os cenários utilizados para testar o comportamento resultante. Neste
+sentido, o processo de aquisição e evolução do conhecimento pode ser
+representado da seguinte forma:
+
+\begin{figure}[H]
+  \centering
+  \begin{tikzpicture}[
+      node distance=6mm and 8mm,
+      etapa/.style={draw=corEscura, fill=corFundo, thick, rounded corners=2pt,
+        text width=5cm, minimum height=0.9cm, align=center, font=\small},
+      fonte/.style={etapa, text width=3.6cm},
+      seta/.style={-latex, thick, draw=corEscura}]
+    \node[etapa] (aquisicao) {Aquisição de conhecimento\\do domínio};
+    \node[fonte, left=of aquisicao, yshift=7mm] (literatura)
+      {Literatura académica\\e técnica};
+    \node[fonte, left=of aquisicao, yshift=-7mm] (perito)
+      {Perito do domínio\\Prof.\ Gil Lopes};
+    \node[etapa, below=of aquisicao] (modelo)
+      {Modelo conceptual: factos,\\eventos e prioridades};
+    \node[etapa, below=of modelo] (regras) {Formalização das regras};
+    \node[etapa, below=of regras] (validacao) {Validação de cenários e testes};
+    \node[fonte, right=of validacao] (revisao)
+      {Revisão da base\\de conhecimento};
+    \draw[seta] (literatura.east) -- ([yshift=2mm]aquisicao.west);
+    \draw[seta] (perito.east) -- ([yshift=-2mm]aquisicao.west);
+    \draw[seta] (aquisicao) -- (modelo);
+    \draw[seta] (modelo) -- (regras);
+    \draw[seta] (regras) -- (validacao);
+    \draw[seta] (validacao) -- (revisao);
+    \draw[seta] (revisao.north) |- node[pos=0.25, right, font=\footnotesize,
+      text=corCinza] {iteração} (aquisicao.east);
+  \end{tikzpicture}
+  \caption{Processo de aquisição, validação e atualização da base de
+    conhecimento}
+  \label{fig:aquisicao}
+\end{figure}
+
+% ---------------------------------------------------------------
+% Secção 3.3 (proposta): desativada até ser validada pela equipa.
+% Para a reativar, apagar o \iffalse abaixo e o \fi no fim do ficheiro.
+% ---------------------------------------------------------------
+\iffalse
+\section{Síntese do conhecimento adquirido}
+\label{sec:alteracoes-bc}
+
+A \cref{tab:sintese-perito} resume as indicações do perito e a forma como se
+refletem no sistema, distinguindo o que já está implementado no protótipo do
+que está apenas previsto ou ainda em análise pela equipa. As perguntas e
+respostas completas encontram-se no Anexo~\ref{anx:sessoes}.
+
+\begin{table}[H]
+  \centering
+  \caption{Indicações do perito e reflexo no sistema}
+  \label{tab:sintese-perito}
+  \footnotesize
+  \renewcommand{\arraystretch}{1.15}
+  \begin{tabularx}{\textwidth}{@{}L{2.3cm}
+      >{\raggedright\arraybackslash}X
+      >{\raggedright\arraybackslash}X
+      L{2.05cm}@{}}
+    \toprule
+    \textbf{Tema} & \textbf{Indicação do perito} & \textbf{Reflexo no sistema}
+      & \textbf{Estado} \\
+    \midrule
+    Falha do veículo
+      & Paragem imediata (STOP)
+      & Paragem com a prioridade máxima perante uma falha; o protótipo ainda
+        não deteta falhas
+      & Previsto \\
+    Relevância dos sensores
+      & Os dados considerados são suficientes; cada sensor é necessário na
+        situação para a qual contribui
+      & Sensores descritos no \cref{cap:sensores}; cinco são simulados no
+        protótipo
+      & Parcial \\
+    Criticidade
+      & Equação com a velocidade, a distância e a capacidade de travagem, sem
+        travagens instantâneas e com um ponto de não-retorno
+      & Comparação da distância ao objeto com a distância de travagem; o
+        protótipo usa ainda limiares fixos de TTC e de distância
+      & Previsto \\
+    Número de leituras
+      & Uma leitura numa situação crítica; duas numa situação normal
+      & Janelas temporais de leituras recentes; a regra de TTC persistente
+        exige três leituras
+      & Em análise \\
+    Prioridades e desempate
+      & Quatro níveis (baixo, médio, alto e crítico); desempate aleatório ou
+        pela primeira opção de uma lista ordenada
+      & Quatro níveis de risco e sete categorias de prioridade; desempate pela
+        menor velocidade recomendada
+      & Em análise \\
+    Memória de trabalho
+      & Esquecer os eventos que saem do campo de deteção; os sinais alteram um
+        estado
+      & As perceções deixam de ser consideradas sem atualização durante cerca
+        de 600~ms; os sinais atualizam estados, como o limite de velocidade
+      & Implementado \\
+    Dados contraditórios
+      & Sem terceira fonte, aplica-se o desempate; com risco alto ou crítico,
+        paragem
+      & LiDAR como terceira fonte e regra de desempate
+      & Previsto \\
+    Cenários
+      & Os cenários da S1, a passadeira com peão e objetos inseridos pelo
+        utilizador
+      & Catorze cenários e inserção de elementos pelo utilizador; a passadeira
+        ainda não existe
+      & Parcial \\
+    Explicações
+      & As explicações devem seguir as regras
+      & Cada decisão guarda a regra de origem, a razão e a evidência
+      & Implementado \\
+    Representação do ambiente (S1)
+      & Representar o percurso através de uma matriz
+      & Elementos do ambiente posicionados por via e por posição ao longo do
+        percurso
+      & Implementado \\
+    Teoria dos Jogos (S1)
+      & Abordagem para situações de interação entre veículos
+      & Considerada para trabalho futuro
+      & Previsto \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+\fi

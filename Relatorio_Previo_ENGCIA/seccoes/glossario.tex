@@ -1,14 +1,12 @@
-\chapter{Terminologia específica}
+\chapter*{Terminologia específica}
 \label{cap:glossario}
 
-A \cref{tab:glossario} reúne, por ordem alfabética, os termos técnicos
-usados neste relatório. Quando o termo é habitualmente usado em inglês,
-indica-se o equivalente entre parênteses.
+A tabela seguinte reúne, por ordem alfabética, os termos técnicos usados
+neste relatório. Quando o termo é habitualmente usado em inglês, indica-se o
+equivalente entre parênteses.
 
 {\small
 \begin{longtable}{@{}L{4.4cm}L{10.0cm}@{}}
-  \caption{Terminologia específica}
-  \label{tab:glossario}\\
   \toprule
   \textbf{Termo} & \textbf{Definição} \\
   \midrule
@@ -22,7 +20,7 @@ indica-se o equivalente entre parênteses.
   ADAS
     & Sistemas avançados de assistência à condução (\emph{Advanced Driver
       Assistance Systems}), como a travagem automática de emergência ou a
-      manutenção na faixa. \\
+      manutenção na via. \\
   AEB
     & Travagem automática de emergência (\emph{Autonomous Emergency
       Braking}): função que trava o veículo quando deteta uma colisão
@@ -38,17 +36,26 @@ indica-se o equivalente entre parênteses.
   Base de conhecimento
     & Componente de um sistema pericial que contém o conhecimento do
       domínio sob a forma de factos, regras, prioridades e exceções. \\
+  CEP
+    & Processamento de eventos complexos (\emph{Complex Event Processing}):
+      tratamento de dados como eventos com dimensão temporal, analisados em
+      janelas de tempo ou de número de observações. \\
   Confiança da deteção
-    & Medida do grau de certeza com que um sensor, ou a fusão de vários,
-      identifica um objeto ou uma condição. \\
+    & Medida do grau de certeza associado a uma deteção sensorial. A sua
+      representação explícita encontra-se prevista como evolução futura do
+      protótipo. \\
   Desempate
-    & Critério aplicado quando duas ou mais ações candidatas têm a mesma
-      prioridade. Neste projeto, escolhe-se a primeira de uma lista
-      ordenada de ações (\cref{sec:alteracoes-bc}). \\
+    & Critério utilizado quando duas propostas apresentam a mesma
+      prioridade. Na implementação atual, quando ambas possuem uma
+      velocidade recomendada, é favorecida a proposta correspondente à
+      velocidade mais reduzida. \\
   Distância de paragem
     & Distância percorrida pelo veículo desde a deteção de um perigo até à
       imobilização. Inclui a distância percorrida durante o tempo de
       reação e a distância de travagem. \\
+  DRL
+    & Linguagem em que são escritas as regras do Drools (\emph{Drools Rule
+      Language}). \\
   Drools
     & Motor de regras de produção de código aberto para Java, usado na
       implementação do sistema. \\
@@ -60,19 +67,22 @@ indica-se o equivalente entre parênteses.
     & Estratégia de inferência que parte de uma conclusão a provar e
       procura os factos e regras que a sustentam (\emph{backward
       chaining}). \\
+  \emph{Entry point}
+    & Em Drools, canal através do qual os eventos são inseridos na sessão,
+      permitindo separar diferentes fluxos de informação. \\
   Explicação \emph{How}
     & Explicação que mostra a cadeia de factos e regras que conduziu a uma
       conclusão. \\
   Explicação \emph{Why}
     & Explicação que justifica por que motivo uma ação foi escolhida,
       indicando a regra aplicada e as condições satisfeitas. \\
-  Explicação \emph{Why not}
+  Explicação \emph{Why Not}
     & Explicação que justifica por que motivo uma ação alternativa não foi
       escolhida, indicando as condições não satisfeitas ou a ação de maior
       prioridade que prevaleceu. \\
   Facto
     & Unidade de informação sobre a situação atual, mantida na memória de
-      trabalho; por exemplo, \facto{obstaculo\_confirmado}. \\
+      trabalho; por exemplo, «há um peão na trajetória». \\
   Falso positivo
     & Deteção de um objeto ou condição que não existe na realidade,
       resultante, por exemplo, de uma leitura atípica de um sensor. \\
@@ -86,7 +96,7 @@ indica-se o equivalente entre parênteses.
   IMU
     & Unidade de medição inercial (\emph{Inertial Measurement Unit}):
       sensor que mede acelerações e velocidades angulares do veículo. \\
-  Intervalo temporal
+  Intervalo temporal (THW)
     & Tempo que o veículo próprio demora a percorrer a distância que o
       separa do veículo precedente, à velocidade atual (\emph{time
       headway}). \\
@@ -126,8 +136,8 @@ indica-se o equivalente entre parênteses.
     & Instante a partir do qual a travagem já não permite evitar a
       colisão. \\
   Prioridade
-    & Nível de importância associado a uma regra ou ação: baixo, médio,
-      alto ou crítico. \\
+    & Importância semântica atribuída a uma proposta de decisão e utilizada
+      pelo \texttt{DecisionContext} para comparar propostas concorrentes. \\
   Radar
     & Sensor que usa ondas de rádio para medir a distância e a velocidade
       relativa de objetos. \\
@@ -161,11 +171,15 @@ indica-se o equivalente entre parênteses.
     & Tempo que falta para uma colisão se as velocidades se mantiverem:
       distância ao objeto dividida pela velocidade de aproximação
       (\emph{time to collision}). \\
+  Tempo até transpor a marca rodoviária (TLC)
+    & Tempo que falta para o veículo atravessar a marca rodoviária que
+      delimita a via, se mantiver a trajetória atual (\emph{time to line
+      crossing}). \\
   TTC
     & Sigla de \emph{time to collision}; ver tempo até à colisão. \\
   Veículo precedente
     & Veículo que circula imediatamente à frente do veículo próprio, na
-      mesma faixa (\emph{lead vehicle}). \\
+      mesma via (\emph{lead vehicle}). \\
   Veículo próprio
     & Veículo controlado pelo sistema (\emph{ego vehicle}). \\
   Velocidade relativa

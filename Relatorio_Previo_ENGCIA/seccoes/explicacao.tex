@@ -1,15 +1,132 @@
-\chapter{Mecanismo de explicação}
+\chapter{Explicação da tomada de decisão}
 \label{cap:explicacao}
 
-\section{Explicação \emph{Why}}
+Uma das características do sistema pericial é a possibilidade de compreender
+o raciocínio que conduziu a uma determinada conclusão e, por isso, permitir
+relacionar a decisão com os factos e as regras utilizados durante o processo
+de inferência. No contexto deste projeto, a ação selecionada é importante;
+porém, interessa perceber também quais as condições que levaram a essa
+escolha e por que motivo outras alternativas não prevaleceram. Para
+estruturar esta componente, foram consideradas três formas de explicação
+complementares: \emph{Why}, \emph{How} e \emph{Why Not}, cada uma orientada
+para uma questão diferente relacionada com a tomada de decisão.
 
-\preencher{Secção por redigir}
+\begin{figure}[H]
+  \centering
+  \begin{tikzpicture}[
+      caixa/.style={draw=corEscura, fill=corFundo, thick, rounded corners=2pt,
+        text width=9.2cm, minimum height=1.15cm, align=center, font=\small},
+      seta/.style={-latex, thick, draw=corEscura}]
+    \node[draw=corEscura, fill=corFundo, thick, rounded corners=2pt,
+      minimum height=1.15cm, text width=2.4cm, align=center, font=\small]
+      (decisao) at (0,0) {Decisão final};
+    \node[caixa] (why) at (7.4,1.6)
+      {\emph{Why?} -- Porque foi escolhida?\\Regra + evidência};
+    \node[caixa] (how) at (7.4,0)
+      {\emph{How?} -- Como foi obtida?\\Sensor $\rightarrow$ evento
+       $\rightarrow$ facto $\rightarrow$ regra $\rightarrow$ decisão};
+    \node[caixa] (whynot) at (7.4,-1.6)
+      {\emph{Why Not?} -- Porque não outra ação?\\Condições não satisfeitas /
+       alternativa de menor prioridade};
+    \draw[seta] (decisao.east) -- (why.west);
+    \draw[seta] (decisao.east) -- (how.west);
+    \draw[seta] (decisao.east) -- (whynot.west);
+  \end{tikzpicture}
+  \caption{Três dimensões de explicação}
+  \label{fig:explicacao}
+\end{figure}
 
-\section{Explicação \emph{Why not}}
+\section{\emph{Why}}
+\label{sec:why}
 
-\preencher{Secção por redigir}
+A explicação do \emph{Why} procura dar resposta à questão: «O porquê de ter
+sido tomada esta decisão?». Neste sentido, é necessário identificar a regra
+que originou a proposta, os factos que satisfizeram as respetivas condições e
+a prioridade associada à ação. Por exemplo, caso o sistema determine uma
+travagem por ter detetado um peão, a explicação deverá permitir perceber que
+a decisão foi o resultado da presença do peão no caminho, da distância
+observada, do nível de risco identificado e da regra correspondente a essa
+situação. Como proposta, passível de alteração, procurar-se-á utilizar uma
+estrutura semelhante à seguinte:
 
-\section{Informação registada}
+\begin{tcolorbox}[enhanced, colback=corFundo, colframe=corEscura,
+    boxrule=0pt, leftrule=1.2pt, arc=0pt, outer arc=0pt,
+    left=8pt, right=8pt, top=4pt, bottom=4pt, fontupper=\small]
+  \textbf{Decisão:} Travar.\\
+  \textbf{Motivo:} Foi detetado um peão na trajetória do veículo e a situação
+  identificada levou à aplicação de uma regra de segurança cuja proposta
+  prevaleceu sobre as restantes.
+\end{tcolorbox}
 
-\preencher{Secção por redigir}
+Na implementação atual, as decisões propostas permitem associar informação
+relativa à razão apresentada, à regra de origem e à evidência utilizada.
+Desta forma, o \emph{Why} permite justificar a ação selecionada através do
+conhecimento efetivamente utilizado durante a tomada de decisão.
 
+\section{\emph{How}}
+\label{sec:how}
+
+Enquanto o \emph{Why} tem como finalidade justificar a decisão final, o
+\emph{How} tem como foco descrever como é que o sistema chegou até essa
+conclusão. Neste caso, o objetivo é reconstruir o percurso desde a informação
+recolhida até à ação selecionada. A explicação pode, por exemplo, identificar
+a origem da informação, o facto criado a partir dessa observação, a regra que
+utilizou esse facto e a decisão resultante desse processo. A título de
+exemplo, num cenário em que é detetado um peão, a explicação poderá mostrar
+que a informação foi obtida através de um sensor, posteriormente representada
+como um facto na memória de trabalho, utilizada por uma determinada regra e,
+por fim, transformada numa proposta de ação. A possibilidade de consultar
+alterações na memória de trabalho e acompanhar as regras que foram ativadas
+permite reconstruir este percurso e, consequentemente, perceber de que forma
+a conclusão foi obtida.
+
+\section{\emph{Why Not}}
+\label{sec:whynot}
+
+O \emph{Why Not} procura dar resposta à seguinte questão: «Porque não foi
+escolhida outra alternativa?».
+
+Uma alternativa pode não ter sido escolhida por dois motivos principais. Em
+primeiro lugar, não reuniu as condições necessárias para ativar a regra que a
+escolhesse. Por outro lado, essa ação pode ter sido efetivamente proposta,
+mas ter sido recusada face a outra decisão com uma prioridade superior. A
+título de exemplo, imagine-se que, perante uma situação de risco, o sistema
+poderá considerar uma redução de velocidade e, simultaneamente, uma travagem.
+Caso a travagem esteja associada a um nível de prioridade superior, a
+explicação deverá indicar que a redução de velocidade não foi selecionada
+porque a situação exigia uma ação com maior criticidade. Uma explicação deste
+tipo poderá ser feita da seguinte forma:
+
+\begin{tcolorbox}[enhanced, colback=corFundo, colframe=corEscura,
+    boxrule=0pt, leftrule=1.2pt, arc=0pt, outer arc=0pt,
+    left=8pt, right=8pt, top=4pt, bottom=4pt, fontupper=\small]
+  \textbf{Alternativa:} Desacelerar.\\
+  \textbf{Motivo de ter sido rejeitada:} Foi identificada uma situação de
+  maior risco e respetiva prioridade superior (regra de travagem).
+\end{tcolorbox}
+
+O \emph{Why Not} pode também ser utilizado quando uma determinada ação nem
+chegou a ser proposta. Por exemplo, se for questionado por que motivo o
+veículo não mudou de via, a explicação poderá indicar que a via adjacente se
+encontrava ocupada ou que não estavam reunidas as condições necessárias para
+realizar a manobra.
+
+No estado atual do projeto, esta componente encontra-se ainda em
+desenvolvimento. O sistema consegue justificar a decisão selecionada, mas uma
+explicação completa de \emph{Why Not} exige a conservação explícita das
+propostas não selecionadas ou das condições que impediram determinadas regras
+de produzir uma proposta.
+
+A informação necessária para construir estas explicações poderá incluir a
+identificação da regra, os factos e eventos considerados, as condições
+verificadas, a prioridade atribuída e as alternativas analisadas. Para além de
+facilitar a compreensão das decisões, esta informação poderá também
+contribuir para a identificação de regras incompletas ou comportamentos
+inesperados durante a validação do sistema.
+
+Desta forma, os mecanismos \emph{Why}, \emph{How} e \emph{Why Not}
+complementam-se: o primeiro justifica a decisão tomada, o segundo apresenta o
+percurso que conduziu até essa decisão e o terceiro tenta explicar por que
+razão uma alternativa não foi selecionada. Em conjunto, estes propósitos
+contribuem para um processo de inferência mais transparente e facilitam a
+análise das decisões tomadas.

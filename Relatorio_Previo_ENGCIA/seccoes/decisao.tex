@@ -1,0 +1,153 @@
+\chapter{Raciocínio e tomada de decisão}
+\label{cap:decisao}
+
+A tomada de decisão num ambiente dinâmico depende não só dos factos conhecidos
+num determinado momento, mas também da forma como esses factos evoluem ao
+longo do tempo e da possibilidade de mais do que uma regra ser aplicável em
+simultâneo. Neste sentido, o sistema necessita de mecanismos que permitam
+considerar informação recente, distinguir o nível de risco associado às
+diferentes situações e estabelecer uma ordem entre as propostas de decisão
+resultantes do motor de inferência.
+
+\section{Raciocínio temporal}
+\label{sec:raciocinio-temporal}
+
+A informação recebida pelos sensores é atualizada continuamente e pode sofrer
+alterações nos diferentes ciclos de inferência. Uma única leitura pode
+representar uma ocorrência com um valor atípico. No entanto, várias leituras
+sucessivas podem indicar que uma determinada condição se mantém ou que a
+situação está a evoluir. O raciocínio temporal permite, assim, que o sistema
+não dependa exclusivamente do último valor recebido. Por exemplo, uma única
+leitura de TTC reduzido pode ter uma interpretação diferente de uma sequência
+de leituras em que o valor permanece baixo ou continua a diminuir. Da mesma
+forma, a análise de várias medições de distância pode ajudar a perceber se um
+veículo se está a aproximar, a afastar ou a manter uma distância
+aproximadamente constante.
+
+Esta necessidade foi também abordada durante a aquisição de conhecimento
+junto do perito. Segundo a informação recolhida, o número de leituras
+necessário antes de tomar uma decisão depende da gravidade da situação. Em
+condições normais, pode ser considerada uma segunda leitura para reduzir a
+influência de um possível falso positivo. Numa situação crítica, pelo
+contrário, esperar por uma nova confirmação pode atrasar uma ação necessária,
+ou seja, a decisão poderá ter de ser tomada à primeira indicação de perigo. Na
+implementação atual, este princípio encontra-se representado, nomeadamente,
+no tratamento temporal do TTC. O sistema consegue ter em conta várias
+ocorrências recentes numa determinada janela temporal e, assim, identificar
+situações persistentes. Em simultâneo, existem condições de maior criticidade
+que podem desencadear uma reação imediata, sem aguardar por novas
+observações.
+
+A utilização de uma sessão com estado, em conjunto com mecanismos de
+processamento temporal, permite ainda manter informação relevante entre
+diferentes ciclos de inferência. Desta forma, o sistema consegue considerar a
+evolução recente de determinados valores, em vez de analisar cada leitura de
+forma completamente isolada. À medida que estas condições são avaliadas,
+várias regras podem ser aplicadas em simultâneo e daí resultarem diferentes
+propostas de ação. Neste sentido, surge a necessidade de distinguir o risco
+associado à situação e a importância das diferentes propostas de ação.
+
+\section{Níveis de risco, prioridades e resolução de conflitos}
+\label{sec:prioridades}
+
+O facto de uma regra satisfazer determinadas condições não significa
+necessariamente que a ação proposta corresponda à decisão final. No mesmo
+ciclo de inferência podem existir várias situações relevantes e,
+consequentemente, várias regras capazes de encontrar propostas de tomada de
+decisão diferentes. Para caracterizar a gravidade das situações, são
+considerados quatro níveis de risco:
+
+\begin{figure}[H]
+  \centering
+  \definecolor{nivelModerado}{HTML}{E9B824}
+  \begin{tikzpicture}
+    \foreach \i/\nome/\cor/\texto in {%
+        0/Baixo/corSucesso/white,
+        1/Moderado/nivelModerado/black,
+        2/Alto/corAviso/white,
+        3/Crítico/corCritico/white} {
+      \pgfmathsetmacro{\x}{\i*3.7}
+      \fill[\cor] (\x,0) -- ++(3.2,0) -- ++(0.45,0.45) -- ++(-0.45,0.45)
+        -- ++(-3.2,0) -- ++(0.45,-0.45) -- cycle;
+      \node[text=\texto, font=\small\bfseries] at (\x+1.8,0.45) {\nome};
+    }
+  \end{tikzpicture}
+  \caption{Níveis de risco considerados na tomada de decisão}
+  \label{fig:niveis-risco}
+\end{figure}
+
+Estes níveis permitem distinguir, de forma geral, situações de menor gravidade
+de situações que exigem uma resposta mais urgente. Uma situação classificada
+como crítica representa, assim, um contexto de maior risco do que uma situação
+classificada como alta, moderada ou baixa. Contudo, o nível de risco não
+corresponde diretamente à prioridade utilizada para selecionar a decisão
+final. Na implementação atual, as propostas resultantes da aplicação das
+regras possuem também uma prioridade associada ao tipo de decisão. Esta
+separação permite distinguir a gravidade de uma situação da importância
+atribuída à ação durante o processo de seleção. Por exemplo, uma regra
+relacionada com a progressão normal do veículo pode ser aplicada no mesmo
+momento que uma regra destinada a evitar uma colisão. Mesmo que ambas sejam
+propostas válidas, a proposta associada à segurança deverá prevalecer. Foram
+definidas sete categorias de prioridade, apresentadas na tabela seguinte. Os
+valores associados a cada categoria são utilizados apenas para comparar a
+importância das propostas durante a tomada de decisão.
+
+\begin{table}[H]
+  \centering
+  \caption{Categorias de prioridade utilizadas na seleção das propostas de
+    decisão}
+  \label{tab:prioridades}
+  \small
+  \begin{tabularx}{\textwidth}{@{}L{4.6cm}C{1.2cm}X@{}}
+    \toprule
+    \textbf{Categoria de prioridade} & \textbf{Valor} & \textbf{Significado} \\
+    \midrule
+    Progressão e conforto & 10 & Continuação normal da circulação quando não
+      existe uma situação mais prioritária \\
+    Cumprimento da velocidade & 20 & Adaptação da velocidade aos limites
+      aplicáveis \\
+    Segurança na manobra & 30 & Segurança associada, por exemplo, à mudança de
+      via \\
+    Perigo rodoviário & 40 & Resposta face a obstáculos ou outros perigos
+      existentes na via \\
+    Prevenção da colisão & 50 & Ações realizadas com o objetivo de evitar uma
+      possível colisão \\
+    Paragem legal obrigatória & 60 & Situações em que existe uma obrigação
+      legal de paragem \\
+    Segurança e emergência & 70 & Situações que exigem uma resposta imediata
+      de segurança \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+Os valores presentes na tabela representam uma forma de ordenar as propostas
+de decisão: quanto maior o valor, maior a prioridade atribuída. Assim, por
+exemplo, uma proposta de ação que tenha como objetivo prevenir uma colisão, ou
+seja, com prioridade 50, prevalece sobre uma proposta relacionada com o
+cumprimento da velocidade, de prioridade 20.
+
+A resolução de conflitos encontra-se implementada através do
+\texttt{DecisionContext}, que recebe as propostas sugeridas durante o processo
+de inferência e compara as respetivas prioridades. Quando uma nova proposta
+tem uma prioridade superior à atualmente considerada, esta passa a assumir
+precedência na decisão. Quando duas propostas apresentam a mesma prioridade, a
+implementação atual utiliza ainda um critério de desempate conservador. Nos
+casos em que existe uma velocidade recomendada associada às duas propostas, é
+favorecida a opção que recomenda uma velocidade inferior. Desta forma, a
+decisão final não depende simplesmente da primeira regra executada, mas sim da
+comparação entre as propostas encontradas no mesmo ciclo de inferência. Este
+mecanismo permite que situações relacionadas com a segurança possam
+prevalecer sobre objetivos de menor importância, como a progressão normal ou o
+conforto.
+
+Importa ainda distinguir a prioridade atribuída às propostas de decisão da
+ordem de execução das regras pelo motor de inferência. No Drools, a saliência
+(\emph{salience}) pode influenciar a ordem pela qual determinadas regras são
+executadas, mas não determina qual é a decisão final. A seleção da ação é
+realizada, posteriormente, pelo \texttt{DecisionContext}, através da
+comparação da prioridade semântica atribuída às diferentes propostas. Desta
+forma, o resultado final não depende apenas da ordem de execução das regras.
+Por outro lado, para que as escolhas possam ser compreendidas, é necessário
+relacionar a decisão final com os factos, as regras e as alternativas
+consideradas. Esta necessidade está relacionada com as explicações
+\emph{Why}, \emph{How} e \emph{Why Not}.

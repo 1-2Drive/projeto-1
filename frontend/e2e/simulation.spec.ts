@@ -339,4 +339,69 @@ test.describe('Driving expert simulation UI', () => {
     const egoEl = page.locator('[data-testid="road-ego"]');
     await egoEl.screenshot({ path: '../screenshot_clean_ego_badge.png' });
   });
+
+  test('world mutation drawer layout stability: no displacement, right-side alignment, clean cleanup', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/');
+    await page.waitForTimeout(400);
+
+    const app = page.locator('.page');
+    const beforeBox = await app.boundingBox();
+    const scrollBefore = await page.evaluate(() => window.scrollY);
+    const docHeightBefore = await page.evaluate(() => document.documentElement.scrollHeight);
+    expect(beforeBox).not.toBeNull();
+
+    // Open Stop sign drawer
+    await page.locator('[data-testid="add-stop-sign"]').click();
+    await page.waitForTimeout(300);
+
+    const afterBox = await app.boundingBox();
+    const scrollAfter = await page.evaluate(() => window.scrollY);
+    const docHeightAfter = await page.evaluate(() => document.documentElement.scrollHeight);
+    expect(afterBox).not.toBeNull();
+
+    // Assert: zero vertical displacement of application content
+    expect(afterBox!.y).toBeCloseTo(beforeBox!.y, 1);
+    expect(afterBox!.width).toBeCloseTo(beforeBox!.width, 1);
+
+    // Assert: zero scroll jump
+    expect(scrollAfter).toBe(scrollBefore);
+
+    // Assert: document height does not jump or expand
+    expect(docHeightAfter).toBe(docHeightBefore);
+
+    // Assert: drawer is pinned to right side and within viewport
+    const drawer = page.locator('.drawer');
+    await expect(drawer).toBeVisible();
+    const drawerBox = await drawer.boundingBox();
+    expect(drawerBox).not.toBeNull();
+    expect(drawerBox!.x + drawerBox!.width).toBeLessThanOrEqual(1440 + 1);
+    expect(drawerBox!.x).toBeGreaterThan(1000); // Right side
+    expect(drawerBox!.y).toBe(0);
+    expect(drawerBox!.height).toBe(900);
+
+    // Close via close button
+    await page.locator('.drawer__close').click();
+    await page.waitForTimeout(300);
+    await expect(drawer).toHaveCount(0);
+    await expect(page.locator('.backdrop')).toHaveCount(0);
+
+    // Open Obstacle and cancel
+    await page.locator('[data-testid="add-obstacle"]').click();
+    await page.waitForTimeout(300);
+    await expect(drawer).toBeVisible();
+    await page.locator('.drawer__btn--ghost').click();
+    await page.waitForTimeout(300);
+    await expect(drawer).toHaveCount(0);
+    await expect(page.locator('.backdrop')).toHaveCount(0);
+
+    // Open Pedestrian and add to road
+    await page.locator('[data-testid="add-pedestrian"]').click();
+    await page.waitForTimeout(300);
+    await page.locator('[data-testid="apply-config"]').click();
+    await page.waitForTimeout(400);
+    await expect(drawer).toHaveCount(0);
+    await expect(page.locator('.backdrop')).toHaveCount(0);
+    await expect(page.locator('[data-testid="road-pedestrian"]')).toBeVisible();
+  });
 });

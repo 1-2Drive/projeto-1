@@ -1,10 +1,18 @@
+:host {
+  display: contents;
+}
+
 .backdrop {
   position: fixed;
-  inset: 0;
-  z-index: 40;
-  background: rgba(4, 8, 12, 0.62);
-  backdrop-filter: blur(2px);
-  animation: fade-in 140ms ease-out;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1000;
+  background: rgba(4, 8, 12, 0.35);
+  pointer-events: auto;
 }
 
 .drawer {
@@ -12,17 +20,19 @@
   top: 0;
   right: 0;
   bottom: 0;
-  z-index: 41;
-  width: min(23rem, 92vw);
+  z-index: 1001;
+  width: 380px;
+  max-width: min(420px, 100vw);
+  height: 100vh;
   display: flex;
   flex-direction: column;
   gap: var(--ds-space-3);
-  padding: var(--ds-space-5) var(--ds-space-4);
+  padding: var(--ds-space-4);
   background: var(--ds-bg-elevated);
   border-left: 1px solid var(--ds-border-strong);
-  box-shadow: -18px 0 48px rgba(0, 0, 0, 0.55);
+  box-shadow: -12px 0 36px rgba(0, 0, 0, 0.6);
   overflow-y: auto;
-  animation: slide-in 170ms ease-out;
+  box-sizing: border-box;
 }
 
 @keyframes slide-in {
@@ -135,11 +145,11 @@
 }
 
 .drawer__actions {
-  margin-top: auto;
+  margin-top: var(--ds-space-4);
   display: flex;
   gap: 0.5rem;
   justify-content: flex-end;
-  padding-top: var(--ds-space-4);
+  padding-top: var(--ds-space-3);
   border-top: 1px solid var(--ds-border);
 }
 

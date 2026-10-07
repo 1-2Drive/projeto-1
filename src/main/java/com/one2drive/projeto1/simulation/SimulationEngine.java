@@ -325,8 +325,17 @@ public class SimulationEngine implements AutoCloseable {
     private void refreshSensorTelemetry(List<Object> events) {
         SensorTelemetry previous = sensorTelemetry;
 
-        double speedRadarDist = Double.POSITIVE_INFINITY;
-        double speedRadarLimit = 0.0;
+        double speedRadarDist = previous.frontRadar().speedRadarDistanceMeters();
+        double speedRadarLimit = previous.frontRadar().speedRadarLimitKmh();
+        var radarAhead = worldState.findNearestSpeedRadarAhead(config.getRadarRangeMeters());
+        if (radarAhead.isPresent()) {
+            com.one2drive.projeto1.domain.SpeedRadar sr = radarAhead.get();
+            speedRadarDist = worldState.distanceAhead(sr.getPositionMeters());
+            speedRadarLimit = sr.getSpeedLimitKmh();
+        } else {
+            speedRadarDist = Double.POSITIVE_INFINITY;
+            speedRadarLimit = 0.0;
+        }
         for (Object event : events) {
             if (event instanceof com.one2drive.projeto1.drools.events.SpeedRadarEvent sre) {
                 speedRadarDist = sre.getDistanceMeters();
@@ -968,7 +977,7 @@ public class SimulationEngine implements AutoCloseable {
         double ahead = worldState.distanceAhead(positionMeters);
         double relative = ahead > length - behindWindow ? ahead - length : ahead;
         if (relative >= -behindWindow && relative <= forwardMeters) {
-            items.add(new RoadRenderItem(type, id, relative, lane.name(), details));
+            items.add(new RoadRenderItem(type, id, relative, lane.name(), details, positionMeters));
         }
     }
 

@@ -165,4 +165,75 @@ describe('RoadCanvasComponent', () => {
     // Wheels must be inside the SVG container of .ego, sharing the same parent world transform
     expect(egoElement.contains(wheelGroup)).toBeTrue();
   });
+
+  it('should visibly advance ego screen X toward static speed radar across time and separate radar from FOV', () => {
+    // Initial state at 200m
+    fixture.componentRef.setInput('snapshot', {
+      simulationTimeMillis: 0,
+      status: 'RUNNING',
+      egoVehicle: { speedKmh: 80, positionMeters: 200, lane: 'RIGHT', accelerationMps2: -1.5 },
+      environment: { weatherCondition: 'CLEAR', visibilityFactor: 1, gripFactor: 1 },
+      speedAdvisor: { currentKmh: 80, legalLimitKmh: 50, recommendedKmh: 50, action: 'REDUCE_SPEED' },
+      currentDecision: { action: 'REDUCE_SPEED', recommendedSpeedKmh: 50, riskLevel: 'MODERATE', reason: '', sourceRule: '', timestamp: 0, evidence: [] },
+      sensorReadings: {},
+      sensors: {
+        frontRadar: {
+          rangeMeters: 130, targetId: 'none', distanceMeters: Infinity, relativeSpeedKmh: 0,
+          ttcSeconds: Infinity, status: 'CLEAR', speedRadarDistanceMeters: 130, speedRadarLimitKmh: 50
+        }
+      },
+      worldObjects: [
+        { id: 'radar_1', type: 'SpeedRadar', positionMeters: 130, worldPositionMeters: 330, lane: 'RIGHT', details: 'speedLimitKmh=50' }
+      ],
+      sensorRanges: { cameraRangeMeters: 100, radarRangeMeters: 130, blindSpotRangeMeters: 25, cameraRateMillis: 200, radarRateMillis: 50 }
+    });
+    fixture.detectChanges();
+
+    const speedRadar = fixture.nativeElement.querySelector('[data-testid="speed-radar"]');
+    const radarFov = fixture.nativeElement.querySelector('[data-testid="radar-fov"]');
+    expect(speedRadar).toBeTruthy('Physical speed radar object must exist and be visible');
+    expect(radarFov).toBeTruthy('Radar FOV sensor edge must exist');
+    expect(speedRadar).not.toBe(radarFov, 'Physical radar and radar FOV must be distinct elements');
+
+    const egoT1 = fixture.nativeElement.querySelector('[data-testid="road-ego"]') as HTMLElement;
+    const egoT1Left = parseFloat(egoT1.style.left);
+    const radarT1 = speedRadar as HTMLElement;
+    const radarT1Left = parseFloat(radarT1.style.left);
+    const distT1 = Math.abs(radarT1Left - egoT1Left);
+
+    // Advanced state at 260m
+    fixture.componentRef.setInput('snapshot', {
+      simulationTimeMillis: 3000,
+      status: 'RUNNING',
+      egoVehicle: { speedKmh: 60, positionMeters: 260, lane: 'RIGHT', accelerationMps2: -1.0 },
+      environment: { weatherCondition: 'CLEAR', visibilityFactor: 1, gripFactor: 1 },
+      speedAdvisor: { currentKmh: 60, legalLimitKmh: 50, recommendedKmh: 50, action: 'REDUCE_SPEED' },
+      currentDecision: { action: 'REDUCE_SPEED', recommendedSpeedKmh: 50, riskLevel: 'MODERATE', reason: '', sourceRule: '', timestamp: 3000, evidence: [] },
+      sensorReadings: {},
+      sensors: {
+        frontRadar: {
+          rangeMeters: 130, targetId: 'none', distanceMeters: Infinity, relativeSpeedKmh: 0,
+          ttcSeconds: Infinity, status: 'CLEAR', speedRadarDistanceMeters: 70, speedRadarLimitKmh: 50
+        }
+      },
+      worldObjects: [
+        { id: 'radar_1', type: 'SpeedRadar', positionMeters: 70, worldPositionMeters: 330, lane: 'RIGHT', details: 'speedLimitKmh=50' }
+      ],
+      sensorRanges: { cameraRangeMeters: 100, radarRangeMeters: 130, blindSpotRangeMeters: 25, cameraRateMillis: 200, radarRateMillis: 50 }
+    });
+    fixture.detectChanges();
+
+    const egoT2 = fixture.nativeElement.querySelector('[data-testid="road-ego"]') as HTMLElement;
+    const egoT2Left = parseFloat(egoT2.style.left);
+    const radarT2 = fixture.nativeElement.querySelector('[data-testid="speed-radar"]') as HTMLElement;
+    const radarT2Left = parseFloat(radarT2.style.left);
+    const distT2 = Math.abs(radarT2Left - egoT2Left);
+
+    // Assert ego moved forward horizontally
+    expect(egoT2Left).toBeGreaterThan(egoT1Left, 'Ego screen X must increase as world position increases');
+    // Assert radar remained at static position
+    expect(radarT2Left).toBeCloseTo(radarT1Left, 1, 'Radar must remain static on screen during approach');
+    // Assert distance between car and radar visibly decreased
+    expect(distT2).toBeLessThan(distT1, 'Visual distance between ego and speed radar must decrease');
+  });
 });

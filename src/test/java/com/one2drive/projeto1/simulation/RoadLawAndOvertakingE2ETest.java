@@ -233,7 +233,7 @@ class RoadLawAndOvertakingE2ETest {
             assertTrue(radarOpt.isPresent(), "Speed radar must be present ahead on the road");
             var radar = radarOpt.get();
             double fixedRadarPos = radar.getPositionMeters();
-            assertEquals(130.0, fixedRadarPos, 0.01, "Radar position must be 130m");
+            assertEquals(330.0, fixedRadarPos, 0.01, "Radar position must be 330m");
 
             double previousDistance = Double.POSITIVE_INFINITY;
             double previousEgoPos = engine.getWorldState().getEgo().getPositionMeters();
@@ -241,7 +241,7 @@ class RoadLawAndOvertakingE2ETest {
             for (int i = 0; i < 40; i++) {
                 SimulationSnapshot snapshot = engine.tick();
                 double egoPos = snapshot.egoPositionMeters();
-                assertEquals(130.0, radar.getPositionMeters(), 0.001, "Radar world position must NOT move");
+                assertEquals(330.0, radar.getPositionMeters(), 0.001, "Radar world position must NOT move");
 
                 if (egoPos < fixedRadarPos) {
                     double expectedDistance = fixedRadarPos - egoPos;
@@ -289,7 +289,7 @@ class RoadLawAndOvertakingE2ETest {
                     sawSpeedReduction = true;
                 }
 
-                if (egoPos >= 130.0) {
+                if (egoPos >= 330.0) {
                     passedRadar = true;
                     // When passing radar, vehicle speed must be legal (<= 50 + small margin)
                     assertTrue(egoSpeed <= 55.0,

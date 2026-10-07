@@ -29,6 +29,7 @@ export interface ApiRoadElement {
   positionMeters: number;
   lane: 'LEFT' | 'CENTER' | 'RIGHT';
   details: string;
+  worldPositionMeters?: number;
 }
 
 export interface ApiWorkingMemoryRow {

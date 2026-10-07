@@ -3789,22 +3789,20 @@
   {
     "id": "S18_SPEED_RADAR_APPROACH",
     "name": "Speed radar approach and compliant pass",
+    "initialPositionMeters": 200,
     "initialSpeedKmh": 80,
     "initialLane": "RIGHT",
     "leftMarking": "DASHED",
     "initialWeather": "CLEAR",
-    "actors": [],
-    "timedActions": [
+    "roadElements": [
       {
-        "triggerTimeMillis": 50,
-        "type": "ADD_ROAD_ELEMENT",
-        "roadElement": {
-          "type": "SPEED_RADAR",
-          "positionMeters": 130,
-          "lane": "RIGHT",
-          "speedLimitKmh": 50
-        }
+        "type": "SPEED_RADAR",
+        "positionMeters": 330,
+        "lane": "RIGHT",
+        "speedLimitKmh": 50
       }
-    ]
+    ],
+    "actors": [],
+    "timedActions": []
   }
 ]

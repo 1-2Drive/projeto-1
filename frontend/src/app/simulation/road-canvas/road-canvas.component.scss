@@ -395,6 +395,18 @@
   width: 1.9rem;
 }
 
+.obj--speedRadar {
+  width: 3.8rem;
+  z-index: 7;
+}
+
+.physical-radar {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
 /* detection highlight (not colour-only: badge text too) */
 .obj--detected {
   filter: drop-shadow(0 0 0.55rem rgba(122, 205, 245, 0.6));

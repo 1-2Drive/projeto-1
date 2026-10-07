@@ -17,7 +17,7 @@ salience 320
 no-loop true
 when
     $ctx : DecisionContext()
-    $radar : SpeedRadarFact(radarId != "none", $distance : distanceMeters > 0, distanceMeters <= 120.0, $limit : speedLimitKmh)
+    $radar : SpeedRadarFact(radarId != "none", $distance : distanceMeters > 0, distanceMeters <= 135.0, $limit : speedLimitKmh)
     VehicleStateFact( $speed : speedKmh > ($limit + 1.0) )
 then
     droolsSupport.proposeDecision(

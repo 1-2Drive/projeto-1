@@ -24,10 +24,12 @@ export interface RoadRenderItem {
   state: string;
   ariaLabel: string;
   relativeMeters: number;
+  worldPositionMeters: number;
   xPercent: number;
   yPercent: number;
   detectedByCamera: boolean;
   detectedByRadar: boolean;
+  visible: boolean;
 }
 
 /**
@@ -67,9 +69,19 @@ const EMPTY_RANGES = {
 export class RoadCanvasComponent {
   readonly snapshot = input<ApiSimulationSnapshot | null>(null);
 
-  /** Metres of road visible behind and ahead of the ego vehicle. */
+  /** Visible road span in viewport (in world meters). */
+  readonly viewportSpanMeters = 180;
+  /** Left margin in world meters at scenario start so vehicle begins near the left edge (~5.5%). */
+  readonly initialLeftMarginMeters = 10;
+  /** Dead-zone threshold ratio (0.80 = 80%) before camera starts scrolling. */
+  readonly deadZoneRatio = 0.80;
+
+  /** Metres of road visible behind and ahead for backward compatibility. */
   readonly worldBackwardMeters = 40;
   readonly worldForwardMeters = 200;
+
+  private lastSimTime = -1;
+  private scenarioStartPos = 0;
 
   protected readonly ranges = computed(() => this.snapshot()?.sensorRanges ?? EMPTY_RANGES);
 
@@ -106,38 +118,117 @@ export class RoadCanvasComponent {
 
   protected readonly indicatorHazard = computed(() => this.indicatorName() === 'HAZARD');
 
+  /**
+   * Evaluates the scenario starting position cleanly whenever simulation resets (time 0 or rewind).
+   */
+  private resolveStartPos(snapshot: ApiSimulationSnapshot | null): number {
+    if (!snapshot) return 0;
+    const t = snapshot.simulationTimeMillis;
+    if (t === 0 || t < this.lastSimTime) {
+      this.scenarioStartPos = snapshot.egoVehicle.positionMeters;
+    }
+    this.lastSimTime = t;
+    return this.scenarioStartPos;
+  }
+
+  /**
+   * Dead-zone camera offset in world meters:
+   * Stays completely static while ego vehicle traverses from start up to the dead-zone threshold (80% of viewport).
+   * Only after ego exceeds the dead-zone threshold does the camera begin scrolling smoothly forward.
+   */
+  protected readonly cameraOffset = computed(() => {
+    const snap = this.snapshot();
+    const startPos = this.resolveStartPos(snap);
+    const egoPos = this.egoPosition();
+    const baseOffset = startPos - this.initialLeftMarginMeters;
+    const thresholdWorldPos = baseOffset + this.viewportSpanMeters * this.deadZoneRatio;
+    if (egoPos <= thresholdWorldPos) {
+      return baseOffset;
+    }
+    return egoPos - this.viewportSpanMeters * this.deadZoneRatio;
+  });
+
+  /**
+   * Deterministic conversion from world meters to screen percentage across the viewport.
+   * Shared by ego vehicle, speed radar, distance ticks, sensor cones, and all road obstacles.
+   */
+  protected worldToPercentX(worldMeters: number): number {
+    const offset = this.cameraOffset();
+    return ((worldMeters - offset) / this.viewportSpanMeters) * 100;
+  }
+
+  /**
+   * Ego vehicle screen X coordinate. Increases continuously as ego advances through the world!
+   */
+  protected readonly egoXPercent = computed(() => {
+    return Math.max(0, Math.min(100, this.worldToPercentX(this.egoPosition())));
+  });
+
   protected readonly speedRadarDist = computed(() => {
     const d = this.snapshot()?.sensors?.frontRadar?.speedRadarDistanceMeters;
-    return (d != null && Number.isFinite(d) && d > 0) ? d : null;
+    if (d != null && Number.isFinite(d) && d > 0 && d <= 135) {
+      return d;
+    }
+    const egoPos = this.egoPosition();
+    const radar = this.snapshot()?.worldObjects?.find((o) => o.type.includes('SpeedRadar'));
+    if (radar) {
+      const worldPos = radar.worldPositionMeters != null && Number.isFinite(radar.worldPositionMeters)
+        ? radar.worldPositionMeters
+        : (egoPos + radar.positionMeters);
+      const diff = worldPos - egoPos;
+      if (diff > 0 && diff <= 135) {
+        return diff;
+      }
+    }
+    return null;
   });
 
   protected readonly speedRadarLimit = computed(() => {
-    return this.snapshot()?.sensors?.frontRadar?.speedRadarLimitKmh ?? null;
+    const l = this.snapshot()?.sensors?.frontRadar?.speedRadarLimitKmh;
+    if (l != null && l > 0) return l;
+    const radar = this.snapshot()?.worldObjects?.find((o) => o.type.includes('SpeedRadar'));
+    if (radar?.details) {
+      const match = radar.details.match(/speedLimitKmh=([\d.]+)/);
+      if (match) return Math.round(parseFloat(match[1]));
+    }
+    return 50;
   });
 
-  /** Dynamic ticks in world metres that scroll past smoothly as the ego moves forward */
-  protected readonly dynamicTicks = computed(() => {
+  protected readonly speedRadarPassed = computed(() => {
     const egoPos = this.egoPosition();
-    const minM = egoPos - this.worldBackwardMeters;
-    const maxM = egoPos + this.worldForwardMeters;
+    const radar = this.snapshot()?.worldObjects?.find((o) => o.type.includes('SpeedRadar'));
+    if (!radar) return false;
+    const worldPos = radar.worldPositionMeters != null && Number.isFinite(radar.worldPositionMeters)
+      ? radar.worldPositionMeters
+      : (egoPos + radar.positionMeters);
+    return egoPos >= worldPos;
+  });
+
+  /** Dynamic ticks in world metres. Completely static while camera is static; scrolls when camera scrolls. */
+  protected readonly dynamicTicks = computed(() => {
+    const camOffset = this.cameraOffset();
+    const span = this.viewportSpanMeters;
+    const minM = camOffset;
+    const maxM = camOffset + span;
     const step = 40;
-    const first = Math.ceil(minM / step) * step;
+    const first = Math.floor(minM / step) * step;
     const ticks: { worldMeters: number; percent: number }[] = [];
-    for (let m = first; m <= maxM; m += step) {
-      ticks.push({
-        worldMeters: m,
-        percent: this.toPercentX(m - egoPos)
-      });
+    for (let m = first; m <= maxM + step; m += step) {
+      const pct = this.worldToPercentX(m);
+      if (pct >= -5 && pct <= 105) {
+        ticks.push({
+          worldMeters: m,
+          percent: pct
+        });
+      }
     }
     return ticks;
   });
 
-  /** Dash offset in percent for streaming lane line animation */
+  /** Dash offset in percent for streaming lane line animation. Static while camera is static. */
   protected readonly dashOffsetPercent = computed(() => {
-    const span = this.worldForwardMeters + this.worldBackwardMeters;
-    // Repeat every 16m
-    const mod = this.egoPosition() % 16;
-    return -(mod / span) * 100;
+    const mod = ((this.cameraOffset() % 16) + 16) % 16;
+    return -(mod / this.viewportSpanMeters) * 100;
   });
 
   protected readonly laneLabels = [
@@ -148,31 +239,35 @@ export class RoadCanvasComponent {
 
   protected readonly items = computed<RoadRenderItem[]>(() => {
     const snapshot = this.snapshot();
-    if (!snapshot) {
+    if (!snapshot || !snapshot.worldObjects) {
       return [];
     }
+    const egoPos = this.egoPosition();
     return snapshot.worldObjects
-      .filter((item) => this.isVisible(item.positionMeters))
       .map((item) => {
         const kind = this.kindOf(item);
         const state = this.stateOf(item);
+        const worldPos = item.worldPositionMeters != null && Number.isFinite(item.worldPositionMeters)
+          ? item.worldPositionMeters
+          : (egoPos + item.positionMeters);
+        const xPct = this.worldToPercentX(worldPos);
         return {
           id: item.id,
           kind,
           label: this.labelOf(item),
           state,
-          ariaLabel: `${this.objectIconLabel(kind)} ${state ? state.toLowerCase() + ' ' : ''}at ${item.positionMeters.toFixed(0)} metres`,
+          ariaLabel: `${this.objectIconLabel(kind)} ${state ? state.toLowerCase() + ' ' : ''}at ${worldPos.toFixed(0)} metres`,
           relativeMeters: item.positionMeters,
-          xPercent: this.toPercentX(item.positionMeters),
+          worldPositionMeters: worldPos,
+          xPercent: xPct,
           yPercent: this.lateralToY(LANE_CENTRE_METRES[item.lane] ?? 0),
-          detectedByCamera: snapshot.cameraDetectedObjectIds.includes(item.id),
-          detectedByRadar: snapshot.radarDetectedObjectIds.includes(item.id)
+          detectedByCamera: snapshot.cameraDetectedObjectIds?.includes(item.id) ?? false,
+          detectedByRadar: snapshot.radarDetectedObjectIds?.includes(item.id) ?? false,
+          visible: xPct >= -15 && xPct <= 115
         };
-      });
+      })
+      .filter((item) => item.visible);
   });
-
-  /** Ego marker uses the same metric mapping as every other object. */
-  protected readonly egoXPercent = computed(() => this.toPercentX(0));
 
   /**
    * Vertical position comes straight from the backend lateral coordinate, so during a
@@ -209,8 +304,17 @@ export class RoadCanvasComponent {
     return this.snapshot()?.maneuver?.braking ?? false;
   });
 
-  protected readonly cameraEdgePercent = computed(() => this.toPercentX(this.ranges().cameraRangeMeters));
-  protected readonly radarEdgePercent = computed(() => this.toPercentX(this.ranges().radarRangeMeters));
+  protected readonly cameraEdgePercent = computed(() => {
+    return this.worldToPercentX(this.egoPosition() + this.ranges().cameraRangeMeters);
+  });
+
+  protected readonly radarEdgePercent = computed(() => {
+    return this.worldToPercentX(this.egoPosition() + this.ranges().radarRangeMeters);
+  });
+
+  protected readonly blindSpotEdgePercent = computed(() => {
+    return this.worldToPercentX(this.egoPosition() + this.ranges().blindSpotRangeMeters);
+  });
 
   /** True before the first tick so the UI can invite the user to press START. */
   protected readonly awaitingStart = computed(() => {
@@ -225,7 +329,8 @@ export class RoadCanvasComponent {
   }
 
   protected isVisible(relativeMeters: number): boolean {
-    return relativeMeters >= -this.worldBackwardMeters && relativeMeters <= this.worldForwardMeters;
+    const xPct = this.toPercentX(relativeMeters);
+    return xPct >= -15 && xPct <= 115;
   }
 
   /** Maps a lateral offset in metres onto the vertical centre band of the road. */
@@ -235,10 +340,9 @@ export class RoadCanvasComponent {
       * (LANE_CENTER_Y.RIGHT - LANE_CENTER_Y.CENTER);
   }
 
+  /** Retained for test compatibility */
   protected toPercentX(relativeMeters: number): number {
-    const span = this.worldForwardMeters + this.worldBackwardMeters;
-    const normalized = (relativeMeters + this.worldBackwardMeters) / span;
-    return Math.max(0, Math.min(100, normalized * 100));
+    return this.worldToPercentX(this.egoPosition() + relativeMeters);
   }
 
   protected objectIconLabel(kind: RoadObjectKind): string {

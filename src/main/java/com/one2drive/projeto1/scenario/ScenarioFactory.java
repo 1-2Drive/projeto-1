@@ -26,7 +26,8 @@ public final class ScenarioFactory {
 
     public static WorldState buildWorld(ScenarioDefinition definition, SimulationConfig config) {
         Lane lane = definition.getInitialLane() == null ? Lane.CENTER : definition.getInitialLane();
-        EgoVehicleState ego = new EgoVehicleState(0, definition.getInitialSpeedKmh() / 3.6, 0, lane);
+        double initialPos = definition.getInitialPositionMeters();
+        EgoVehicleState ego = new EgoVehicleState(initialPos, definition.getInitialSpeedKmh() / 3.6, 0, lane);
         WeatherState weather = toWeatherState(definition.getInitialWeather());
         WorldState worldState = new WorldState(ego, weather, buildRoadMap(definition, config));
         if (definition.getLeftMarking() != null) {
@@ -34,6 +35,12 @@ public final class ScenarioFactory {
         }
         if (definition.getRightMarking() != null) {
             worldState.setRightMarking(definition.getRightMarking());
+        }
+
+        if (definition.getRoadElements() != null) {
+            for (ScenarioRoadElementDefinition roadElement : definition.getRoadElements()) {
+                worldState.getRoadMap().place(roadElement, roadElement.getPositionMeters());
+            }
         }
 
         for (ScenarioActorDefinition actor : definition.getActors()) {

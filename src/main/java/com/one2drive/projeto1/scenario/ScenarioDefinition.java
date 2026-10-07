@@ -21,7 +21,9 @@ public class ScenarioDefinition {
     /** Extra or replaced legend codes for this scenario, on top of the default legend. */
     private Map<Integer, ScenarioRoadElementDefinition> mapLegend = new LinkedHashMap<>();
     private List<ScenarioActorDefinition> actors = new ArrayList<>();
+    private List<ScenarioRoadElementDefinition> roadElements = new ArrayList<>();
     private List<ScenarioTimedAction> timedActions = new ArrayList<>();
+    private double initialPositionMeters = 0.0;
     private com.one2drive.projeto1.domain.Lane initialLane;
     private com.one2drive.projeto1.domain.RoadMarkingType leftMarking = com.one2drive.projeto1.domain.RoadMarkingType.DASHED;
     private com.one2drive.projeto1.domain.RoadMarkingType rightMarking = com.one2drive.projeto1.domain.RoadMarkingType.DASHED;
@@ -128,5 +130,21 @@ public class ScenarioDefinition {
 
     public void setTimedActions(List<ScenarioTimedAction> timedActions) {
         this.timedActions = timedActions;
+    }
+
+    public List<ScenarioRoadElementDefinition> getRoadElements() {
+        return roadElements;
+    }
+
+    public void setRoadElements(List<ScenarioRoadElementDefinition> roadElements) {
+        this.roadElements = roadElements;
+    }
+
+    public double getInitialPositionMeters() {
+        return initialPositionMeters;
+    }
+
+    public void setInitialPositionMeters(double initialPositionMeters) {
+        this.initialPositionMeters = initialPositionMeters;
     }
 }

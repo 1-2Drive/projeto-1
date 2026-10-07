@@ -164,9 +164,8 @@
       </g>
     </svg>
 
-    <div class="ego__tag" aria-hidden="true">
+    <div class="ego__tag" aria-hidden="true" data-testid="ego-badge">
       <span class="ego__tag-name">EGO</span>
-      <span class="ego__tag-state">{{ drivingState() }}</span>
     </div>
   </div>
 
@@ -182,7 +181,9 @@
       [style.left.%]="item.xPercent"
       [style.top.%]="item.yPercent"
       [attr.aria-label]="item.ariaLabel"
-      [attr.data-testid]="item.kind === 'speedRadar' ? 'speed-radar' : ('obj-' + item.id)"
+      [attr.data-testid]="testIdFor(item.kind)"
+      [attr.data-object-id]="item.id"
+      [attr.data-object-kind]="item.kind"
     >
       @switch (item.kind) {
         @case ('speedLimit') {

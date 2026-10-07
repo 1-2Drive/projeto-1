@@ -175,6 +175,87 @@ test.describe('Driving expert simulation UI', () => {
 
     // Vehicle reaches overtaking lane
     await expect(page.locator('[data-testid="road-ego"]')).toHaveAttribute('data-lane', 'CENTER', { timeout: 35000 });
+
+    // Vehicle passes slow vehicle, decides return right, and returns to RIGHT lane per Art. 38 CE
+    await expect(page.locator('[data-testid="road-ego"]')).toHaveAttribute('data-lane', 'RIGHT', { timeout: 45000 });
+    await expect(page.locator('[data-testid="hud-indicator"]')).toContainText('OFF', { timeout: 15000 });
+  });
+
+  test('TEST A: full viewport responsiveness at 1440x900 and 1920x1080 without blank white area', async ({ page }) => {
+    await page.goto('/');
+
+    // 1440x900 verification
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.waitForTimeout(300);
+    const bodyWidth1440 = await page.evaluate(() => document.body.clientWidth);
+    const appRootWidth1440 = await page.evaluate(() => document.querySelector('app-root')?.clientWidth ?? 0);
+    expect(bodyWidth1440).toBe(1440);
+    expect(appRootWidth1440).toBe(1440);
+
+    // 1920x1080 verification
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await page.waitForTimeout(300);
+    const bodyWidth1920 = await page.evaluate(() => document.body.clientWidth);
+    const appRootWidth1920 = await page.evaluate(() => document.querySelector('app-root')?.clientWidth ?? 0);
+    expect(bodyWidth1920).toBe(1920);
+    expect(appRootWidth1920).toBe(1920);
+  });
+
+  test('TEST B: toolbox object creation immediately appears in road canvas and matrix', async ({ page }) => {
+    await page.goto('/');
+    await page.locator('[data-testid="reset-btn"]').click();
+    await page.waitForTimeout(300);
+
+    // Add obstacle 150m ahead in CENTER
+    await page.locator('[data-testid="add-obstacle"]').click();
+    await expect(page.locator('[data-testid="config-panel"]')).toBeVisible();
+    await page.locator('[data-testid="apply-config"]').click();
+    await page.waitForTimeout(400);
+
+    // Physical road obstacle is immediately visible
+    const roadObstacle = page.locator('[data-testid="road-obstacle"]');
+    await expect(roadObstacle).toBeVisible();
+    await expect(roadObstacle).toHaveAttribute('data-object-id', 'r30-CENTER');
+
+    // Matrix contains obstacle in row 30 CENTER
+    const cell = page.locator('[data-testid="map-cell-30-CENTER"]');
+    await expect(cell).toHaveClass(/cell--obstacle/);
+  });
+
+  test('TEST C: painting cell in matrix immediately updates road canvas and erasing removes it', async ({ page }) => {
+    await page.goto('/');
+    await page.locator('[data-testid="reset-btn"]').click();
+    await page.waitForTimeout(300);
+
+    // Select Obstacle brush (code 1)
+    await page.locator('[data-testid="map-brush-1"]').click();
+    const cell = page.locator('[data-testid="map-cell-25-RIGHT"]');
+    await cell.scrollIntoViewIfNeeded();
+    await cell.click();
+    await page.waitForTimeout(400);
+
+    // Assert road canvas immediately displays it
+    const roadObstacle = page.locator('[data-testid="road-obstacle"]');
+    await expect(roadObstacle).toBeVisible();
+    await expect(roadObstacle).toHaveAttribute('data-object-id', 'r25-RIGHT');
+
+    // Erase cell by clicking it again
+    await cell.click();
+    await page.waitForTimeout(400);
+    await expect(roadObstacle).toHaveCount(0);
+    await expect(cell).toHaveClass(/cell--free/);
+  });
+
+  test('TEST E: clean EGO badge is displayed and EGOCRUISING never appears', async ({ page }) => {
+    await page.goto('/');
+    const egoBadge = page.locator('[data-testid="ego-badge"]');
+    await expect(egoBadge).toBeVisible();
+    await expect(egoBadge).toHaveText('EGO');
+
+    const egoText = await page.locator('[data-testid="road-ego"]').textContent();
+    expect(egoText?.trim()).toBe('EGO');
+    expect(egoText).not.toContain('EGOCRUISING');
+    expect(egoText).not.toContain('CRUISING');
   });
 
   test('speed radar scenario: physical radar object rendered, speed decelerates to legal limit, passes without avoiding or stopping', async ({ page }) => {
@@ -230,5 +311,32 @@ test.describe('Driving expert simulation UI', () => {
 
     // Ego vehicle passes radar and continues driving past 330m
     await expect(page.locator('[data-testid="hud-position"]')).toContainText(/\d{3}\.\d m/, { timeout: 35000 });
+  });
+
+  test('capture evidence screenshots for viewports, toolbox objects, and clean EGO badge', async ({ page }) => {
+    test.setTimeout(60000);
+
+    // 1. Viewport 1440x900
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/');
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: '../screenshot_viewport_1440x900.png' });
+
+    // 2. Viewport 1920x1080
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: '../screenshot_viewport_1920x1080.png' });
+
+    // 3. Toolbox object and matrix synchronization
+    await page.locator('[data-testid="add-obstacle"]').click();
+    await expect(page.locator('[data-testid="config-panel"]')).toBeVisible();
+    await page.locator('[data-testid="apply-config"]').click();
+    await page.waitForTimeout(500);
+    await expect(page.locator('[data-testid="road-obstacle"]')).toBeVisible();
+    await page.screenshot({ path: '../screenshot_toolbox_objects_road.png' });
+
+    // 4. Clean EGO badge
+    const egoEl = page.locator('[data-testid="road-ego"]');
+    await egoEl.screenshot({ path: '../screenshot_clean_ego_badge.png' });
   });
 });

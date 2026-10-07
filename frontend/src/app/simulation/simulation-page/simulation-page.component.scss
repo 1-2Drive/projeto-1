@@ -1,5 +1,7 @@
 :host {
   display: block;
+  width: 100%;
+  min-height: 100vh;
 }
 
 .page {
@@ -7,8 +9,11 @@
   --right-rail: 20rem;
   /* Matches the road canvas max-height so all three workspace columns end together. */
   --rail-max: 40rem;
+  width: 100%;
+  max-width: 100%;
   min-height: 100vh;
   min-width: 0;
+  box-sizing: border-box;
   padding: var(--ds-space-4);
   display: grid;
   gap: var(--ds-space-3);

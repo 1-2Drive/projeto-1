@@ -33,7 +33,8 @@ rule "Maintain ongoing lane change left avoidance"
 salience 475
 when
     $ctx : DecisionContext()
-    VehicleStateFact(laneChangeState == LaneChangeState.REQUESTED || laneChangeState == LaneChangeState.CHANGING, targetLane == Lane.LEFT)
+    VehicleStateFact(laneChangeState == LaneChangeState.REQUESTED || laneChangeState == LaneChangeState.CHANGING,
+                     targetLane == Lane.LEFT || (lane == Lane.RIGHT && targetLane == Lane.CENTER))
 then
     droolsSupport.proposeDecision(
         $ctx,
@@ -41,7 +42,7 @@ then
         Double.NaN,
         RiskLevel.LOW,
         DecisionPriority.MANEUVER_SAFETY,
-        "Executing lane change left to avoid road hazard",
+        "Executing ongoing lane change left",
         drools.getRule().getName(),
         "maneuver in progress to left lane"
     );
@@ -51,7 +52,8 @@ rule "Maintain ongoing lane change right avoidance"
 salience 475
 when
     $ctx : DecisionContext()
-    VehicleStateFact(laneChangeState == LaneChangeState.REQUESTED || laneChangeState == LaneChangeState.CHANGING, targetLane == Lane.RIGHT)
+    VehicleStateFact(laneChangeState == LaneChangeState.REQUESTED || laneChangeState == LaneChangeState.CHANGING,
+                     targetLane == Lane.RIGHT || (lane == Lane.LEFT && targetLane == Lane.CENTER))
 then
     droolsSupport.proposeDecision(
         $ctx,
@@ -59,7 +61,7 @@ then
         Double.NaN,
         RiskLevel.LOW,
         DecisionPriority.MANEUVER_SAFETY,
-        "Executing lane change right to avoid road hazard",
+        "Executing ongoing lane change right",
         drools.getRule().getName(),
         "maneuver in progress to right lane"
     );

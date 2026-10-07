@@ -9,6 +9,7 @@ import com.one2drive.projeto1.domain.RiskLevel
 import com.one2drive.projeto1.domain.RoadMarkingType
 import com.one2drive.projeto1.drools.DroolsSupport
 import com.one2drive.projeto1.drools.facts.FrontVehicleState
+import com.one2drive.projeto1.drools.facts.LaneChangeRequestState
 import com.one2drive.projeto1.drools.facts.LaneOccupancyState
 import com.one2drive.projeto1.drools.facts.OvertakingStateFact
 import com.one2drive.projeto1.drools.facts.VehicleStateFact
@@ -126,6 +127,7 @@ when
     $state : OvertakingStateFact(active == true, passedTarget == true)
     VehicleStateFact(lane != Lane.RIGHT, laneChangeState == LaneChangeState.IDLE, rightMarking != RoadMarkingType.CONTINUOUS)
     LaneOccupancyState(lane == Lane.RIGHT, occupied == false)
+    not LaneChangeRequestState(active == true)
 then
     droolsSupport.proposeDecision(
         $ctx,
@@ -140,7 +142,7 @@ then
 end
 
 rule "Deactivate overtaking state once return right completes"
-salience 200
+salience 455
 no-loop true
 when
     $state : OvertakingStateFact(active == true, passedTarget == true)

@@ -98,7 +98,8 @@ class RoadLawAndOvertakingE2ETest {
                     reachedCenter = true;
                 }
 
-                if (reachedCenter && snapshot.currentDecision().equals(DrivingAction.RETURN_RIGHT.name())) {
+                if (reachedCenter && (snapshot.currentDecision().equals(DrivingAction.RETURN_RIGHT.name())
+                    || snapshot.currentDecision().equals(DrivingAction.CHANGE_LANE_RIGHT.name()))) {
                     sawReturnRight = true;
                 }
 
@@ -185,6 +186,7 @@ class RoadLawAndOvertakingE2ETest {
     }
 
     @Test
+    @Timeout(10)
     @DisplayName("Matrix state vector extracts kinematic vector [x, y, vx, vy] accurately")
     void stateVectorRepresentationReflectsKinematics() {
         ScenarioDefinition scenario = new ScenarioDefinition();
@@ -217,6 +219,7 @@ class RoadLawAndOvertakingE2ETest {
     }
 
     @Test
+    @Timeout(10)
     @DisplayName("Radar Regression: Speed radar has fixed world position; distance derives from world coordinates and decreases naturally")
     void radarHasFixedWorldPositionAndCalculatesDecreasingDistance() {
         ScenarioLibrary library = ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json");
@@ -258,6 +261,7 @@ class RoadLawAndOvertakingE2ETest {
     }
 
     @Test
+    @Timeout(10)
     @DisplayName("Radar Regression: Speeding vehicle progressively decelerates approaching radar; no lane changes or obstacle avoidance")
     void speedingVehicleApproachingRadarProgressivelyDeceleratesWithoutLaneChange() {
         ScenarioLibrary library = ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json");
@@ -319,6 +323,7 @@ class RoadLawAndOvertakingE2ETest {
     }
 
     @Test
+    @Timeout(10)
     @DisplayName("Radar Regression: Legal-speed vehicle does not brake unnecessarily approaching radar")
     void legalSpeedVehicleDoesNotBrakeApproachingRadar() {
         ScenarioDefinition scenario = new ScenarioDefinition();

@@ -977,7 +977,8 @@ public class SimulationEngine implements AutoCloseable {
         double ahead = worldState.distanceAhead(positionMeters);
         double relative = ahead > length - behindWindow ? ahead - length : ahead;
         if (relative >= -behindWindow && relative <= forwardMeters) {
-            items.add(new RoadRenderItem(type, id, relative, lane.name(), details, positionMeters));
+            double worldPositionMeters = worldState.getEgo().getPositionMeters() + relative;
+            items.add(new RoadRenderItem(type, id, relative, lane.name(), details, worldPositionMeters));
         }
     }
 

@@ -345,6 +345,22 @@ export class RoadCanvasComponent {
     return this.worldToPercentX(this.egoPosition() + relativeMeters);
   }
 
+  protected testIdFor(kind: RoadObjectKind): string {
+    switch (kind) {
+      case 'speedRadar': return 'speed-radar';
+      case 'obstacle': return 'road-obstacle';
+      case 'pothole': return 'road-pothole';
+      case 'barrier': return 'road-barrier';
+      case 'stopSign': return 'road-stop-sign';
+      case 'yieldSign': return 'road-yield-sign';
+      case 'trafficLight': return 'road-traffic-light';
+      case 'speedLimit': return 'road-speed-limit';
+      case 'vehicle': return 'road-vehicle';
+      case 'pedestrian': return 'road-pedestrian';
+      default: return 'road-' + kind;
+    }
+  }
+
   protected objectIconLabel(kind: RoadObjectKind): string {
     switch (kind) {
       case 'speedLimit':

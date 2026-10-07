@@ -32,17 +32,32 @@
   box-sizing: border-box;
 }
 
-html,
-body {
+html {
   margin: 0;
   padding: 0;
+  width: 100%;
   min-height: 100%;
+  background-color: var(--ds-bg, #0b1118);
+  overflow-x: hidden;
 }
 
 body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100%;
   background: radial-gradient(circle at 85% -10%, #20344b 0%, #0b1118 45%) fixed;
+  background-color: #0b1118;
   color: var(--ds-text-primary);
   font-family: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  overflow-x: hidden;
+}
+
+app-root {
+  display: block;
+  width: 100%;
+  min-height: 100vh;
+  background-color: #0b1118;
 }
 
 button,

@@ -236,4 +236,30 @@ describe('RoadCanvasComponent', () => {
     // Assert distance between car and radar visibly decreased
     expect(distT2).toBeLessThan(distT1, 'Visual distance between ego and speed radar must decrease');
   });
+
+  it('should render clean EGO badge without concatenating state text like EGOCRUISING', () => {
+    fixture.componentRef.setInput('snapshot', {
+      simulationTimeMillis: 500,
+      status: 'RUNNING',
+      egoVehicle: { speedKmh: 50, positionMeters: 10, lane: 'CENTER', accelerationMps2: 0, drivingState: 'CRUISING' },
+      environment: { weatherCondition: 'CLEAR', visibilityFactor: 1, gripFactor: 1 },
+      speedAdvisor: { currentKmh: 50, legalLimitKmh: 50, recommendedKmh: 50, action: 'MAINTAIN_SPEED' },
+      currentDecision: { action: 'MAINTAIN_SPEED', recommendedSpeedKmh: 50, riskLevel: 'LOW', reason: '', sourceRule: '', timestamp: 500, evidence: [] },
+      sensorReadings: {},
+      sensors: {},
+      worldObjects: [
+        { id: 'obs_1', type: 'StaticObstacle', positionMeters: 50, worldPositionMeters: 60, lane: 'CENTER', details: 'severity=HIGH' }
+      ],
+      sensorRanges: { cameraRangeMeters: 100, radarRangeMeters: 130, blindSpotRangeMeters: 25, cameraRateMillis: 200, radarRateMillis: 50 }
+    });
+    fixture.detectChanges();
+
+    const egoTag = fixture.nativeElement.querySelector('.ego__tag');
+    expect(egoTag).toBeTruthy();
+    expect(egoTag.textContent.trim()).toBe('EGO');
+    expect(fixture.nativeElement.textContent).not.toContain('EGOCRUISING');
+
+    const obstacle = fixture.nativeElement.querySelector('[data-testid="road-obstacle"]');
+    expect(obstacle).toBeTruthy('Obstacle must have data-testid="road-obstacle"');
+  });
 });

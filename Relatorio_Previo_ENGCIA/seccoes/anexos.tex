@@ -1,19 +1,77 @@
-\chapter{Guião de entrevista}
-\label{anx:guiao}
-
-\preencher{Anexo por redigir}
-
-\chapter{Síntese das sessões com o perito}
+\chapter{Perguntas e respostas ao perito}
 \label{anx:sessoes}
 
-\preencher{Anexo por redigir}
-
-\chapter{Ficha de validação}
-\label{anx:validacao}
-
-\preencher{Anexo por redigir}
-
-\chapter{Catálogo de regras}
-\label{anx:regras}
-
-\preencher{Anexo por redigir}
+{\footnotesize
+\begin{longtable}{@{}L{2.6cm}L{5.3cm}L{7.0cm}@{}}
+  \caption{Perguntas e respostas ao perito}
+  \label{tab:perguntas-perito}\\
+  \toprule
+  \textbf{Tema} & \textbf{Pergunta (síntese)}
+    & \textbf{Resposta do perito (síntese)} \\
+  \midrule
+  \endfirsthead
+  \toprule
+  \textbf{Tema} & \textbf{Pergunta (síntese)}
+    & \textbf{Resposta do perito (síntese)} \\
+  \midrule
+  \endhead
+  \bottomrule
+  \endfoot
+  Falha do veículo
+    & Que estado deve assumir o veículo em caso de falha?
+    & «STOP imediato, sem dúvida.» \\
+  Relevância dos sensores
+    & Que informação dos sensores é mais importante (velocidade, distância
+      ao obstáculo, TTC, semáforos, meteorologia, sinais de trânsito)?
+    & Os dados indicados já são suficientes. Todos são importantes: cada
+      sensor é necessário na situação específica para a qual contribui. \\
+  Criticidade e TTC
+    & Como distinguir uma situação normal de uma crítica, usando o TTC para
+      decidir entre desviar e travar?
+    & A criticidade deve resultar de uma equação a desenvolver pela equipa,
+      com base na velocidade atual, na distância ao objeto e na capacidade de
+      travagem. Existe um «ponto de não-retorno» a partir do qual a colisão é
+      inevitável. «Nunca considerem arranque e travagem instantâneos.» \\
+  Número de leituras
+    & Quantas leituras considerar antes de decidir?
+    & Depende do resultado da equação. Numa situação crítica mas ainda
+      passível de manobra, a decisão é tomada logo à primeira leitura (por
+      exemplo, mudança de via). Numa situação normal, pode fazer-se uma
+      segunda leitura para excluir um valor atípico (falso positivo). \\
+  Prioridades e desempate
+    & Que níveis de prioridade definir e como desempatar situações com a
+      mesma prioridade?
+    & Usar quatro níveis: baixo, médio, alto e crítico. Para desempatar,
+      escolher aleatoriamente entre as possibilidades ou, se estiverem
+      ordenadas numa lista, escolher a primeira. \\
+  Memória de trabalho
+    & Durante quanto tempo guardar factos como a presença de um peão ou de
+      um obstáculo?
+    & Quando o evento sai do campo de deteção, passa a ser um evento passado
+      e pode ser esquecido. Não é necessário memorizar eventos: uma alteração
+      por sinal de trânsito é uma mudança de estado, não uma posição a
+      memorizar. \\
+  Dados contraditórios
+    & Como deve o veículo comportar-se quando os sensores dão informação
+      contraditória?
+    & Sem uma terceira fonte, aplica-se o critério de desempate. Se o nível
+      for alto ou crítico, «é melhor o STOP». \\
+  Cenários
+    & Que cenários apresentar?
+    & Todos os discutidos na reunião (S1), podendo acrescentar-se a
+      passadeira com peão. Sugere ainda permitir que o utilizador clique na
+      estrada para fazer surgir um elemento fora de contexto (por exemplo,
+      carga caída de outra via). \\
+  Explicações
+    & Como apresentar as explicações \emph{Why} e \emph{Why Not}: pelas
+      regras ou por uma explicação?
+    & As regras são obrigatórias e a informação apresentada deve estar
+      alinhada com elas. \\
+  Melhorias
+    & Que melhorias sugere?
+    & Considera difícil sugerir melhorias a um sistema que ainda não existe,
+      mas avalia como correto o levantamento de requisitos e o plano de
+      trabalhos. Devemos voltar a fazer esta questão numa fase mais avançada
+      do projeto. \\
+\end{longtable}
+}

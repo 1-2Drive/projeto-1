@@ -1,27 +1,112 @@
-\chapter{Casos de estudo}
+\chapter{Cenários e critérios de aceitação}
 \label{cap:casos}
 
-\section{Adaptação da velocidade à chuva}
+\section{Cenários}
+\label{sec:cenarios}
 
-\preencher{Secção por redigir}
+Os cenários simulados, no presente trabalho, representam configurações do
+ambiente a simular que, depois de iniciadas, são observadas pelos sensores.
+Apenas a informação efetivamente detetada é posteriormente transformada em
+eventos e factos utilizados pelo motor de inferência. Neste sentido, existe
+uma diferença entre aquilo que existe no ambiente e aquilo que o sistema
+conhece num determinado instante, ou seja, o carregamento de um cenário não
+significa que o motor de inferência tenha imediatamente acesso a todos os
+elementos existentes no mesmo. Por exemplo, um sinal ou um peão pode estar
+presente no percurso, mas apenas passa a influenciar a tomada de decisão
+quando é detetado pelos sensores e a respetiva informação chega ao motor de
+inferência.
 
-\section{Obstáculo frontal e risco de colisão}
+Na versão atual do projeto encontram-se definidos diferentes cenários, cerca
+de catorze, entre os quais:
 
-\preencher{Secção por redigir}
+\begin{table}[H]
+  \centering
+  \caption{Exemplos de cenários e respetivo comportamento}
+  \label{tab:cenarios}
+  \small
+  \begin{tabularx}{\textwidth}{@{}L{5.2cm}X@{}}
+    \toprule
+    \textbf{Cenário} & \textbf{Comportamento} \\
+    \midrule
+    Estrada sem situações de perigo & Continuação da circulação na ausência de
+      condições que exijam intervenção \\
+    Alteração do limite de velocidade & Deteção do novo limite e adaptação da
+      velocidade \\
+    Semáforo vermelho & Reconhecimento da obrigação de parar \\
+    Sinal STOP & Aproximação, paragem e continuação após o cumprimento da
+      condição \\
+    Peão ou objeto na via & Avaliação do risco e escolha da ação em função da
+      situação \\
+    TTC crítico & Reação perante uma situação de elevado risco de colisão \\
+    Mudança de via impedida & Avaliação da ocupação da via adjacente \\
+    Chuva & Adaptação do comportamento às condições meteorológicas \\
+    Cenário sequencial & Resposta do sistema a diferentes situações
+      introduzidas ao longo do mesmo percurso \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
 
-\section{Manutenção da distância de segurança}
+Para além de definir os elementos inicialmente presentes no ambiente, os
+cenários com ações temporizadas permitem introduzir alterações durante o
+decorrer da simulação, como modificar as condições meteorológicas ou
+adicionar elementos ao percurso. Desta forma, o ambiente não permanece
+necessariamente igual desde o início até ao fim do cenário, o que permite
+observar a reação do sistema à evolução das condições. A utilização destes
+cenários permite avaliar não só se uma determinada regra é ativada, mas
+também se o sistema acompanha corretamente a evolução da situação. Num
+cenário com um peão, por exemplo, interessa acompanhar o processo desde o
+momento em que é detetado pelos sensores até à decisão. Num cenário de TTC
+crítico, interessa também perceber de que forma as diferentes leituras
+recebidas ao longo do tempo influenciam a resposta do sistema.
 
-\preencher{Secção por redigir}
+\section{Critérios de aceitação}
+\label{sec:criterios}
 
-\section{Saída involuntária da faixa}
+Os cenários que incluem várias situações ao longo do mesmo percurso permitem
+perceber a interação entre os diferentes tipos de conhecimento e verificar se
+o sistema consegue adaptar sucessivamente as suas decisões à medida que
+surgem novos elementos no ambiente. No entanto, para além dos cenários, é
+também importante ter em conta os critérios de aceitação do comportamento do
+sistema, uma vez que não é suficiente verificar apenas se uma determinada
+regra foi selecionada. É necessário confirmar se a informação utilizada pelo
+motor de inferência corresponde ao estado observado, se a decisão sugerida é
+coerente com as regras definidas e se o resultado pode ser explicado a partir
+do conhecimento representado. Neste sentido, foram considerados os seguintes
+critérios de aceitação:
+\begin{itemize}
+  \item a informação detetada pelos sensores deve dar origem a eventos e
+    factos coerentes com a situação simulada;
+  \item as regras a aplicar devem corresponder às condições presentes no
+    cenário;
+  \item a decisão final deve respeitar o nível de risco e as prioridades
+    definidas para o sistema;
+  \item quando existirem várias propostas de decisão, o mecanismo de
+    resolução de conflitos deve selecionar a alternativa esperada;
+  \item o comportamento do sistema deve acompanhar a evolução do cenário,
+    nomeadamente as alterações que ocorram ao longo do tempo;
+  \item após as decisões propostas deve ser permitido identificar, sempre que
+    possível, a regra e a evidência que lhes deram origem;
+  \item situações equivalentes devem dar origem a comportamentos consistentes
+    em execuções repetidas;
+  \item os cenários devem permitir identificar regras incompletas, conflitos
+    inesperados ou condições ainda não representadas;
+  \item à medida que a implementação em Prolog for concluída, deverá ser
+    verificado se, perante factos conceptualmente equivalentes, as conclusões
+    obtidas são coerentes com as obtidas no Drools.
+\end{itemize}
 
-\preencher{Secção por redigir}
+\section{Testes realizados}
+\label{sec:testes}
 
-\section{Peão na trajetória}
-
-\preencher{Secção por redigir}
-
-\section{Matriz resumo dos casos}
-
-\preencher{Secção por redigir}
-
+Para além dos cenários utilizados durante a simulação, foram realizados
+testes para validar e verificar o comportamento das regras e a integração
+entre os componentes. Atualmente, o projeto conta com cerca de 41 testes no
+\emph{backend}, nos quais se incluem testes específicos às regras do Drools,
+aos conflitos entre propostas de decisão, à descrição dos factos e testes
+\emph{end-to-end} do motor de simulação e das mudanças de via. No
+\emph{frontend} encontram-se ainda definidos 16 testes unitários, com foco nas
+componentes e serviços da interface, bem como 7 testes \emph{end-to-end} com
+Playwright, para testar situações como a introdução dos limites de velocidade
+e o desvio de obstáculos. Os testes utilizados, até ao momento, permitem
+verificar não só as regras de forma isolada, mas também a alteração do
+ambiente, a inferência, a decisão e a respetiva representação na aplicação.

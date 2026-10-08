@@ -60,12 +60,21 @@ public class SensorSignificance {
      */
     public String classify(Object event) {
         if (event instanceof PotholeDetectedEvent e) {
+            if ("none".equals(e.getPotholeId()) || Double.isInfinite(e.getDistanceMeters()) || e.getDistanceMeters() <= 0) {
+                return null;
+            }
             return transition("pothole:" + e.getPotholeId(), true, describePothole(e));
         }
         if (event instanceof ObstacleDetectedEvent e) {
+            if ("none".equals(e.getObstacleId()) || Double.isInfinite(e.getDistanceMeters()) || e.getDistanceMeters() <= 0) {
+                return null;
+            }
             return transition("obstacle:" + e.getObstacleId(), true, describeObstacle(e));
         }
         if (event instanceof PedestrianDetectedEvent e) {
+            if ("none".equals(e.getPedestrianId()) || Double.isInfinite(e.getDistanceMeters()) || e.getDistanceMeters() <= 0) {
+                return null;
+            }
             return transition("pedestrian:" + e.getPedestrianId(), true,
                 "Pedestrian detected " + round(e.getDistanceMeters()) + "m ahead"
                     + (e.isInPath() ? " in path" : " outside path"));

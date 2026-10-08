@@ -20,7 +20,6 @@ import com.one2drive.projeto1.drools.events.StopSignEvent;
 import com.one2drive.projeto1.drools.events.TTCEvent;
 import com.one2drive.projeto1.drools.events.TrafficLightEvent;
 import com.one2drive.projeto1.drools.events.WeatherEvent;
-import com.one2drive.projeto1.drools.events.YieldSignEvent;
 import com.one2drive.projeto1.explanation.TimelineEntryType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -57,6 +56,34 @@ class DrivingExpertSystemRulesTest {
 
     @Test
     @Timeout(10)
+    void sessionSeedLimitAloneIsNotATargetToSpeedUpTo() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(60.0)) {
+            DrivingDecision decision = harness.cycle(1_000, 60.0);
+            assertEquals(DrivingAction.MAINTAIN_SPEED, decision.getAction());
+            assertEquals(60.0, decision.getRecommendedSpeedKmh(), 0.01,
+                "the placeholder limit must not turn into a target the vehicle chases");
+            assertEquals("Default maintain speed baseline", decision.getSourceRule());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void signAboveCurrentSpeedBecomesTheTargetToBuildUpTo() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(60.0)) {
+            DrivingDecision decision = harness.cycle(
+                1_000,
+                60.0,
+                new SpeedLimitDetectedEvent(1_000, "camera", 90, 80, "sign-90")
+            );
+            assertEquals(DrivingAction.MAINTAIN_SPEED, decision.getAction());
+            assertEquals(90.0, decision.getRecommendedSpeedKmh(), 0.01,
+                "approaching a limit from below means building up to it, not holding the old speed");
+            assertEquals("Maintain speed when compliant with detected limit", decision.getSourceRule());
+        }
+    }
+
+    @Test
+    @Timeout(10)
     void redLightTriggersStop() {
         try (DroolsTestHarness harness = new DroolsTestHarness(60.0)) {
             DrivingDecision decision = harness.cycle(
@@ -75,7 +102,9 @@ class DrivingExpertSystemRulesTest {
             DrivingDecision approach = harness.cycle(
                 1_000,
                 50.0,
-                new StopSignEvent(1_000, "camera", 25, "stop-1")
+                // 35 m is the closest point at which comfortable braking (2.8 m/s2) can
+                // still stop from 50 km/h, so the approach must be a plain reduction.
+                new StopSignEvent(1_000, "camera", 35, "stop-1")
             );
             assertEquals(DrivingAction.REDUCE_SPEED, approach.getAction());
 
@@ -94,15 +123,14 @@ class DrivingExpertSystemRulesTest {
 
     @Test
     @Timeout(10)
-    void yieldSignTriggersCautionaryReduction() {
-        try (DroolsTestHarness harness = new DroolsTestHarness(65.0)) {
-            DrivingDecision decision = harness.cycle(
+    void stopSignTooCloseForComfortableBrakingTriggersEmergencyBrake() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(55.0)) {
+            DrivingDecision approach = harness.cycle(
                 1_000,
-                65.0,
-                new YieldSignEvent(1_000, "camera", 18.0, "yield-1")
+                50.0,
+                new StopSignEvent(1_000, "camera", 25, "stop-1")
             );
-            assertEquals(DrivingAction.REDUCE_SPEED, decision.getAction());
-            assertTrue(decision.getRecommendedSpeedKmh() < 65.0);
+            assertEquals(DrivingAction.EMERGENCY_BRAKE, approach.getAction());
         }
     }
 

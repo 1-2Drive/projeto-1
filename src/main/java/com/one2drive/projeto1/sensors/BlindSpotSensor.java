@@ -35,7 +35,11 @@ public class BlindSpotSensor extends AbstractSensor<Object> {
                 id(),
                 occupancy.lane(),
                 occupancy.occupied(),
-                occupancy.nearestDistanceMeters()
+                occupancy.nearestDistanceMeters(),
+                occupancy.safeToEnter(),
+                occupancy.frontDistanceMeters(),
+                occupancy.rearDistanceMeters(),
+                occupancy.rearTtcSeconds()
             ));
         }
         return events;

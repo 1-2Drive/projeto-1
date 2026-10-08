@@ -58,16 +58,18 @@ rule "Approaching trend from sliding distance window"
 salience 505
 when
     $ctx : DecisionContext()
+    FrontVehicleState(targetId != "none", distanceMeters > 0, distanceMeters < 50.0)
+    VehicleStateFact(laneChangeState == LaneChangeState.IDLE)
     $count : Number( intValue >= 3 ) from accumulate(
-        FrontDistanceEvent( $d : distanceMeters > 0 ) over window:length(5) from entry-point "PERCEPTION_STREAM",
+        FrontDistanceEvent( $d : distanceMeters > 0 ) over window:time(2s) from entry-point "PERCEPTION_STREAM",
         count(1)
     )
     $min : Number() from accumulate(
-        FrontDistanceEvent( $dMin : distanceMeters > 0 ) over window:length(5) from entry-point "PERCEPTION_STREAM",
+        FrontDistanceEvent( $dMin : distanceMeters > 0 ) over window:time(2s) from entry-point "PERCEPTION_STREAM",
         min($dMin)
     )
     $max : Number() from accumulate(
-        FrontDistanceEvent( $dMax : distanceMeters > 0 ) over window:length(5) from entry-point "PERCEPTION_STREAM",
+        FrontDistanceEvent( $dMax : distanceMeters > 0 ) over window:time(2s) from entry-point "PERCEPTION_STREAM",
         max($dMax)
     )
     eval($min.doubleValue() < ($max.doubleValue() - 4.0))
@@ -90,11 +92,11 @@ no-loop true
 when
     $ctx : DecisionContext()
     $state : OvertakingStateFact(active == false)
-    VehicleStateFact(lane == Lane.RIGHT || lane == Lane.CENTER, laneChangeState == LaneChangeState.IDLE, leftMarking != RoadMarkingType.CONTINUOUS, $now : timestamp)
+    VehicleStateFact(lane == Lane.RIGHT || lane == Lane.CENTER, $currentLane : lane, laneChangeState == LaneChangeState.IDLE, leftMarking != RoadMarkingType.CONTINUOUS, $now : timestamp)
     FrontVehicleState(targetId != "none", $distance : distanceMeters > 15.0, distanceMeters <= 50.0, $relative : relativeSpeedMps > 0.5)
     LaneOccupancyState(lane == Lane.LEFT, occupied == false)
 then
-    modify($state) { setActive(true), setOriginalLane(Lane.RIGHT), setPassedTarget(false), setTimestamp($now) }
+    modify($state) { setActive(true), setOriginalLane($currentLane), setPassedTarget(false), setTimestamp($now) }
     droolsSupport.proposeDecision(
         $ctx,
         DrivingAction.CHANGE_LANE_LEFT,

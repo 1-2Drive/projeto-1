@@ -8,7 +8,6 @@ export type MapCellTone =
   | 'pothole'
   | 'barrier'
   | 'stop'
-  | 'yield'
   | 'light-red'
   | 'light-yellow'
   | 'light-green'
@@ -125,8 +124,6 @@ export class RoadMapComponent {
         return entry.detail === 'OPEN' ? 'free' : 'barrier';
       case 'STOP_SIGN':
         return 'stop';
-      case 'YIELD_SIGN':
-        return 'yield';
       case 'TRAFFIC_LIGHT':
         return entry.detail === 'GREEN' ? 'light-green' : entry.detail === 'YELLOW' ? 'light-yellow' : 'light-red';
       case 'SPEED_LIMIT':

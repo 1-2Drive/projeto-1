@@ -6,7 +6,6 @@ import { ApiRoadElement, ApiSimulationSnapshot, LaneName } from '../../core/mode
 export type RoadObjectKind =
   | 'speedLimit'
   | 'stopSign'
-  | 'yieldSign'
   | 'trafficLight'
   | 'barrier'
   | 'pothole'
@@ -72,16 +71,11 @@ export class RoadCanvasComponent {
   /** Visible road span in viewport (in world meters). */
   readonly viewportSpanMeters = 180;
   /** Left margin in world meters at scenario start so vehicle begins near the left edge (~5.5%). */
-  readonly initialLeftMarginMeters = 10;
-  /** Dead-zone threshold ratio (0.80 = 80%) before camera starts scrolling. */
-  readonly deadZoneRatio = 0.80;
+  readonly egoTrackingRatio = 0.20;
 
   /** Metres of road visible behind and ahead for backward compatibility. */
   readonly worldBackwardMeters = 40;
   readonly worldForwardMeters = 200;
-
-  private lastSimTime = -1;
-  private scenarioStartPos = 0;
 
   protected readonly ranges = computed(() => this.snapshot()?.sensorRanges ?? EMPTY_RANGES);
 
@@ -91,7 +85,7 @@ export class RoadCanvasComponent {
   protected readonly egoPosition = computed(() => this.snapshot()?.egoVehicle?.positionMeters ?? 0);
   protected readonly egoSpeed = computed(() => this.snapshot()?.egoVehicle?.speedKmh ?? 0);
   protected readonly egoAcceleration = computed(() => this.snapshot()?.egoVehicle?.accelerationMps2 ?? 0);
-  protected readonly currentLane = computed(() => this.snapshot()?.egoVehicle?.lane ?? 'CENTER');
+  protected readonly currentLane = computed(() => this.snapshot()?.egoVehicle?.lane ?? 'RIGHT');
   protected readonly drivingState = computed(() => this.snapshot()?.egoVehicle?.drivingState ?? (this.egoSpeed() > 0.5 ? 'CRUISING' : 'STOPPED'));
   protected readonly indicatorName = computed(() => {
     const ego = this.snapshot()?.egoVehicle;
@@ -119,33 +113,13 @@ export class RoadCanvasComponent {
   protected readonly indicatorHazard = computed(() => this.indicatorName() === 'HAZARD');
 
   /**
-   * Evaluates the scenario starting position cleanly whenever simulation resets (time 0 or rewind).
-   */
-  private resolveStartPos(snapshot: ApiSimulationSnapshot | null): number {
-    if (!snapshot) return 0;
-    const t = snapshot.simulationTimeMillis;
-    if (t === 0 || t < this.lastSimTime) {
-      this.scenarioStartPos = snapshot.egoVehicle.positionMeters;
-    }
-    this.lastSimTime = t;
-    return this.scenarioStartPos;
-  }
-
-  /**
-   * Dead-zone camera offset in world meters:
-   * Stays completely static while ego vehicle traverses from start up to the dead-zone threshold (80% of viewport).
-   * Only after ego exceeds the dead-zone threshold does the camera begin scrolling smoothly forward.
+   * Camera offset in world meters: smoothly tracks the ego vehicle, placing it
+   * at egoTrackingRatio (20%) of the viewport so the car has stable tracking
+   * while road markings, signs, and hazards visibly stream past.
    */
   protected readonly cameraOffset = computed(() => {
-    const snap = this.snapshot();
-    const startPos = this.resolveStartPos(snap);
     const egoPos = this.egoPosition();
-    const baseOffset = startPos - this.initialLeftMarginMeters;
-    const thresholdWorldPos = baseOffset + this.viewportSpanMeters * this.deadZoneRatio;
-    if (egoPos <= thresholdWorldPos) {
-      return baseOffset;
-    }
-    return egoPos - this.viewportSpanMeters * this.deadZoneRatio;
+    return egoPos - (this.viewportSpanMeters * this.egoTrackingRatio);
   });
 
   /**
@@ -158,7 +132,7 @@ export class RoadCanvasComponent {
   }
 
   /**
-   * Ego vehicle screen X coordinate. Increases continuously as ego advances through the world!
+   * Ego vehicle screen X coordinate. Positioned at stable tracking region (~20%).
    */
   protected readonly egoXPercent = computed(() => {
     return Math.max(0, Math.min(100, this.worldToPercentX(this.egoPosition())));
@@ -225,10 +199,12 @@ export class RoadCanvasComponent {
     return ticks;
   });
 
-  /** Dash offset in percent for streaming lane line animation. Static while camera is static. */
+  /** Dash offset in percent for streaming lane line animation. Continuously streams backwards as vehicle advances! */
   protected readonly dashOffsetPercent = computed(() => {
-    const mod = ((this.cameraOffset() % 16) + 16) % 16;
-    return -(mod / this.viewportSpanMeters) * 100;
+    const dashLengthMeters = 16.0;
+    const egoPos = this.egoPosition();
+    const mod = ((egoPos % dashLengthMeters) + dashLengthMeters) % dashLengthMeters;
+    return -(mod / dashLengthMeters) * 100;
   });
 
   protected readonly laneLabels = [
@@ -263,7 +239,7 @@ export class RoadCanvasComponent {
           yPercent: this.lateralToY(LANE_CENTRE_METRES[item.lane] ?? 0),
           detectedByCamera: snapshot.cameraDetectedObjectIds?.includes(item.id) ?? false,
           detectedByRadar: snapshot.radarDetectedObjectIds?.includes(item.id) ?? false,
-          visible: xPct >= -15 && xPct <= 115
+          visible: item.positionMeters >= -36 && item.positionMeters <= 150 && xPct >= -10 && xPct <= 110
         };
       })
       .filter((item) => item.visible);
@@ -352,7 +328,6 @@ export class RoadCanvasComponent {
       case 'pothole': return 'road-pothole';
       case 'barrier': return 'road-barrier';
       case 'stopSign': return 'road-stop-sign';
-      case 'yieldSign': return 'road-yield-sign';
       case 'trafficLight': return 'road-traffic-light';
       case 'speedLimit': return 'road-speed-limit';
       case 'vehicle': return 'road-vehicle';
@@ -367,8 +342,6 @@ export class RoadCanvasComponent {
         return 'Speed limit sign';
       case 'stopSign':
         return 'Stop sign';
-      case 'yieldSign':
-        return 'Yield sign';
       case 'trafficLight':
         return 'Traffic light';
       case 'barrier':
@@ -404,7 +377,6 @@ export class RoadCanvasComponent {
     if (type.includes('SpeedRadar')) return 'speedRadar';
     if (type.includes('SpeedLimit')) return 'speedLimit';
     if (type.includes('StopSign')) return 'stopSign';
-    if (type.includes('YieldSign')) return 'yieldSign';
     if (type.includes('TrafficLight')) return 'trafficLight';
     if (type.includes('Barrier')) return 'barrier';
     if (type.includes('Pothole')) return 'pothole';

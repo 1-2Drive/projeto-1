@@ -2,7 +2,9 @@ package com.one2drive.projeto1.simulation;
 
 import com.one2drive.projeto1.config.SimulationConfig;
 import com.one2drive.projeto1.domain.DrivingAction;
+import com.one2drive.projeto1.domain.DrivingState;
 import com.one2drive.projeto1.domain.Lane;
+import com.one2drive.projeto1.domain.StopSign;
 import com.one2drive.projeto1.domain.WeatherCondition;
 import com.one2drive.projeto1.scenario.ScenarioActorDefinition;
 import com.one2drive.projeto1.scenario.ScenarioActorType;
@@ -78,6 +80,195 @@ class SimulationEngineE2ETest {
             assertTrue(engine.snapshot().currentDecision().equals(DrivingAction.MAINTAIN_SPEED.name())
                 || engine.snapshot().currentDecision().equals(DrivingAction.CONTINUE.name())
                 || engine.snapshot().currentDecision().equals(DrivingAction.REDUCE_SPEED.name()));
+        }
+    }
+
+    /**
+     * Approaching a limit from below: the sign is the target, not just a ceiling. The
+     * vehicle has to build up to it, because in the web product nothing else can ever
+     * speed the car up, and the recommendation must show the limit while it does.
+     */
+    @Test
+    @Timeout(25)
+    void signAheadWithHigherLimitBuildsTheVehicleUpToThatLimit() {
+        ScenarioLibrary library = ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json");
+        ScenarioDefinition scenario = library.findById("S1").orElseThrow();
+
+        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {
+        })) {
+            double startSpeed = engine.snapshot().egoSpeedKmh();
+            engine.start();
+
+            ScenarioRoadElementDefinition sign = new ScenarioRoadElementDefinition();
+            sign.setType(ScenarioRoadElementType.SPEED_LIMIT);
+            sign.setLane(Lane.CENTER);
+            sign.setPositionMeters(260.0);
+            sign.setSpeedLimitKmh(90);
+            engine.addRoadElementAhead(sign);
+            // The element is queued while the simulation runs and lands in the world on
+            // the next tick.
+            engine.tick();
+
+            boolean targetSeen = false;
+            SimulationSnapshot snapshot = engine.snapshot();
+            for (int i = 0; i < 400; i++) {
+                snapshot = engine.tick();
+                targetSeen = targetSeen || snapshot.recommendedSpeedKmh() >= 89.9;
+                if (targetSeen && snapshot.egoSpeedKmh() >= 89.5) {
+                    break;
+                }
+            }
+
+            assertTrue(targetSeen, "the sign must become the recommendation, last recommendation "
+                + snapshot.recommendedSpeedKmh());
+            assertTrue(snapshot.egoSpeedKmh() >= 88.0,
+                "the vehicle must build up to the higher limit, reached " + snapshot.egoSpeedKmh()
+                    + " km/h from " + startSpeed + " km/h");
+            assertTrue(snapshot.recommendedSpeedKmh() <= 90.1,
+                "and never be advised above it, advised " + snapshot.recommendedSpeedKmh());
+        }
+    }
+
+    @Test
+    @Timeout(20)
+    void stopSignFlowBringsVehicleToFullStopThenProceeds() {
+        ScenarioLibrary library = ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json");
+        ScenarioDefinition scenario = library.findById("S4").orElseThrow();
+
+        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {
+        })) {
+            double signPosition = engine.getWorldState().getRoadElements().stream()
+                .filter(element -> element instanceof StopSign)
+                .findFirst()
+                .orElseThrow()
+                .getPositionMeters();
+            engine.start();
+
+            boolean approached = false;
+            boolean stoppedAtLine = false;
+            double closestDistance = Double.MAX_VALUE;
+            int stoppedTicks = 0;
+            for (int i = 0; i < 500 && !stoppedAtLine; i++) {
+                SimulationSnapshot snapshot = engine.tick();
+                double distance = engine.getWorldState().signedDistance(signPosition);
+                closestDistance = Math.min(closestDistance, distance);
+                approached = approached || snapshot.timeline().stream().anyMatch(
+                    line -> line.contains("Stop sign requires progressive deceleration")
+                        || line.contains("Stop sign requires full stop near line"));
+                if (snapshot.egoSpeedKmh() < 0.6 && distance <= 4.0) {
+                    stoppedTicks++;
+                    stoppedAtLine = stoppedTicks >= 10;
+                } else {
+                    stoppedTicks = 0;
+                }
+            }
+
+            assertTrue(approached, "the stop sign must be perceived and acted on during the approach");
+            assertTrue(stoppedAtLine,
+                "the vehicle must come to a full stop at the stop sign, closest distance " + closestDistance);
+            assertTrue(closestDistance >= -1.0 && closestDistance <= 4.0,
+                "the vehicle must stop at the line instead of crossing it, closest distance " + closestDistance);
+
+            boolean proceeded = false;
+            for (int i = 0; i < 250; i++) {
+                SimulationSnapshot snapshot = engine.tick();
+                proceeded = proceeded || snapshot.timeline().stream()
+                    .anyMatch(line -> line.contains("Proceed after stop sign condition satisfied"));
+            }
+            assertTrue(proceeded, "the stop condition must be released so the vehicle can move off again");
+            assertTrue(engine.snapshot().egoSpeedKmh() >= 25.0,
+                "the vehicle must pull away to its move-off speed after the stop, speed "
+                    + engine.snapshot().egoSpeedKmh());
+        }
+    }
+
+    /**
+     * The approach must be owned by one rule and braked at a steady comfortable rate.
+     * Recommending the braking curve used to leave the vehicle a widening gap above it,
+     * which pushed the required deceleration back through the hard-braking threshold over
+     * and over: the decision then alternated between EMERGENCY_BRAKE, coasting and the
+     * baseline, the hazard lights flashed with every pulse, and the vehicle undershot so
+     * far that it stalled short of the sign instead of stopping at the line.
+     */
+    @Test
+    @Timeout(20)
+    void stopSignApproachBrakesSteadilyInsteadOfPulsingEmergencyBrake() {
+        ScenarioLibrary library = ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json");
+        ScenarioDefinition scenario = library.findById("S1").orElseThrow();
+
+        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {
+        })) {
+            engine.start();
+
+            ScenarioRoadElementDefinition sign = new ScenarioRoadElementDefinition();
+            sign.setType(ScenarioRoadElementType.STOP_SIGN);
+            sign.setLane(Lane.CENTER);
+            sign.setPositionMeters(60.0);
+            engine.addRoadElementAhead(sign);
+            // The element is queued while the simulation runs and lands in the world on the
+            // next tick, so it can only be looked up after that tick.
+            engine.tick();
+            double signPosition = engine.getWorldState().getRoadElements().stream()
+                .filter(element -> element instanceof StopSign)
+                .findFirst()
+                .orElseThrow()
+                .getPositionMeters();
+
+            int emergencyBursts = 0;
+            int emergencyTicks = 0;
+            int baselineTicks = 0;
+            boolean approaching = false;
+            boolean previousWasEmergency = false;
+            boolean stopped = false;
+            int stoppedTicks = 0;
+            double closestDistance = Double.MAX_VALUE;
+            double firstRestDistance = Double.NaN;
+
+            for (int i = 0; i < 400 && !stopped; i++) {
+                SimulationSnapshot snapshot = engine.tick();
+                double distance = engine.getWorldState().signedDistance(signPosition);
+                closestDistance = Math.min(closestDistance, distance);
+                if (snapshot.egoSpeedKmh() < 0.6 && Double.isNaN(firstRestDistance)) {
+                    firstRestDistance = distance;
+                }
+
+                boolean emergency = DrivingAction.EMERGENCY_BRAKE.name().equals(snapshot.currentDecision());
+                boolean fromStopRule = snapshot.sourceRule() != null
+                    && snapshot.sourceRule().startsWith("Stop sign");
+                if (emergency) {
+                    emergencyTicks++;
+                    if (!previousWasEmergency) {
+                        emergencyBursts++;
+                    }
+                } else if (approaching && "Default maintain speed baseline".equals(snapshot.sourceRule())) {
+                    baselineTicks++;
+                }
+                approaching = approaching || fromStopRule;
+                previousWasEmergency = emergency;
+
+                if (snapshot.egoSpeedKmh() < 0.6 && distance <= 4.0) {
+                    stoppedTicks++;
+                    stopped = stoppedTicks >= 10;
+                } else {
+                    stoppedTicks = 0;
+                }
+            }
+
+            assertTrue(stopped, "the vehicle must come to a full stop at the sign, closest distance "
+                + closestDistance);
+            assertTrue(closestDistance >= -1.0 && closestDistance <= 4.0,
+                "the vehicle must stop at the line instead of undershooting or crossing it, closest distance "
+                    + closestDistance);
+            assertFalse(Double.isNaN(firstRestDistance), "the vehicle must come to rest at the sign");
+            assertTrue(firstRestDistance >= -1.0 && firstRestDistance <= 4.0,
+                "the first rest must be at the line, not a stall short of it that has to be crept away from: "
+                    + firstRestDistance);
+            assertTrue(emergencyBursts <= 2,
+                "hard braking must be one short burst, not a pulse train: " + emergencyBursts
+                    + " bursts over " + emergencyTicks + " ticks");
+            assertTrue(baselineTicks < 10,
+                "the stop sign must own the whole approach instead of handing the decision back to the "
+                    + "baseline for " + baselineTicks + " ticks");
         }
     }
 
@@ -209,6 +400,7 @@ class SimulationEngineE2ETest {
                 SimulationSnapshot snapshot = engine.tick();
                 detected = detected || snapshot.timeline().stream().anyMatch(line -> line.contains("Camera read pothole"));
                 reacted = reacted || snapshot.currentDecision().equals(DrivingAction.CHANGE_LANE_LEFT.name())
+                    || snapshot.currentDecision().equals(DrivingAction.CHANGE_LANE_RIGHT.name())
                     || snapshot.currentDecision().equals(DrivingAction.REDUCE_SPEED.name())
                     || snapshot.currentDecision().equals(DrivingAction.BRAKE.name());
                 if (detected && reacted) {
@@ -352,6 +544,82 @@ class SimulationEngineE2ETest {
                 .noneMatch(view -> view.type().equals("CurrentSpeedLimit") && view.value().contains("limitKmh=50")));
             assertTrue(engine.getWorldState().getActors().isEmpty());
             assertTrue(engine.getDemoEvidence().isEmpty());
+        }
+    }
+
+    /**
+     * A world that is not running reports the vehicle at rest, even when the scenario
+     * defines an entry speed: START is what applies that speed, so a stopped
+     * simulation never shows a cruising value or moves on its own.
+     */
+    @Test
+    @Timeout(10)
+    void stoppedWorldReportsRestAndStartAppliesScenarioSpeed() {
+        ScenarioLibrary library = ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json");
+        ScenarioDefinition scenario = library.findById("S1").orElseThrow();
+
+        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {
+        })) {
+            SimulationSnapshot stopped = engine.snapshot();
+            assertEquals(SimulationStatus.STOPPED, stopped.status());
+            assertEquals(0.0, stopped.egoSpeedKmh(), 0.001,
+                "A stopped world must report the vehicle at rest");
+            assertEquals(DrivingState.STOPPED, engine.getWorldState().getEgo().getDrivingState());
+
+            engine.start();
+            assertEquals(scenario.getInitialSpeedKmh(), engine.getWorldState().getEgo().getSpeedKmh(), 0.001,
+                "START applies the scenario's entry speed");
+            engine.tick();
+            assertTrue(engine.snapshot().egoSpeedKmh() > 0.0,
+                "A started simulation advances the vehicle");
+
+            engine.reset(scenario);
+            SimulationSnapshot afterReset = engine.snapshot();
+            assertEquals(SimulationStatus.STOPPED, afterReset.status());
+            assertEquals(0L, afterReset.simTimeMillis());
+            assertEquals(0.0, afterReset.egoSpeedKmh(), 0.001,
+                "A reset world reports the vehicle at rest again");
+            assertEquals(DrivingState.STOPPED, engine.getWorldState().getEgo().getDrivingState());
+        }
+    }
+
+    /**
+     * A rule that only slows the vehicle down leaves it stranded at the reduced speed once
+     * the road is clear again. With no sign governing the road, the scenario cruise speed
+     * must be the target the vehicle builds back up to.
+     */
+    @Test
+    @Timeout(25)
+    void vehicleBuildsBackUpToScenarioCruiseSpeedAfterBrakingWithNoSign() {
+        ScenarioLibrary library = ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json");
+        ScenarioDefinition scenario = library.findById("S1").orElseThrow();
+
+        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {
+        })) {
+            engine.start();
+            engine.getWorldState().getEgo().setSpeedKmh(25.0);
+
+            boolean cruiseTargetSeen = false;
+            SimulationSnapshot snapshot = engine.snapshot();
+            for (int i = 0; i < 400; i++) {
+                snapshot = engine.tick();
+                cruiseTargetSeen = cruiseTargetSeen || snapshot.recommendedSpeedKmh() >= 59.5;
+                if (cruiseTargetSeen && snapshot.egoSpeedKmh() >= 59.0) {
+                    break;
+                }
+            }
+
+            assertTrue(cruiseTargetSeen,
+                "the scenario cruise speed must become the recommendation, last recommendation "
+                    + snapshot.recommendedSpeedKmh());
+            assertTrue(snapshot.egoSpeedKmh() >= 58.0,
+                "the vehicle must build back up to the cruise speed, reached "
+                    + snapshot.egoSpeedKmh() + " km/h from 25 km/h");
+            assertTrue(snapshot.recommendedSpeedKmh() <= 60.5,
+                "and never be advised above it, advised " + snapshot.recommendedSpeedKmh());
+            assertTrue(snapshot.timeline().stream()
+                    .anyMatch(line -> line.contains("Build back up to the scenario cruise speed")),
+                "the cruise recovery rule must be visible in the inference timeline");
         }
     }
 }

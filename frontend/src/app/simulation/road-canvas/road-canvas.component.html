@@ -199,12 +199,6 @@
             <text class="sign__word" x="20" y="24">STOP</text>
           </svg>
         }
-        @case ('yieldSign') {
-          <svg class="sign sign--yield" viewBox="0 0 40 40" role="img">
-            <polygon class="sign__disc" points="20,3 38,33 2,33" />
-            <polygon class="sign__inner" points="20,9.5 31.5,29 8.5,29" />
-          </svg>
-        }
         @case ('trafficLight') {
           <svg class="light" viewBox="0 0 26 54" role="img">
             <rect class="light__case" x="1" y="1" width="24" height="52" rx="5" />
@@ -305,7 +299,11 @@
           {{ item.detectedByCamera ? 'DETECTED' : 'RADAR' }}
         </span>
       }
-      <span class="obj__distance">{{ item.relativeMeters | number: '1.0-0' }} m</span>
+      @if (item.relativeMeters > 0) {
+        <span class="obj__distance">{{ item.relativeMeters | number: '1.0-0' }} m</span>
+      } @else {
+        <span class="obj__distance obj__distance--passed">PASSED</span>
+      }
     </div>
   }
 

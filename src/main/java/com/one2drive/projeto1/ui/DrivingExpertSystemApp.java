@@ -167,8 +167,7 @@ public class DrivingExpertSystemApp extends Application {
             addRoadElementButton("Speed 70", speedLimit(70)),
             addRoadElementButton("Speed 90", speedLimit(90)),
             addRoadElementButton("Speed 120", speedLimit(120)),
-            addRoadElementButton("STOP", stopSign()),
-            addRoadElementButton("Yield", yieldSign())
+            addRoadElementButton("STOP", stopSign())
         );
 
         VBox road = group("Road",
@@ -456,14 +455,6 @@ public class DrivingExpertSystemApp extends Application {
     private ScenarioRoadElementDefinition stopSign() {
         ScenarioRoadElementDefinition d = new ScenarioRoadElementDefinition();
         d.setType(ScenarioRoadElementType.STOP_SIGN);
-        d.setLane(Lane.CENTER);
-        d.setPositionMeters(80);
-        return d;
-    }
-
-    private ScenarioRoadElementDefinition yieldSign() {
-        ScenarioRoadElementDefinition d = new ScenarioRoadElementDefinition();
-        d.setType(ScenarioRoadElementType.YIELD_SIGN);
         d.setLane(Lane.CENTER);
         d.setPositionMeters(80);
         return d;

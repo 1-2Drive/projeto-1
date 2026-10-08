@@ -6,7 +6,9 @@
     }
   </header>
 
-  @if (steps().length > 0) {
+  @if (idle()) {
+    <p class="empty">Nothing perceived yet. Press START and the engine will begin reporting.</p>
+  } @else if (steps().length > 0) {
     <ol class="steps">
       @for (step of steps(); track $index) {
         <li class="step"
@@ -17,7 +19,7 @@
       }
     </ol>
   } @else {
-    <p class="empty">Nothing perceived yet. Press START and the engine will begin reporting.</p>
+    <p class="empty">No inference cycle reported yet.</p>
   }
 </section>
 

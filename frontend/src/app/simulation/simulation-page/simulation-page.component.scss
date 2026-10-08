@@ -7,8 +7,6 @@
 .page {
   --left-rail: 15.5rem;
   --right-rail: 20rem;
-  /* Matches the road canvas max-height so all three workspace columns end together. */
-  --rail-max: 40rem;
   width: 100%;
   max-width: 100%;
   min-height: 100vh;
@@ -307,7 +305,7 @@
   display: grid;
   gap: var(--ds-space-3);
   grid-template-columns: var(--left-rail) minmax(0, 1fr) var(--right-rail);
-  align-items: start;
+  align-items: stretch;
   min-height: 0;
 }
 
@@ -317,12 +315,30 @@
   gap: 0.55rem;
   align-content: start;
   min-width: 0;
-  max-height: var(--rail-max);
-  overflow-y: auto;
 }
 
 .workspace__center {
   min-width: 0;
+}
+
+/* Side rails sit next to the centre column, so they must take the row height the
+   centre defines instead of their own content height. `height: 0` keeps them out of
+   the row sizing and `min-height: 100%` fills the row that the centre column set, so
+   all three columns always end on the same line and the rails scroll internally. */
+@media (min-width: 1101px) {
+  .workspace__left {
+    height: 0;
+    min-height: 100%;
+    overflow-y: auto;
+  }
+}
+
+@media (min-width: 1361px) {
+  .workspace__right {
+    height: 0;
+    min-height: 100%;
+    overflow-y: auto;
+  }
 }
 
 /* ============================ evidence ============================ */
@@ -391,12 +407,6 @@
 
   .workspace {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .workspace__left,
-  .workspace__right {
-    max-height: none;
-    overflow-y: visible;
   }
 
   .workspace__right {

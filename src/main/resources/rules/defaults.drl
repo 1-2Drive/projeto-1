@@ -14,22 +14,32 @@ import com.one2drive.projeto1.drools.facts.VehicleStateFact
 
 global DroolsSupport droolsSupport
 
+// Fallback for a cycle in which nothing else proposed anything: keep the speed the
+// driver already set. Two guards are needed because Drools only re-checks a pattern
+// when the fact it reads is update()d, and the DecisionContext is mutated in place by
+// every proposal instead. So the constraint below can still match after a rule fired at
+// a higher salience and already proposed: without the RHS guard the baseline would then
+// re-propose the current speed at the same priority, its lower recommendation would win
+// the tie-break, and the proposal that told the vehicle to build up to a detected limit
+// or to answer a driver acceleration request would be discarded in silence.
 rule "Default maintain speed baseline"
 salience -100
 when
     $ctx : DecisionContext(priority <= 0)
     VehicleStateFact($speed : speedKmh)
 then
-    droolsSupport.proposeDecision(
-        $ctx,
-        DrivingAction.MAINTAIN_SPEED,
-        $speed,
-        RiskLevel.LOW,
-        DecisionPriority.COMFORT_PROGRESS,
-        "No restrictive condition detected",
-        drools.getRule().getName(),
-        "baseline speed=" + $speed + " km/h"
-    );
+    if ($ctx.getPriority() == 0) {
+        droolsSupport.proposeDecision(
+            $ctx,
+            DrivingAction.MAINTAIN_SPEED,
+            $speed,
+            RiskLevel.LOW,
+            DecisionPriority.COMFORT_PROGRESS,
+            "No restrictive condition detected",
+            drools.getRule().getName(),
+            "baseline speed=" + $speed + " km/h"
+        );
+    }
 end
 
 // Moving off: a stopped vehicle that nothing holds any more (a lane opened next to an
@@ -38,15 +48,20 @@ end
 // survives a driver lane change in between, and a car that merely slowed down is never
 // sped up.
 //
-// It starts from a standstill when only baseline rules won the previous cycle, so
-// nothing held the car. It ends when a hazard or hold wins a cycle, or once the car is
-// within 1 km/h of the target, where the actuator settles.
+// It starts from a standstill when nothing holds the vehicle any more. A decision that
+// only reaches the maneuver safety priority (a stop sign's own proceed proposal, a lane
+// change) is permission to move rather than a hold, so it counts too: without that a
+// vehicle stopped for a stop sign could never start again, because the stop rules that
+// ended MoveOffState leave the proceed proposal as the winner and it sits exactly on
+// that priority. Only a hazard or mandatory stop above it keeps the vehicle standing.
+// It ends when a hazard or hold wins a cycle, or once the car is within 1 km/h of the
+// target, where the actuator settles.
 rule "Start moving off after a standstill"
 salience 60
 when
     $state : MoveOffState(active == false)
     VehicleStateFact(speedKmh < 3.0, laneChangeState == LaneChangeState.IDLE, $now : timestamp)
-    DrivingDecision(priority < DecisionPriority.MANEUVER_SAFETY)
+    DrivingDecision(priority <= DecisionPriority.MANEUVER_SAFETY)
 then
     modify($state) { setActive(true), setTimestamp($now) }
 end

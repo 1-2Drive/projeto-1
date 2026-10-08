@@ -25,9 +25,11 @@
         <em>{{ legalLimitKmh() | number: '1.0-0' }}</em>
       </span>
 
-      <span class="gauge__pin gauge__pin--rec" [style.transform]="'rotate(' + recommendedAngle() + 'deg)'">
-        <em data-testid="speed-recommended">{{ recommendedKmh() | number: '1.0-0' }}</em>
-      </span>
+      @if (!idle()) {
+        <span class="gauge__pin gauge__pin--rec" [style.transform]="'rotate(' + recommendedAngle() + 'deg)'">
+          <em data-testid="speed-recommended">{{ recommendedKmh() | number: '1.0-0' }}</em>
+        </span>
+      }
     </div>
 
     <footer class="gauge__legend">
@@ -37,11 +39,11 @@
       </span>
       <span class="legend legend--rec">
         Recommended
-        <strong>{{ recommendedKmh() | number: '1.0-0' }} km/h</strong>
+        <strong data-testid="speed-recommended-value">{{ recommendedLabel() }}</strong>
       </span>
       <span class="legend" [class]="'legend legend--delta legend--' + deltaClass()">
         Delta
-        <strong>{{ deltaKmh() > 0 ? '+' : '' }}{{ deltaKmh() | number: '1.0-1' }} km/h</strong>
+        <strong data-testid="speed-delta">{{ deltaLabel() }}</strong>
       </span>
     </footer>
   </section>

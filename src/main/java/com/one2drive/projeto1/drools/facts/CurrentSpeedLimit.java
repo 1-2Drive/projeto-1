@@ -1,6 +1,13 @@
 package com.one2drive.projeto1.drools.facts;
 
 public class CurrentSpeedLimit {
+    /**
+     * sourceId of the fact every session starts with: no sign has been seen yet, so the
+     * value is only the "unrestricted" placeholder and must not be mistaken for a limit
+     * a sign actually posted.
+     */
+    public static final String DEFAULT_SOURCE = "default";
+
     private int limitKmh;
     private String sourceId;
     private long timestamp;

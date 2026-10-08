@@ -19,7 +19,6 @@ import com.one2drive.projeto1.drools.events.TrafficLightEvent;
 import com.one2drive.projeto1.drools.events.VehicleSpeedEvent;
 import com.one2drive.projeto1.drools.events.VisibilityEvent;
 import com.one2drive.projeto1.drools.events.WeatherEvent;
-import com.one2drive.projeto1.drools.events.YieldSignEvent;
 import org.kie.api.runtime.KieSession;
 
 public class EventRouter {
@@ -38,7 +37,7 @@ public class EventRouter {
             kieSession.getEntryPoint(DroolsEntryPoints.PERCEPTION_STREAM).insert(event);
         } else if (event instanceof SpeedLimitDetectedEvent || event instanceof StopSignEvent
             || event instanceof ObstacleDetectedEvent || event instanceof PotholeDetectedEvent
-            || event instanceof BarrierDetectedEvent || event instanceof YieldSignEvent) {
+            || event instanceof BarrierDetectedEvent) {
             kieSession.getEntryPoint(DroolsEntryPoints.ROAD_STREAM).insert(event);
         } else if (event instanceof TrafficLightEvent) {
             kieSession.getEntryPoint(DroolsEntryPoints.TRAFFIC_STREAM).insert(event);

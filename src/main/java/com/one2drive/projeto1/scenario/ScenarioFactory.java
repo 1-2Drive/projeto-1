@@ -15,7 +15,6 @@ import com.one2drive.projeto1.domain.TrafficLight;
 import com.one2drive.projeto1.domain.TrafficLightState;
 import com.one2drive.projeto1.domain.WeatherCondition;
 import com.one2drive.projeto1.domain.WeatherState;
-import com.one2drive.projeto1.domain.YieldSign;
 import com.one2drive.projeto1.simulation.MapLegend;
 import com.one2drive.projeto1.simulation.RoadMap;
 import com.one2drive.projeto1.simulation.WorldState;
@@ -74,7 +73,6 @@ public final class ScenarioFactory {
         return switch (definition.getType()) {
             case SPEED_LIMIT -> new SpeedLimitSign(definition.getPositionMeters(), lane, definition.getSpeedLimitKmh());
             case STOP_SIGN -> new StopSign(definition.getPositionMeters(), lane);
-            case YIELD_SIGN -> new YieldSign(definition.getPositionMeters(), lane);
             case TRAFFIC_LIGHT -> new TrafficLight(
                 definition.getPositionMeters(),
                 lane,

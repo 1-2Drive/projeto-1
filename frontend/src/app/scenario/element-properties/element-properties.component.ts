@@ -5,7 +5,6 @@ import { CreateActorRequest, CreateRoadElementRequest } from '../../core/models/
 export type ToolboxAction =
   | 'SPEED_LIMIT'
   | 'STOP_SIGN'
-  | 'YIELD_SIGN'
   | 'TRAFFIC_LIGHT'
   | 'POTHOLE'
   | 'STATIC_OBSTACLE'
@@ -32,11 +31,6 @@ const ACTIONS: Record<ToolboxAction, ActionDefinition> = {
   },
   STOP_SIGN: {
     title: 'Add stop sign', hint: 'Vehicle must decelerate, stop and hold before proceeding.',
-    needsLane: true, needsSeverity: false, needsSpeedLimit: false,
-    needsLightState: false, needsBarrierState: false, needsActorSpeed: false
-  },
-  YIELD_SIGN: {
-    title: 'Add yield sign', hint: 'Approach cautiously and give way when safe.',
     needsLane: true, needsSeverity: false, needsSpeedLimit: false,
     needsLightState: false, needsBarrierState: false, needsActorSpeed: false
   },
@@ -172,9 +166,6 @@ export class ElementPropertiesComponent {
         break;
       case 'STOP_SIGN':
         this.createRoadElement.emit(this.simpleElement('STOP_SIGN'));
-        break;
-      case 'YIELD_SIGN':
-        this.createRoadElement.emit(this.simpleElement('YIELD_SIGN'));
         break;
       case 'TRAFFIC_LIGHT':
         this.createRoadElement.emit({

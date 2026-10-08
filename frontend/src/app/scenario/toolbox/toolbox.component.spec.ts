@@ -24,12 +24,32 @@ describe('ToolboxComponent', () => {
 
   it('emits an environment update when rain is toggled off', () => {
     const component = fixture.componentInstance;
+    fixture.componentRef.setInput('environment', {
+      weatherCondition: 'RAIN',
+      visibilityFactor: 1,
+      gripFactor: 1
+    });
     spyOn(component.updateEnvironment, 'emit');
 
     const rain = fixture.nativeElement.querySelector('[data-testid="toggle-rain"]') as HTMLButtonElement;
     rain.click();
 
     expect(component.updateEnvironment.emit).toHaveBeenCalledWith({ rain: false });
+  });
+
+  it('emits an environment update when rain is toggled on from a clear snapshot', () => {
+    const component = fixture.componentInstance;
+    fixture.componentRef.setInput('environment', {
+      weatherCondition: 'CLEAR',
+      visibilityFactor: 1,
+      gripFactor: 1
+    });
+    spyOn(component.updateEnvironment, 'emit');
+
+    const rain = fixture.nativeElement.querySelector('[data-testid="toggle-rain"]') as HTMLButtonElement;
+    rain.click();
+
+    expect(component.updateEnvironment.emit).toHaveBeenCalledWith({ rain: true });
   });
 
   it('converts the visibility slider into a visibility factor', () => {

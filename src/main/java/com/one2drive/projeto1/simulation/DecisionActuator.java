@@ -63,15 +63,27 @@ public class DecisionActuator {
         double recommendedSpeed = decision.getRecommendedSpeedKmh();
         if (decision.getAction() != DrivingAction.EMERGENCY_BRAKE && !Double.isNaN(recommendedSpeed)) {
             double current = ego.getSpeedKmh();
-            if (current > recommendedSpeed + 1) {
-                ego.setAccelerationMps2(-config.getComfortableDecelerationMps2());
-            } else if (current < recommendedSpeed - 1) {
+            if (current > recommendedSpeed) {
+                if (current > recommendedSpeed + 2.0) {
+                    ego.setAccelerationMps2(-config.getComfortableDecelerationMps2());
+                } else if (current > recommendedSpeed + 0.1) {
+                    ego.setAccelerationMps2(-Math.max(1.0, (current - recommendedSpeed) * 1.5));
+                } else {
+                    ego.setSpeedKmh(recommendedSpeed);
+                    ego.setAccelerationMps2(0);
+                }
+            } else if (current < recommendedSpeed - 0.5) {
                 double accel = (decision.getAction() == DrivingAction.RESUME || decision.getAction() == DrivingAction.ACCELERATE || current < 5.0)
                     ? config.getMaxAccelerationMps2()
                     : config.getMaxAccelerationMps2() * 0.5;
-                ego.setAccelerationMps2(accel);
-            } else if (decision.getAction() == DrivingAction.MAINTAIN_SPEED || decision.getAction() == DrivingAction.CONTINUE) {
-                ego.setAccelerationMps2(0);
+                double dt = config.getTickMillis() / 1000.0;
+                double maxAccel = ((recommendedSpeed / 3.6) - ego.getSpeedMps()) / Math.max(dt, 0.01);
+                ego.setAccelerationMps2(Math.max(0.0, Math.min(accel, maxAccel)));
+            } else {
+                if (decision.getAction() == DrivingAction.MAINTAIN_SPEED || decision.getAction() == DrivingAction.CONTINUE) {
+                    ego.setSpeedKmh(Math.min(current, recommendedSpeed));
+                    ego.setAccelerationMps2(0);
+                }
             }
         }
 

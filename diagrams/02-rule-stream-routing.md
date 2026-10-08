@@ -16,7 +16,7 @@ flowchart TD
     PEDESTRIAN[PedestrianDetectedEvent] --> PERCEPTION_STREAM
     LANE_OCC[LaneOccupancyEvent] --> PERCEPTION_STREAM
 
-    SIGNS[SpeedLimitDetectedEvent / StopSignEvent / YieldSignEvent] --> ROAD_STREAM
+    SIGNS[SpeedLimitDetectedEvent / StopSignEvent / SpeedRadarEvent] --> ROAD_STREAM
     HAZARDS[Pothole / Obstacle / Barrier] --> ROAD_STREAM
 
     TL[TrafficLightEvent] --> TRAFFIC_STREAM

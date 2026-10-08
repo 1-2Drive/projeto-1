@@ -4,6 +4,7 @@ import com.one2drive.projeto1.config.SimulationConfig;
 import com.one2drive.projeto1.decision.DrivingDecision;
 import com.one2drive.projeto1.domain.DynamicActor;
 import com.one2drive.projeto1.domain.DrivingAction;
+import com.one2drive.projeto1.domain.DrivingState;
 import com.one2drive.projeto1.domain.Lane;
 import com.one2drive.projeto1.domain.EgoVehicleState;
 import com.one2drive.projeto1.domain.LaneChangeDirection;
@@ -26,7 +27,7 @@ import com.one2drive.projeto1.drools.events.SpeedLimitDetectedEvent;
 import com.one2drive.projeto1.drools.events.StopSignEvent;
 import com.one2drive.projeto1.drools.events.TTCEvent;
 import com.one2drive.projeto1.drools.events.TrafficLightEvent;
-import com.one2drive.projeto1.drools.events.YieldSignEvent;
+import com.one2drive.projeto1.drools.facts.CruiseTargetFact;
 import com.one2drive.projeto1.drools.facts.CurrentSpeedLimit;
 import com.one2drive.projeto1.drools.facts.VehicleStateFact;
 import com.one2drive.projeto1.explanation.ExplanationTrace;
@@ -96,6 +97,7 @@ public class SimulationEngine implements AutoCloseable {
     private FactHandle vehicleStateHandle;
     private VehicleStateFact vehicleStateFact;
     private String scenarioId;
+    private double scenarioInitialSpeedKmh;
 
     public SimulationEngine(SimulationConfig config,
                             ScenarioDefinition scenarioDefinition,
@@ -132,6 +134,9 @@ public class SimulationEngine implements AutoCloseable {
         this.timedActions.sort(Comparator.comparingLong(ScenarioTimedAction::getTriggerTimeMillis));
         this.scenarioActionCursor = 0;
 
+        this.scenarioInitialSpeedKmh = scenarioDefinition.getInitialSpeedKmh();
+        holdVehicleAtRest();
+
         this.sensorManager = new SensorManager(List.of(
             new SpeedSensor(config),
             new FrontRadarSensor(config, 42L),
@@ -141,6 +146,7 @@ public class SimulationEngine implements AutoCloseable {
         ));
 
         insertInitialVehicleFact();
+        insertCruiseTargetFact();
     }
 
     private KnowledgeSession createKnowledgeSession() {
@@ -160,8 +166,36 @@ public class SimulationEngine implements AutoCloseable {
         this.vehicleStateHandle = knowledgeSession.getKieSession().insert(vehicleStateFact);
     }
 
+    /**
+     * Publishes the scenario's initial speed as the cruise speed of this road: it is the
+     * only target that can accelerate the vehicle again after a rule slowed it down
+     * (brake, overtake, stop) and no speed-limit sign governs the road.
+     */
+    private void insertCruiseTargetFact() {
+        knowledgeSession.getKieSession().insert(new CruiseTargetFact(scenarioInitialSpeedKmh));
+    }
+
+    /**
+     * A world that is not running reports the vehicle at rest: the scenario's initial
+     * speed is applied by {@link #start()}, so a stopped simulation never shows a
+     * cruising speed or moves without an explicit START.
+     */
+    private void holdVehicleAtRest() {
+        EgoVehicleState ego = worldState.getEgo();
+        ego.setSpeedKmh(0.0);
+        ego.setDrivingState(DrivingState.STOPPED);
+    }
+
     public synchronized void start() {
         if (status == SimulationStatus.STOPPED || status == SimulationStatus.PAUSED) {
+            // A world still at rest takes the scenario's initial speed; a caller that
+            // preset a speed (or a resumed simulation) keeps it untouched.
+            if (simTimeMillis == 0L && scenarioInitialSpeedKmh > 0.0
+                && worldState.getEgo().getSpeedKmh() <= 0.0) {
+                EgoVehicleState ego = worldState.getEgo();
+                ego.setSpeedKmh(scenarioInitialSpeedKmh);
+                ego.setDrivingState(DrivingState.CRUISING);
+            }
             status = SimulationStatus.RUNNING;
         }
     }
@@ -210,7 +244,10 @@ public class SimulationEngine implements AutoCloseable {
         cameraDetectedObjectTimestamps.clear();
         radarDetectedObjectTimestamps.clear();
         demoEvidence.clear();
+        scenarioInitialSpeedKmh = scenarioDefinition.getInitialSpeedKmh();
+        holdVehicleAtRest();
         insertInitialVehicleFact();
+        insertCruiseTargetFact();
     }
 
     public synchronized SimulationSnapshot tick() {
@@ -547,6 +584,8 @@ public class SimulationEngine implements AutoCloseable {
         vehicleStateFact.setLateralPositionMeters(ego.getLateralPositionMeters());
         vehicleStateFact.setLeftMarking(worldState.getLeftMarking());
         vehicleStateFact.setRightMarking(worldState.getRightMarking());
+        vehicleStateFact.setRightLaneBlockedAhead(worldState.hasHazardAheadInLane(com.one2drive.projeto1.domain.Lane.RIGHT, 150.0));
+        vehicleStateFact.setPresentationDemo("S14_PRESENTATION_DEMO".equals(scenarioId));
         knowledgeSession.getKieSession().update(vehicleStateHandle, vehicleStateFact);
     }
 
@@ -625,7 +664,6 @@ public class SimulationEngine implements AutoCloseable {
         if (event instanceof SpeedLimitDetectedEvent e) objectId = e.getSignId();
         else if (event instanceof TrafficLightEvent e) objectId = e.getLightId();
         else if (event instanceof StopSignEvent e) objectId = e.getSignId();
-        else if (event instanceof YieldSignEvent e) objectId = e.getSignId();
         else if (event instanceof PedestrianDetectedEvent e) objectId = e.getPedestrianId();
         else if (event instanceof PotholeDetectedEvent e) objectId = e.getPotholeId();
         else if (event instanceof BarrierDetectedEvent e) objectId = e.getBarrierId();
@@ -658,7 +696,6 @@ public class SimulationEngine implements AutoCloseable {
         boolean hasReducedWeather = events.stream().anyMatch(event -> event instanceof com.one2drive.projeto1.drools.events.ReducedVisibilityEvent
             || event instanceof com.one2drive.projeto1.drools.events.ReducedGripEvent);
         boolean hasTtc = events.stream().anyMatch(TTCEvent.class::isInstance);
-        boolean hasYield = events.stream().anyMatch(YieldSignEvent.class::isInstance);
         boolean hasPedestrian = events.stream().anyMatch(PedestrianDetectedEvent.class::isInstance);
         DrivingAction action = currentDecision.getAction();
 
@@ -668,15 +705,11 @@ public class SimulationEngine implements AutoCloseable {
         if (hasReducedWeather && action == DrivingAction.REDUCE_SPEED) {
             demoEvidence.add("weather");
         }
-        if (hasTtc && action == DrivingAction.EMERGENCY_BRAKE) {
+        if (hasTtc && (action == DrivingAction.EMERGENCY_BRAKE || action == DrivingAction.BRAKE || action == DrivingAction.REDUCE_SPEED)) {
             demoEvidence.add("ttc");
         }
-        if (hasYield && (action == DrivingAction.REDUCE_SPEED || action == DrivingAction.WAIT
-            || action == DrivingAction.CONTINUE)) {
-            demoEvidence.add("yield");
-        }
         if (hasPedestrian && (action == DrivingAction.BRAKE || action == DrivingAction.STOP
-            || action == DrivingAction.EMERGENCY_BRAKE)) {
+            || action == DrivingAction.EMERGENCY_BRAKE || action == DrivingAction.REDUCE_SPEED)) {
             demoEvidence.add("pedestrian");
         }
     }

@@ -31,7 +31,7 @@ public final class MapLegend {
                 case TRAFFIC_LIGHT -> template.getTrafficLightState().name();
                 case POTHOLE, STATIC_OBSTACLE -> template.getSeverity().name();
                 case BARRIER -> Boolean.TRUE.equals(template.getBarrierOpen()) ? "OPEN" : "CLOSED";
-                case STOP_SIGN, YIELD_SIGN -> "";
+                case STOP_SIGN -> "";
                 case SPEED_RADAR -> String.valueOf((int) template.getSpeedLimitKmh());
             };
         }
@@ -45,7 +45,6 @@ public final class MapLegend {
         legend.put(2, hazard(ScenarioRoadElementType.POTHOLE, HazardSeverity.HIGH));
         legend.put(3, barrier(false));
         legend.put(4, element(ScenarioRoadElementType.STOP_SIGN));
-        legend.put(5, element(ScenarioRoadElementType.YIELD_SIGN));
         legend.put(6, trafficLight(TrafficLightState.RED));
         legend.put(7, trafficLight(TrafficLightState.GREEN));
         int code = 8;
@@ -117,7 +116,7 @@ public final class MapLegend {
             case POTHOLE -> template.setSeverity(source.getSeverity() == null ? HazardSeverity.MEDIUM : source.getSeverity());
             case STATIC_OBSTACLE -> template.setSeverity(source.getSeverity() == null ? HazardSeverity.HIGH : source.getSeverity());
             case BARRIER -> template.setBarrierOpen(source.getBarrierOpen() == null || source.getBarrierOpen());
-            case STOP_SIGN, YIELD_SIGN -> {
+            case STOP_SIGN -> {
             }
             case SPEED_RADAR -> {
                 template.setSpeedLimitKmh(source.getSpeedLimitKmh() != null ? source.getSpeedLimitKmh() : 50);
@@ -140,7 +139,6 @@ public final class MapLegend {
             case POTHOLE -> "Pothole" + severitySuffix(template.getSeverity());
             case BARRIER -> Boolean.TRUE.equals(template.getBarrierOpen()) ? "Open barrier" : "Closed barrier";
             case STOP_SIGN -> "Stop sign";
-            case YIELD_SIGN -> "Yield sign";
             case TRAFFIC_LIGHT -> switch (template.getTrafficLightState()) {
                 case RED -> "Red light";
                 case YELLOW -> "Yellow light";

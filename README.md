@@ -140,7 +140,9 @@ scheduler and, in order:
 
 Reset (used by `RESET` and scenario load) clears pending mutations, disposes and
 rebuilds the KieSession, resets the clock, clears sensor cadence state and the
-explanation trace, so no perception state leaks between runs.
+explanation trace, so no perception state leaks between runs. The ego vehicle is
+placed at rest (0 km/h, `STOPPED`) and the scenario's entry speed is applied by
+`START`, so a stopped simulation never reports a cruising speed.
 
 Every tick starts a fresh decision cycle: the `DecisionContext` is reset and updated in
 the KieSession, so all rules re-evaluate against the current state facts on every tick.
@@ -162,7 +164,6 @@ without `map` gets an empty 100x3 road (`SimulationConfig`: block length and row
 | 2 | Pothole (high severity) |
 | 3 | Closed barrier |
 | 4 | Stop sign |
-| 5 | Yield sign |
 | 6 / 7 | Red / green traffic light |
 | 8 - 13 | Speed limit 30 / 50 / 70 / 90 / 100 / 120 km/h |
 
@@ -180,7 +181,10 @@ simulation runs (`PUT /api/world/map/cells`).
 When an obstacle blocks the car's lane and neither side lane is free,
 `Stop before obstacle when no lane is free` stops it 10 m short. Once a lane opens the
 car steers through it and `Move off when stopped and nothing holds the vehicle` takes it
-back up to 30 km/h (or the speed limit, if lower).
+back up to 30 km/h (or the speed limit, if lower). From there
+`Build back up to the scenario cruise speed when no sign governs the road` keeps
+accelerating until the vehicle reaches the scenario's entry speed, so a brake, an
+overtake or a stop never leaves the car stranded below the speed the road asks for.
 
 ### Sensors
 
@@ -204,7 +208,7 @@ relative speed and TTC are derived from real world state.
 |---|---|
 | `VEHICLE_STREAM` | `VehicleSpeedEvent` |
 | `PERCEPTION_STREAM` | `FrontDistanceEvent`, `RelativeSpeedEvent`, `TTCEvent`, `PedestrianDetectedEvent`, `LaneOccupancyEvent` |
-| `ROAD_STREAM` | speed/stop/yield sign, obstacle, pothole, barrier events |
+| `ROAD_STREAM` | speed/stop sign, obstacle, pothole, barrier events |
 | `TRAFFIC_STREAM` | `TrafficLightEvent` |
 | `ENVIRONMENT_STREAM` | weather, visibility, grip, reduced visibility, reduced grip |
 | `COMMAND_STREAM` | `AccelerationRequestEvent`, `LaneChangeRequestEvent` |
@@ -654,11 +658,11 @@ It is no longer the primary UI, but core simulation and Drools remain shared.
 
 ## Scenario Editor
 
-The left Toolbox supports speed limits, stop/yield signs, traffic lights, potholes, obstacles, barriers, front vehicles, pedestrians, rain, low visibility, and low grip. Configurable actions collect the supported lane, distance, state, severity, and speed fields before calling the REST API.
+The left Toolbox supports speed limits, stop signs, traffic lights, potholes, obstacles, barriers, front vehicles, pedestrians, rain, low visibility, and low grip. Configurable actions collect the supported lane, distance, state, severity, and speed fields before calling the REST API.
 
 ## Presentation Demo
 
-`S14_PRESENTATION_DEMO` is a backend timed scenario for a 90-second classroom walkthrough. It schedules world mutations only: a speed sign, rain, a slower front vehicle, a yield sign, a pedestrian, and weather recovery. The backend marks phases from observed sensor/rule/decision evidence; Angular only displays those statuses.
+`S14_PRESENTATION_DEMO` is a backend timed scenario for a 90-second classroom walkthrough. It schedules world mutations only: a speed sign, rain, a slower front vehicle, a pedestrian, and weather recovery. The backend marks phases from observed sensor/rule/decision evidence; Angular only displays those statuses.
 
 ## Predefined Scenarios
 
@@ -674,7 +678,13 @@ Defined in `src/main/resources/scenarios/scenarios.json`.
 - `S9` Critical TTC
 - `S10` Lane change blocked
 - `S11` Rain low grip
-- `S11B` Yield sign approach
+- `S12` Complex sequential scenario
+- `S14_PRESENTATION_DEMO` Presentation demo end-to-end
+- `S15_MATRIX_COURSE` Matrix obstacle course: a slalom through obstacles and a pothole that repeats every lap
+- `S16_SLOW_VEHICLE_OVERTAKE` Slow vehicle overtake and return to the right lane
+- `S17_CONTINUOUS_LINE_BLOCKED` Continuous line blocks avoidance to the right
+- `S18_SPEED_RADAR_APPROACH` Speed radar approach and compliant pass
+
 ## Validation focus
 
 Integration tests validate dynamic behavior end-to-end without injecting final decision facts:
@@ -684,10 +694,11 @@ Integration tests validate dynamic behavior end-to-end without injecting final d
 - pedestrian dynamic insertion,
 - dynamic pothole insertion while running,
 - priority conflict (pedestrian safety over green-light progression),
+- stop sign full stop and release,
 - weather mutation impact,
 - reset isolation and KieSession rebuild.
 
-The direct integration suite covers 53 backend tests: 21 rule/CEP tests, 7 fact description tests, 8 SimulationEngine flows, 7 lane change flows, and 10 road map tests. Angular has 19 Karma unit tests. Browser E2E has 7 Playwright tests covering startup, runtime speed-limit, pedestrian, pothole progressive lane change, blocked lane change fallback, sensor groups, and presentation-demo paths with the real stack.
+The direct integration suite covers 81 backend tests: 23 rule/CEP tests, 7 fact description tests, 13 SimulationEngine flows, 7 lane change flows, 21 road-law and overtaking flows, 5 road map integration tests, and 5 road map unit tests. Angular has 24 Karma unit tests. Browser E2E has 16 Playwright tests covering startup, runtime speed-limit, pedestrian, pothole progressive lane change, blocked lane change fallback, sensor groups, and presentation-demo paths with the real stack.
 
 ## Manual Test
 
@@ -716,11 +727,6 @@ The direct integration suite covers 53 backend tests: 21 rule/CEP tests, 7 fact 
 - JavaFX interaction is still manual in GUI environments; automated UI acceptance targets Angular.
 - The world is an in-memory single-simulation academic model with simplified one-dimensional physics and lane abstraction; it is not a production ADAS controller.
 - Angular production assets use Google Fonts when network access is available and fall back to system fonts otherwise.
-
-- `S11B` Yield sign approach
-- `S12` Complex sequential scenario
-- `S14_PRESENTATION_DEMO` Presentation demo end-to-end
-- `S15_MATRIX_COURSE` Matrix obstacle course: a slalom through obstacles and a pothole that repeats every lap
 
 ## Adding Rules
 
@@ -765,7 +771,7 @@ Do not decide vehicle behaviour outside Drools: the actuator only reacts to the
 - `diagrams/02-rule-stream-routing.md`
 - `diagrams/03-simulation-tick-sequence.md`
 - `diagrams/04-stop-sign-state-machine.md`
-- `diagrams/05-yield-and-weather-decision-flow.md`
+- `diagrams/05-stop-sign-and-weather-decision-flow.md`
 - `diagrams/06-core-class-diagram.md`
 - `diagrams/07-scenario-timed-actions.md`
 - `diagrams/08-test-coverage-map.md`

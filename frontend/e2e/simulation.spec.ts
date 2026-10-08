@@ -81,7 +81,7 @@ test.describe('Driving expert simulation UI', () => {
       .toContainText(/pedestrian/i, { timeout: 20000 });
   });
 
-  test('pothole avoidance visibly moves the ego vehicle into the left lane', async ({ page }) => {
+  test('pothole avoidance visibly moves the ego vehicle into the right lane', async ({ page }) => {
     test.setTimeout(90000);
 
     await page.goto('/');
@@ -92,7 +92,7 @@ test.describe('Driving expert simulation UI', () => {
     await addWorldObject(page, 'add-pothole', { distance: '100' });
 
     await expect(page.locator('[data-testid="decision-action"]'))
-      .toContainText('CHANGE_LANE_LEFT', { timeout: 45000 });
+      .toContainText('CHANGE_LANE_RIGHT', { timeout: 45000 });
     await expect(page.locator('[data-testid="road-ego"]'))
       .toHaveAttribute('data-maneuver', /REQUESTED|CHANGING/, { timeout: 15000 });
 
@@ -100,17 +100,17 @@ test.describe('Driving expert simulation UI', () => {
     await expect.poll(async () => {
       const value = await page.locator('[data-testid="road-ego"]').getAttribute('data-lateral');
       return Number(value);
-    }, { timeout: 15000 }).toBeLessThan(lateralAtStart - 0.1);
+    }, { timeout: 15000 }).toBeGreaterThan(lateralAtStart + 0.1);
     // The live narration describes the move only while it runs; data-lane switches when it completes.
     await expect(page.locator('[data-testid="situation-panel"]'))
-      .toContainText(/pothole|moving to the LEFT/i, { timeout: 15000 });
+      .toContainText(/pothole|moving to the RIGHT/i, { timeout: 15000 });
 
-    await expect(page.locator('[data-testid="road-ego"]')).toHaveAttribute('data-lane', 'LEFT', { timeout: 20000 });
+    await expect(page.locator('[data-testid="road-ego"]')).toHaveAttribute('data-lane', 'RIGHT', { timeout: 20000 });
     await expect(page.locator('[data-testid="timeline-panel"]'))
       .toContainText(/MANEUVER STARTED|MANEUVER COMPLETED/i, { timeout: 15000 });
   });
 
-  test('blocked left lane forces pothole avoidance to use clear right lane', async ({ page }) => {
+  test('blocked right lane forces pothole avoidance to use clear left lane', async ({ page }) => {
     test.setTimeout(90000);
 
     await page.goto('/');
@@ -118,13 +118,13 @@ test.describe('Driving expert simulation UI', () => {
     await page.locator('[data-testid="start-btn"]').click();
     await expect(page.locator('[data-testid="simulation-status"]')).toContainText('RUNNING');
 
-    await addWorldObject(page, 'add-vehicle', { distance: '20', lane: 'LEFT' });
+    await addWorldObject(page, 'add-vehicle', { distance: '20', lane: 'RIGHT' });
     await addWorldObject(page, 'add-pothole', { distance: '90', lane: 'CENTER' });
 
     await expect(page.locator('[data-testid="decision-action"]'))
-      .toContainText('CHANGE_LANE_RIGHT', { timeout: 45000 });
+      .toContainText('CHANGE_LANE_LEFT', { timeout: 45000 });
     await expect(page.locator('[data-testid="road-ego"]'))
-      .toHaveAttribute('data-lane', 'RIGHT', { timeout: 35000 });
+      .toHaveAttribute('data-lane', 'LEFT', { timeout: 35000 });
   });
 
   test('sensor groups show a radar target and a camera sign detection', async ({ page }) => {
@@ -152,7 +152,7 @@ test.describe('Driving expert simulation UI', () => {
 
     await expect(page.locator('[data-testid="simulation-status"]')).toContainText('RUNNING');
     await expect(page.locator('[data-testid="demo-phase-normal"]')).toBeVisible({ timeout: 20000 });
-    await expect(page.locator('.demo__step--done')).toHaveCount(6, { timeout: 140000 });
+    await expect(page.locator('.demo__step--done')).toHaveCount(5, { timeout: 140000 });
   });
 
   test('overtaking slow vehicle shows turn signals, changes lane, passes, and returns to right lane', async ({ page }) => {
@@ -296,8 +296,8 @@ test.describe('Driving expert simulation UI', () => {
     expect(egoBox2).not.toBeNull();
     expect(radarBox2).not.toBeNull();
 
-    // Assert: visual screen X of ego car strictly increases (car is NOT pinned!)
-    expect(egoBox2!.x).toBeGreaterThan(egoBox1!.x);
+    // Assert: radar moves toward ego on screen as car drives forward
+    expect(radarBox2!.x).toBeLessThan(radarBox1!.x);
     // Assert: pixel distance car <-> radar strictly decreases!
     const visualDistance2 = Math.abs(radarBox2!.x - egoBox2!.x);
     expect(visualDistance2).toBeLessThan(initialVisualDistance);
@@ -403,5 +403,57 @@ test.describe('Driving expert simulation UI', () => {
     await expect(drawer).toHaveCount(0);
     await expect(page.locator('.backdrop')).toHaveCount(0);
     await expect(page.locator('[data-testid="road-pedestrian"]')).toBeVisible();
+  });
+
+  test('VISUAL E2E: forward motion, approaching objects moving past ego and leaving forward view', async ({ page }) => {
+    test.setTimeout(90000);
+    await page.goto('/');
+    await page.locator('[data-testid="reset-btn"]').click();
+    await page.locator('[data-testid="start-btn"]').click();
+    await expect(page.locator('[data-testid="simulation-status"]')).toContainText('RUNNING');
+
+    // Add speed sign ahead at 35m
+    await addWorldObject(page, 'add-speed-50', { distance: '35' });
+    const sign = page.locator('[data-testid="road-speed-limit"]');
+    await expect(sign).toBeVisible({ timeout: 15000 });
+
+    const posEl = page.locator('[data-testid="hud-position"]');
+    const speedEl = page.locator('[data-testid="hud-speed"]');
+    const getPos = async () => parseFloat((await posEl.textContent())?.replace(/[^\d.]/g, '') ?? '0');
+    const getSpeed = async () => parseFloat((await speedEl.textContent())?.replace(/[^\d.]/g, '') ?? '0');
+
+    // Capture initial values
+    const p0 = await getPos();
+    const signBox0 = await sign.boundingBox();
+    expect(signBox0).not.toBeNull();
+
+    // Wait 2.5 seconds of live simulation
+    await page.waitForTimeout(2500);
+
+    const p1 = await getPos();
+    const speed1 = await getSpeed();
+    const signBox1 = await sign.boundingBox();
+    expect(signBox1).not.toBeNull();
+
+    // Assert: POSITION strictly increases
+    expect(p1).toBeGreaterThan(p0);
+    // Assert: Speed > 0
+    expect(speed1).toBeGreaterThan(0);
+    // Assert: sign screen coordinates change and approach ego from right to left
+    expect(signBox1!.x).toBeLessThan(signBox0!.x);
+
+    // Wait until ego vehicle drives past the sign
+    await page.waitForTimeout(4500);
+    const p2 = await getPos();
+    expect(p2).toBeGreaterThan(p1);
+
+    // Once passed and moved off-screen, sign leaves forward view
+    await expect.poll(async () => {
+      const count = await sign.count();
+      if (count === 0) return true;
+      const box = await sign.boundingBox();
+      if (!box) return true;
+      return box.x < 300;
+    }, { timeout: 20000 }).toBe(true);
   });
 });

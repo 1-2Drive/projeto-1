@@ -15,7 +15,6 @@ import com.one2drive.projeto1.drools.facts.PotholeStateFact;
 import com.one2drive.projeto1.drools.facts.StopSignState;
 import com.one2drive.projeto1.drools.facts.TrafficLightStateFact;
 import com.one2drive.projeto1.drools.facts.WeatherStateFact;
-import com.one2drive.projeto1.drools.facts.YieldSignState;
 import com.one2drive.projeto1.drools.listeners.RuleRuntimeTraceListener;
 import com.one2drive.projeto1.drools.listeners.WorkingMemoryTraceListener;
 import com.one2drive.projeto1.explanation.ExplanationTrace;
@@ -100,7 +99,8 @@ public class KnowledgeSession implements AutoCloseable {
 
         FactHandle contextHandle = kieSession.insert(context);
         kieSession.insert(decision);
-        kieSession.insert(new CurrentSpeedLimit(120, "default", 0L));
+        // Seed limit: the placeholder every session starts with, until a sign is seen.
+        kieSession.insert(new CurrentSpeedLimit(120, CurrentSpeedLimit.DEFAULT_SOURCE, 0L));
         kieSession.insert(new WeatherStateFact(com.one2drive.projeto1.domain.WeatherCondition.CLEAR, 1.0, 1.0, 0L));
         // Lane occupancy starts pessimistic: an adjacent lane is treated as occupied
         // until the blind-spot sensor has actually reported it clear. A vehicle must
@@ -113,7 +113,6 @@ public class KnowledgeSession implements AutoCloseable {
         kieSession.insert(new ObstacleStateFact("none", Double.POSITIVE_INFINITY, com.one2drive.projeto1.domain.HazardSeverity.LOW, com.one2drive.projeto1.domain.Lane.CENTER, 0L));
         kieSession.insert(new BarrierStateFact("none", Double.POSITIVE_INFINITY, true, 0L));
         kieSession.insert(new StopSignState("none", Double.POSITIVE_INFINITY, 0L));
-        kieSession.insert(new YieldSignState("none", Double.POSITIVE_INFINITY, 0L));
         kieSession.insert(new TrafficLightStateFact("none", com.one2drive.projeto1.domain.TrafficLightState.GREEN, Double.POSITIVE_INFINITY, 0L));
         kieSession.insert(new AccelerationRequestState(0.0, 0L));
         kieSession.insert(new LaneChangeRequestState(false, com.one2drive.projeto1.domain.LaneChangeDirection.LEFT, -1L));

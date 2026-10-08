@@ -72,7 +72,7 @@ public class WorkingMemoryInspector {
     }
 
     private String inferStream(String type) {
-        if (type.contains("SpeedLimit") || type.contains("StopSign") || type.contains("YieldSign")
+        if (type.contains("SpeedLimit") || type.contains("StopSign")
             || type.contains("Pothole") || type.contains("Obstacle")
             || type.contains("Barrier")) {
             return "ROAD_STREAM";

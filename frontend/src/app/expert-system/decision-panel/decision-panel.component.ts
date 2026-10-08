@@ -17,7 +17,19 @@ export class DecisionPanelComponent {
   readonly snapshot = input<ApiSimulationSnapshot | null>(null);
 
   protected readonly decision = computed(() => this.snapshot()?.currentDecision ?? null);
-  protected readonly hasDecision = computed(() => this.decision()?.action !== 'AWAITING_DECISION');
+
+  /**
+   * True before the first decision cycle ever ran (fresh load, or after RESET). The
+   * backend still ships its untouched default decision there, so the panel shows its
+   * own idle state instead of presenting that placeholder as a real conclusion.
+   */
+  protected readonly idle = computed(() => {
+    const snapshot = this.snapshot();
+    if (!snapshot) {
+      return true;
+    }
+    return snapshot.status === 'STOPPED' && snapshot.simulationTimeMillis === 0;
+  });
 
   protected readonly riskClass = computed<RiskLevel>(() => {
     const risk = (this.decision()?.riskLevel ?? 'LOW').toUpperCase();
@@ -30,12 +42,16 @@ export class DecisionPanelComponent {
     return 'risk-low';
   });
 
+  /**
+   * Colour of the decision card. It mirrors `DrivingAction`: stopping actions are red,
+   * actions that slow the vehicle down are amber, progressing actions are green.
+   */
   protected readonly tone = computed<ActionTone>(() => {
     const action = (this.decision()?.action ?? '').toUpperCase();
-    if (action.includes('EMERGENCY') || action === 'STOP' || action.includes('HOLD')) {
+    if (action.includes('EMERGENCY') || action === 'STOP') {
       return 'stop';
     }
-    if (action.includes('REDUCE') || action.includes('DECELER') || action.includes('CAUTION') || action.includes('YIELD')) {
+    if (action.includes('REDUCE') || action.includes('BRAKE') || action.includes('WAIT')) {
       return 'caution';
     }
     return 'go';

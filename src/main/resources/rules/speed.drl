@@ -12,13 +12,18 @@ import com.one2drive.projeto1.drools.facts.VehicleStateFact
 
 global DroolsSupport droolsSupport
 
+// 0.1 km/h deadband around the limit. Without it the km/h <-> m/s round trip in the
+// actuator leaves the fact a few ulp above the limit, "exceeding" never deactivates and
+// the decision sticks on REDUCE_SPEED instead of settling on MAINTAIN_SPEED. It matches
+// the actuator, which snaps to the target for any excess of 0.1 km/h or less.
+// "exceeding" and "compliant" must stay exact complements so one of them always wins.
 rule "Decelerate approaching speed radar to comply with legal limit"
 salience 320
 no-loop true
 when
     $ctx : DecisionContext()
     $radar : SpeedRadarFact(radarId != "none", $distance : distanceMeters > 0, distanceMeters <= 135.0, $limit : speedLimitKmh)
-    VehicleStateFact( $speed : speedKmh > ($limit + 1.0) )
+    VehicleStateFact( $speed : speedKmh > $limit + 0.1 )
 then
     droolsSupport.proposeDecision(
         $ctx,
@@ -38,7 +43,7 @@ when
     $ctx : DecisionContext()
     VehicleStateFact( $speed : speedKmh )
     CurrentSpeedLimit( $limit : limitKmh )
-    eval($speed > ($limit + 1.5))
+    eval($speed > $limit + 0.1)
 then
     droolsSupport.proposeDecision(
         $ctx,
@@ -52,13 +57,19 @@ then
     );
 end
 
+// The limit a sign posted stays in force after the sign has passed, so a limit above the
+// current speed is a target the vehicle may build up to: that is what "approaching a
+// limit from below" means. The session's seed fact (sourceId "default") is not a sign:
+// it only says "no sign seen yet", and letting it nominate a target would send every
+// vehicle towards 120 km/h as soon as it starts. When no sign governs the road, the
+// scenario cruise speed below is the only target that can speed the vehicle up again.
 rule "Maintain speed when compliant with detected limit"
 salience 210
 when
     $ctx : DecisionContext()
     VehicleStateFact( $speed : speedKmh )
-    CurrentSpeedLimit( $limit : limitKmh )
-    eval($speed <= ($limit + 1.5))
+    CurrentSpeedLimit( $limit : limitKmh, sourceId != CurrentSpeedLimit.DEFAULT_SOURCE )
+    eval($speed <= $limit + 0.1)
 then
     droolsSupport.proposeDecision(
         $ctx,
@@ -69,6 +80,33 @@ then
         "Vehicle is compliant with legal limit",
         drools.getRule().getName(),
         "speed=" + $speed + " km/h, limit=" + $limit + " km/h"
+    );
+end
+
+// Every other rule can only slow the vehicle down, so without a target the vehicle would
+// freeze at whatever speed a brake, an overtake or a stop left it at, even with a clear
+// road ahead. The scenario's initial speed is the cruise speed of this road: the vehicle
+// builds back up to it while nothing stricter is proposed. The seed limit (sourceId
+// "default") is not a sign, so this rule steps aside the moment a sign posts a limit and
+// lets the sign's own rules keep the vehicle compliant.
+rule "Build back up to the scenario cruise speed when no sign governs the road"
+salience 208
+when
+    $ctx : DecisionContext(priority <= DecisionPriority.COMFORT_PROGRESS)
+    CruiseTargetFact( $target : targetKmh, targetKmh > 0 )
+    CurrentSpeedLimit( $limit : limitKmh, sourceId == CurrentSpeedLimit.DEFAULT_SOURCE )
+    VehicleStateFact( $speed : speedKmh )
+    eval($speed < Math.min($target, $limit) - 0.5)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.MAINTAIN_SPEED,
+        Math.min($target, $limit),
+        RiskLevel.LOW,
+        DecisionPriority.SPEED_COMPLIANCE,
+        "Road is clear; building back up to the scenario cruise speed",
+        drools.getRule().getName(),
+        "cruise=" + $target + " km/h, limit=" + $limit + " km/h, current=" + $speed + " km/h"
     );
 end
 

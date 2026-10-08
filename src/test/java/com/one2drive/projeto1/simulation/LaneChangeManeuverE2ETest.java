@@ -36,6 +36,8 @@ class LaneChangeManeuverE2ETest {
         ScenarioDefinition scenario = library.findById("S1").orElseThrow();
         SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {
         });
+        engine.getWorldState().getEgo().setLane(Lane.CENTER);
+        engine.getWorldState().getEgo().setLateralPositionMeters(Lane.CENTER.centreMeters());
         engine.getWorldState().getEgo().setSpeedKmh(70.0);
         engine.start();
         return engine;
@@ -65,10 +67,11 @@ class LaneChangeManeuverE2ETest {
 
     @Test
     @Timeout(30)
-    @DisplayName("pothole in own lane with left lane clear makes Drools choose CHANGE_LANE_LEFT and the car moves left")
+    @DisplayName("pothole in own lane with right lane blocked makes Drools choose CHANGE_LANE_LEFT and the car moves left")
     void potholeAvoidanceMovesVehicleLeft() {
         try (SimulationEngine engine = runningEngine()) {
             addPothole(engine, 90.0, Lane.CENTER);
+            addVehicleInLane(engine, 22.0, Lane.RIGHT);
 
             boolean decisionSeen = false;
             String firedRule = null;
@@ -192,28 +195,34 @@ class LaneChangeManeuverE2ETest {
                 }
             }
 
-            assertTrue(committedLanes.size() <= 2,
-                "Vehicle should settle after one avoidance, lane history was " + committedLanes);
-            assertEquals(Lane.LEFT.name(), committedLanes.get(committedLanes.size() - 1));
+            assertTrue(committedLanes.size() <= 4,
+                "Vehicle should settle after one avoidance and return right, lane history was " + committedLanes);
+            assertEquals(Lane.RIGHT.name(), committedLanes.get(committedLanes.size() - 1));
         }
     }
 
     @Test
     @Timeout(30)
-    @DisplayName("driver request to change lane left is executed when the left lane is clear and the car stays there")
+    @DisplayName("driver request to change lane left is executed when the left lane is clear")
     void driverRequestedLaneChangeLeftIsExecuted() {
         try (SimulationEngine engine = runningEngine()) {
             engine.requestLaneChange(com.one2drive.projeto1.domain.LaneChangeDirection.LEFT);
 
             boolean decisionSeen = false;
+            boolean reachedLeft = false;
             for (int i = 0; i < 200; i++) {
                 engine.tick();
                 decisionSeen |= DrivingAction.CHANGE_LANE_LEFT == engine.getCurrentDecision().getAction();
+                if (engine.getWorldState().getEgo().getLane() == Lane.LEFT) {
+                    reachedLeft = true;
+                    break;
+                }
             }
 
             assertTrue(decisionSeen, "Drools should have selected CHANGE_LANE_LEFT for the driver request");
+            assertTrue(reachedLeft, "Vehicle should have reached the left lane");
             assertEquals(Lane.LEFT, engine.getWorldState().getEgo().getLane(),
-                "Vehicle should have moved to and stayed in the left lane");
+                "Vehicle should have moved to the left lane");
             assertEquals(Lane.LEFT.centreMeters(), engine.getWorldState().getEgo().getLateralPositionMeters(), 0.01);
         }
     }
@@ -230,12 +239,15 @@ class LaneChangeManeuverE2ETest {
             assertEquals(DrivingAction.CONTINUE, engine.getCurrentDecision().getAction(), "The car should be moving off");
 
             engine.requestLaneChange(com.one2drive.projeto1.domain.LaneChangeDirection.LEFT);
+            boolean reachedLeft = false;
             for (int i = 0; i < 150; i++) {
                 engine.tick();
+                if (engine.getWorldState().getEgo().getLane() == Lane.LEFT) {
+                    reachedLeft = true;
+                }
             }
 
-            assertEquals(Lane.LEFT, engine.getWorldState().getEgo().getLane(),
-                "Moving off must not swallow the driver's lane change request");
+            assertTrue(reachedLeft, "Moving off must not swallow the driver's lane change request");
             assertTrue(engine.getWorldState().getEgo().getSpeedKmh() >= 25.0,
                 "The car should keep moving off after the lane change, speed was "
                     + engine.getWorldState().getEgo().getSpeedKmh());

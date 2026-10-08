@@ -22,10 +22,29 @@ export class SpeedAdvisorComponent {
   protected readonly currentKmh = computed(() => this.snapshot()?.speedAdvisor.currentKmh ?? 0);
   protected readonly legalLimitKmh = computed(() => this.snapshot()?.speedAdvisor.legalLimitKmh ?? 0);
   protected readonly recommendedKmh = computed(() => this.snapshot()?.speedAdvisor.recommendedKmh ?? 0);
-  protected readonly action = computed(() => this.snapshot()?.speedAdvisor.action ?? '—');
+
+  /**
+   * Before the first decision cycle the backend reports a placeholder recommendation
+   * of 0 km/h. Showing that as "recommended 0, delta +60" would be misleading, so the
+   * gauge announces that it is only waiting for START instead.
+   */
+  protected readonly idle = computed(() => {
+    const snapshot = this.snapshot();
+    if (!snapshot) {
+      return true;
+    }
+    return snapshot.status === 'STOPPED' && snapshot.simulationTimeMillis === 0;
+  });
+
+  protected readonly action = computed(() => (this.idle() ? 'READY' : this.snapshot()?.speedAdvisor.action ?? '—'));
+  protected readonly recommendedLabel = computed(() => (this.idle() ? '—' : `${Math.round(this.recommendedKmh())} km/h`));
 
   protected readonly deltaKmh = computed(() =>
     Math.round((this.currentKmh() - this.recommendedKmh()) * 10) / 10
+  );
+
+  protected readonly deltaLabel = computed(() =>
+    this.idle() ? '—' : `${this.deltaKmh() > 0 ? '+' : ''}${Math.round(this.deltaKmh() * 10) / 10} km/h`
   );
 
   protected readonly deltaClass = computed<'above' | 'equal' | 'below'>(() => {

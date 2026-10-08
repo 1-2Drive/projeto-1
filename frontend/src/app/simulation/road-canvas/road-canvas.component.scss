@@ -383,8 +383,7 @@
 }
 
 .obj--speedLimit,
-.obj--stopSign,
-.obj--yieldSign {
+.obj--stopSign {
   width: 2.5rem;
 }
 
@@ -494,17 +493,6 @@
   font-weight: 700;
   letter-spacing: 0.4px;
   text-anchor: middle;
-}
-
-.sign--yield .sign__disc {
-  fill: #f2f4f6;
-  stroke: #c92f28;
-  stroke-width: 3;
-  stroke-linejoin: round;
-}
-
-.sign--yield .sign__inner {
-  fill: #c92f28;
 }
 
 /* ===================== traffic light ===================== */

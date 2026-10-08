@@ -263,8 +263,8 @@ public class ApiModelMapper {
             return List.of();
         }
 
-        List<String> ids = List.of("normal", "speed-limit", "weather", "ttc", "yield", "pedestrian");
-        List<String> labels = List.of("Normal driving", "Speed limit", "Weather", "TTC safety", "Yield", "Pedestrian");
+        List<String> ids = List.of("normal", "speed-limit", "weather", "ttc", "pedestrian");
+        List<String> labels = List.of("Normal driving", "Speed limit", "Weather", "TTC safety", "Pedestrian");
         Set<String> evidence = engine.getDemoEvidence();
         String activeId = ids.stream().filter(id -> !evidence.contains(id)).findFirst().orElse(null);
 

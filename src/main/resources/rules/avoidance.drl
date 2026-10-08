@@ -67,13 +67,35 @@ then
     );
 end
 
-rule "Avoid pothole in centre lane by changing left"
+rule "Avoid pothole in centre lane by changing right when right is clear"
+salience 475
+when
+    $ctx : DecisionContext()
+    VehicleStateFact(lane == Lane.CENTER, laneChangeState == LaneChangeState.IDLE, rightMarking != RoadMarkingType.CONTINUOUS)
+    PotholeStateFact(potholeId != "none", lane == Lane.CENTER,
+                     $distance : distanceMeters > 0, distanceMeters <= 50.0)
+    LaneOccupancyState(lane == Lane.RIGHT, occupied == false)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.CHANGE_LANE_RIGHT,
+        Double.NaN,
+        RiskLevel.LOW,
+        DecisionPriority.ROAD_HAZARD,
+        "Avoiding pothole by moving into the clear right lane (rightmost safe lane policy)",
+        drools.getRule().getName(),
+        "pothole " + $distance + "m ahead in own lane, right lane clear"
+    );
+end
+
+rule "Avoid pothole in centre lane by changing left when right is occupied"
 salience 470
 when
     $ctx : DecisionContext()
-    VehicleStateFact(lane == Lane.CENTER, laneChangeState == LaneChangeState.IDLE)
+    VehicleStateFact(lane == Lane.CENTER, laneChangeState == LaneChangeState.IDLE, leftMarking != RoadMarkingType.CONTINUOUS)
     PotholeStateFact(potholeId != "none", lane == Lane.CENTER,
                      $distance : distanceMeters > 0, distanceMeters <= 50.0)
+    LaneOccupancyState(lane == Lane.RIGHT, occupied == true)
     LaneOccupancyState(lane == Lane.LEFT, occupied == false)
 then
     droolsSupport.proposeDecision(
@@ -84,29 +106,7 @@ then
         DecisionPriority.ROAD_HAZARD,
         "Avoiding pothole by moving into the clear left lane",
         drools.getRule().getName(),
-        "pothole " + $distance + "m ahead in own lane, left lane clear"
-    );
-end
-
-rule "Avoid pothole in centre lane by changing right when left is occupied"
-salience 470
-when
-    $ctx : DecisionContext()
-    VehicleStateFact(lane == Lane.CENTER, laneChangeState == LaneChangeState.IDLE)
-    PotholeStateFact(potholeId != "none", lane == Lane.CENTER,
-                     $distance : distanceMeters > 0, distanceMeters <= 50.0)
-    LaneOccupancyState(lane == Lane.LEFT, occupied == true)
-    LaneOccupancyState(lane == Lane.RIGHT, occupied == false)
-then
-    droolsSupport.proposeDecision(
-        $ctx,
-        DrivingAction.CHANGE_LANE_RIGHT,
-        Double.NaN,
-        RiskLevel.LOW,
-        DecisionPriority.ROAD_HAZARD,
-        "Avoiding pothole by moving into the clear right lane",
-        drools.getRule().getName(),
-        "pothole " + $distance + "m ahead in own lane, left occupied, right clear"
+        "pothole " + $distance + "m ahead in own lane, right occupied, left clear"
     );
 end
 

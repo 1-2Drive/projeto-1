@@ -4,6 +4,7 @@ import com.one2drive.projeto1.decision.DecisionContext;
 import com.one2drive.projeto1.decision.DrivingDecision;
 import com.one2drive.projeto1.drools.facts.BarrierStateFact;
 import com.one2drive.projeto1.drools.facts.CurrentSpeedLimit;
+import com.one2drive.projeto1.drools.facts.CruiseTargetFact;
 import com.one2drive.projeto1.drools.facts.FrontVehicleState;
 import com.one2drive.projeto1.drools.facts.LaneOccupancyState;
 import com.one2drive.projeto1.drools.facts.PedestrianStateFact;
@@ -12,7 +13,6 @@ import com.one2drive.projeto1.drools.facts.StopSignState;
 import com.one2drive.projeto1.drools.facts.TrafficLightStateFact;
 import com.one2drive.projeto1.drools.facts.VehicleStateFact;
 import com.one2drive.projeto1.drools.facts.WeatherStateFact;
-import com.one2drive.projeto1.drools.facts.YieldSignState;
 import com.one2drive.projeto1.drools.events.BarrierDetectedEvent;
 import com.one2drive.projeto1.drools.events.FrontDistanceEvent;
 import com.one2drive.projeto1.drools.events.LaneOccupancyEvent;
@@ -31,7 +31,6 @@ import com.one2drive.projeto1.drools.events.TrafficLightEvent;
 import com.one2drive.projeto1.drools.events.VehicleSpeedEvent;
 import com.one2drive.projeto1.drools.events.VisibilityEvent;
 import com.one2drive.projeto1.drools.events.WeatherEvent;
-import com.one2drive.projeto1.drools.events.YieldSignEvent;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.regex.Pattern;
@@ -59,6 +58,9 @@ public final class FactDescription {
         }
         if (fact instanceof CurrentSpeedLimit value) {
             return "Speed limit: %d km/h in force (source %s)".formatted(value.getLimitKmh(), value.getSourceId());
+        }
+        if (fact instanceof CruiseTargetFact value) {
+            return "Cruise target: %s km/h from the scenario".formatted(decimal(value.getTargetKmh(), 1));
         }
         if (fact instanceof WeatherStateFact value) {
             return "Weather: %s, visibility %s, grip %s".formatted(
@@ -88,9 +90,6 @@ public final class FactDescription {
         if (fact instanceof StopSignState value) {
             return "Stop sign %s: %s m".formatted(id(value.getSignId()), decimal(value.getDistanceMeters(), 1));
         }
-        if (fact instanceof YieldSignState value) {
-            return "Yield sign %s: %s m".formatted(id(value.getSignId()), decimal(value.getDistanceMeters(), 1));
-        }
         if (fact instanceof LaneOccupancyState value) {
             return "Lane %s: %s, nearest %s".formatted(
                 value.getLane(), value.isOccupied() ? "occupied" : "clear", distance(value.getNearestDistanceMeters()));
@@ -110,9 +109,6 @@ public final class FactDescription {
         }
         if (fact instanceof StopSignEvent value) {
             return "Camera read stop sign %s at %s m".formatted(id(value.getSignId()), decimal(value.getDistanceMeters(), 1));
-        }
-        if (fact instanceof YieldSignEvent value) {
-            return "Camera read yield sign %s at %s m".formatted(id(value.getSignId()), decimal(value.getDistanceMeters(), 1));
         }
         if (fact instanceof TrafficLightEvent value) {
             return "Camera read traffic light %s: %s at %s m".formatted(

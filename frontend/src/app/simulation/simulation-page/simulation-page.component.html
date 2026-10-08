@@ -127,6 +127,7 @@
     <aside class="workspace__left" aria-label="Scenario controls">
       <app-toolbox
         [simulationStatus]="simulationStatus()"
+        [environment]="snapshot()?.environment ?? null"
         (createRoadElement)="addRoadElement($event)"
         (createActor)="addActor($event)"
         (updateEnvironment)="updateEnvironment($event)"

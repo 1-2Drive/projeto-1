@@ -29,16 +29,14 @@ public class FrontRadarSensor extends AbstractSensor<Object> {
         List<Object> events = new ArrayList<>();
 
         Optional<SpeedRadar> speedRadar = worldState.findNearestSpeedRadarAhead(rangeMeters());
-        if (speedRadar.isPresent()) {
-            SpeedRadar radar = speedRadar.get();
-            double distanceToRadar = worldState.distanceAhead(radar.getPositionMeters());
+        speedRadar.ifPresent(radar -> {
+            double distanceToRadar = worldState.signedDistance(radar.getPositionMeters());
             events.add(new SpeedRadarEvent(timestampMillis, radar.getId(), distanceToRadar, radar.getSpeedLimitKmh()));
-        }
+        });
 
         Optional<OtherVehicle> front = worldState.nearestFrontVehicleInLane(rangeMeters());
-        if (front.isPresent()) {
-            OtherVehicle vehicle = front.get();
-            double trueDistance = worldState.distanceAhead(vehicle.getPositionMeters());
+        front.ifPresent(vehicle -> {
+            double trueDistance = worldState.signedDistance(vehicle.getPositionMeters());
             double measuredDistance = Math.max(0, trueDistance + random.nextGaussian() * config.getDistanceNoiseStdMeters());
             double relativeSpeed = worldState.getEgo().getSpeedMps() - vehicle.getSpeedMps();
             double ttc = relativeSpeed > 0.05 ? measuredDistance / relativeSpeed : Double.POSITIVE_INFINITY;
@@ -46,7 +44,7 @@ public class FrontRadarSensor extends AbstractSensor<Object> {
             events.add(new FrontDistanceEvent(timestampMillis, id(), measuredDistance, vehicle.getId()));
             events.add(new RelativeSpeedEvent(timestampMillis, id(), relativeSpeed, vehicle.getId()));
             events.add(new TTCEvent(timestampMillis, id(), ttc, vehicle.getId()));
-        }
+        });
 
         return events;
     }

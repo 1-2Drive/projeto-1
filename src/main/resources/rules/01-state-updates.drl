@@ -6,6 +6,7 @@ import com.one2drive.projeto1.drools.events.*
 import com.one2drive.projeto1.drools.facts.*
 
 rule "Update current speed limit from latest sign"
+salience 1000
 no-loop true
 when
     $e : SpeedLimitDetectedEvent() from entry-point "ROAD_STREAM"
@@ -22,6 +23,7 @@ then
 end
 
 rule "Update vehicle state from speed sensor"
+salience 1000
 no-loop true
 when
     $e : VehicleSpeedEvent() from entry-point "VEHICLE_STREAM"
@@ -35,6 +37,7 @@ then
 end
 
 rule "Update traffic light state"
+salience 1000
 no-loop true
 when
     $e : TrafficLightEvent() from entry-point "TRAFFIC_STREAM"
@@ -52,6 +55,7 @@ then
 end
 
 rule "Update stop sign state"
+salience 1000
 no-loop true
 when
     $e : StopSignEvent() from entry-point "ROAD_STREAM"
@@ -71,23 +75,8 @@ then
     update($state);
 end
 
-rule "Update yield sign state"
-no-loop true
-when
-    $e : YieldSignEvent() from entry-point "ROAD_STREAM"
-    $state : YieldSignState()
-    eval($e.getTimestamp() >= $state.getTimestamp()
-        && ($e.getTimestamp() > $state.getTimestamp()
-            || Math.abs($state.getDistanceMeters() - $e.getDistanceMeters()) > 0.01
-            || !$state.getSignId().equals($e.getSignId())))
-then
-    $state.setSignId($e.getSignId());
-    $state.setDistanceMeters($e.getDistanceMeters());
-    $state.setTimestamp($e.getTimestamp());
-    update($state);
-end
-
 rule "Update weather state"
+salience 1000
 no-loop true
 when
     $e : WeatherEvent() from entry-point "ENVIRONMENT_STREAM"
@@ -106,6 +95,7 @@ then
 end
 
 rule "Update front vehicle from distance"
+salience 1000
 no-loop true
 when
     $e : FrontDistanceEvent() from entry-point "PERCEPTION_STREAM"
@@ -115,13 +105,21 @@ when
             || !$e.getTargetId().equals($state.getTargetId())
             || Math.abs($state.getDistanceMeters() - $e.getDistanceMeters()) > 0.01))
 then
-    $state.setTargetId($e.getTargetId());
-    $state.setDistanceMeters($e.getDistanceMeters());
+    if ($e.getDistanceMeters() <= 0 || "none".equals($e.getTargetId()) || Double.isInfinite($e.getDistanceMeters())) {
+        $state.setTargetId("none");
+        $state.setDistanceMeters(Double.POSITIVE_INFINITY);
+        $state.setRelativeSpeedMps(0.0);
+        $state.setTtcSeconds(Double.POSITIVE_INFINITY);
+    } else {
+        $state.setTargetId($e.getTargetId());
+        $state.setDistanceMeters($e.getDistanceMeters());
+    }
     $state.setTimestamp($e.getTimestamp());
     update($state);
 end
 
 rule "Update front vehicle from relative speed"
+salience 1000
 no-loop true
 when
     $e : RelativeSpeedEvent() from entry-point "PERCEPTION_STREAM"
@@ -137,6 +135,7 @@ then
 end
 
 rule "Update front vehicle from ttc"
+salience 1000
 no-loop true
 when
     $e : TTCEvent() from entry-point "PERCEPTION_STREAM"
@@ -154,6 +153,7 @@ then
 end
 
 rule "Update pedestrian state"
+salience 1000
 no-loop true
 when
     $e : PedestrianDetectedEvent() from entry-point "PERCEPTION_STREAM"
@@ -164,14 +164,21 @@ when
             || Math.abs($state.getDistanceMeters() - $e.getDistanceMeters()) > 0.01
             || $state.isInPath() != $e.isInPath()))
 then
-    $state.setPedestrianId($e.getPedestrianId());
-    $state.setDistanceMeters($e.getDistanceMeters());
-    $state.setInPath($e.isInPath());
+    if ($e.getDistanceMeters() <= 0 || "none".equals($e.getPedestrianId()) || Double.isInfinite($e.getDistanceMeters())) {
+        $state.setPedestrianId("none");
+        $state.setDistanceMeters(Double.POSITIVE_INFINITY);
+        $state.setInPath(false);
+    } else {
+        $state.setPedestrianId($e.getPedestrianId());
+        $state.setDistanceMeters($e.getDistanceMeters());
+        $state.setInPath($e.isInPath());
+    }
     $state.setTimestamp($e.getTimestamp());
     update($state);
 end
 
 rule "Update pothole state"
+salience 1000
 no-loop true
 when
     $e : PotholeDetectedEvent() from entry-point "ROAD_STREAM"
@@ -182,15 +189,21 @@ when
             || Math.abs($state.getDistanceMeters() - $e.getDistanceMeters()) > 0.01
             || $state.getSeverity() != $e.getSeverity()))
 then
-    $state.setPotholeId($e.getPotholeId());
-    $state.setDistanceMeters($e.getDistanceMeters());
-    $state.setSeverity($e.getSeverity());
-    $state.setLane($e.getLane());
+    if ($e.getDistanceMeters() <= 0 || "none".equals($e.getPotholeId()) || Double.isInfinite($e.getDistanceMeters())) {
+        $state.setPotholeId("none");
+        $state.setDistanceMeters(Double.POSITIVE_INFINITY);
+    } else {
+        $state.setPotholeId($e.getPotholeId());
+        $state.setDistanceMeters($e.getDistanceMeters());
+        $state.setSeverity($e.getSeverity());
+        $state.setLane($e.getLane());
+    }
     $state.setTimestamp($e.getTimestamp());
     update($state);
 end
 
 rule "Update barrier state"
+salience 1000
 no-loop true
 when
     $e : BarrierDetectedEvent() from entry-point "ROAD_STREAM"
@@ -201,14 +214,21 @@ when
             || Math.abs($state.getDistanceMeters() - $e.getDistanceMeters()) > 0.01
             || $state.isOpen() != $e.isOpen()))
 then
-    $state.setBarrierId($e.getBarrierId());
-    $state.setDistanceMeters($e.getDistanceMeters());
-    $state.setOpen($e.isOpen());
+    if ($e.getDistanceMeters() <= 0 || "none".equals($e.getBarrierId()) || Double.isInfinite($e.getDistanceMeters())) {
+        $state.setBarrierId("none");
+        $state.setDistanceMeters(Double.POSITIVE_INFINITY);
+        $state.setOpen(true);
+    } else {
+        $state.setBarrierId($e.getBarrierId());
+        $state.setDistanceMeters($e.getDistanceMeters());
+        $state.setOpen($e.isOpen());
+    }
     $state.setTimestamp($e.getTimestamp());
     update($state);
 end
 
 rule "Update lane occupancy left"
+salience 1000
 no-loop true
 when
     $e : LaneOccupancyEvent(lane == Lane.LEFT) from entry-point "PERCEPTION_STREAM"
@@ -216,15 +236,21 @@ when
     eval($e.getTimestamp() >= $state.getTimestamp()
         && ($e.getTimestamp() > $state.getTimestamp()
             || $state.isOccupied() != $e.isOccupied()
+            || $state.isSafeToEnter() != $e.isSafeToEnter()
             || Math.abs($state.getNearestDistanceMeters() - $e.getNearestDistanceMeters()) > 0.01))
 then
     $state.setOccupied($e.isOccupied());
     $state.setNearestDistanceMeters($e.getNearestDistanceMeters());
+    $state.setSafeToEnter($e.isSafeToEnter());
+    $state.setFrontDistanceMeters($e.getFrontDistanceMeters());
+    $state.setRearDistanceMeters($e.getRearDistanceMeters());
+    $state.setRearTtcSeconds($e.getRearTtcSeconds());
     $state.setTimestamp($e.getTimestamp());
     update($state);
 end
 
 rule "Update lane occupancy right"
+salience 1000
 no-loop true
 when
     $e : LaneOccupancyEvent(lane == Lane.RIGHT) from entry-point "PERCEPTION_STREAM"
@@ -232,15 +258,21 @@ when
     eval($e.getTimestamp() >= $state.getTimestamp()
         && ($e.getTimestamp() > $state.getTimestamp()
             || $state.isOccupied() != $e.isOccupied()
+            || $state.isSafeToEnter() != $e.isSafeToEnter()
             || Math.abs($state.getNearestDistanceMeters() - $e.getNearestDistanceMeters()) > 0.01))
 then
     $state.setOccupied($e.isOccupied());
     $state.setNearestDistanceMeters($e.getNearestDistanceMeters());
+    $state.setSafeToEnter($e.isSafeToEnter());
+    $state.setFrontDistanceMeters($e.getFrontDistanceMeters());
+    $state.setRearDistanceMeters($e.getRearDistanceMeters());
+    $state.setRearTtcSeconds($e.getRearTtcSeconds());
     $state.setTimestamp($e.getTimestamp());
     update($state);
 end
 
 rule "Update acceleration request"
+salience 1000
 no-loop true
 when
     $e : AccelerationRequestEvent() from entry-point "COMMAND_STREAM"
@@ -254,6 +286,7 @@ then
 end
 
 rule "Update lane change request"
+salience 1000
 no-loop true
 when
     $e : LaneChangeRequestEvent() from entry-point "COMMAND_STREAM"
@@ -271,6 +304,7 @@ end
 
 rule "Expire lane change request"
 no-loop true
+salience 900
 when
     $state : LaneChangeRequestState(active == true, $ts : timestamp)
     VehicleStateFact($now : timestamp)
@@ -282,11 +316,11 @@ end
 
 rule "Clear stale front vehicle perception"
 no-loop true
-salience -100
+salience 900
 when
     $state : FrontVehicleState(targetId != "none", $timestamp : timestamp)
     VehicleStateFact($now : timestamp)
-    eval($now - $timestamp > 600)
+    eval($now - $timestamp > 1000)
 then
     $state.setTargetId("none");
     $state.setDistanceMeters(Double.POSITIVE_INFINITY);
@@ -297,6 +331,7 @@ then
 end
 
 rule "Update speed radar perception"
+salience 1000
 no-loop true
 when
     $e : SpeedRadarEvent() from entry-point "PERCEPTION_STREAM"
@@ -306,20 +341,25 @@ when
             || !$e.getRadarId().equals($state.getRadarId())
             || Math.abs($state.getDistanceMeters() - $e.getDistanceMeters()) > 0.01))
 then
-    $state.setRadarId($e.getRadarId());
-    $state.setDistanceMeters($e.getDistanceMeters());
-    $state.setSpeedLimitKmh($e.getSpeedLimitKmh());
+    if ($e.getDistanceMeters() <= 0 || "none".equals($e.getRadarId()) || Double.isInfinite($e.getDistanceMeters())) {
+        $state.setRadarId("none");
+        $state.setDistanceMeters(Double.POSITIVE_INFINITY);
+    } else {
+        $state.setRadarId($e.getRadarId());
+        $state.setDistanceMeters($e.getDistanceMeters());
+        $state.setSpeedLimitKmh($e.getSpeedLimitKmh());
+    }
     $state.setTimestamp($e.getTimestamp());
     update($state);
 end
 
 rule "Clear stale speed radar perception"
 no-loop true
-salience -100
+salience 900
 when
     $state : SpeedRadarFact(radarId != "none", $timestamp : timestamp)
     VehicleStateFact($now : timestamp)
-    eval($now - $timestamp > 600)
+    eval($now - $timestamp > 1000)
 then
     $state.setRadarId("none");
     $state.setDistanceMeters(Double.POSITIVE_INFINITY);
@@ -329,11 +369,11 @@ end
 
 rule "Clear stale pedestrian perception"
 no-loop true
-salience -100
+salience 900
 when
     $state : PedestrianStateFact(pedestrianId != "none", $timestamp : timestamp)
     VehicleStateFact($now : timestamp)
-    eval($now - $timestamp > 600)
+    eval($now - $timestamp > 1000)
 then
     $state.setPedestrianId("none");
     $state.setDistanceMeters(Double.POSITIVE_INFINITY);
@@ -344,11 +384,11 @@ end
 
 rule "Clear stale stop sign perception"
 no-loop true
-salience -100
+salience 900
 when
     $state : StopSignState(signId != "none", $timestamp : detectedTimestamp)
     VehicleStateFact($now : timestamp)
-    eval($now - $timestamp > 600)
+    eval($now - $timestamp > 1500)
 then
     $state.setSignId("none");
     $state.setDistanceMeters(Double.POSITIVE_INFINITY);
@@ -358,27 +398,13 @@ then
     update($state);
 end
 
-rule "Clear stale yield sign perception"
-no-loop true
-salience -100
-when
-    $state : YieldSignState(signId != "none", $timestamp : timestamp)
-    VehicleStateFact($now : timestamp)
-    eval($now - $timestamp > 600)
-then
-    $state.setSignId("none");
-    $state.setDistanceMeters(Double.POSITIVE_INFINITY);
-    $state.setTimestamp($now);
-    update($state);
-end
-
 rule "Clear stale traffic light perception"
 no-loop true
-salience -100
+salience 900
 when
     $state : TrafficLightStateFact(lightId != "none", $timestamp : timestamp)
     VehicleStateFact($now : timestamp)
-    eval($now - $timestamp > 600)
+    eval($now - $timestamp > 1000)
 then
     $state.setLightId("none");
     $state.setState(TrafficLightState.GREEN);
@@ -389,11 +415,11 @@ end
 
 rule "Clear stale pothole perception"
 no-loop true
-salience -100
+salience 900
 when
     $state : PotholeStateFact(potholeId != "none", $timestamp : timestamp)
     VehicleStateFact($now : timestamp)
-    eval($now - $timestamp > 600)
+    eval($now - $timestamp > 1000)
 then
     $state.setPotholeId("none");
     $state.setDistanceMeters(Double.POSITIVE_INFINITY);
@@ -404,11 +430,11 @@ end
 
 rule "Clear stale barrier perception"
 no-loop true
-salience -100
+salience 900
 when
     $state : BarrierStateFact(barrierId != "none", $timestamp : timestamp)
     VehicleStateFact($now : timestamp)
-    eval($now - $timestamp > 600)
+    eval($now - $timestamp > 1000)
 then
     $state.setBarrierId("none");
     $state.setDistanceMeters(Double.POSITIVE_INFINITY);
@@ -417,29 +443,34 @@ then
     update($state);
 end
 
-
 rule "Update obstacle state"
+salience 1000
 no-loop true
 when
     $e : ObstacleDetectedEvent() from entry-point "ROAD_STREAM"
     $state : ObstacleStateFact()
     eval($e.getTimestamp() >= $state.getTimestamp())
 then
-    $state.setObstacleId($e.getObstacleId());
-    $state.setDistanceMeters($e.getDistanceMeters());
-    $state.setSeverity($e.getSeverity());
-    $state.setLane($e.getLane());
+    if ($e.getDistanceMeters() <= 0 || "none".equals($e.getObstacleId()) || Double.isInfinite($e.getDistanceMeters())) {
+        $state.setObstacleId("none");
+        $state.setDistanceMeters(Double.POSITIVE_INFINITY);
+    } else {
+        $state.setObstacleId($e.getObstacleId());
+        $state.setDistanceMeters($e.getDistanceMeters());
+        $state.setSeverity($e.getSeverity());
+        $state.setLane($e.getLane());
+    }
     $state.setTimestamp($e.getTimestamp());
     update($state);
 end
 
 rule "Clear stale obstacle perception"
 no-loop true
-salience -100
+salience 900
 when
     $state : ObstacleStateFact(obstacleId != "none", $timestamp : timestamp)
     VehicleStateFact($now : timestamp)
-    eval($now - $timestamp > 600)
+    eval($now - $timestamp > 1000)
 then
     $state.setObstacleId("none");
     $state.setDistanceMeters(Double.POSITIVE_INFINITY);

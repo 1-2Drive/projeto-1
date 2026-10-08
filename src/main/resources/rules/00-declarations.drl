@@ -19,7 +19,6 @@ import com.one2drive.projeto1.drools.events.TrafficLightEvent
 import com.one2drive.projeto1.drools.events.VehicleSpeedEvent
 import com.one2drive.projeto1.drools.events.VisibilityEvent
 import com.one2drive.projeto1.drools.events.WeatherEvent
-import com.one2drive.projeto1.drools.events.YieldSignEvent
 
 declare VehicleSpeedEvent
     @role( event )
@@ -58,12 +57,6 @@ declare TrafficLightEvent
 end
 
 declare StopSignEvent
-    @role( event )
-    @timestamp( timestamp )
-    @expires( 20s )
-end
-
-declare YieldSignEvent
     @role( event )
     @timestamp( timestamp )
     @expires( 20s )

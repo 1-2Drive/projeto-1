@@ -229,12 +229,13 @@ describe('RoadCanvasComponent', () => {
     const radarT2Left = parseFloat(radarT2.style.left);
     const distT2 = Math.abs(radarT2Left - egoT2Left);
 
-    // Assert ego moved forward horizontally
-    expect(egoT2Left).toBeGreaterThan(egoT1Left, 'Ego screen X must increase as world position increases');
-    // Assert radar remained at static position
-    expect(radarT2Left).toBeCloseTo(radarT1Left, 1, 'Radar must remain static on screen during approach');
-    // Assert distance between car and radar visibly decreased
+    // Assert visual distance between car and radar visibly decreased
     expect(distT2).toBeLessThan(distT1, 'Visual distance between ego and speed radar must decrease');
+    // Assert radar approached ego on screen
+    expect(radarT2Left).toBeLessThan(radarT1Left, 'Radar screen position must move toward ego as car approaches');
+    // Assert ego stays in stable tracking region
+    expect(egoT1Left).toBeCloseTo(20, 1);
+    expect(egoT2Left).toBeCloseTo(20, 1);
   });
 
   it('should render clean EGO badge without concatenating state text like EGOCRUISING', () => {

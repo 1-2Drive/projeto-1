@@ -28,7 +28,7 @@ public class FrontRadarSensor extends AbstractSensor<Object> {
     public List<Object> observe(WorldState worldState, long timestampMillis) {
         List<Object> events = new ArrayList<>();
 
-        Optional<SpeedRadar> speedRadar = worldState.findNearestSpeedRadarAhead(rangeMeters());
+        Optional<SpeedRadar> speedRadar = worldState.findNearestSpeedRadarAhead(Math.max(rangeMeters(), 250.0));
         speedRadar.ifPresent(radar -> {
             double distanceToRadar = worldState.signedDistance(radar.getPositionMeters());
             events.add(new SpeedRadarEvent(timestampMillis, radar.getId(), distanceToRadar, radar.getSpeedLimitKmh()));

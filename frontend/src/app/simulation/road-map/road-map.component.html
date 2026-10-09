@@ -24,6 +24,17 @@
       }
     </div>
 
+    <div class="lane-placement" role="group" aria-label="Place a hazard in a lane">
+      <span>Place at row {{ m.egoRow }} +</span>
+      @for (choice of laneColumns(); track choice.lane) {
+        <button type="button" class="lane-placement__button"
+                [attr.data-testid]="'place-lane-' + choice.lane"
+                [disabled]="choice.index < 0"
+                (click)="placeAhead(choice.lane)">+ {{ choice.lane }}</button>
+      }
+    </div>
+    <p class="infrastructure-hint">RADAR map markers repeat across the full row and govern all three lanes.</p>
+
     <div class="matrix">
       <div class="matrix__lanes" aria-hidden="true">
         @for (row of laneRows(); track row.lane) {

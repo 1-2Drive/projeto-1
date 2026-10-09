@@ -212,16 +212,19 @@ when
         && ($e.getTimestamp() > $state.getTimestamp()
             || !$e.getBarrierId().equals($state.getBarrierId())
             || Math.abs($state.getDistanceMeters() - $e.getDistanceMeters()) > 0.01
+            || $state.getLane() != $e.getLane()
             || $state.isOpen() != $e.isOpen()))
 then
     if ($e.getDistanceMeters() <= 0 || "none".equals($e.getBarrierId()) || Double.isInfinite($e.getDistanceMeters())) {
         $state.setBarrierId("none");
         $state.setDistanceMeters(Double.POSITIVE_INFINITY);
         $state.setOpen(true);
+        $state.setLane(Lane.CENTER);
     } else {
         $state.setBarrierId($e.getBarrierId());
         $state.setDistanceMeters($e.getDistanceMeters());
         $state.setOpen($e.isOpen());
+        $state.setLane($e.getLane());
     }
     $state.setTimestamp($e.getTimestamp());
     update($state);
@@ -337,9 +340,9 @@ when
     $e : SpeedRadarEvent() from entry-point "PERCEPTION_STREAM"
     $state : SpeedRadarFact()
     eval($e.getTimestamp() >= $state.getTimestamp()
-        && ($e.getTimestamp() > $state.getTimestamp()
+        && (!$state.isPassed() && ($e.getTimestamp() > $state.getTimestamp()
             || !$e.getRadarId().equals($state.getRadarId())
-            || Math.abs($state.getDistanceMeters() - $e.getDistanceMeters()) > 0.01))
+            || Math.abs($state.getDistanceMeters() - $e.getDistanceMeters()) > 0.01)))
 then
     if ($e.getDistanceMeters() <= 0 || "none".equals($e.getRadarId()) || Double.isInfinite($e.getDistanceMeters())) {
         $state.setRadarId("none");
@@ -357,7 +360,7 @@ rule "Clear stale speed radar perception"
 no-loop true
 salience 900
 when
-    $state : SpeedRadarFact(radarId != "none", $timestamp : timestamp)
+    $state : SpeedRadarFact(radarId != "none", passed == false, $timestamp : timestamp)
     VehicleStateFact($now : timestamp)
     eval($now - $timestamp > 1000)
 then

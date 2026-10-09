@@ -3,6 +3,7 @@ package com.one2drive.projeto1.simulation;
 import com.one2drive.projeto1.domain.Lane;
 import com.one2drive.projeto1.domain.RoadElement;
 import com.one2drive.projeto1.scenario.ScenarioFactory;
+import com.one2drive.projeto1.scenario.ScenarioRoadElementType;
 import com.one2drive.projeto1.scenario.ScenarioRoadElementDefinition;
 
 import java.util.ArrayList;
@@ -43,8 +44,21 @@ public class RoadMap {
                 throw new IllegalArgumentException("Road map row " + row + " must have "
                     + LANES.length + " values (LEFT, CENTER, RIGHT)");
             }
+            int radarCode = 0;
             for (Lane lane : LANES) {
-                set(row, lane, cells[row][lane.ordinal()]);
+                int code = cells[row][lane.ordinal()];
+                if (code != MapLegend.FREE && legend.entry(code).isPresent()
+                    && legend.entry(code).orElseThrow().template().getType() == ScenarioRoadElementType.SPEED_RADAR) {
+                    radarCode = code;
+                    break;
+                }
+            }
+            if (radarCode != 0) {
+                set(row, Lane.CENTER, radarCode);
+            } else {
+                for (Lane lane : LANES) {
+                    set(row, lane, cells[row][lane.ordinal()]);
+                }
             }
         }
     }
@@ -76,6 +90,30 @@ public class RoadMap {
     /** Writes a legend code into a cell and rebuilds the road element it stands for. */
     public void set(int row, Lane lane, int code) {
         checkCell(row, code);
+        int checkedRow = checkRow(row);
+        int previousCode = cells[checkedRow][lane.ordinal()];
+        if (code == MapLegend.FREE && previousCode != MapLegend.FREE
+            && legend.entry(previousCode).orElseThrow().template().getType() == ScenarioRoadElementType.SPEED_RADAR) {
+            for (Lane roadLane : LANES) {
+                cells[checkedRow][roadLane.ordinal()] = MapLegend.FREE;
+                elements[checkedRow][roadLane.ordinal()] = null;
+            }
+            return;
+        }
+        if (code != MapLegend.FREE
+            && legend.entry(code).orElseThrow().template().getType() == ScenarioRoadElementType.SPEED_RADAR) {
+            int radarRow = checkedRow;
+            ScenarioRoadElementDefinition definition = legend.entry(code).orElseThrow().template().copy();
+            definition.setLane(Lane.CENTER);
+            definition.setPositionMeters(radarRow * blockLengthMeters);
+            RoadElement radar = ScenarioFactory.createRoadElement(definition);
+            radar.setId("r" + radarRow + "-ALL");
+            for (Lane roadLane : LANES) {
+                cells[radarRow][roadLane.ordinal()] = code;
+                elements[radarRow][roadLane.ordinal()] = roadLane == Lane.LEFT ? radar : null;
+            }
+            return;
+        }
         cells[row][lane.ordinal()] = code;
         elements[row][lane.ordinal()] = code == MapLegend.FREE
             ? null
@@ -91,7 +129,12 @@ public class RoadMap {
     public String place(ScenarioRoadElementDefinition definition, double positionMeters) {
         Lane lane = definition.getLane() == null ? Lane.CENTER : definition.getLane();
         int row = rowAt(positionMeters);
-        set(row, lane, legend.codeFor(definition));
+        int code = legend.codeFor(definition);
+        if (definition.getType() == ScenarioRoadElementType.SPEED_RADAR) {
+            set(row, Lane.CENTER, code);
+            return "r" + row + "-ALL";
+        }
+        set(row, lane, code);
         return cellId(row, lane);
     }
 
@@ -101,6 +144,13 @@ public class RoadMap {
             for (Lane lane : LANES) {
                 RoadElement element = elements[row][lane.ordinal()];
                 if (element != null && element.getId().equals(elementId)) {
+                    if (element instanceof com.one2drive.projeto1.domain.SpeedRadar) {
+                        for (Lane radarLane : LANES) {
+                            cells[row][radarLane.ordinal()] = MapLegend.FREE;
+                            elements[row][radarLane.ordinal()] = null;
+                        }
+                        return true;
+                    }
                     set(row, lane, MapLegend.FREE);
                     return true;
                 }
@@ -118,7 +168,8 @@ public class RoadMap {
         List<RoadElement> result = new ArrayList<>();
         for (RoadElement[] row : elements) {
             for (RoadElement element : row) {
-                if (element != null) {
+                if (element != null && (!(element instanceof com.one2drive.projeto1.domain.SpeedRadar)
+                    || result.stream().noneMatch(existing -> existing.getId().equals(element.getId())))) {
                     result.add(element);
                 }
             }
@@ -132,6 +183,20 @@ public class RoadMap {
             copy[row] = cells[row].clone();
         }
         return copy;
+    }
+
+    /** Applies a legend code at a longitudinal row; speed enforcement spans all lanes. */
+    public void setInfrastructureRow(int row, int code) {
+        checkCell(row, code);
+        for (Lane lane : LANES) set(row, lane, code);
+    }
+
+    public void clearInfrastructureRow(int row) {
+        int checkedRow = checkRow(row);
+        for (Lane lane : LANES) {
+            cells[checkedRow][lane.ordinal()] = MapLegend.FREE;
+            elements[checkedRow][lane.ordinal()] = null;
+        }
     }
 
     /** Row of the block containing the given position. */
@@ -161,10 +226,16 @@ public class RoadMap {
 
     private RoadElement createElement(int row, Lane lane, MapLegend.Entry entry) {
         ScenarioRoadElementDefinition definition = entry.template().copy();
-        definition.setLane(lane);
+        if (definition.getType() == ScenarioRoadElementType.SPEED_RADAR) {
+            if (lane != Lane.LEFT) return null;
+            definition.setLane(Lane.CENTER);
+        } else {
+            definition.setLane(lane);
+        }
         definition.setPositionMeters(row * blockLengthMeters);
         RoadElement element = ScenarioFactory.createRoadElement(definition);
-        element.setId(cellId(row, lane));
+        element.setId(definition.getType() == ScenarioRoadElementType.SPEED_RADAR
+            ? "r" + row + "-ALL" : cellId(row, lane));
         return element;
     }
 

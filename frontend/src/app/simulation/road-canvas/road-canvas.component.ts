@@ -139,6 +139,10 @@ export class RoadCanvasComponent {
   });
 
   protected readonly speedRadarDist = computed(() => {
+    const speedControlDistance = this.snapshot()?.sensors?.frontRadar?.speedRadarDistanceMeters;
+    if (speedControlDistance != null && Number.isFinite(speedControlDistance) && speedControlDistance >= 0) {
+      return speedControlDistance;
+    }
     const d = this.snapshot()?.sensors?.frontRadar?.speedRadarDistanceMeters;
     if (d != null && Number.isFinite(d) && d > 0 && d <= 135) {
       return d;
@@ -220,6 +224,7 @@ export class RoadCanvasComponent {
     }
     const egoPos = this.egoPosition();
     return snapshot.worldObjects
+      .filter((item) => item.positionMeters >= -36 || item.type.includes('SpeedRadar'))
       .map((item) => {
         const kind = this.kindOf(item);
         const state = this.stateOf(item);
@@ -236,10 +241,11 @@ export class RoadCanvasComponent {
           relativeMeters: item.positionMeters,
           worldPositionMeters: worldPos,
           xPercent: xPct,
-          yPercent: this.lateralToY(LANE_CENTRE_METRES[item.lane] ?? 0),
+          yPercent: kind === 'speedRadar' ? 6 : this.lateralToY(LANE_CENTRE_METRES[item.lane as LaneName] ?? 0),
           detectedByCamera: snapshot.cameraDetectedObjectIds?.includes(item.id) ?? false,
           detectedByRadar: snapshot.radarDetectedObjectIds?.includes(item.id) ?? false,
-          visible: item.positionMeters >= -36 && item.positionMeters <= 150 && xPct >= -10 && xPct <= 110
+          visible: (kind === 'speedRadar' ? item.positionMeters >= -36 && item.positionMeters <= 250
+            : item.positionMeters >= -36 && item.positionMeters <= this.worldForwardMeters) && xPct >= -10 && xPct <= 110
         };
       })
       .filter((item) => item.visible);
@@ -299,6 +305,12 @@ export class RoadCanvasComponent {
   });
 
   protected readonly running = computed(() => this.snapshot()?.status === 'RUNNING');
+
+  protected readonly raining = computed(() => {
+    const snapshot = this.snapshot();
+    return snapshot?.environment?.weatherCondition === 'RAIN'
+      || snapshot?.sensors?.environment?.rain === true;
+  });
 
   protected tickPercent(meters: number): number {
     return this.toPercentX(meters);

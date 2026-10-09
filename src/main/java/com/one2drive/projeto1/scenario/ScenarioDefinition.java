@@ -27,6 +27,15 @@ public class ScenarioDefinition {
     private com.one2drive.projeto1.domain.Lane initialLane;
     private com.one2drive.projeto1.domain.RoadMarkingType leftMarking = com.one2drive.projeto1.domain.RoadMarkingType.DASHED;
     private com.one2drive.projeto1.domain.RoadMarkingType rightMarking = com.one2drive.projeto1.domain.RoadMarkingType.DASHED;
+    private boolean loopWorldObjects;
+
+    public boolean isLoopWorldObjects() {
+        return loopWorldObjects;
+    }
+
+    public void setLoopWorldObjects(boolean loopWorldObjects) {
+        this.loopWorldObjects = loopWorldObjects;
+    }
 
     public com.one2drive.projeto1.domain.Lane getInitialLane() {
         return initialLane;

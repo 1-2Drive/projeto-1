@@ -61,7 +61,7 @@ describe('RoadCanvasComponent', () => {
     expect(text).toContain('35 m');
   });
 
-  it('should render physical speed radar station with dish, camera, and speed limit badge', () => {
+  it('renders an all-lane speed enforcement station above the road with its configured limit', () => {
     fixture.componentRef.setInput('snapshot', {
       simulationTimeMillis: 1000,
       status: 'RUNNING',
@@ -91,7 +91,7 @@ describe('RoadCanvasComponent', () => {
         }
       },
       worldObjects: [
-        { id: 'radar_1', type: 'SpeedRadar', positionMeters: 130, lane: 'RIGHT', details: 'speedLimitKmh=50' }
+        { id: 'radar_1', type: 'SpeedRadar', positionMeters: 130, lane: 'ALL', details: 'SpeedRadar{speedLimitKmh=50, scope=ALL_LANES}' }
       ],
       workingMemory: [],
       recentTimeline: [],
@@ -116,6 +116,10 @@ describe('RoadCanvasComponent', () => {
 
     const radarStation = fixture.nativeElement.querySelector('.radar-station');
     expect(radarStation).toBeTruthy('Physical speed radar SVG must be rendered on the road');
+    expect(radarStation.textContent).toContain('RADAR');
+    expect(radarStation.getAttribute('aria-label')).toContain('All-lane speed radar');
+    const radarObject = fixture.nativeElement.querySelector('.obj--speedRadar') as HTMLElement;
+    expect(radarObject.style.top).toBe('4%');
 
     const hudRadar = fixture.nativeElement.querySelector('[data-testid="hud-radar"]');
     expect(hudRadar).toBeTruthy('Speed radar HUD telemetry must display');
@@ -183,7 +187,7 @@ describe('RoadCanvasComponent', () => {
         }
       },
       worldObjects: [
-        { id: 'radar_1', type: 'SpeedRadar', positionMeters: 130, worldPositionMeters: 330, lane: 'RIGHT', details: 'speedLimitKmh=50' }
+        { id: 'radar_1', type: 'SpeedRadar', positionMeters: 130, worldPositionMeters: 330, lane: 'ALL', details: 'SpeedRadar{speedLimitKmh=50, scope=ALL_LANES}' }
       ],
       sensorRanges: { cameraRangeMeters: 100, radarRangeMeters: 130, blindSpotRangeMeters: 25, cameraRateMillis: 200, radarRateMillis: 50 }
     });
@@ -217,7 +221,7 @@ describe('RoadCanvasComponent', () => {
         }
       },
       worldObjects: [
-        { id: 'radar_1', type: 'SpeedRadar', positionMeters: 70, worldPositionMeters: 330, lane: 'RIGHT', details: 'speedLimitKmh=50' }
+        { id: 'radar_1', type: 'SpeedRadar', positionMeters: 70, worldPositionMeters: 330, lane: 'ALL', details: 'SpeedRadar{speedLimitKmh=50, scope=ALL_LANES}' }
       ],
       sensorRanges: { cameraRangeMeters: 100, radarRangeMeters: 130, blindSpotRangeMeters: 25, cameraRateMillis: 200, radarRateMillis: 50 }
     });

@@ -27,7 +27,7 @@ export interface ApiRoadElement {
   id: string;
   type: string;
   positionMeters: number;
-  lane: 'LEFT' | 'CENTER' | 'RIGHT';
+  lane: 'LEFT' | 'CENTER' | 'RIGHT' | 'ALL';
   details: string;
   worldPositionMeters?: number;
 }
@@ -113,6 +113,7 @@ export interface ApiSimulationSnapshot {
     leftMarking: 'DASHED' | 'CONTINUOUS' | string;
     rightMarking: 'DASHED' | 'CONTINUOUS' | string;
   };
+  laneSafety?: Array<{ lane: LaneName; safe: boolean }>;
 }
 
 /**

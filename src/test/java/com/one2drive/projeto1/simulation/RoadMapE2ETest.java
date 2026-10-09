@@ -27,8 +27,10 @@ class RoadMapE2ETest {
         ScenarioDefinition scenario = new ScenarioDefinition();
         scenario.setId("MAP_TEST");
         scenario.setName("Road map test");
+        scenario.setLoopWorldObjects(true);
         scenario.setInitialSpeedKmh(speedKmh);
         scenario.setInitialWeather(WeatherCondition.CLEAR);
+        scenario.setInitialLane(Lane.CENTER);
         scenario.setMap(cells);
         SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {
         });

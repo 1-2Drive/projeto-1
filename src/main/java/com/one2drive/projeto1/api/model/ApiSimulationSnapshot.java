@@ -27,7 +27,8 @@ public record ApiSimulationSnapshot(
     SensorTelemetryView sensors,
     InferenceSummaryView inference,
     RoadMapView roadMap,
-    RoadMarksView roadMarks
+    RoadMarksView roadMarks,
+    List<LaneSafetyView> laneSafety
 ) {
     /**
      * The road as a matrix: {@code cells[row][lane]}, rows going forward along the
@@ -83,6 +84,8 @@ public record ApiSimulationSnapshot(
         String rightMarking
     ) {
     }
+
+    public record LaneSafetyView(String lane, boolean safe) { }
 
     public record RadarTelemetryView(
         double rangeMeters,

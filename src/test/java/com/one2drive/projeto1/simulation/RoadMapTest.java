@@ -5,6 +5,7 @@ import com.one2drive.projeto1.domain.Pothole;
 import com.one2drive.projeto1.domain.RoadElement;
 import com.one2drive.projeto1.domain.SpeedLimitSign;
 import com.one2drive.projeto1.domain.StaticObstacle;
+import com.one2drive.projeto1.domain.SpeedRadar;
 import com.one2drive.projeto1.scenario.ScenarioRoadElementDefinition;
 import com.one2drive.projeto1.scenario.ScenarioRoadElementType;
 import org.junit.jupiter.api.DisplayName;
@@ -86,9 +87,28 @@ class RoadMapTest {
 
         limit.setSpeedLimitKmh(40);
         int added = legend.codeFor(limit);
-        assertEquals(14, added);
+        assertEquals(15, added);
         assertEquals("Limit 40 km/h", legend.entry(added).orElseThrow().label());
         assertEquals(added, legend.codeFor(limit));
+    }
+
+    @Test
+    @DisplayName("a speed radar occupies one infrastructure marker and its map code spans all lanes")
+    void radarMapCodeRepresentsAllLaneInfrastructure() {
+        RoadMap map = RoadMap.empty(20, 5.0, MapLegend.defaults());
+        ScenarioRoadElementDefinition radar = new ScenarioRoadElementDefinition();
+        radar.setType(ScenarioRoadElementType.SPEED_RADAR);
+        radar.setLane(Lane.RIGHT);
+        radar.setSpeedLimitKmh(70);
+        assertEquals("r4-ALL", map.place(radar, 20.0));
+        assertEquals(1, map.elements().stream().filter(SpeedRadar.class::isInstance).count());
+        assertEquals(map.get(4, Lane.LEFT), map.get(4, Lane.CENTER));
+        assertEquals(map.get(4, Lane.CENTER), map.get(4, Lane.RIGHT));
+        SpeedRadar device = (SpeedRadar) map.elements().get(0);
+        assertTrue(device.getLane() == null);
+        assertEquals(70.0, device.getSpeedLimitKmh());
+        assertTrue(map.clear("r4-ALL"));
+        assertEquals(0, map.get(4, Lane.LEFT) + map.get(4, Lane.CENTER) + map.get(4, Lane.RIGHT));
     }
 
     @Test

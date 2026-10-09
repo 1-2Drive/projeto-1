@@ -3,17 +3,106 @@ package rules
 import com.one2drive.projeto1.decision.DecisionContext
 import com.one2drive.projeto1.decision.DecisionPriority
 import com.one2drive.projeto1.domain.DrivingAction
+import com.one2drive.projeto1.domain.Lane
+import com.one2drive.projeto1.domain.LaneChangeState
 import com.one2drive.projeto1.domain.RiskLevel
 import com.one2drive.projeto1.drools.DroolsSupport
 import com.one2drive.projeto1.drools.facts.BarrierStateFact
+import com.one2drive.projeto1.drools.facts.VehicleStateFact
 
 global DroolsSupport droolsSupport
+
+rule "Avoid closed barrier by changing left when safe"
+salience 650
+when
+    $ctx : DecisionContext()
+    VehicleStateFact(lane == Lane.RIGHT, laneChangeState == LaneChangeState.IDLE,
+                     leftAdjacentLaneSafe == true)
+    BarrierStateFact(barrierId != "none", open == false, lane == Lane.RIGHT,
+                     $distance : distanceMeters > 0, distanceMeters <= 55.0)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.CHANGE_LANE_LEFT,
+        Double.NaN,
+        RiskLevel.HIGH,
+        DecisionPriority.MANEUVER_SAFETY,
+        "Closed barrier ahead; changing left to a verified clear lane",
+        drools.getRule().getName(),
+        "barrier " + $distance + "m ahead in RIGHT, CENTER clear"
+    );
+end
+
+rule "Avoid closed barrier by changing left from centre when safe"
+salience 650
+when
+    $ctx : DecisionContext()
+    VehicleStateFact(lane == Lane.CENTER, laneChangeState == LaneChangeState.IDLE,
+                     leftAdjacentLaneSafe == true)
+    BarrierStateFact(barrierId != "none", open == false, lane == Lane.CENTER,
+                     $distance : distanceMeters > 0, distanceMeters <= 55.0)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.CHANGE_LANE_LEFT,
+        Double.NaN,
+        RiskLevel.HIGH,
+        DecisionPriority.MANEUVER_SAFETY,
+        "Closed barrier ahead; changing left to a verified clear lane",
+        drools.getRule().getName(),
+        "barrier " + $distance + "m ahead in CENTER, LEFT clear"
+    );
+end
+
+rule "Avoid closed barrier by changing right from centre when safe"
+salience 650
+when
+    $ctx : DecisionContext()
+    VehicleStateFact(lane == Lane.CENTER, laneChangeState == LaneChangeState.IDLE,
+                     leftAdjacentLaneSafe == false, rightAdjacentLaneSafe == true)
+    BarrierStateFact(barrierId != "none", open == false, lane == Lane.CENTER,
+                     $distance : distanceMeters > 0, distanceMeters <= 55.0)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.CHANGE_LANE_RIGHT,
+        Double.NaN,
+        RiskLevel.HIGH,
+        DecisionPriority.MANEUVER_SAFETY,
+        "Closed barrier ahead; changing right to a verified clear lane",
+        drools.getRule().getName(),
+        "barrier " + $distance + "m ahead in CENTER, RIGHT clear"
+    );
+end
+
+rule "Avoid closed barrier by changing right when safe"
+salience 650
+when
+    $ctx : DecisionContext()
+    VehicleStateFact(lane == Lane.LEFT, laneChangeState == LaneChangeState.IDLE,
+                     rightAdjacentLaneSafe == true)
+    BarrierStateFact(barrierId != "none", open == false, lane == Lane.LEFT,
+                     $distance : distanceMeters > 0, distanceMeters <= 55.0)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.CHANGE_LANE_RIGHT,
+        Double.NaN,
+        RiskLevel.HIGH,
+        DecisionPriority.MANEUVER_SAFETY,
+        "Closed barrier ahead; changing right to a verified clear lane",
+        drools.getRule().getName(),
+        "barrier " + $distance + "m ahead in LEFT, CENTER clear"
+    );
+end
 
 rule "Closed barrier requires stop"
 salience 640
 when
     $ctx : DecisionContext()
-    BarrierStateFact(barrierId != "none", open == false, $distance : distanceMeters >= 0, distanceMeters <= 45.0)
+    VehicleStateFact($egoLane : lane, leftAdjacentLaneSafe == false, rightAdjacentLaneSafe == false)
+    BarrierStateFact(barrierId != "none", open == false, lane == $egoLane,
+                     $distance : distanceMeters >= 0, distanceMeters <= 55.0)
 then
     droolsSupport.proposeDecision(
         $ctx,
@@ -21,9 +110,9 @@ then
         0.0,
         RiskLevel.HIGH,
         DecisionPriority.LEGAL_MANDATORY_STOP,
-        "Closed barrier ahead",
+        "Closed barrier ahead and no adjacent lane is safe",
         drools.getRule().getName(),
-        "distance=" + $distance + "m"
+        "distance=" + $distance + "m, both adjacent lanes blocked"
     );
 end
 

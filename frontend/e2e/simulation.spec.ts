@@ -23,6 +23,13 @@ async function addWorldObject(
   });
 }
 
+async function loadScenario(page: import('@playwright/test').Page, exactName: string): Promise<void> {
+  await page.locator('[data-testid="reset-btn"]').click();
+  await page.getByRole('button', { name: exactName, exact: true }).click();
+  await expect(page.locator('[data-testid="simulation-status"]')).toContainText('STOPPED');
+  await expect(page.locator('[data-testid="simulation-clock"]')).toContainText('00:00.000');
+}
+
 test.describe('Driving expert simulation UI', () => {
   test('starts on a clean stopped road and only runs after START', async ({ page }) => {
     await page.goto('/');
@@ -51,7 +58,8 @@ test.describe('Driving expert simulation UI', () => {
     test.setTimeout(90000);
 
     await page.goto('/');
-    await page.locator('[data-testid="reset-btn"]').click();
+    await loadScenario(page, 'S1 Empty safe road');
+    await page.evaluate(() => fetch('/api/world/actors', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'FRONT_VEHICLE', lane: 'RIGHT', distanceAheadMeters: 80, speedKmh: 30 }) }));
     await page.locator('[data-testid="start-btn"]').click();
     await expect(page.locator('[data-testid="simulation-status"]')).toContainText('RUNNING');
 
@@ -81,18 +89,21 @@ test.describe('Driving expert simulation UI', () => {
       .toContainText(/pedestrian/i, { timeout: 20000 });
   });
 
-  test('pothole avoidance visibly moves the ego vehicle into the right lane', async ({ page }) => {
+  test('pothole avoidance visibly moves the ego vehicle from RIGHT to CENTER', async ({ page }) => {
     test.setTimeout(90000);
 
     await page.goto('/');
-    await page.locator('[data-testid="reset-btn"]').click();
+    await loadScenario(page, 'S1 Empty safe road');
+    await page.waitForTimeout(250);
+    await page.locator('[data-testid="add-pothole"]').click();
+    await page.locator('[data-testid="lane-select"]').selectOption('RIGHT');
+    await page.locator('[data-testid="drawer-distance-input"]').fill('100');
+    await page.locator('[data-testid="apply-config"]').click();
     await page.locator('[data-testid="start-btn"]').click();
     await expect(page.locator('[data-testid="simulation-status"]')).toContainText('RUNNING');
 
-    await addWorldObject(page, 'add-pothole', { distance: '100' });
-
     await expect(page.locator('[data-testid="decision-action"]'))
-      .toContainText('CHANGE_LANE_RIGHT', { timeout: 45000 });
+      .toContainText('CHANGE_LANE_LEFT', { timeout: 45000 });
     await expect(page.locator('[data-testid="road-ego"]'))
       .toHaveAttribute('data-maneuver', /REQUESTED|CHANGING/, { timeout: 15000 });
 
@@ -100,12 +111,12 @@ test.describe('Driving expert simulation UI', () => {
     await expect.poll(async () => {
       const value = await page.locator('[data-testid="road-ego"]').getAttribute('data-lateral');
       return Number(value);
-    }, { timeout: 15000 }).toBeGreaterThan(lateralAtStart + 0.1);
+    }, { timeout: 15000 }).toBeLessThan(lateralAtStart - 0.1);
     // The live narration describes the move only while it runs; data-lane switches when it completes.
     await expect(page.locator('[data-testid="situation-panel"]'))
-      .toContainText(/pothole|moving to the RIGHT/i, { timeout: 15000 });
+      .toContainText(/pothole|moving to the CENTER/i, { timeout: 15000 });
 
-    await expect(page.locator('[data-testid="road-ego"]')).toHaveAttribute('data-lane', 'RIGHT', { timeout: 20000 });
+    await expect(page.locator('[data-testid="road-ego"]')).toHaveAttribute('data-lane', 'CENTER', { timeout: 20000 });
     await expect(page.locator('[data-testid="timeline-panel"]'))
       .toContainText(/MANEUVER STARTED|MANEUVER COMPLETED/i, { timeout: 15000 });
   });
@@ -114,17 +125,24 @@ test.describe('Driving expert simulation UI', () => {
     test.setTimeout(90000);
 
     await page.goto('/');
-    await page.locator('[data-testid="reset-btn"]').click();
+    await loadScenario(page, 'S1 Empty safe road');
+    await page.waitForTimeout(250);
+    await page.locator('[data-testid="add-vehicle"]').click();
+    await page.locator('[data-testid="lane-select"]').selectOption('RIGHT');
+    await page.locator('[data-testid="drawer-distance-input"]').fill('20');
+    await page.locator('[data-testid="actor-speed-input"]').fill('30');
+    await page.locator('[data-testid="apply-config"]').click();
+    await page.locator('[data-testid="add-pothole"]').click();
+    await page.locator('[data-testid="lane-select"]').selectOption('RIGHT');
+    await page.locator('[data-testid="drawer-distance-input"]').fill('90');
+    await page.locator('[data-testid="apply-config"]').click();
     await page.locator('[data-testid="start-btn"]').click();
     await expect(page.locator('[data-testid="simulation-status"]')).toContainText('RUNNING');
 
-    await addWorldObject(page, 'add-vehicle', { distance: '20', lane: 'RIGHT' });
-    await addWorldObject(page, 'add-pothole', { distance: '90', lane: 'CENTER' });
-
     await expect(page.locator('[data-testid="decision-action"]'))
-      .toContainText('CHANGE_LANE_LEFT', { timeout: 45000 });
+      .toContainText(/REDUCE_SPEED|EMERGENCY_BRAKE/, { timeout: 45000 });
     await expect(page.locator('[data-testid="road-ego"]'))
-      .toHaveAttribute('data-lane', 'LEFT', { timeout: 35000 });
+      .toHaveAttribute('data-lane', 'RIGHT', { timeout: 35000 });
   });
 
   test('sensor groups show a radar target and a camera sign detection', async ({ page }) => {
@@ -134,7 +152,7 @@ test.describe('Driving expert simulation UI', () => {
     await page.locator('[data-testid="reset-btn"]').click();
     await page.locator('[data-testid="start-btn"]').click();
 
-    await addWorldObject(page, 'add-vehicle', { distance: '80' });
+    await addWorldObject(page, 'add-vehicle', { distance: '80', lane: 'RIGHT' });
     await expect(page.locator('[data-testid="sensor-radar"]'))
       .toContainText(/TRACKING|WARNING|CRITICAL/, { timeout: 20000 });
     await expect(page.locator('[data-testid="sensor-radar"]')).toContainText(/Target|Distance|TTC/);
@@ -152,7 +170,7 @@ test.describe('Driving expert simulation UI', () => {
 
     await expect(page.locator('[data-testid="simulation-status"]')).toContainText('RUNNING');
     await expect(page.locator('[data-testid="demo-phase-normal"]')).toBeVisible({ timeout: 20000 });
-    await expect(page.locator('.demo__step--done')).toHaveCount(5, { timeout: 140000 });
+    await expect(page.locator('.demo__step--done')).toHaveCount(4, { timeout: 140000 });
   });
 
   test('overtaking slow vehicle shows turn signals, changes lane, passes, and returns to right lane', async ({ page }) => {
@@ -205,6 +223,8 @@ test.describe('Driving expert simulation UI', () => {
     await page.goto('/');
     await page.locator('[data-testid="reset-btn"]').click();
     await page.waitForTimeout(300);
+
+    await page.locator('[data-testid="road-map"]').scrollIntoViewIfNeeded();
 
     // Add obstacle 150m ahead in CENTER
     await page.locator('[data-testid="add-obstacle"]').click();
@@ -408,12 +428,12 @@ test.describe('Driving expert simulation UI', () => {
   test('VISUAL E2E: forward motion, approaching objects moving past ego and leaving forward view', async ({ page }) => {
     test.setTimeout(90000);
     await page.goto('/');
-    await page.locator('[data-testid="reset-btn"]').click();
+    await loadScenario(page, 'S1 Empty safe road');
     await page.locator('[data-testid="start-btn"]').click();
     await expect(page.locator('[data-testid="simulation-status"]')).toContainText('RUNNING');
 
     // Add speed sign ahead at 35m
-    await addWorldObject(page, 'add-speed-50', { distance: '35' });
+    await addWorldObject(page, 'add-speed-50', { distance: '100' });
     const sign = page.locator('[data-testid="road-speed-limit"]');
     await expect(sign).toBeVisible({ timeout: 15000 });
 

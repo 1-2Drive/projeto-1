@@ -125,7 +125,10 @@ public class ApiModelMapper {
             new ApiSimulationSnapshot.RoadMarksView(
                 engine.getWorldState().getLeftMarking().name(),
                 engine.getWorldState().getRightMarking().name()
-            )
+            ),
+            Arrays.stream(Lane.values())
+                .map(lane -> new ApiSimulationSnapshot.LaneSafetyView(lane.name(), engine.isLaneSafe(lane)))
+                .toList()
         );
     }
 

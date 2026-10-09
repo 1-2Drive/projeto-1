@@ -1540,6 +1540,7 @@
   {
     "id": "S6",
     "name": "Pothole",
+    "initialLane": "CENTER",
     "initialSpeedKmh": 70,
     "initialWeather": "CLEAR",
     "map": [
@@ -2560,6 +2561,7 @@
   {
     "id": "S8",
     "name": "Pedestrian crossing",
+    "initialLane": "CENTER",
     "initialSpeedKmh": 60,
     "initialWeather": "CLEAR",
     "actors": [
@@ -2618,6 +2620,7 @@
   {
     "id": "S14_PRESENTATION_DEMO",
     "name": "Presentation demo end-to-end",
+    "initialLane": "CENTER",
     "initialSpeedKmh": 90,
     "initialWeather": "CLEAR",
     "actors": [],
@@ -2708,7 +2711,9 @@
   {
     "id": "S15_MATRIX_COURSE",
     "name": "Matrix obstacle course",
+    "loopWorldObjects": true,
     "initialSpeedKmh": 60,
+    "initialLane": "CENTER",
     "initialWeather": "CLEAR",
     "map": [
       [

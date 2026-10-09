@@ -51,6 +51,7 @@ public final class MapLegend {
         for (int limit : DEFAULT_SPEED_LIMITS) {
             legend.put(code++, speedLimit(limit));
         }
+        legend.put(14, speedRadar(50));
         return legend;
     }
 

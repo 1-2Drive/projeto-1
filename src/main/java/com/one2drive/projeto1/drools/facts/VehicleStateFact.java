@@ -19,6 +19,8 @@ public class VehicleStateFact {
     private RoadMarkingType leftMarking;
     private RoadMarkingType rightMarking;
     private boolean rightLaneBlockedAhead;
+    private boolean leftAdjacentLaneSafe;
+    private boolean rightAdjacentLaneSafe;
     private boolean presentationDemo;
 
     public VehicleStateFact(double speedKmh, double positionMeters, Lane lane, long timestamp) {
@@ -34,6 +36,8 @@ public class VehicleStateFact {
         this.leftMarking = RoadMarkingType.DASHED;
         this.rightMarking = RoadMarkingType.DASHED;
         this.rightLaneBlockedAhead = false;
+        this.leftAdjacentLaneSafe = false;
+        this.rightAdjacentLaneSafe = false;
         this.presentationDemo = false;
     }
 
@@ -52,6 +56,11 @@ public class VehicleStateFact {
     public void setRightLaneBlockedAhead(boolean rightLaneBlockedAhead) {
         this.rightLaneBlockedAhead = rightLaneBlockedAhead;
     }
+
+    public boolean isLeftAdjacentLaneSafe() { return leftAdjacentLaneSafe; }
+    public void setLeftAdjacentLaneSafe(boolean safe) { this.leftAdjacentLaneSafe = safe; }
+    public boolean isRightAdjacentLaneSafe() { return rightAdjacentLaneSafe; }
+    public void setRightAdjacentLaneSafe(boolean safe) { this.rightAdjacentLaneSafe = safe; }
 
     public double getSpeedKmh() {
         return speedKmh;

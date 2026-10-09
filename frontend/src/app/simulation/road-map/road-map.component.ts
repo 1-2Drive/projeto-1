@@ -11,7 +11,8 @@ export type MapCellTone =
   | 'light-red'
   | 'light-yellow'
   | 'light-green'
-  | 'limit';
+  | 'limit'
+  | 'radar';
 
 export interface MapCellView {
   row: number;
@@ -73,6 +74,12 @@ export class RoadMapComponent {
     return ticks;
   });
 
+  protected readonly laneColumns = computed(() => [
+    { lane: 'LEFT' as LaneName, index: this.map()?.lanes.indexOf('LEFT') ?? -1 },
+    { lane: 'CENTER' as LaneName, index: this.map()?.lanes.indexOf('CENTER') ?? -1 },
+    { lane: 'RIGHT' as LaneName, index: this.map()?.lanes.indexOf('RIGHT') ?? -1 }
+  ]);
+
   /** Car marker: horizontal from the distance driven on this lap, vertical from the lateral position. */
   protected readonly ego = computed(() => {
     const snapshot = this.snapshot();
@@ -109,6 +116,13 @@ export class RoadMapComponent {
     this.strokeCode = null;
   }
 
+  protected placeAhead(lane: LaneName): void {
+    const map = this.map();
+    if (!map || map.rows === 0) return;
+    const row = (map.egoRow + Math.max(2, Math.ceil(50 / map.blockLengthMeters))) % map.rows;
+    this.paint.emit({ row, lane, code: this.brush() || 1 });
+  }
+
   protected entryFor(code: number): ApiMapLegendEntry | undefined {
     return this.legendByCode().get(code);
   }
@@ -128,6 +142,8 @@ export class RoadMapComponent {
         return entry.detail === 'GREEN' ? 'light-green' : entry.detail === 'YELLOW' ? 'light-yellow' : 'light-red';
       case 'SPEED_LIMIT':
         return 'limit';
+      case 'SPEED_RADAR':
+        return 'radar';
       default:
         return 'free';
     }

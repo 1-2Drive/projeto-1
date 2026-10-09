@@ -9,7 +9,6 @@ public class ApiCreateRoadElementRequest {
     @NotBlank
     private String type;
 
-    @NotBlank
     private String lane;
 
     @NotNull

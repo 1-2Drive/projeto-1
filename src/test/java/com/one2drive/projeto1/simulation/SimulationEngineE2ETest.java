@@ -284,7 +284,7 @@ class SimulationEngineE2ETest {
 
             ScenarioActorDefinition frontVehicle = new ScenarioActorDefinition();
             frontVehicle.setType(ScenarioActorType.FRONT_VEHICLE);
-            frontVehicle.setLane(Lane.CENTER);
+            frontVehicle.setLane(Lane.RIGHT);
             frontVehicle.setPositionMeters(18.0);
             frontVehicle.setSpeedKmh(0.0);
             engine.addActorAhead(frontVehicle);
@@ -492,7 +492,7 @@ class SimulationEngineE2ETest {
 
             ScenarioActorDefinition frontVehicle = new ScenarioActorDefinition();
             frontVehicle.setType(ScenarioActorType.FRONT_VEHICLE);
-            frontVehicle.setLane(Lane.CENTER);
+            frontVehicle.setLane(Lane.RIGHT);
             frontVehicle.setPositionMeters(14.0);
             frontVehicle.setSpeedKmh(0.0);
             engine.addActorAhead(frontVehicle);
@@ -580,6 +580,123 @@ class SimulationEngineE2ETest {
             assertEquals(0.0, afterReset.egoSpeedKmh(), 0.001,
                 "A reset world reports the vehicle at rest again");
             assertEquals(DrivingState.STOPPED, engine.getWorldState().getEgo().getDrivingState());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void scenarioWithoutInitialLaneStartsAndResetsInRightLane() {
+        ScenarioLibrary library = ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json");
+        ScenarioDefinition scenario = library.findById("S1").orElseThrow();
+        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> { })) {
+            assertEquals(Lane.RIGHT, engine.getWorldState().getEgo().getLane());
+            engine.reset(scenario);
+            assertEquals(Lane.RIGHT, engine.getWorldState().getEgo().getLane());
+
+            ScenarioDefinition explicitCenter = new ScenarioDefinition();
+            explicitCenter.setId("EXPLICIT_CENTER");
+            explicitCenter.setInitialLane(Lane.CENTER);
+            assertEquals(Lane.CENTER, com.one2drive.projeto1.scenario.ScenarioFactory
+                .buildWorld(explicitCenter, SimulationConfig.defaultConfig()).getEgo().getLane());
+        }
+    }
+
+    @Test
+    @Timeout(20)
+    void aDetectedMapHazardIsRemovedAfterItsFirstPass() {
+        int[][] cells = new int[100][3];
+        cells[4][Lane.RIGHT.ordinal()] = 1;
+        ScenarioDefinition scenario = new ScenarioDefinition();
+        scenario.setId("ONE_SHOT_HAZARD");
+        scenario.setInitialSpeedKmh(90);
+        scenario.setMap(cells);
+        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> { })) {
+            engine.start();
+            for (int i = 0; i < 250; i++) engine.tick();
+            assertTrue(engine.getWorldState().findRoadElementById(RoadMap.cellId(4, Lane.RIGHT)).isEmpty(),
+                "A detected map hazard is consumed after passing, rather than returning on the next lap");
+        }
+    }
+
+    @Test
+    @Timeout(45)
+    void speedRadarEnforcesSameLimitInEveryEgoLane() {
+        for (Lane lane : Lane.values()) {
+            ScenarioDefinition scenario = new ScenarioDefinition();
+            scenario.setId("RADAR_" + lane);
+            scenario.setInitialSpeedKmh(120);
+            scenario.setInitialLane(lane);
+            scenario.setRightMarking(com.one2drive.projeto1.domain.RoadMarkingType.CONTINUOUS);
+            ScenarioRoadElementDefinition radar = new ScenarioRoadElementDefinition();
+            radar.setType(ScenarioRoadElementType.SPEED_RADAR);
+            radar.setLane(lane == Lane.LEFT ? Lane.RIGHT : Lane.LEFT);
+            radar.setPositionMeters(250);
+            radar.setSpeedLimitKmh(70);
+            scenario.getRoadElements().add(radar);
+
+            try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> { })) {
+                assertEquals(1, engine.getWorldState().getRoadElements().stream()
+                    .filter(com.one2drive.projeto1.domain.SpeedRadar.class::isInstance).count(),
+                    "The all-lane radar must exist once in world state");
+                engine.start();
+                boolean reducedByRadar = false;
+                for (int i = 0; i < 150; i++) {
+                    SimulationSnapshot snapshot = engine.tick();
+                    reducedByRadar |= snapshot.timeline().stream()
+                        .anyMatch(line -> line.contains("Decelerate approaching speed radar"));
+                    if (snapshot.egoPositionMeters() >= 235) break;
+                    if (snapshot.simTimeMillis() > 10_000 && !reducedByRadar) break;
+                }
+                assertTrue(reducedByRadar, "Radar rule must apply in " + lane);
+                assertTrue(engine.getWorldState().getEgo().getSpeedKmh() <= 70.1,
+                    "Ego in " + lane + " must approach the radar at <= 70 km/h, got "
+                        + engine.getWorldState().getEgo().getSpeedKmh());
+                assertEquals(lane, engine.getWorldState().getEgo().getLane(), "radar enforcement must not change lanes");
+                boolean passed = false;
+                for (int i = 0; i < 400; i++) {
+                    SimulationSnapshot snapshot = engine.tick();
+                    assertTrue(snapshot.egoPositionMeters() < 250.0 || snapshot.egoSpeedKmh() <= 70.1,
+                        "Ego must stay at/below radar speed through the enforcement point");
+                    passed = engine.getWorkingMemoryFactViews().stream()
+                        .anyMatch(f -> f.type().equals("SpeedRadarFact") && f.value().contains("passed=true"));
+                    if (passed) break;
+                }
+                assertTrue(passed, "The all-lane radar must be recorded as passed for " + lane);
+            }
+        }
+    }
+
+    @Test
+    @Timeout(15)
+    void radarDoesNotAccelerateCompliantEgoAboveItsLimitAndReleasesAfterPassage() {
+        ScenarioDefinition scenario = new ScenarioDefinition();
+        scenario.setId("RADAR_COMPLIANT");
+        scenario.setInitialSpeedKmh(90);
+        scenario.setInitialLane(Lane.CENTER);
+        ScenarioRoadElementDefinition radar = new ScenarioRoadElementDefinition();
+        radar.setType(ScenarioRoadElementType.SPEED_RADAR);
+        radar.setLane(Lane.RIGHT);
+        radar.setPositionMeters(100);
+        radar.setSpeedLimitKmh(70);
+        scenario.getRoadElements().add(radar);
+        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> { })) {
+            engine.start();
+            boolean compliedBeforeRadar = false;
+            for (int i = 0; i < 250; i++) {
+                SimulationSnapshot snapshot = engine.tick();
+                if (snapshot.egoPositionMeters() < 100) {
+                    if (snapshot.egoPositionMeters() > 85) {
+                        compliedBeforeRadar = snapshot.egoSpeedKmh() <= 70.1;
+                    }
+                }
+                if (snapshot.egoPositionMeters() >= 100) break;
+            }
+            assertTrue(compliedBeforeRadar, "Radar must enforce 70 km/h before the enforcement point");
+            for (int i = 0; i < 500 && engine.getWorldState().getEgo().getSpeedKmh() <= 88.0; i++) engine.tick();
+            assertTrue(engine.getWorldState().getEgo().getSpeedKmh() > 70.0,
+                "Normal cruise recovery resumes after the radar has been passed");
+            assertTrue(engine.getWorldState().getEgo().getSpeedKmh() <= 90.1,
+                "Cruise recovery returns only to scenario cruise speed");
         }
     }
 

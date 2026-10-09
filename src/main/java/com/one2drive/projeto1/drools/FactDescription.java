@@ -4,6 +4,7 @@ import com.one2drive.projeto1.decision.DecisionContext;
 import com.one2drive.projeto1.decision.DrivingDecision;
 import com.one2drive.projeto1.drools.facts.BarrierStateFact;
 import com.one2drive.projeto1.drools.facts.CurrentSpeedLimit;
+import com.one2drive.projeto1.drools.facts.SpeedRadarFact;
 import com.one2drive.projeto1.drools.facts.CruiseTargetFact;
 import com.one2drive.projeto1.drools.facts.FrontVehicleState;
 import com.one2drive.projeto1.drools.facts.LaneOccupancyState;
@@ -61,6 +62,11 @@ public final class FactDescription {
         }
         if (fact instanceof CruiseTargetFact value) {
             return "Cruise target: %s km/h from the scenario".formatted(decimal(value.getTargetKmh(), 1));
+        }
+        if (fact instanceof SpeedRadarFact value && !"none".equals(value.getRadarId())) {
+            return "Speed-control radar %s: limit %s km/h, %s m ahead%s".formatted(
+                id(value.getRadarId()), decimal(value.getSpeedLimitKmh(), 0),
+                decimal(value.getDistanceMeters(), 1), value.isPassed() ? " (passed)" : "");
         }
         if (fact instanceof WeatherStateFact value) {
             return "Weather: %s, visibility %s, grip %s".formatted(

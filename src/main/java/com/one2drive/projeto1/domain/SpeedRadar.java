@@ -5,14 +5,16 @@ package com.one2drive.projeto1.domain;
  * It monitors vehicle speed against a legal limit. It is NOT a collision hazard
  * or obstacle and must never trigger avoidance lane changes or emergency stops.
  */
-public class SpeedRadar extends RoadElement {
+public final class SpeedRadar extends RoadElement {
     private double speedLimitKmh;
-    private boolean passedRecorded;
 
-    public SpeedRadar(double positionMeters, Lane lane, double speedLimitKmh) {
-        super(positionMeters, lane);
+    public SpeedRadar(double positionMeters, Lane ignoredLane, double speedLimitKmh) {
+        super(positionMeters, null);
         this.speedLimitKmh = speedLimitKmh;
-        this.passedRecorded = false;
+    }
+
+    public SpeedRadar(double positionMeters, double speedLimitKmh) {
+        this(positionMeters, null, speedLimitKmh);
     }
 
     public double getSpeedLimitKmh() {
@@ -23,11 +25,4 @@ public class SpeedRadar extends RoadElement {
         this.speedLimitKmh = speedLimitKmh;
     }
 
-    public boolean isPassedRecorded() {
-        return passedRecorded;
-    }
-
-    public void setPassedRecorded(boolean passedRecorded) {
-        this.passedRecorded = passedRecorded;
-    }
 }

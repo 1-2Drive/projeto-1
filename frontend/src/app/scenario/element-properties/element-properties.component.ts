@@ -9,6 +9,7 @@ export type ToolboxAction =
   | 'POTHOLE'
   | 'STATIC_OBSTACLE'
   | 'BARRIER'
+  | 'SPEED_RADAR'
   | 'FRONT_VEHICLE'
   | 'PEDESTRIAN';
 
@@ -53,6 +54,11 @@ const ACTIONS: Record<ToolboxAction, ActionDefinition> = {
     title: 'Add barrier', hint: 'A closed barrier produces a mandatory stop decision.',
     needsLane: true, needsSeverity: false, needsSpeedLimit: false,
     needsLightState: false, needsBarrierState: true, needsActorSpeed: false
+  },
+  SPEED_RADAR: {
+    title: 'Add speed radar', hint: 'Roadside enforcement device; its configured limit governs all three lanes at this road position.',
+    needsLane: false, needsSeverity: false, needsSpeedLimit: true,
+    needsLightState: false, needsBarrierState: false, needsActorSpeed: false
   },
   FRONT_VEHICLE: {
     title: 'Add vehicle', hint: 'Radar measures distance, relative speed and time-to-collision.',
@@ -135,6 +141,14 @@ export class ElementPropertiesComponent {
     if (defaultLimit !== undefined) {
       this.speedLimitKmh.set(defaultLimit);
     }
+    if (action === 'PEDESTRIAN') {
+      this.actorSpeedKmh.set(4.5);
+    }
+    if (action === 'BARRIER') {
+      this.lane.set('RIGHT');
+    } else if (action === 'POTHOLE' || action === 'STATIC_OBSTACLE') {
+      this.lane.set('CENTER');
+    }
     this.submitted.set(false);
     this.selectedAction.set(action);
   }
@@ -163,6 +177,9 @@ export class ElementPropertiesComponent {
           distanceAheadMeters: this.distanceAheadMeters(),
           speedLimitKmh: this.speedLimitKmh()
         });
+        break;
+      case 'SPEED_RADAR':
+        this.createRoadElement.emit({ type: 'SPEED_RADAR', lane: 'ALL', distanceAheadMeters: this.distanceAheadMeters(), speedLimitKmh: this.speedLimitKmh() });
         break;
       case 'STOP_SIGN':
         this.createRoadElement.emit(this.simpleElement('STOP_SIGN'));
@@ -195,7 +212,7 @@ export class ElementPropertiesComponent {
           type: 'PEDESTRIAN',
           lane: this.lane(),
           distanceAheadMeters: this.distanceAheadMeters(),
-          speedKmh: Math.min(this.actorSpeedKmh(), 10)
+          speedKmh: Math.min(this.actorSpeedKmh(), 6)
         });
         break;
     }

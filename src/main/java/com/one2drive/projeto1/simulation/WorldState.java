@@ -32,6 +32,7 @@ public class WorldState {
     private final WeatherState weatherState;
     private final RoadMap roadMap;
     private final List<DynamicActor> actors;
+    private boolean loopWorldObjects;
     private long simTimeMillis;
     private RoadMarkingType leftMarking = RoadMarkingType.DASHED;
     private RoadMarkingType rightMarking = RoadMarkingType.DASHED;
@@ -102,6 +103,14 @@ public class WorldState {
 
     public void addActor(DynamicActor actor) {
         actors.add(actor);
+    }
+
+    public boolean isLoopWorldObjects() {
+        return loopWorldObjects;
+    }
+
+    public void setLoopWorldObjects(boolean loopWorldObjects) {
+        this.loopWorldObjects = loopWorldObjects;
     }
 
     public Optional<RoadElement> findRoadElementById(String id) {
@@ -269,7 +278,18 @@ public class WorldState {
     }
 
     public Optional<com.one2drive.projeto1.domain.SpeedRadar> findNearestSpeedRadarAhead(double maxDistance) {
-        return nearestHazardAhead(com.one2drive.projeto1.domain.SpeedRadar.class, maxDistance);
+        com.one2drive.projeto1.domain.SpeedRadar nearest = null;
+        double nearestDistance = Double.POSITIVE_INFINITY;
+        for (RoadElement element : getRoadElements()) {
+            if (element instanceof com.one2drive.projeto1.domain.SpeedRadar radar && radar.isActive()) {
+                double distance = signedDistance(radar.getPositionMeters());
+                if (distance > 0 && distance <= maxDistance && distance < nearestDistance) {
+                    nearest = radar;
+                    nearestDistance = distance;
+                }
+            }
+        }
+        return Optional.ofNullable(nearest);
     }
 
     public Optional<Pothole> nearestPotholeAhead(double maxDistance) {
@@ -385,6 +405,16 @@ public class WorldState {
         boolean occupied = hazardBlocking || actorUnsafe;
         boolean safeToEnter = !occupied;
         return new LaneOccupancy(sideName, occupied, Double.isFinite(best) ? best : 0.0, false, safeToEnter, frontDist, rearDist, rearTtc);
+    }
+
+    /** Whether an absolute lane is clear and safe for the ego to occupy. */
+    public boolean isLaneSafe(Lane lane, double actorRange, double hazardLookahead) {
+        if (lane == ego.getLane()) return false;
+        LaneChangeDirection direction = lane.centreMeters() < ego.getLane().centreMeters()
+            ? LaneChangeDirection.LEFT : LaneChangeDirection.RIGHT;
+        Lane immediate = direction == LaneChangeDirection.LEFT ? ego.getLane().left() : ego.getLane().right();
+        if (immediate != lane) return false;
+        return !sideLaneOccupancy(direction, actorRange, hazardLookahead).occupied();
     }
 
     private static boolean blocksLane(RoadElement element) {

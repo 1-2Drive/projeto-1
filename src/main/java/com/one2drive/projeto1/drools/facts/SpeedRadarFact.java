@@ -8,12 +8,25 @@ public class SpeedRadarFact {
     private double distanceMeters;
     private double speedLimitKmh;
     private long timestamp;
+    private boolean passed;
+    private boolean detected;
 
     public SpeedRadarFact(String radarId, double distanceMeters, double speedLimitKmh, long timestamp) {
+        this(radarId, distanceMeters, speedLimitKmh, timestamp, false, false);
+    }
+
+    public SpeedRadarFact(String radarId, double distanceMeters, double speedLimitKmh, long timestamp, boolean passed) {
+        this(radarId, distanceMeters, speedLimitKmh, timestamp, passed, false);
+    }
+
+    public SpeedRadarFact(String radarId, double distanceMeters, double speedLimitKmh, long timestamp,
+                          boolean passed, boolean detected) {
         this.radarId = radarId;
         this.distanceMeters = distanceMeters;
         this.speedLimitKmh = speedLimitKmh;
         this.timestamp = timestamp;
+        this.passed = passed;
+        this.detected = detected;
     }
 
     public String getRadarId() {
@@ -44,6 +57,11 @@ public class SpeedRadarFact {
         return timestamp;
     }
 
+    public boolean isPassed() { return passed; }
+    public void setPassed(boolean passed) { this.passed = passed; }
+    public boolean isDetected() { return detected; }
+    public void setDetected(boolean detected) { this.detected = detected; }
+
     public void setTimestamp(long timestamp) {
         this.timestamp = timestamp;
     }
@@ -51,6 +69,6 @@ public class SpeedRadarFact {
     @Override
     public String toString() {
         return "SpeedRadarFact{radarId='" + radarId + "', distanceMeters=" + distanceMeters +
-            ", speedLimitKmh=" + speedLimitKmh + "}";
+            ", speedLimitKmh=" + speedLimitKmh + ", detected=" + detected + ", passed=" + passed + "}";
     }
 }

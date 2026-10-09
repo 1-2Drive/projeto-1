@@ -152,6 +152,7 @@ then
     );
 end
 
+
 rule "Avoid obstacle in centre lane by changing left"
 salience 470
 when

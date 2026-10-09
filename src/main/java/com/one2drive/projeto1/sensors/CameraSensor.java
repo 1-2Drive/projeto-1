@@ -83,7 +83,8 @@ public class CameraSensor extends AbstractSensor<Object> {
             id(),
             worldState.signedDistance(b.getPositionMeters()),
             b.getId(),
-            b.isOpen()
+            b.isOpen(),
+            b.getLane()
         )));
 
         Optional<StaticObstacle> obstacle = worldState.nearestObstacleAhead(rangeMeters());

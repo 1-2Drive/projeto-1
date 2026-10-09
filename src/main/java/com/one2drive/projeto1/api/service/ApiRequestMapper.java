@@ -16,7 +16,8 @@ public class ApiRequestMapper {
     public ScenarioRoadElementDefinition toRoadElement(ApiCreateRoadElementRequest request) {
         ScenarioRoadElementDefinition definition = new ScenarioRoadElementDefinition();
         definition.setType(ScenarioRoadElementType.valueOf(request.getType().trim().toUpperCase()));
-        definition.setLane(Lane.valueOf(request.getLane().trim().toUpperCase()));
+        definition.setLane(definition.getType() == ScenarioRoadElementType.SPEED_RADAR
+            ? null : Lane.valueOf(request.getLane().trim().toUpperCase()));
         definition.setPositionMeters(request.getDistanceAheadMeters());
         definition.setSpeedLimitKmh(request.getSpeedLimitKmh());
 

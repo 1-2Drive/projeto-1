@@ -2,21 +2,26 @@
   display: block;
   width: 100%;
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .page {
-  --left-rail: 15.5rem;
-  --right-rail: 20rem;
+  --left-rail: clamp(12rem, 13vw, 15.5rem);
+  --right-rail: clamp(16rem, 17vw, 20rem);
   width: 100%;
   max-width: 100%;
   min-height: 100vh;
+  min-height: 100dvh;
+  height: 100%;
+  min-height: max(100vh, 100dvh);
   min-width: 0;
   box-sizing: border-box;
   padding: var(--ds-space-4);
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: var(--ds-space-3);
-  align-content: start;
-  grid-template-columns: minmax(0, 1fr);
+  overflow-x: clip;
+  overflow-y: auto;
 }
 
 .sr-only {
@@ -307,6 +312,7 @@
   grid-template-columns: var(--left-rail) minmax(0, 1fr) var(--right-rail);
   align-items: stretch;
   min-height: 0;
+  flex: 1 1 0;
 }
 
 .workspace__left,
@@ -318,7 +324,12 @@
 }
 
 .workspace__center {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-3);
+  height: 100%;
   min-width: 0;
+  min-height: 0;
 }
 
 /* Side rails sit next to the centre column, so they must take the row height the
@@ -333,7 +344,7 @@
   }
 }
 
-@media (min-width: 1361px) {
+@media (min-width: 1101px) {
   .workspace__right {
     height: 0;
     min-height: 100%;
@@ -343,6 +354,11 @@
 
 /* ============================ evidence ============================ */
 .evidence {
+  display: flex;
+  flex: 0 1 15rem;
+  flex-direction: column;
+  min-height: 10.5rem;
+  max-height: 36vh;
   border: 1px solid var(--ds-border);
   border-radius: var(--ds-radius-lg);
   background: rgba(15, 23, 32, 0.85);
@@ -378,28 +394,49 @@
 
 .tabs__body {
   padding: 0.55rem;
+  min-height: 0;
+  overflow: auto;
 }
 
 /* ============================ responsive ============================ */
 @media (max-width: 1600px) {
   .page {
-    --left-rail: 14rem;
-    --right-rail: 18.5rem;
-  }
-}
-
-@media (max-width: 1360px) {
-  .workspace {
-    grid-template-columns: var(--left-rail) minmax(0, 1fr);
-  }
-
-  .workspace__right {
-    grid-column: 1 / -1;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    --left-rail: clamp(12rem, 14vw, 14rem);
+    --right-rail: clamp(16rem, 19vw, 18.5rem);
   }
 }
 
 @media (max-width: 1100px) {
+  :host {
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  .page {
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  .workspace {
+    flex: 0 0 auto;
+  }
+
+  .workspace__center {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+  }
+
+  app-road-canvas { flex: 0 0 auto; }
+
+  .evidence {
+    flex: 0 0 auto;
+    max-height: none;
+  }
+
   .page > * {
     min-width: 0;
     max-width: 100%;
@@ -408,6 +445,10 @@
   .workspace {
     grid-template-columns: minmax(0, 1fr);
   }
+
+  .workspace__center { order: 0; }
+  .workspace__left { order: 1; }
+  .workspace__right { order: 2; }
 
   .workspace__right {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -426,5 +467,47 @@
 @media (max-width: 760px) {
   .workspace__right {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-height: 760px) and (min-width: 1101px) {
+  :host {
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  .page {
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    overflow: visible;
+  }
+
+  .workspace {
+    flex: 0 0 auto;
+  }
+
+  .workspace__center {
+    height: auto;
+  }
+
+  app-road-canvas {
+    flex: 0 0 auto;
+  }
+
+  .evidence {
+    flex: 0 0 auto;
+    max-height: none;
+  }
+}
+
+@media (min-width: 1101px) and (min-height: 761px) and (max-height: 950px) {
+  .evidence {
+    flex-basis: 10rem;
+    min-height: 8rem;
+    max-height: 24vh;
   }
 }

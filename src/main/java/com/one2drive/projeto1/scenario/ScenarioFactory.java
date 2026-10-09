@@ -24,11 +24,12 @@ public final class ScenarioFactory {
     }
 
     public static WorldState buildWorld(ScenarioDefinition definition, SimulationConfig config) {
-        Lane lane = definition.getInitialLane() == null ? Lane.CENTER : definition.getInitialLane();
+        Lane lane = definition.getInitialLane() == null ? Lane.RIGHT : definition.getInitialLane();
         double initialPos = definition.getInitialPositionMeters();
         EgoVehicleState ego = new EgoVehicleState(initialPos, definition.getInitialSpeedKmh() / 3.6, 0, lane);
         WeatherState weather = toWeatherState(definition.getInitialWeather());
         WorldState worldState = new WorldState(ego, weather, buildRoadMap(definition, config));
+        worldState.setLoopWorldObjects(definition.isLoopWorldObjects());
         if (definition.getLeftMarking() != null) {
             worldState.setLeftMarking(definition.getLeftMarking());
         }
@@ -95,9 +96,7 @@ public final class ScenarioFactory {
             );
             case SPEED_RADAR -> new com.one2drive.projeto1.domain.SpeedRadar(
                 definition.getPositionMeters(),
-                lane,
-                definition.getSpeedLimitKmh() > 0 ? definition.getSpeedLimitKmh() : 50.0
-            );
+                definition.getSpeedLimitKmh() > 0 ? definition.getSpeedLimitKmh() : 50.0);
         };
     }
 
@@ -105,7 +104,7 @@ public final class ScenarioFactory {
         Lane lane = definition.getLane() == null ? Lane.CENTER : definition.getLane();
         double speedMps = definition.getSpeedKmh() / 3.6;
         return switch (definition.getType()) {
-            case PEDESTRIAN -> new Pedestrian(definition.getPositionMeters(), lane, speedMps);
+            case PEDESTRIAN -> new Pedestrian(definition.getPositionMeters(), lane, Math.min(speedMps, 1.7));
             case FRONT_VEHICLE, VEHICLE_LEFT, VEHICLE_RIGHT -> new OtherVehicle(definition.getPositionMeters(), lane, speedMps);
         };
     }

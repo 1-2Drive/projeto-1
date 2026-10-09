@@ -120,6 +120,7 @@ describe('RoadCanvasComponent', () => {
     expect(radarStation.getAttribute('aria-label')).toContain('All-lane speed radar');
     const radarObject = fixture.nativeElement.querySelector('.obj--speedRadar') as HTMLElement;
     expect(radarObject.style.top).toBe('4%');
+    expect(radarObject.querySelector('.car--other')).toBeNull('Radar infrastructure must never use the vehicle renderer');
 
     const hudRadar = fixture.nativeElement.querySelector('[data-testid="hud-radar"]');
     expect(hudRadar).toBeTruthy('Speed radar HUD telemetry must display');

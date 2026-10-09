@@ -376,13 +376,24 @@ public class SimulationEngine implements AutoCloseable {
     /** Retires single-use static objects after passing while retaining their visual as it moves behind the car. */
     private void consumePassedRoadElements() {
         for (RoadElement element : List.copyOf(worldState.getRoadElements())) {
-            if (worldState.isLoopWorldObjects()) continue;
             double distance = worldState.signedDistance(element.getPositionMeters());
+            if (worldState.isLoopWorldObjects()
+                && !(element instanceof com.one2drive.projeto1.domain.SpeedRadar)) continue;
             if (distance <= 0.0 && detectedWorldObjectIds.contains(element.getId())) {
                 element.setActive(false);
             }
             if (distance < -RENDER_BEHIND_METERS && detectedWorldObjectIds.contains(element.getId())) {
-                worldState.removeRoadElementById(element.getId());
+                if (worldState.isLoopWorldObjects()) {
+                    if (element instanceof com.one2drive.projeto1.domain.SpeedRadar radar) {
+                        worldState.getRoadMap().clearInfrastructureRow(
+                            worldState.getRoadMap().rowAt(radar.getPositionMeters()));
+                        worldState.removeRoadElementById(radar.getId());
+                    } else {
+                        worldState.removeRoadElementById(element.getId());
+                    }
+                } else {
+                    worldState.removeRoadElementById(element.getId());
+                }
             }
         }
         for (DynamicActor actor : List.copyOf(worldState.getActors())) {

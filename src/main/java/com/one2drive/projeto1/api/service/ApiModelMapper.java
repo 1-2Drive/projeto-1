@@ -126,7 +126,7 @@ public class ApiModelMapper {
                 engine.getWorldState().getLeftMarking().name(),
                 engine.getWorldState().getRightMarking().name()
             ),
-            Arrays.stream(Lane.values())
+            Arrays.stream(new Lane[] {Lane.LEFT, Lane.CENTER, Lane.RIGHT})
                 .map(lane -> new ApiSimulationSnapshot.LaneSafetyView(lane.name(), engine.isLaneSafe(lane)))
                 .toList()
         );
@@ -135,7 +135,7 @@ public class ApiModelMapper {
     private ApiSimulationSnapshot.RoadMapView roadMap(RoadMapSnapshot map) {
         return new ApiSimulationSnapshot.RoadMapView(
             map.cells().length,
-            Arrays.stream(Lane.values()).map(Lane::name).toList(),
+            Arrays.stream(new Lane[] {Lane.LEFT, Lane.CENTER, Lane.RIGHT}).map(Lane::name).toList(),
             map.blockLengthMeters(),
             map.egoRow(),
             map.lap(),

@@ -8,7 +8,8 @@ package com.one2drive.projeto1.domain;
 public enum Lane {
     LEFT(-3.5),
     CENTER(0.0),
-    RIGHT(3.5);
+    RIGHT(3.5),
+    ALL(Double.NaN);
 
     /** Metres from the road centre line. Negative is left, positive is right. */
     private final double centreMeters;
@@ -27,6 +28,7 @@ public enum Lane {
             case LEFT -> LEFT;
             case CENTER -> LEFT;
             case RIGHT -> CENTER;
+            case ALL -> ALL;
         };
     }
 
@@ -36,11 +38,16 @@ public enum Lane {
             case LEFT -> CENTER;
             case CENTER -> RIGHT;
             case RIGHT -> RIGHT;
+            case ALL -> ALL;
         };
     }
 
     /** The lane containing the given lateral offset, used to derive committed lane from physical position. */
     public static Lane fromLateralPosition(double lateralPositionMeters) {
         return lateralPositionMeters < -1.75 ? LEFT : lateralPositionMeters > 1.75 ? RIGHT : CENTER;
+    }
+
+    public boolean isPhysicalLane() {
+        return this != ALL;
     }
 }

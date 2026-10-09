@@ -354,6 +354,7 @@ public class DrivingExpertSystemApp extends Application {
             case LEFT -> 95;
             case CENTER -> 160;
             case RIGHT -> 225;
+            case ALL -> 40;
         };
     }
 

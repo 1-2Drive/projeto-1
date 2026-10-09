@@ -224,7 +224,7 @@ export class RoadCanvasComponent {
     }
     const egoPos = this.egoPosition();
     return snapshot.worldObjects
-      .filter((item) => item.positionMeters >= -36 || item.type.includes('SpeedRadar'))
+      .filter((item) => item.positionMeters >= -36)
       .map((item) => {
         const kind = this.kindOf(item);
         const state = this.stateOf(item);

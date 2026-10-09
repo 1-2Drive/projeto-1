@@ -21,7 +21,7 @@ import java.util.Optional;
  * rules keep working with ordinary road elements.
  */
 public class RoadMap {
-    private static final Lane[] LANES = Lane.values();
+    private static final Lane[] LANES = {Lane.LEFT, Lane.CENTER, Lane.RIGHT};
 
     private final int[][] cells;
     private final RoadElement[][] elements;

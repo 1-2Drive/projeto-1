@@ -125,7 +125,7 @@ class RoadMapE2ETest {
                 var ego = engine.getWorldState().getEgo();
                 Lane physicalLane = Lane.fromLateralPosition(ego.getLateralPositionMeters());
                 int row = map.rowAt(ego.getPositionMeters());
-                lanesUsed.add(ego.getLane());
+            lanesUsed.add(ego.getLane());
                 assertFalse(map.get(row, physicalLane) == 1,
                     "Drove into the obstacle at row " + row + ", lane " + physicalLane);
 
@@ -138,7 +138,7 @@ class RoadMapE2ETest {
 
             assertTrue(engine.roadMapSnapshot().lap() >= 1, "The course should loop back to row 0");
             assertTrue(firstObstacleAvoidances >= 1, "The first obstacle must be avoided");
-            assertEquals(EnumSet.allOf(Lane.class), lanesUsed, "The slalom uses every lane");
+            assertEquals(EnumSet.of(Lane.LEFT, Lane.CENTER, Lane.RIGHT), lanesUsed, "The slalom uses every physical lane");
         }
     }
 

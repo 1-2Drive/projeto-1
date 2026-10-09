@@ -401,21 +401,6 @@ then
     update($state);
 end
 
-rule "Clear stale traffic light perception"
-no-loop true
-salience 900
-when
-    $state : TrafficLightStateFact(lightId != "none", $timestamp : timestamp)
-    VehicleStateFact($now : timestamp)
-    eval($now - $timestamp > 1000)
-then
-    $state.setLightId("none");
-    $state.setState(TrafficLightState.GREEN);
-    $state.setDistanceMeters(Double.POSITIVE_INFINITY);
-    $state.setTimestamp($now);
-    update($state);
-end
-
 rule "Clear stale pothole perception"
 no-loop true
 salience 900

@@ -877,21 +877,14 @@ public class SimulationEngine implements AutoCloseable {
             return Optional.empty();
         }
         ScenarioRoadElementDefinition update = definition.copy();
-        if (existing.get() instanceof com.one2drive.projeto1.domain.SpeedRadar) {
-            update.setType(com.one2drive.projeto1.scenario.ScenarioRoadElementType.SPEED_RADAR);
-            double position = worldState.getEgo().getPositionMeters() + definition.getPositionMeters();
-            int row = worldState.getRoadMap().rowAt(position);
-            int code = worldState.getRoadMap().legend().codeFor(update);
-            enqueueWorldMutation(() -> {
-                worldState.getRoadMap().clear(id);
-                worldState.getRoadMap().setInfrastructureRow(row, code);
-            });
-            return Optional.of("r" + row + "-ALL");
-        }
         if (update.getLane() == null) {
             update.setLane(existing.get().getLane());
         }
-        return Optional.of(writeRoadElementAhead(update, id));
+        double position = worldState.getEgo().getPositionMeters() + definition.getPositionMeters();
+        int row = worldState.getRoadMap().rowAt(position);
+        int code = worldState.getRoadMap().legend().codeFor(update);
+        enqueueWorldMutation(() -> worldState.getRoadMap().updateElement(id, update, position));
+        return Optional.of(update.isAllLaneInfrastructure() ? "r" + row + "-ALL" : RoadMap.cellId(row, update.getLane()));
     }
 
     public synchronized boolean updateActorById(String id, ScenarioActorDefinition definition) {
@@ -905,14 +898,15 @@ public class SimulationEngine implements AutoCloseable {
     }
 
     public synchronized boolean removeWorldObjectById(String id) {
-        boolean roadExists = worldState.findRoadElementById(id).isPresent();
+        Optional<RoadElement> existingRoadElement = worldState.findRoadElementById(id);
+        boolean roadExists = existingRoadElement.isPresent();
         boolean actorExists = worldState.findActorById(id).isPresent();
         if (!roadExists && !actorExists) {
             return false;
         }
         enqueueWorldMutation(() -> {
             if (roadExists) {
-                worldState.removeRoadElementById(id);
+                worldState.removeRoadElementById(existingRoadElement.get().getId());
             }
             if (actorExists) {
                 worldState.removeActorById(id);

@@ -30,6 +30,30 @@ public class DecisionActuator {
     public void applyDecision(WorldState worldState, DrivingDecision decision) {
         EgoVehicleState ego = worldState.getEgo();
 
+        if (decision.getAction() == DrivingAction.CHANGE_LANE_LEFT
+            || decision.getAction() == DrivingAction.CHANGE_LANE_RIGHT
+            || decision.getAction() == DrivingAction.RETURN_RIGHT) {
+            Lane target = switch (decision.getAction()) {
+                case CHANGE_LANE_LEFT -> ego.getLane().left();
+                case CHANGE_LANE_RIGHT -> ego.getLane().right();
+                case RETURN_RIGHT -> ego.getLane() == Lane.LEFT ? Lane.CENTER : Lane.RIGHT;
+                default -> ego.getLane();
+            };
+            if (!worldState.isLaneSafe(target, config.getBlindSpotRangeMeters(), 60.0)) {
+                decision.apply(DrivingAction.REDUCE_SPEED, Math.max(0.0, ego.getSpeedKmh() - 10.0),
+                    com.one2drive.projeto1.domain.RiskLevel.HIGH,
+                    com.one2drive.projeto1.decision.DecisionPriority.COLLISION_AVOIDANCE,
+                    "Lane-change command rejected: target lane is occupied or unsafe",
+                    "Actuator safety guard",
+                    decision.getTimestamp(),
+                    java.util.List.of("target lane=" + target + " is not safe to enter"));
+                ego.setAccelerationMps2(-config.getComfortableDecelerationMps2());
+                ego.setIndicatorState(IndicatorState.OFF);
+                ego.setSteeringState(SteeringState.STRAIGHT);
+                return;
+            }
+        }
+
         switch (decision.getAction()) {
             case EMERGENCY_BRAKE -> {
                 ego.setAccelerationMps2(-config.getEmergencyDecelerationMps2());
@@ -61,6 +85,21 @@ public class DecisionActuator {
         }
 
         double recommendedSpeed = decision.getRecommendedSpeedKmh();
+        boolean mandatoryStop = decision.getPriority() >= com.one2drive.projeto1.decision.DecisionPriority.LEGAL_MANDATORY_STOP;
+        if (mandatoryStop) {
+            DrivingAction action = decision.getAction();
+            if (action == DrivingAction.STOP || action == DrivingAction.WAIT || action == DrivingAction.REDUCE_SPEED) {
+                ego.setAccelerationMps2(ego.getSpeedKmh() < 0.6 ? 0.0 : -config.getComfortableDecelerationMps2());
+            } else if (action == DrivingAction.EMERGENCY_BRAKE) {
+                ego.setAccelerationMps2(-config.getEmergencyDecelerationMps2());
+            }
+            if ((action == DrivingAction.STOP || action == DrivingAction.WAIT) && ego.getSpeedKmh() < 0.6) {
+                ego.setSpeedKmh(0.0);
+                ego.setAccelerationMps2(0.0);
+            }
+            preserveIndicatorsAndState(ego, decision);
+            return;
+        }
         if (decision.getAction() != DrivingAction.EMERGENCY_BRAKE && !Double.isNaN(recommendedSpeed)) {
             double current = ego.getSpeedKmh();
             if (current > recommendedSpeed) {
@@ -94,6 +133,11 @@ public class DecisionActuator {
             }
         }
 
+        preserveIndicatorsAndState(ego, decision);
+    }
+
+    private static void preserveIndicatorsAndState(EgoVehicleState ego, DrivingDecision decision) {
+        double recommendedSpeed = decision.getRecommendedSpeedKmh();
         // Maintain turn signal and steering indicator while lane change is in progress
         if (ego.getLaneChangeState() == LaneChangeState.REQUESTED || ego.getLaneChangeState() == LaneChangeState.CHANGING) {
             if (ego.getTargetLane().centreMeters() < ego.getLateralPositionMeters()) {

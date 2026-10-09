@@ -6,16 +6,48 @@ import com.one2drive.projeto1.domain.DrivingAction
 import com.one2drive.projeto1.domain.RiskLevel
 import com.one2drive.projeto1.domain.TrafficLightState
 import com.one2drive.projeto1.drools.DroolsSupport
+import com.one2drive.projeto1.drools.facts.CurrentSpeedLimit
 import com.one2drive.projeto1.drools.facts.TrafficLightStateFact
 import com.one2drive.projeto1.drools.facts.VehicleStateFact
 
 global DroolsSupport droolsSupport
 
-rule "Red traffic light requires stop"
-salience 600
+rule "Red traffic light progressive approach"
+salience 620
 when
     $ctx : DecisionContext()
-    TrafficLightStateFact(state == TrafficLightState.RED, $distance : distanceMeters, distanceMeters <= 45.0)
+    TrafficLightStateFact(lightId != "none", state == TrafficLightState.RED,
+                         $distance : distanceMeters > 5.0, distanceMeters <= 125.0)
+    VehicleStateFact($speed : speedKmh)
+    CurrentSpeedLimit($limit : limitKmh)
+    eval($speed / 3.6 > Math.sqrt(2.0 * 2.0 * Math.max(0.0, $distance - 5.0)))
+then
+    double room = Math.max(0.0, $distance - 5.0);
+    double speedMps = $speed / 3.6;
+    double comfortableCurve = Math.sqrt(2.0 * 2.8 * room) * 3.6;
+    double shortfall = speedMps * speedMps / (2.0 * 2.8) - room;
+    DrivingAction action = shortfall > 2.0 ? DrivingAction.EMERGENCY_BRAKE
+        : ($speed > comfortableCurve ? DrivingAction.REDUCE_SPEED : DrivingAction.MAINTAIN_SPEED);
+    double target = action == DrivingAction.EMERGENCY_BRAKE ? 0.0 : Math.min($speed, $limit);
+    droolsSupport.proposeDecision(
+        $ctx,
+        action,
+        target,
+        action == DrivingAction.EMERGENCY_BRAKE ? RiskLevel.HIGH : RiskLevel.MODERATE,
+        DecisionPriority.LEGAL_MANDATORY_STOP,
+        "Red traffic light ahead; decelerating to stop before the line",
+        drools.getRule().getName(),
+        "red signal at " + Math.round($distance) + "m, current speed=" + Math.round($speed)
+            + " km/h, stop target 3m before line"
+    );
+end
+
+rule "Hold at red traffic light"
+salience 640
+when
+    $ctx : DecisionContext()
+    TrafficLightStateFact(lightId != "none", state == TrafficLightState.RED,
+                         $distance : distanceMeters <= 5.0)
 then
     droolsSupport.proposeDecision(
         $ctx,
@@ -23,9 +55,28 @@ then
         0.0,
         RiskLevel.HIGH,
         DecisionPriority.LEGAL_MANDATORY_STOP,
-        "Red traffic light detected",
+        "Stopped before red traffic light; waiting for green",
         drools.getRule().getName(),
-        "distance=" + $distance + "m"
+        "red signal at " + Math.round($distance) + "m; hold position"
+    );
+end
+
+rule "Red traffic light requires full stop and hold"
+salience 635
+when
+    $ctx : DecisionContext()
+    TrafficLightStateFact(lightId != "none", state == TrafficLightState.RED,
+                         $distance : distanceMeters >= 0, distanceMeters <= 4.0)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.STOP,
+        0.0,
+        RiskLevel.HIGH,
+        DecisionPriority.LEGAL_MANDATORY_STOP,
+        "Red traffic light; vehicle must remain stopped before the line",
+        drools.getRule().getName(),
+        "red signal at " + Math.round($distance) + "m, full stop and hold until green"
     );
 end
 
@@ -53,7 +104,7 @@ rule "Green traffic light allows progression when no higher hazard"
 salience 180
 when
     $ctx : DecisionContext(priority < DecisionPriority.COLLISION_AVOIDANCE)
-    TrafficLightStateFact(state == TrafficLightState.GREEN, distanceMeters <= 40.0)
+    TrafficLightStateFact(lightId != "none", state == TrafficLightState.GREEN, distanceMeters <= 40.0)
 then
     droolsSupport.proposeDecision(
         $ctx,
@@ -64,5 +115,25 @@ then
         "Green light and no higher-priority hazard",
         drools.getRule().getName(),
         "green light observed"
+    );
+end
+
+rule "Green traffic light releases red-light hold"
+salience 610
+when
+    $ctx : DecisionContext()
+    TrafficLightStateFact(lightId != "none", state == TrafficLightState.GREEN,
+                         distanceMeters >= 0, distanceMeters <= 40.0)
+    VehicleStateFact(speedKmh < 1.0)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.RESUME,
+        30.0,
+        RiskLevel.LOW,
+        DecisionPriority.MANEUVER_SAFETY,
+        "Traffic light is green; releasing the red-light hold",
+        drools.getRule().getName(),
+        "green signal observed; resume smoothly"
     );
 end

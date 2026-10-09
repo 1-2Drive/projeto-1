@@ -114,7 +114,7 @@ public class WorldState {
     }
 
     public Optional<RoadElement> findRoadElementById(String id) {
-        return roadMap.findElement(id);
+        return roadMap.findElement(id).or(() -> roadMap.findCellIdByElementId(id).flatMap(roadMap::findElement));
     }
 
     public Optional<DynamicActor> findActorById(String id) {

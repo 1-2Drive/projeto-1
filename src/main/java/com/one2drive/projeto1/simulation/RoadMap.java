@@ -138,6 +138,19 @@ public class RoadMap {
         return cellId(row, lane);
     }
 
+    public Optional<String> findCellIdByElementId(String elementId) {
+        for (int row = 0; row < cells.length; row++) {
+            for (Lane lane : LANES) {
+                RoadElement element = elements[row][lane.ordinal()];
+                if (element != null && element.getId().equals(elementId)) {
+                    return Optional.of(element instanceof com.one2drive.projeto1.domain.SpeedRadar
+                        ? "r" + row + "-ALL" : cellId(row, lane));
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
     /** Frees the cell backing the given element id. */
     public boolean clear(String elementId) {
         for (int row = 0; row < cells.length; row++) {
@@ -157,6 +170,26 @@ public class RoadMap {
             }
         }
         return false;
+    }
+
+    public boolean updateElement(String elementId, ScenarioRoadElementDefinition definition, double positionMeters) {
+        Optional<String> cellId = findCellIdByElementId(elementId);
+        if (cellId.isEmpty()) return false;
+        RoadElement existing = findElement(cellId.get()).orElse(null);
+        if (existing == null) return false;
+        Lane lane = definition.getType() == ScenarioRoadElementType.SPEED_RADAR ? Lane.CENTER
+            : (definition.getLane() == null ? existing.getLane() : definition.getLane());
+        int newRow = rowAt(positionMeters);
+        int code = legend.codeFor(definition);
+        clear(elementId);
+        if (definition.getType() == ScenarioRoadElementType.SPEED_RADAR) {
+            set(newRow, lane, code);
+            return true;
+        }
+        set(newRow, lane, code);
+        RoadElement replacement = elements[newRow][lane.ordinal()];
+        if (replacement != null) replacement.setId(elementId);
+        return true;
     }
 
     public Optional<RoadElement> findElement(String elementId) {

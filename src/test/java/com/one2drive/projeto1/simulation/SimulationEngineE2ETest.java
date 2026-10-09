@@ -1,10 +1,13 @@
 package com.one2drive.projeto1.simulation;
 
 import com.one2drive.projeto1.config.SimulationConfig;
+import com.one2drive.projeto1.decision.DrivingDecision;
+import com.one2drive.projeto1.domain.LaneChangeDirection;
 import com.one2drive.projeto1.domain.DrivingAction;
 import com.one2drive.projeto1.domain.DrivingState;
 import com.one2drive.projeto1.domain.Lane;
 import com.one2drive.projeto1.domain.StopSign;
+import com.one2drive.projeto1.domain.TrafficLight;
 import com.one2drive.projeto1.domain.WeatherCondition;
 import com.one2drive.projeto1.scenario.ScenarioActorDefinition;
 import com.one2drive.projeto1.scenario.ScenarioActorType;
@@ -697,6 +700,158 @@ class SimulationEngineE2ETest {
                 "Normal cruise recovery resumes after the radar has been passed");
             assertTrue(engine.getWorldState().getEgo().getSpeedKmh() <= 90.1,
                 "Cruise recovery returns only to scenario cruise speed");
+        }
+    }
+
+    @Test
+    @Timeout(35)
+    void redTrafficLightStopsAndHoldsThenGreenResumesAndResetClearsFact() {
+        ScenarioDefinition scenario = new ScenarioDefinition();
+        scenario.setId("RED_GREEN_LIFECYCLE");
+        scenario.setInitialSpeedKmh(60);
+        scenario.setInitialLane(Lane.RIGHT);
+        ScenarioRoadElementDefinition red = new ScenarioRoadElementDefinition();
+        red.setType(ScenarioRoadElementType.TRAFFIC_LIGHT);
+        red.setLane(Lane.RIGHT);
+        red.setPositionMeters(90);
+        red.setTrafficLightState(com.one2drive.projeto1.domain.TrafficLightState.RED);
+        scenario.getRoadElements().add(red);
+
+        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> { })) {
+            engine.start();
+            boolean stopped = false;
+            for (int i = 0; i < 350; i++) {
+                engine.tick();
+                if (engine.getWorldState().getEgo().getSpeedKmh() < 0.1) {
+                    stopped = true;
+                    break;
+                }
+            }
+            assertTrue(stopped, "RED must bring ego to a complete stop");
+            double lightDistance = engine.getWorldState().signedDistance(
+                engine.getWorldState().getRoadElements().stream().filter(TrafficLight.class::isInstance)
+                    .map(TrafficLight.class::cast).findFirst().orElseThrow().getPositionMeters());
+            assertTrue(lightDistance >= 2.0, "Ego must stop before the light line, distance=" + lightDistance);
+
+            for (int i = 0; i < 20; i++) engine.tick();
+            assertEquals(0.0, engine.getWorldState().getEgo().getSpeedKmh(), 0.1,
+                "Ego must remain stopped while RED persists");
+            assertEquals(DrivingAction.STOP, engine.getCurrentDecision().getAction());
+            assertTrue(engine.getWorkingMemoryFactViews().stream()
+                .anyMatch(f -> f.type().equals("TrafficLightStateFact") && f.value().contains("state=RED")),
+                "RED must remain in working memory rather than stale-clearing to GREEN");
+
+            ScenarioRoadElementDefinition green = new ScenarioRoadElementDefinition();
+            green.setType(ScenarioRoadElementType.TRAFFIC_LIGHT);
+            green.setLane(Lane.RIGHT);
+            green.setPositionMeters(lightDistance);
+            green.setTrafficLightState(com.one2drive.projeto1.domain.TrafficLightState.GREEN);
+            String lightId = engine.getWorldState().getRoadElements().stream()
+                .filter(TrafficLight.class::isInstance).map(TrafficLight.class::cast).findFirst().orElseThrow().getId();
+            assertTrue(engine.updateRoadElementById(lightId, green).isPresent());
+
+            boolean resumed = false;
+            for (int i = 0; i < 30; i++) {
+                SimulationSnapshot snapshot = engine.tick();
+                if (snapshot.egoSpeedKmh() > 1.0) {
+                    resumed = true;
+                    break;
+                }
+            }
+            assertTrue(resumed, "GREEN must smoothly release the stop and resume forward motion");
+
+            engine.reset(scenario);
+            assertTrue(engine.getWorkingMemoryFactViews().stream()
+                .filter(f -> f.type().equals("TrafficLightStateFact"))
+                .noneMatch(f -> f.value().contains("lightId='" + lightId + "'")),
+                "RESET must discard the old traffic-light fact and KIE session state");
+        }
+    }
+
+    @Test
+    @Timeout(20)
+    void potholeInRightLaneChangesLeftOnlyWhenCenterIsClear() {
+        ScenarioDefinition scenario = new ScenarioDefinition();
+        scenario.setId("RIGHT_POTHOLE_CLEAR_CENTER");
+        scenario.setInitialSpeedKmh(50);
+        scenario.setInitialLane(Lane.RIGHT);
+        ScenarioRoadElementDefinition pothole = new ScenarioRoadElementDefinition();
+        pothole.setType(ScenarioRoadElementType.POTHOLE);
+        pothole.setLane(Lane.RIGHT);
+        pothole.setPositionMeters(80);
+        pothole.setSeverity(com.one2drive.projeto1.domain.HazardSeverity.HIGH);
+        scenario.getRoadElements().add(pothole);
+        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> { })) {
+            engine.start();
+            boolean changedLeft = false;
+            for (int i = 0; i < 100; i++) {
+                SimulationSnapshot snapshot = engine.tick();
+                changedLeft |= DrivingAction.CHANGE_LANE_LEFT.name().equals(snapshot.currentDecision());
+                if (engine.getWorldState().getEgo().getLane() == Lane.CENTER) break;
+            }
+            assertTrue(changedLeft, "RIGHT pothole with clear CENTER should start the staged left change");
+            assertEquals(Lane.CENTER, engine.getWorldState().getEgo().getLane());
+        }
+    }
+
+    @Test
+    @Timeout(20)
+    void unsafeCenterTargetBlocksRightLanePotholeManeuverAndBrakes() {
+        ScenarioDefinition scenario = new ScenarioDefinition();
+        scenario.setId("RIGHT_POTHOLE_OCCUPIED_CENTER");
+        scenario.setInitialSpeedKmh(50);
+        scenario.setInitialLane(Lane.RIGHT);
+        ScenarioRoadElementDefinition pothole = new ScenarioRoadElementDefinition();
+        pothole.setType(ScenarioRoadElementType.POTHOLE);
+        pothole.setLane(Lane.RIGHT);
+        pothole.setPositionMeters(80);
+        pothole.setSeverity(com.one2drive.projeto1.domain.HazardSeverity.HIGH);
+        scenario.getRoadElements().add(pothole);
+        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> { })) {
+            engine.getWorldState().addActor(new com.one2drive.projeto1.domain.OtherVehicle(
+                engine.getWorldState().getEgo().getPositionMeters() + 5.0, Lane.CENTER, 0.0));
+            assertFalse(engine.isLaneSafe(Lane.CENTER), "CENTER vehicle 5m ahead must block that lane");
+            DecisionActuator actuator = new DecisionActuator(SimulationConfig.defaultConfig());
+            DrivingDecision forced = new DrivingDecision();
+            forced.apply(DrivingAction.CHANGE_LANE_LEFT, Double.NaN, com.one2drive.projeto1.domain.RiskLevel.LOW,
+                com.one2drive.projeto1.decision.DecisionPriority.ROAD_HAZARD, "forced unsafe lane change", "test", 0L, List.of());
+            actuator.applyDecision(engine.getWorldState(), forced);
+            assertEquals("Actuator safety guard", forced.getSourceRule());
+            assertEquals(DrivingAction.REDUCE_SPEED, forced.getAction());
+            assertEquals(Lane.RIGHT, engine.getWorldState().getEgo().getLane());
+            assertEquals(Lane.RIGHT, engine.getWorldState().getEgo().getTargetLane());
+            assertEquals(com.one2drive.projeto1.domain.LaneChangeState.IDLE,
+                engine.getWorldState().getEgo().getLaneChangeState());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void actuatorRejectsLaneChangeIntoOccupiedTargetLane() {
+        SimulationConfig config = SimulationConfig.defaultConfig();
+        ScenarioDefinition scenario = new ScenarioDefinition();
+        scenario.setId("GLOBAL_LANE_GUARD");
+        scenario.setInitialSpeedKmh(40);
+        scenario.setInitialLane(Lane.RIGHT);
+        try (SimulationEngine engine = new SimulationEngine(config, scenario, true, d -> { })) {
+            com.one2drive.projeto1.domain.EgoVehicleState ego = engine.getWorldState().getEgo();
+            ScenarioActorDefinition alongside = new ScenarioActorDefinition();
+            alongside.setType(ScenarioActorType.FRONT_VEHICLE);
+            alongside.setLane(Lane.CENTER);
+            alongside.setPositionMeters(-2.0);
+            alongside.setSpeedKmh(40);
+            engine.getWorldState().addActor(com.one2drive.projeto1.scenario.ScenarioFactory.createActor(alongside));
+            assertFalse(engine.isLaneSafe(Lane.CENTER), "CENTER occupied by an alongside vehicle must be unsafe");
+            assertFalse(engine.isLaneSafe(Lane.LEFT), "A non-adjacent lane cannot be entered in one lane-change action");
+
+            DecisionActuator actuator = new DecisionActuator(config);
+            DrivingDecision forced = new DrivingDecision();
+            forced.apply(DrivingAction.CHANGE_LANE_LEFT, Double.NaN, com.one2drive.projeto1.domain.RiskLevel.LOW,
+                com.one2drive.projeto1.decision.DecisionPriority.ROAD_HAZARD, "forced unsafe lane change", "test", 0L, List.of());
+            actuator.applyDecision(engine.getWorldState(), forced);
+            assertEquals(Lane.RIGHT, ego.getTargetLane(), "Unsafe CENTER target is rejected, preserving current lane");
+            assertEquals(com.one2drive.projeto1.domain.LaneChangeState.IDLE, ego.getLaneChangeState());
+            assertTrue(ego.getAccelerationMps2() < 0.0, "Rejected unsafe change selects safe deceleration");
         }
     }
 

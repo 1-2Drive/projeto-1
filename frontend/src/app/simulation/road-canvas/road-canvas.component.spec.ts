@@ -324,6 +324,15 @@ describe('RoadCanvasComponent', () => {
       expect(geometry().blindRight!.y).toBeCloseTo(66, 1);  // (50 + 25) − 9
     });
 
+    it('blind-spot pads span the full sensor range behind and ahead of the car', () => {
+      fixture.componentRef.setInput('snapshot', sensorSnapshot({ lane: 'CENTER', lateralPositionMeters: 0, positionMeters: 100 }));
+      fixture.detectChanges();
+
+      const g = geometry();
+      expect(g.blindLeft!.x).toBeCloseTo(3.3, 0);        // egoX 20 − 30/180·100
+      expect(g.blindLeft!.width).toBeCloseTo(33.3, 0);   // 2 · 30/180·100
+    });
+
     it('slides every shape with the lateral position during a lane change', () => {
       fixture.componentRef.setInput('snapshot', sensorSnapshot({ lane: 'CENTER', lateralPositionMeters: 1.75, targetLane: 'RIGHT', laneChangeState: 'CHANGING', laneChangeProgress: 0.5 }));
       fixture.detectChanges();

@@ -94,8 +94,6 @@ const BLIND_PAD_HALF_HEIGHT_PERCENT = 9;
 const MIN_PAD_HEIGHT_PERCENT = 2;
 /** Distance ahead at which the camera cone has widened to cover all three lanes. */
 const CAMERA_SPREAD_METERS = 40;
-/** How far behind the car the blind-spot pads start. */
-const BLIND_SPOT_BEHIND_METERS = 10;
 
 const EMPTY_RANGES = {
   cameraRangeMeters: 0,
@@ -404,7 +402,8 @@ export class RoadCanvasComponent {
       height: 2 * RADAR_HALF_HEIGHT_PERCENT
     };
 
-    const blindStart = this.worldToPercentX(egoPos - BLIND_SPOT_BEHIND_METERS);
+    // The backend blind-spot zone is symmetric (|distance| <= blindSpotRangeMeters), so the pad is too.
+    const blindStart = this.worldToPercentX(egoPos - this.ranges().blindSpotRangeMeters);
     const blindEnd = this.worldToPercentX(egoPos + this.ranges().blindSpotRangeMeters);
     const lane = this.currentLane();
     const blind = (side: 'LEFT' | 'RIGHT'): BlindSpotRect | null => {

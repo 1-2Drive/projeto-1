@@ -65,6 +65,8 @@ import java.util.function.Consumer;
 public class SimulationEngine implements AutoCloseable {
     /** Objects closer than this behind the car are drawn behind it; anything further back is drawn as coming up. */
     private static final double RENDER_BEHIND_METERS = 50.0;
+    /** Upper bound on rule firings in one tick; a normal tick fires well under a hundred. */
+    private static final int MAX_RULE_FIRINGS_PER_TICK = 5000;
 
     private final SimulationConfig config;
     private final SimulationClock simulationClock;
@@ -295,7 +297,12 @@ public class SimulationEngine implements AutoCloseable {
         updateActiveRadarFact();
         refreshSensorTelemetry(events);
 
-        knowledgeSession.getKieSession().fireAllRules();
+        // Circuit breaker: rules that re-trigger each other must never freeze the tick.
+        int fired = knowledgeSession.getKieSession().fireAllRules(MAX_RULE_FIRINGS_PER_TICK);
+        if (fired >= MAX_RULE_FIRINGS_PER_TICK) {
+            knowledgeSession.getTrace().add(simTimeMillis, TimelineEntryType.INFO,
+                "Rule firing limit reached (" + MAX_RULE_FIRINGS_PER_TICK + "): possible rule loop");
+        }
         knowledgeSession.getDecisionContext().applyTo(currentDecision);
 
         FactHandle decisionHandle = findFactHandle(currentDecision);
@@ -397,6 +404,11 @@ public class SimulationEngine implements AutoCloseable {
             }
         }
         for (DynamicActor actor : List.copyOf(worldState.getActors())) {
+            // An overtaken vehicle stays in the world behind the ego; only pedestrians are
+            // retired once passed.
+            if (actor instanceof com.one2drive.projeto1.domain.OtherVehicle) {
+                continue;
+            }
             if (worldState.signedDistance(actor.getPositionMeters()) <= 0.0
                 && detectedWorldObjectIds.contains(actor.getId())) {
                 worldState.removeActorById(actor.getId());
@@ -1116,9 +1128,20 @@ public class SimulationEngine implements AutoCloseable {
                     element.getLane(), element.toString(), length, behindWindow, forwardMeters);
             }
         });
-        worldState.getActors().forEach(actor -> addRoadItem(items, actor.getClass().getSimpleName(),
-            actor.getId(), actor.getPositionMeters(), actor.getLane(), actor.toString(),
-            length, behindWindow, forwardMeters));
+        worldState.getActors().forEach(actor -> {
+            if (actor instanceof com.one2drive.projeto1.domain.OtherVehicle) {
+                // Vehicles are positioned by metres travelled, not around the loop.
+                double relative = worldState.vehicleSignedDistance(actor);
+                if (relative >= -behindWindow && relative <= forwardMeters) {
+                    items.add(new RoadRenderItem(actor.getClass().getSimpleName(), actor.getId(), relative,
+                        actor.getLane().name(), actor.toString(), actor.getPositionMeters()));
+                }
+                return;
+            }
+            addRoadItem(items, actor.getClass().getSimpleName(),
+                actor.getId(), actor.getPositionMeters(), actor.getLane(), actor.toString(),
+                length, behindWindow, forwardMeters);
+        });
         return items;
     }
 

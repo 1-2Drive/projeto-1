@@ -123,7 +123,10 @@ salience 1000
 no-loop true
 when
     $e : RelativeSpeedEvent() from entry-point "PERCEPTION_STREAM"
-    $state : FrontVehicleState(targetId == $e.getTargetId() || targetId == "none")
+    // Only the distance rule may adopt a new target. Matching a fact reset to "none" here
+    // would re-adopt the target after a 0 m radar sample reset it, the distance rule would
+    // reset it again, and the two rules would re-trigger each other without end.
+    $state : FrontVehicleState(targetId == $e.getTargetId())
     eval($e.getTimestamp() >= $state.getTimestamp()
         && ($e.getTimestamp() > $state.getTimestamp()
             || Math.abs($state.getRelativeSpeedMps() - $e.getRelativeSpeedMps()) > 0.01))
@@ -139,7 +142,10 @@ salience 1000
 no-loop true
 when
     $e : TTCEvent() from entry-point "PERCEPTION_STREAM"
-    $state : FrontVehicleState(targetId == $e.getTargetId() || targetId == "none")
+    // Only the distance rule may adopt a new target. Matching a fact reset to "none" here
+    // would re-adopt the target after a 0 m radar sample reset it, the distance rule would
+    // reset it again, and the two rules would re-trigger each other without end.
+    $state : FrontVehicleState(targetId == $e.getTargetId())
     eval($e.getTimestamp() >= $state.getTimestamp()
         && ($e.getTimestamp() > $state.getTimestamp()
             || (Double.isInfinite($state.getTtcSeconds()) && !Double.isInfinite($e.getTtcSeconds()))
@@ -317,18 +323,56 @@ then
     update($state);
 end
 
+// The front radar reports every 100 ms while a vehicle is ahead in the ego lane, so two
+// missed samples mean it is gone (the ego changed lane, or the vehicle did). Holding the
+// old target for a full second made the rules keep reacting to a vehicle that was no
+// longer in front.
 rule "Clear stale front vehicle perception"
 no-loop true
 salience 900
 when
     $state : FrontVehicleState(targetId != "none", $timestamp : timestamp)
     VehicleStateFact($now : timestamp)
-    eval($now - $timestamp > 1000)
+    eval($now - $timestamp > 250)
 then
     $state.setTargetId("none");
     $state.setDistanceMeters(Double.POSITIVE_INFINITY);
     $state.setRelativeSpeedMps(0.0);
     $state.setTtcSeconds(Double.POSITIVE_INFINITY);
+    $state.setTimestamp($now);
+    update($state);
+end
+
+rule "Update left lane vehicle state"
+salience 1000
+no-loop true
+when
+    $e : LeftLaneVehicleEvent() from entry-point "PERCEPTION_STREAM"
+    $state : LeftLaneVehicleState()
+    eval($e.getTimestamp() >= $state.getTimestamp()
+        && ($e.getTimestamp() > $state.getTimestamp()
+            || !$e.getTargetId().equals($state.getTargetId())
+            || Math.abs($state.getDistanceMeters() - $e.getDistanceMeters()) > 0.01))
+then
+    $state.setTargetId($e.getTargetId());
+    $state.setDistanceMeters($e.getDistanceMeters());
+    $state.setRelativeSpeedMps($e.getRelativeSpeedMps());
+    $state.setTimestamp($e.getTimestamp());
+    update($state);
+end
+
+// Same two-sample rule as the front vehicle: the radar reports every 100 ms.
+rule "Clear stale left lane vehicle perception"
+no-loop true
+salience 900
+when
+    $state : LeftLaneVehicleState(targetId != "none", $timestamp : timestamp)
+    VehicleStateFact($now : timestamp)
+    eval($now - $timestamp > 250)
+then
+    $state.setTargetId(LeftLaneVehicleState.NO_TARGET);
+    $state.setDistanceMeters(Double.POSITIVE_INFINITY);
+    $state.setRelativeSpeedMps(0.0);
     $state.setTimestamp($now);
     update($state);
 end

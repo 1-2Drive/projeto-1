@@ -9,27 +9,44 @@ import com.one2drive.projeto1.domain.TrafficLightState;
 import com.one2drive.projeto1.domain.WeatherCondition;
 import com.one2drive.projeto1.drools.events.AccelerationRequestEvent;
 import com.one2drive.projeto1.drools.events.BarrierDetectedEvent;
+import com.one2drive.projeto1.drools.events.FrontDistanceEvent;
 import com.one2drive.projeto1.drools.events.LaneChangeRequestEvent;
 import com.one2drive.projeto1.drools.events.LaneOccupancyEvent;
+import com.one2drive.projeto1.drools.events.LeftLaneVehicleEvent;
 import com.one2drive.projeto1.drools.events.PedestrianDetectedEvent;
 import com.one2drive.projeto1.drools.events.PotholeDetectedEvent;
 import com.one2drive.projeto1.drools.events.ReducedGripEvent;
 import com.one2drive.projeto1.drools.events.ReducedVisibilityEvent;
+import com.one2drive.projeto1.drools.events.RelativeSpeedEvent;
 import com.one2drive.projeto1.drools.events.SpeedLimitDetectedEvent;
 import com.one2drive.projeto1.drools.events.StopSignEvent;
 import com.one2drive.projeto1.drools.events.TTCEvent;
 import com.one2drive.projeto1.drools.events.TrafficLightEvent;
 import com.one2drive.projeto1.drools.events.WeatherEvent;
 import com.one2drive.projeto1.explanation.TimelineEntryType;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.kie.api.KieServices;
 
+import java.time.Duration;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DrivingExpertSystemRulesTest {
+
+    /**
+     * The knowledge base is compiled once, on first use, and that takes several seconds.
+     * Doing it here keeps it out of the per-test timeouts: a compilation interrupted by a
+     * timeout leaves a broken knowledge base behind and fails every later test.
+     */
+    @BeforeAll
+    static void compileKnowledgeBaseOnce() {
+        new DroolsTestHarness(0.0).close();
+    }
 
     @Test
     @Timeout(10)
@@ -330,6 +347,152 @@ class DrivingExpertSystemRulesTest {
             );
             assertEquals(DrivingAction.BRAKE, decision.getAction());
         }
+    }
+
+    @Test
+    @Timeout(10)
+    void closingOnStationaryVehicleFollowsTheSafeDistanceCurve() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(60.0)) {
+            // 60 km/h, stationary vehicle 40 m ahead: 28 m of room before the 12 m gap.
+            DrivingDecision decision = harness.cycle(
+                1_000,
+                60.0,
+                new FrontDistanceEvent(1_000, "front-radar", 40.0, "front-1"),
+                new RelativeSpeedEvent(1_000, "front-radar", 60.0 / 3.6, "front-1")
+            );
+            assertEquals(DrivingAction.REDUCE_SPEED, decision.getAction());
+            assertEquals("Keep safe following distance behind front vehicle", decision.getSourceRule());
+            assertEquals(Math.sqrt(2.0 * 2.0 * 28.0) * 3.6, decision.getRecommendedSpeedKmh(), 0.1);
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void stoppedBehindStationaryVehicleHoldsTheStop() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(0.0)) {
+            // Both vehicles at rest 12 m apart, left lane not reported clear: nothing is closing
+            // in any more, and the stop must still hold.
+            DrivingDecision decision = harness.cycle(
+                1_000,
+                0.0,
+                new FrontDistanceEvent(1_000, "front-radar", 12.0, "front-1"),
+                new RelativeSpeedEvent(1_000, "front-radar", 0.0, "front-1")
+            );
+            assertEquals(DrivingAction.STOP, decision.getAction());
+            assertEquals("Keep safe following distance behind front vehicle", decision.getSourceRule());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void stoppedBehindStationaryVehicleGoesAroundWhenLeftLaneIsClear() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(0.0)) {
+            DrivingDecision decision = harness.cycle(
+                1_000,
+                0.0,
+                new FrontDistanceEvent(1_000, "front-radar", 12.0, "front-1"),
+                new RelativeSpeedEvent(1_000, "front-radar", 0.0, "front-1"),
+                new LaneOccupancyEvent(1_000, "blind", Lane.LEFT, false, Double.POSITIVE_INFINITY)
+            );
+            assertEquals(DrivingAction.CHANGE_LANE_LEFT, decision.getAction());
+            assertEquals("Go around stationary front vehicle from standstill", decision.getSourceRule());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void redLightAheadForbidsGoingAroundStationaryVehicle() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(0.0)) {
+            // A queue stopped at a red light is not an obstacle to go around (Art. 41 CE).
+            DrivingDecision decision = harness.cycle(
+                1_000,
+                0.0,
+                new FrontDistanceEvent(1_000, "front-radar", 12.0, "front-1"),
+                new RelativeSpeedEvent(1_000, "front-radar", 0.0, "front-1"),
+                new LaneOccupancyEvent(1_000, "blind", Lane.LEFT, false, Double.POSITIVE_INFINITY),
+                new TrafficLightEvent(1_000, "camera", TrafficLightState.RED, 30.0, "light-1")
+            );
+            assertEquals(DrivingAction.STOP, decision.getAction());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void distanceSamplesOfDifferentVehiclesAreNotCombinedIntoOneTrend() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(40.0)) {
+            // Two samples of one vehicle, then the radar switches to another vehicle that is
+            // closer. The drop from 48 m to 40 m is between two vehicles, not an approach.
+            harness.cycle(1_000, 40.0, new FrontDistanceEvent(1_000, "front-radar", 48.0, "front-1"));
+            harness.cycle(1_100, 40.0, new FrontDistanceEvent(1_100, "front-radar", 47.5, "front-1"));
+            DrivingDecision decision = harness.cycle(1_200, 40.0,
+                new FrontDistanceEvent(1_200, "front-radar", 40.0, "front-2"));
+            assertEquals("Default maintain speed baseline", decision.getSourceRule(),
+                "samples of two different vehicles must not form a closing trend");
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void distanceSamplesOfTheSameVehicleStillFormATrend() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(40.0)) {
+            harness.cycle(1_000, 40.0, new FrontDistanceEvent(1_000, "front-radar", 48.0, "front-1"));
+            harness.cycle(1_100, 40.0, new FrontDistanceEvent(1_100, "front-radar", 45.0, "front-1"));
+            DrivingDecision decision = harness.cycle(1_200, 40.0,
+                new FrontDistanceEvent(1_200, "front-radar", 42.0, "front-1"));
+            assertEquals("Approaching trend from sliding distance window", decision.getSourceRule());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void slowerVehicleInTheLeftLaneIsNotPassedOnItsRight() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(60.0)) {
+            // 60 km/h, a vehicle doing 30 km/h 20 m ahead in the lane to the left: the ego may
+            // not draw level with it, so it is slowed down to that vehicle's speed.
+            double relativeMps = 30.0 / 3.6;
+            DrivingDecision decision = harness.cycle(
+                1_000,
+                60.0,
+                new LeftLaneVehicleEvent(1_000, "front-radar", 20.0, relativeMps, "left-1")
+            );
+            assertEquals(DrivingAction.REDUCE_SPEED, decision.getAction());
+            assertEquals("Do not pass a slower left lane vehicle on its right", decision.getSourceRule());
+            // 20 m is inside the 35 m it must keep, so the target is the other vehicle's speed.
+            assertEquals(30.0, decision.getRecommendedSpeedKmh(), 0.1);
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void fasterVehicleInTheLeftLaneDoesNotSlowTheEgoDown() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(60.0)) {
+            DrivingDecision decision = harness.cycle(
+                1_000,
+                60.0,
+                new LeftLaneVehicleEvent(1_000, "front-radar", 20.0, -10.0 / 3.6, "left-1")
+            );
+            assertEquals("Default maintain speed baseline", decision.getSourceRule());
+        }
+    }
+
+    @Test
+    void zeroRadarDistanceWithClosingSpeedDoesNotLoopForever() {
+        // A radar sample clamped to 0 m resets the front vehicle fact; the relative-speed and
+        // TTC updates must not re-adopt the target, or the three rules re-trigger each other
+        // without end and fireAllRules never returns.
+        assertTimeoutPreemptively(Duration.ofSeconds(5), () -> {
+            try (DroolsTestHarness harness = new DroolsTestHarness(5.0)) {
+                harness.cycle(1_000, 5.0,
+                    new FrontDistanceEvent(1_000, "front-radar", 3.0, "front-1"),
+                    new RelativeSpeedEvent(1_000, "front-radar", 0.5, "front-1"),
+                    new TTCEvent(1_000, "front-radar", 6.0, "front-1"));
+                DrivingDecision decision = harness.cycle(1_100, 5.0,
+                    new FrontDistanceEvent(1_100, "front-radar", 0.0, "front-1"),
+                    new RelativeSpeedEvent(1_100, "front-radar", 0.5, "front-1"),
+                    new TTCEvent(1_100, "front-radar", 0.0, "front-1"));
+                assertNotNull(decision.getAction());
+            }
+        });
     }
 
     @Test

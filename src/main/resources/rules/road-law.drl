@@ -34,7 +34,7 @@ no-loop true
 when
     $ctx : DecisionContext()
     VehicleStateFact(lane != Lane.RIGHT, presentationDemo == false, laneChangeState == LaneChangeState.IDLE, rightMarking != RoadMarkingType.CONTINUOUS, rightLaneBlockedAhead == false, timestamp >= 4000)
-    LaneOccupancyState(lane == Lane.RIGHT, occupied == false)
+    LaneOccupancyState(lane == Lane.RIGHT, occupied == false, frontDistanceMeters > 80.0)
     not MoveOffState(active == true)
     not ObstacleStateFact(obstacleId != "none", distanceMeters > 0)
     not PotholeStateFact(potholeId != "none", distanceMeters > 0)

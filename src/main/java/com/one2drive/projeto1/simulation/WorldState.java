@@ -59,6 +59,16 @@ public class WorldState {
         return roadMap.signedDistance(ego.getPositionMeters(), positionMeters);
     }
 
+    /**
+     * Signed distance from the ego to another vehicle along the road travelled, without
+     * wrapping around the loop: negative once the ego has passed it. Vehicles keep counting
+     * metres like the ego does, so a vehicle left behind stays behind until it actually
+     * catches up, instead of reappearing ahead half a lap later.
+     */
+    public double vehicleSignedDistance(DynamicActor vehicle) {
+        return vehicle.getPositionMeters() - ego.getPositionMeters();
+    }
+
     public EgoVehicleState getEgo() {
         return ego;
     }
@@ -139,7 +149,11 @@ public class WorldState {
     }
 
     public Optional<OtherVehicle> nearestFrontVehicleInLane(double maxDistance) {
-        Lane egoLane = ego.getLane();
+        return nearestFrontVehicleInLane(ego.getLane(), maxDistance);
+    }
+
+    /** Nearest vehicle ahead of the ego in the given lane, which need not be the ego's own. */
+    public Optional<OtherVehicle> nearestFrontVehicleInLane(Lane egoLane, double maxDistance) {
         OtherVehicle nearest = null;
         double best = Double.MAX_VALUE;
         for (DynamicActor actor : actors) {
@@ -149,7 +163,7 @@ public class WorldState {
             if (vehicle.getLane() != egoLane) {
                 continue;
             }
-            double d = signedDistance(vehicle.getPositionMeters());
+            double d = vehicleSignedDistance(vehicle);
             if (d > 0.0 && d <= maxDistance && d < best) {
                 best = d;
                 nearest = vehicle;
@@ -369,7 +383,7 @@ public class WorldState {
                 continue;
             }
 
-            double signedDist = signedDistance(actor.getPositionMeters());
+            double signedDist = vehicleSignedDistance(actor);
             double absDist = Math.abs(signedDist);
             best = Math.min(best, absDist);
 

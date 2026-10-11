@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { RoadCanvasComponent } from './road-canvas.component';
+import { RoadCanvasComponent, SensorGeometry } from './road-canvas.component';
 
 describe('RoadCanvasComponent', () => {
   let component: RoadCanvasComponent;
@@ -267,5 +267,139 @@ describe('RoadCanvasComponent', () => {
 
     const obstacle = fixture.nativeElement.querySelector('[data-testid="road-obstacle"]');
     expect(obstacle).toBeTruthy('Obstacle must have data-testid="road-obstacle"');
+  });
+
+  describe('sensor geometry follows the ego vehicle', () => {
+    function sensorSnapshot(ego: Record<string, unknown>, sensors: Record<string, unknown> = {}) {
+      return {
+        simulationTimeMillis: 1000,
+        status: 'RUNNING',
+        egoVehicle: {
+          speedKmh: 60, positionMeters: 100, lane: 'RIGHT', lateralPositionMeters: 3.5,
+          accelerationMps2: 0, targetLane: 'RIGHT', laneChangeState: 'IDLE', laneChangeProgress: 1,
+          ...ego
+        },
+        environment: { weatherCondition: 'CLEAR', visibilityFactor: 1, gripFactor: 1 },
+        speedAdvisor: { currentKmh: 60, legalLimitKmh: 120, recommendedKmh: 60, action: 'MAINTAIN_SPEED' },
+        currentDecision: { action: 'MAINTAIN_SPEED', recommendedSpeedKmh: 60, riskLevel: 'LOW', reason: '', sourceRule: '', timestamp: 1000, evidence: [] },
+        sensorReadings: {},
+        sensors,
+        worldObjects: [],
+        workingMemory: [], recentTimeline: [], recentRules: [], recentFacts: [],
+        activeStage: 'SENSORS', tickMillis: 100,
+        detectedObjectIds: [], cameraDetectedObjectIds: [], radarDetectedObjectIds: [],
+        sensorRanges: { cameraRangeMeters: 120, radarRangeMeters: 130, blindSpotRangeMeters: 30, cameraRateMillis: 200, radarRateMillis: 100 },
+        demoPhases: []
+      };
+    }
+
+    function geometry() {
+      return (component as unknown as { sensorGeometry: () => SensorGeometry }).sensorGeometry();
+    }
+
+    it('starts the camera cone and the radar corridor at the ego lane when driving on the right', () => {
+      fixture.componentRef.setInput('snapshot', sensorSnapshot({ lane: 'RIGHT', lateralPositionMeters: 3.5 }));
+      fixture.detectChanges();
+
+      const g = geometry();
+      const firstPoint = g.cameraPoints.split(' ')[0].split(',').map(Number);
+      expect(firstPoint[1]).toBeCloseTo(71, 1);          // egoY 75 − 4
+      expect(g.radar.y).toBeCloseTo(65, 1);              // egoY 75 − 10
+      expect(g.radar.height).toBe(20);
+      expect(g.radar.x).toBeCloseTo(23, 1);              // car's nose: egoX 20 + 3
+      expect(g.radar.width).toBeCloseTo(69.2, 0);        // radar edge 20 + 130/180·100 = 92.2, minus nose 23
+    });
+
+    it('draws a blind-spot pad only on sides that have a lane', () => {
+      fixture.componentRef.setInput('snapshot', sensorSnapshot({ lane: 'RIGHT', lateralPositionMeters: 3.5 }));
+      fixture.detectChanges();
+      expect(geometry().blindLeft).not.toBeNull();
+      expect(geometry().blindRight).toBeNull();
+
+      fixture.componentRef.setInput('snapshot', sensorSnapshot({ lane: 'CENTER', lateralPositionMeters: 0 }));
+      fixture.detectChanges();
+      expect(geometry().blindLeft).not.toBeNull();
+      expect(geometry().blindRight).not.toBeNull();
+      expect(geometry().blindLeft!.y).toBeCloseTo(16, 1);   // (50 − 25) − 9
+      expect(geometry().blindRight!.y).toBeCloseTo(66, 1);  // (50 + 25) − 9
+    });
+
+    it('slides every shape with the lateral position during a lane change', () => {
+      fixture.componentRef.setInput('snapshot', sensorSnapshot({ lane: 'CENTER', lateralPositionMeters: 1.75, targetLane: 'RIGHT', laneChangeState: 'CHANGING', laneChangeProgress: 0.5 }));
+      fixture.detectChanges();
+
+      const g = geometry();
+      expect(g.radar.y).toBeCloseTo(52.5, 1);            // egoY 62.5 − 10
+      const firstPoint = g.cameraPoints.split(' ')[0].split(',').map(Number);
+      expect(firstPoint[1]).toBeCloseTo(58.5, 1);        // egoY 62.5 − 4
+    });
+
+    it('uses the blind-spot telemetry to hide the road-edge side and to flag an occupied side', () => {
+      const telemetry = {
+        blindSpotLeft: { rangeMeters: 30, occupied: true, targetId: 'v1', distanceMeters: 4, status: 'OCCUPIED' },
+        blindSpotRight: { rangeMeters: 30, occupied: false, targetId: 'none', distanceMeters: Infinity, status: 'NO LANE' }
+      };
+      fixture.componentRef.setInput('snapshot', sensorSnapshot({ lane: 'RIGHT', lateralPositionMeters: 3.5 }, telemetry));
+      fixture.detectChanges();
+
+      expect(geometry().blindLeft!.occupied).toBeTrue();
+      expect(geometry().blindRight).toBeNull();
+    });
+
+    it('renders the sensor fields as SVG shapes with stable test ids', () => {
+      const telemetry = {
+        blindSpotLeft: { rangeMeters: 30, occupied: true, targetId: 'v1', distanceMeters: 4, status: 'OCCUPIED' },
+        blindSpotRight: { rangeMeters: 30, occupied: false, targetId: 'none', distanceMeters: Infinity, status: 'NO LANE' }
+      };
+      fixture.componentRef.setInput('snapshot', sensorSnapshot({ lane: 'RIGHT', lateralPositionMeters: 3.5 }, telemetry));
+      fixture.detectChanges();
+
+      const host = fixture.nativeElement as HTMLElement;
+      const camera = host.querySelector('[data-testid="canvas-sensor-camera"]') as SVGPolygonElement;
+      const radar = host.querySelector('[data-testid="canvas-sensor-radar"]') as SVGRectElement;
+      const blindLeft = host.querySelector('[data-testid="canvas-sensor-blind-left"]') as SVGRectElement;
+
+      expect(camera).toBeTruthy('camera cone polygon must exist');
+      expect(camera.getAttribute('points')!.split(' ').length).toBe(6);
+      expect(parseFloat(radar.getAttribute('y')!)).toBeCloseTo(65, 1);
+      expect(blindLeft.classList.contains('sensor-blind--occupied')).toBeTrue();
+      expect(host.querySelector('[data-testid="canvas-sensor-blind-right"]')).toBeNull();
+      expect(host.querySelector('[data-testid="radar-fov"]')).toBeTruthy('radar range edge keeps its test id');
+      expect(host.querySelector('.sensor-zone')).toBeNull('old static zones must be gone');
+    });
+
+    it('keeps a blind-spot pad on the asphalt while the car drifts towards an outer lane', () => {
+      const clear = {
+        blindSpotLeft: { rangeMeters: 30, occupied: false, targetId: 'none', distanceMeters: Infinity, status: 'CLEAR' },
+        blindSpotRight: { rangeMeters: 30, occupied: false, targetId: 'none', distanceMeters: Infinity, status: 'CLEAR' }
+      };
+      fixture.componentRef.setInput('snapshot', sensorSnapshot({ lane: 'CENTER', lateralPositionMeters: 2.5, targetLane: 'RIGHT', laneChangeState: 'CHANGING' }, clear));
+      fixture.detectChanges();
+
+      const right = geometry().blindRight;
+      expect(right).not.toBeNull();
+      expect(right!.y + right!.height).toBeLessThanOrEqual(88.5);
+    });
+
+    it('drops the road-edge pad even when the telemetry reports that side as CLEAR', () => {
+      const clear = {
+        blindSpotLeft: { rangeMeters: 30, occupied: false, targetId: 'none', distanceMeters: Infinity, status: 'CLEAR' },
+        blindSpotRight: { rangeMeters: 30, occupied: false, targetId: 'none', distanceMeters: Infinity, status: 'CLEAR' }
+      };
+      fixture.componentRef.setInput('snapshot', sensorSnapshot({ lane: 'RIGHT', lateralPositionMeters: 3.5 }, clear));
+      fixture.detectChanges();
+
+      expect(geometry().blindRight).toBeNull();
+      expect(geometry().blindLeft).not.toBeNull();
+    });
+
+    it('draws no sensor layer before the first snapshot arrives', () => {
+      fixture.detectChanges();
+
+      const host = fixture.nativeElement as HTMLElement;
+      expect(host.querySelector('[data-testid="canvas-sensor-layer"]')).toBeNull();
+      expect(host.querySelector('[data-testid="camera-fov"]')).toBeNull('no "CAMERA FOV (0 m)" edge at the car');
+      expect(host.querySelector('[data-testid="radar-fov"]')).toBeNull('no "FRONT RADAR FOV (0 m)" edge at the car');
+    });
   });
 });

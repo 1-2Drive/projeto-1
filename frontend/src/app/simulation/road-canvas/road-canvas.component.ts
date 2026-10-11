@@ -31,6 +31,34 @@ export interface RoadRenderItem {
   visible: boolean;
 }
 
+/** A rectangle in percent of the road canvas (x, y from the top-left corner). */
+export interface SensorRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface BlindSpotRect extends SensorRect {
+  /** True when the backend reports something beside the car on that side. */
+  occupied: boolean;
+}
+
+/**
+ * Sensor fields of view in percent of the road canvas, all anchored on the ego
+ * vehicle so they slide with it during a lane change.
+ */
+export interface SensorGeometry {
+  /** SVG polygon points of the camera cone: nose of the car widening to all lanes. */
+  cameraPoints: string;
+  /** Band between the effective and the nominal camera range when visibility is reduced. */
+  cameraLost: SensorRect | null;
+  /** Radar corridor inside the ego lane. */
+  radar: SensorRect;
+  blindLeft: BlindSpotRect | null;
+  blindRight: BlindSpotRect | null;
+}
+
 /**
  * Lane centre offsets in metres, mirroring the backend Lane.centreMeters() contract.
  * The road view maps this continuously, so a lane change is visible as smooth motion
@@ -48,6 +76,24 @@ const LANE_CENTER_Y: Record<LaneName, number> = {
   CENTER: 50,
   RIGHT: 75
 };
+
+/** Vertical extent of the asphalt in percent of the canvas height (matches .surface in the SCSS). */
+const ROAD_TOP_PERCENT = 11.5;
+const ROAD_BOTTOM_PERCENT = 88.5;
+/** Distance between two lane centres in percent of the canvas height. */
+const LANE_PITCH_PERCENT = LANE_CENTER_Y.CENTER - LANE_CENTER_Y.LEFT;
+/** Horizontal distance from the ego centre to its nose, in percent of the canvas width. */
+const EGO_NOSE_OFFSET_PERCENT = 3;
+/** Half the height of the camera cone's narrow end at the car's nose. */
+const CAMERA_TIP_HALF_PERCENT = 4;
+/** Half the height of the radar corridor, which stays inside the ego lane. */
+const RADAR_HALF_HEIGHT_PERCENT = 10;
+/** Half the height of a blind-spot pad before it is clamped to the asphalt. */
+const BLIND_PAD_HALF_HEIGHT_PERCENT = 9;
+/** Distance ahead at which the camera cone has widened to cover all three lanes. */
+const CAMERA_SPREAD_METERS = 40;
+/** How far behind the car the blind-spot pads start. */
+const BLIND_SPOT_BEHIND_METERS = 10;
 
 const EMPTY_RANGES = {
   cameraRangeMeters: 0,
@@ -286,7 +332,38 @@ export class RoadCanvasComponent {
     return this.snapshot()?.maneuver?.braking ?? false;
   });
 
+  /**
+   * Range the camera can actually see. The backend publishes it as
+   * sensors.environment.effectiveRangeMeters (camera range × visibility factor);
+   * without telemetry the nominal range is assumed.
+   */
+  protected readonly effectiveCameraRange = computed(() => {
+    const nominal = this.ranges().cameraRangeMeters;
+    const effective = this.snapshot()?.sensors?.environment?.effectiveRangeMeters;
+    if (effective != null && Number.isFinite(effective) && effective >= 0 && effective < nominal) {
+      return effective;
+    }
+    return nominal;
+  });
+
+  protected readonly cameraDegraded = computed(() => this.effectiveCameraRange() < this.ranges().cameraRangeMeters - 0.5);
+
+  /** "CAMERA FOV (120 m)" in clear weather; "CAMERA 84 m (120 × 70%)" when visibility shortens it. */
+  protected readonly cameraLabel = computed(() => {
+    const nominal = Math.round(this.ranges().cameraRangeMeters);
+    if (!this.cameraDegraded()) {
+      return `CAMERA FOV (${nominal} m)`;
+    }
+    const effective = Math.round(this.effectiveCameraRange());
+    const percent = Math.round((this.effectiveCameraRange() / this.ranges().cameraRangeMeters) * 100);
+    return `CAMERA ${effective} m (${nominal} × ${percent}%)`;
+  });
+
   protected readonly cameraEdgePercent = computed(() => {
+    return this.worldToPercentX(this.egoPosition() + this.effectiveCameraRange());
+  });
+
+  protected readonly cameraNominalEdgePercent = computed(() => {
     return this.worldToPercentX(this.egoPosition() + this.ranges().cameraRangeMeters);
   });
 
@@ -294,8 +371,60 @@ export class RoadCanvasComponent {
     return this.worldToPercentX(this.egoPosition() + this.ranges().radarRangeMeters);
   });
 
-  protected readonly blindSpotEdgePercent = computed(() => {
-    return this.worldToPercentX(this.egoPosition() + this.ranges().blindSpotRangeMeters);
+  protected readonly sensorGeometry = computed<SensorGeometry>(() => {
+    const snapshot = this.snapshot();
+    const egoX = this.egoXPercent();
+    const egoY = this.egoYPercent();
+    const egoPos = this.egoPosition();
+    const nose = egoX + EGO_NOSE_OFFSET_PERCENT;
+
+    const cameraEdge = Math.max(nose, Math.min(100, this.cameraEdgePercent()));
+    const spreadX = Math.min(cameraEdge, this.worldToPercentX(egoPos + CAMERA_SPREAD_METERS));
+    const cameraPoints = [
+      `${nose},${egoY - CAMERA_TIP_HALF_PERCENT}`,
+      `${spreadX},${ROAD_TOP_PERCENT}`,
+      `${cameraEdge},${ROAD_TOP_PERCENT}`,
+      `${cameraEdge},${ROAD_BOTTOM_PERCENT}`,
+      `${spreadX},${ROAD_BOTTOM_PERCENT}`,
+      `${nose},${egoY + CAMERA_TIP_HALF_PERCENT}`
+    ].join(' ');
+
+    const nominalEdge = Math.min(100, this.cameraNominalEdgePercent());
+    const cameraLost: SensorRect | null = this.cameraDegraded() && nominalEdge > cameraEdge + 0.5
+      ? { x: cameraEdge, y: ROAD_TOP_PERCENT, width: nominalEdge - cameraEdge, height: ROAD_BOTTOM_PERCENT - ROAD_TOP_PERCENT }
+      : null;
+
+    const radarEdge = Math.min(100, this.radarEdgePercent());
+    const radar: SensorRect = {
+      x: nose,
+      y: egoY - RADAR_HALF_HEIGHT_PERCENT,
+      width: Math.max(0, radarEdge - nose),
+      height: 2 * RADAR_HALF_HEIGHT_PERCENT
+    };
+
+    const blindStart = this.worldToPercentX(egoPos - BLIND_SPOT_BEHIND_METERS);
+    const blindEnd = this.worldToPercentX(egoPos + this.ranges().blindSpotRangeMeters);
+    const lane = this.currentLane();
+    const blind = (side: 'LEFT' | 'RIGHT'): BlindSpotRect | null => {
+      const telemetry = side === 'LEFT' ? snapshot?.sensors?.blindSpotLeft : snapshot?.sensors?.blindSpotRight;
+      const noLane = telemetry
+        ? telemetry.status === 'NO LANE'
+        : (side === 'LEFT' ? lane === 'LEFT' : lane === 'RIGHT');
+      if (noLane) {
+        return null;
+      }
+      // The telemetry can report CLEAR on the road-edge side (before START, or mid lane
+      // change while ego.lane is still the source lane), so the pad is also kept on the asphalt.
+      const centreY = side === 'LEFT' ? egoY - LANE_PITCH_PERCENT : egoY + LANE_PITCH_PERCENT;
+      const top = Math.max(ROAD_TOP_PERCENT, centreY - BLIND_PAD_HALF_HEIGHT_PERCENT);
+      const bottom = Math.min(ROAD_BOTTOM_PERCENT, centreY + BLIND_PAD_HALF_HEIGHT_PERCENT);
+      if (bottom - top < 2) {
+        return null;
+      }
+      return { x: blindStart, y: top, width: blindEnd - blindStart, height: bottom - top, occupied: telemetry?.occupied ?? false };
+    };
+
+    return { cameraPoints, cameraLost, radar, blindLeft: blind('LEFT'), blindRight: blind('RIGHT') };
   });
 
   /** True before the first tick so the UI can invite the user to press START. */

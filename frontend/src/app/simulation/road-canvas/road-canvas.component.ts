@@ -90,6 +90,8 @@ const CAMERA_TIP_HALF_PERCENT = 4;
 const RADAR_HALF_HEIGHT_PERCENT = 10;
 /** Half the height of a blind-spot pad before it is clamped to the asphalt. */
 const BLIND_PAD_HALF_HEIGHT_PERCENT = 9;
+/** Blind-spot pads thinner than this (clamped at the road edge) are not drawn. */
+const MIN_PAD_HEIGHT_PERCENT = 2;
 /** Distance ahead at which the camera cone has widened to cover all three lanes. */
 const CAMERA_SPREAD_METERS = 40;
 /** How far behind the car the blind-spot pads start. */
@@ -418,7 +420,7 @@ export class RoadCanvasComponent {
       const centreY = side === 'LEFT' ? egoY - LANE_PITCH_PERCENT : egoY + LANE_PITCH_PERCENT;
       const top = Math.max(ROAD_TOP_PERCENT, centreY - BLIND_PAD_HALF_HEIGHT_PERCENT);
       const bottom = Math.min(ROAD_BOTTOM_PERCENT, centreY + BLIND_PAD_HALF_HEIGHT_PERCENT);
-      if (bottom - top < 2) {
+      if (bottom - top < MIN_PAD_HEIGHT_PERCENT) {
         return null;
       }
       return { x: blindStart, y: top, width: blindEnd - blindStart, height: bottom - top, occupied: telemetry?.occupied ?? false };
@@ -439,6 +441,14 @@ export class RoadCanvasComponent {
     const snapshot = this.snapshot();
     return snapshot?.environment?.weatherCondition === 'RAIN'
       || snapshot?.sensors?.environment?.rain === true;
+  });
+
+  /** "RAIN · VIS 70% · GRIP 65%": the factors the knowledge base is reasoning with. */
+  protected readonly rainChipText = computed(() => {
+    const env = this.snapshot()?.environment;
+    const visibility = Math.round((env?.visibilityFactor ?? 1) * 100);
+    const grip = Math.round((env?.gripFactor ?? 1) * 100);
+    return `RAIN · VIS ${visibility}% · GRIP ${grip}%`;
   });
 
   protected tickPercent(meters: number): number {

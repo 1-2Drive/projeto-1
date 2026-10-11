@@ -401,6 +401,53 @@ describe('RoadCanvasComponent', () => {
       expect(host.querySelector('[data-testid="camera-fov"]')).toBeNull('no "CAMERA FOV (0 m)" edge at the car');
       expect(host.querySelector('[data-testid="radar-fov"]')).toBeNull('no "FRONT RADAR FOV (0 m)" edge at the car');
     });
+
+    it('shortens the camera cone to the effective range and marks the range lost to rain', () => {
+      fixture.componentRef.setInput('snapshot', sensorSnapshot(
+        { lane: 'RIGHT', lateralPositionMeters: 3.5, positionMeters: 100 },
+        { environment: { condition: 'RAIN', effectiveRangeMeters: 84, gripPercent: 65, rain: true } }
+      ));
+      fixture.detectChanges();
+
+      const host = fixture.nativeElement as HTMLElement;
+      const edge = host.querySelector('[data-testid="camera-fov"]') as HTMLElement;
+      const ghost = host.querySelector('[data-testid="camera-fov-nominal"]') as HTMLElement;
+      const lost = host.querySelector('[data-testid="canvas-sensor-camera-lost"]') as SVGRectElement;
+
+      // ego at 20% of a 180 m viewport: 84 m ahead → 20 + 84/180·100 = 66.7%, 120 m → 86.7%
+      expect(parseFloat(edge.style.left)).toBeCloseTo(66.7, 0);
+      expect(parseFloat(ghost.style.left)).toBeCloseTo(86.7, 0);
+      expect(edge.textContent).toContain('CAMERA 84 m (120 × 70%)');
+      expect(lost).toBeTruthy('the band between 84 m and 120 m must be drawn');
+      expect(parseFloat(lost.getAttribute('x')!)).toBeCloseTo(66.7, 0);
+      expect(parseFloat(lost.getAttribute('width')!)).toBeCloseTo(20, 0);
+    });
+
+    it('draws the full camera cone and no lost band in clear weather', () => {
+      fixture.componentRef.setInput('snapshot', sensorSnapshot(
+        { lane: 'RIGHT', lateralPositionMeters: 3.5 },
+        { environment: { condition: 'CLEAR', effectiveRangeMeters: 120, gripPercent: 100, rain: false } }
+      ));
+      fixture.detectChanges();
+
+      const host = fixture.nativeElement as HTMLElement;
+      expect(host.querySelector('[data-testid="canvas-sensor-camera-lost"]')).toBeNull();
+      expect(host.querySelector('[data-testid="camera-fov-nominal"]')).toBeNull();
+      expect((host.querySelector('[data-testid="camera-fov"]') as HTMLElement).textContent).toContain('CAMERA FOV (120 m)');
+    });
+
+    it('never lets the camera cone fold behind the nose when the effective range is tiny', () => {
+      fixture.componentRef.setInput('snapshot', sensorSnapshot(
+        { lane: 'RIGHT', lateralPositionMeters: 3.5 },
+        { environment: { condition: 'RAIN', effectiveRangeMeters: 2, gripPercent: 65, rain: true } }
+      ));
+      fixture.detectChanges();
+
+      const xs = geometry().cameraPoints.split(' ').map((p) => Number(p.split(',')[0]));
+      for (const x of xs) {
+        expect(x).toBeGreaterThanOrEqual(23 - 1e-9);   // nose = egoX 20 + 3
+      }
+    });
   });
 
   it('renders a passed object behind the car with the PASSED label and the passed class', () => {
@@ -426,5 +473,48 @@ describe('RoadCanvasComponent', () => {
     expect(pothole.classList.contains('obj--passed')).toBeTrue();
     expect(pothole.textContent).toContain('PASSED');
     expect(pothole.querySelector('.obj__badge')).toBeNull('a passed object keeps no DETECTED badge');
+  });
+
+  it('shows the rain chip with the visibility and grip the backend is using', () => {
+    fixture.componentRef.setInput('snapshot', {
+      simulationTimeMillis: 2000,
+      status: 'RUNNING',
+      egoVehicle: { speedKmh: 52, positionMeters: 80, lane: 'RIGHT', lateralPositionMeters: 3.5, accelerationMps2: 0 },
+      environment: { weatherCondition: 'RAIN', visibilityFactor: 0.7, gripFactor: 0.65 },
+      speedAdvisor: { currentKmh: 52, legalLimitKmh: 120, recommendedKmh: 52, action: 'REDUCE_SPEED' },
+      currentDecision: { action: 'REDUCE_SPEED', recommendedSpeedKmh: 52, riskLevel: 'HIGH', reason: '', sourceRule: '', timestamp: 2000, evidence: [] },
+      sensorReadings: {},
+      sensors: { environment: { condition: 'RAIN', effectiveRangeMeters: 84, gripPercent: 99, rain: true } },
+      worldObjects: [],
+      detectedObjectIds: [], cameraDetectedObjectIds: [], radarDetectedObjectIds: [],
+      sensorRanges: { cameraRangeMeters: 120, radarRangeMeters: 130, blindSpotRangeMeters: 30, cameraRateMillis: 200, radarRateMillis: 100 }
+    });
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.querySelector('.road--rain')).toBeTruthy();
+    expect(host.querySelector('[data-testid="rain-overlay"]')).toBeTruthy();
+    const chip = host.querySelector('[data-testid="rain-chip"]') as HTMLElement;
+    expect(chip.textContent).toContain('VIS 70%');
+    expect(chip.textContent).toContain('GRIP 65%');
+
+    fixture.componentRef.setInput('snapshot', {
+      simulationTimeMillis: 2100,
+      status: 'RUNNING',
+      egoVehicle: { speedKmh: 52, positionMeters: 81, lane: 'RIGHT', lateralPositionMeters: 3.5, accelerationMps2: 0 },
+      environment: { weatherCondition: 'CLEAR', visibilityFactor: 1, gripFactor: 1 },
+      speedAdvisor: { currentKmh: 52, legalLimitKmh: 120, recommendedKmh: 52, action: 'MAINTAIN_SPEED' },
+      currentDecision: { action: 'MAINTAIN_SPEED', recommendedSpeedKmh: 52, riskLevel: 'LOW', reason: '', sourceRule: '', timestamp: 2100, evidence: [] },
+      sensorReadings: {},
+      sensors: {},
+      worldObjects: [],
+      detectedObjectIds: [], cameraDetectedObjectIds: [], radarDetectedObjectIds: [],
+      sensorRanges: { cameraRangeMeters: 120, radarRangeMeters: 130, blindSpotRangeMeters: 30, cameraRateMillis: 200, radarRateMillis: 100 }
+    });
+    fixture.detectChanges();
+
+    expect(host.querySelector('[data-testid="rain-overlay"]')).toBeNull();
+    expect(host.querySelector('[data-testid="rain-chip"]')).toBeNull();
+    expect(host.querySelector('.road--rain')).toBeNull();
   });
 });

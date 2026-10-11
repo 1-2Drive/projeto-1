@@ -23,8 +23,12 @@
 
   @if (raining()) {
     <div class="rain-overlay" aria-hidden="true" data-testid="rain-overlay">
-      <span class="rain-overlay__label">RAIN · WET ROAD</span>
+      <div class="rain-overlay__sheen rain-overlay__sheen--1"></div>
+      <div class="rain-overlay__sheen rain-overlay__sheen--2"></div>
+      <div class="rain-overlay__sheen rain-overlay__sheen--3"></div>
+      <div class="rain-overlay__drops"></div>
     </div>
+    <span class="rain-chip" data-testid="rain-chip">{{ rainChipText() }}</span>
   }
 
   <!-- ============ lane direction ============ -->

@@ -3,6 +3,7 @@ package rules
 import com.one2drive.projeto1.decision.DecisionContext
 import com.one2drive.projeto1.decision.DecisionPriority
 import com.one2drive.projeto1.domain.DrivingAction
+import com.one2drive.projeto1.domain.PedestrianCrossingState
 import com.one2drive.projeto1.domain.Lane
 import com.one2drive.projeto1.domain.LaneChangeState
 import com.one2drive.projeto1.domain.RiskLevel
@@ -202,7 +203,7 @@ when
     VehicleStateFact(lane == Lane.RIGHT || lane == Lane.CENTER, $currentLane : lane, laneChangeState == LaneChangeState.IDLE, leftMarking != RoadMarkingType.CONTINUOUS, $speed : speedKmh, $now : timestamp)
     FrontVehicleState($target : targetId != "none", $distance : distanceMeters > 15.0, $relative : relativeSpeedMps > 0.5, timestamp == $now)
     LaneOccupancyState(lane == Lane.LEFT, occupied == false, $leftFront : frontDistanceMeters)
-    not PedestrianStateFact(pedestrianId != "none", inPath == true)
+    not PedestrianStateFact(pedestrianId != "none", inPath == true || crossingState == PedestrianCrossingState.CROSSING)
     not TrafficLightStateFact(lightId != "none", state != TrafficLightState.GREEN, distanceMeters <= 125.0)
     eval((!$active || !$target.equals($tracked) || $currentLane != $origin)
         && ($currentLane != Lane.CENTER || $leftFront > $distance + 20.0)
@@ -251,7 +252,7 @@ when
     CurrentSpeedLimit($limit : limitKmh, $source : sourceId)
     not FrontVehicleState(targetId != "none", distanceMeters <= $distance)
     LaneOccupancyState(lane == Lane.LEFT, occupied == false)
-    not PedestrianStateFact(pedestrianId != "none", inPath == true)
+    not PedestrianStateFact(pedestrianId != "none", inPath == true || crossingState == PedestrianCrossingState.CROSSING)
     not TrafficLightStateFact(lightId != "none", state != TrafficLightState.GREEN, distanceMeters <= 125.0)
     eval((!$active || !$target.equals($tracked))
         && $speed / 3.6 - $relative >= 1.4
@@ -336,7 +337,7 @@ when
     VehicleStateFact(lane == Lane.RIGHT || lane == Lane.CENTER, $currentLane : lane, laneChangeState == LaneChangeState.IDLE, leftMarking != RoadMarkingType.CONTINUOUS, $speed : speedKmh < 3.0, $now : timestamp)
     FrontVehicleState($target : targetId != "none", $distance : distanceMeters > 6.0, distanceMeters <= 20.0, $relative : relativeSpeedMps > -0.3)
     LaneOccupancyState(lane == Lane.LEFT, occupied == false)
-    not PedestrianStateFact(pedestrianId != "none", inPath == true)
+    not PedestrianStateFact(pedestrianId != "none", inPath == true || crossingState == PedestrianCrossingState.CROSSING)
     not TrafficLightStateFact(lightId != "none", state != TrafficLightState.GREEN, distanceMeters <= 125.0)
     eval((!$active || !$target.equals($tracked)) && Math.max(0.0, $speed / 3.6 - $relative) < 0.5)
 then

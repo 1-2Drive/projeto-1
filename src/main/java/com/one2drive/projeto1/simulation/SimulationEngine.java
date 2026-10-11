@@ -89,6 +89,8 @@ public class SimulationEngine implements AutoCloseable {
     private final Map<String, Long> cameraDetectedObjectTimestamps;
     private final Map<String, Long> radarDetectedObjectTimestamps;
     private final Set<String> detectedWorldObjectIds;
+    private String trackedPedestrianId = "none";
+    private boolean trackedPedestrianReportedCrossed;
     private final Set<String> demoEvidence;
     private final boolean pseudoClock;
     private final Consumer<DrivingDecision> decisionConsumer;
@@ -249,6 +251,8 @@ public class SimulationEngine implements AutoCloseable {
         cameraDetectedObjectTimestamps.clear();
         radarDetectedObjectTimestamps.clear();
         detectedWorldObjectIds.clear();
+        trackedPedestrianId = "none";
+        trackedPedestrianReportedCrossed = false;
         demoEvidence.clear();
         scenarioInitialSpeedKmh = scenarioDefinition.getInitialSpeedKmh();
         holdVehicleAtRest();
@@ -409,8 +413,16 @@ public class SimulationEngine implements AutoCloseable {
             if (actor instanceof com.one2drive.projeto1.domain.OtherVehicle) {
                 continue;
             }
-            if (worldState.signedDistance(actor.getPositionMeters()) <= 0.0
-                && detectedWorldObjectIds.contains(actor.getId())) {
+            // A pedestrian that has reached the sidewalk has left the road: kept in the world
+            // it would still be drawn in the lane next to that sidewalk, as if in the way. The
+            // one the camera is tracking stays until the camera has reported it as crossed,
+            // so that the rules see the crossing end instead of the pedestrian vanishing.
+            boolean leftTheRoad = actor instanceof com.one2drive.projeto1.domain.Pedestrian pedestrian
+                && pedestrian.getCrossingState() == com.one2drive.projeto1.domain.PedestrianCrossingState.CROSSED
+                && (!pedestrian.getId().equals(trackedPedestrianId) || trackedPedestrianReportedCrossed);
+            if (leftTheRoad
+                || (worldState.signedDistance(actor.getPositionMeters()) <= 0.0
+                    && detectedWorldObjectIds.contains(actor.getId()))) {
                 worldState.removeActorById(actor.getId());
             }
         }
@@ -774,7 +786,12 @@ public class SimulationEngine implements AutoCloseable {
         if (event instanceof SpeedLimitDetectedEvent e) objectId = e.getSignId();
         else if (event instanceof TrafficLightEvent e) objectId = e.getLightId();
         else if (event instanceof StopSignEvent e) objectId = e.getSignId();
-        else if (event instanceof PedestrianDetectedEvent e) objectId = e.getPedestrianId();
+        else if (event instanceof PedestrianDetectedEvent e) {
+            objectId = e.getPedestrianId();
+            trackedPedestrianId = e.getPedestrianId();
+            trackedPedestrianReportedCrossed =
+                e.getCrossingState() == com.one2drive.projeto1.domain.PedestrianCrossingState.CROSSED;
+        }
         else if (event instanceof PotholeDetectedEvent e) objectId = e.getPotholeId();
         else if (event instanceof BarrierDetectedEvent e) objectId = e.getBarrierId();
         else if (event instanceof ObstacleDetectedEvent e) objectId = e.getObstacleId();

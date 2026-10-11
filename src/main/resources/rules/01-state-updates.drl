@@ -1,6 +1,7 @@
 package rules
 
 import com.one2drive.projeto1.domain.Lane
+import com.one2drive.projeto1.domain.PedestrianCrossingState
 import com.one2drive.projeto1.domain.TrafficLightState
 import com.one2drive.projeto1.drools.events.*
 import com.one2drive.projeto1.drools.facts.*
@@ -168,16 +169,19 @@ when
         && ($e.getTimestamp() > $state.getTimestamp()
             || !$e.getPedestrianId().equals($state.getPedestrianId())
             || Math.abs($state.getDistanceMeters() - $e.getDistanceMeters()) > 0.01
-            || $state.isInPath() != $e.isInPath()))
+            || $state.isInPath() != $e.isInPath()
+            || $state.getCrossingState() != $e.getCrossingState()))
 then
     if ($e.getDistanceMeters() <= 0 || "none".equals($e.getPedestrianId()) || Double.isInfinite($e.getDistanceMeters())) {
         $state.setPedestrianId("none");
         $state.setDistanceMeters(Double.POSITIVE_INFINITY);
         $state.setInPath(false);
+        $state.setCrossingState(PedestrianCrossingState.WAITING);
     } else {
         $state.setPedestrianId($e.getPedestrianId());
         $state.setDistanceMeters($e.getDistanceMeters());
         $state.setInPath($e.isInPath());
+        $state.setCrossingState($e.getCrossingState());
     }
     $state.setTimestamp($e.getTimestamp());
     update($state);
@@ -425,6 +429,7 @@ then
     $state.setPedestrianId("none");
     $state.setDistanceMeters(Double.POSITIVE_INFINITY);
     $state.setInPath(false);
+    $state.setCrossingState(PedestrianCrossingState.WAITING);
     $state.setTimestamp($now);
     update($state);
 end

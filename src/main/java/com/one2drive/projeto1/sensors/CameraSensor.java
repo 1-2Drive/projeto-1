@@ -2,7 +2,6 @@ package com.one2drive.projeto1.sensors;
 
 import com.one2drive.projeto1.config.SimulationConfig;
 import com.one2drive.projeto1.domain.Barrier;
-import com.one2drive.projeto1.domain.Pedestrian;
 import com.one2drive.projeto1.domain.Pothole;
 import com.one2drive.projeto1.domain.SpeedLimitSign;
 import com.one2drive.projeto1.domain.StaticObstacle;
@@ -58,13 +57,15 @@ public class CameraSensor extends AbstractSensor<Object> {
             s.getId()
         )));
 
-        Optional<Pedestrian> pedestrian = worldState.nearestPedestrianInLane(rangeMeters());
-        pedestrian.ifPresent(p -> events.add(new PedestrianDetectedEvent(
+        // The pedestrian ahead is reported with what the camera can tell about its crossing
+        // (not crossing, crossing, crossed); the rules decide what that calls for.
+        worldState.nearestPedestrianAhead(rangeMeters()).ifPresent(seen -> events.add(new PedestrianDetectedEvent(
             timestampMillis,
             id(),
-            worldState.signedDistance(p.getPositionMeters()),
-            p.getId(),
-            true
+            seen.distanceMeters(),
+            seen.pedestrian().getId(),
+            seen.inPath(),
+            seen.crossingState()
         )));
 
         Optional<Pothole> pothole = worldState.nearestPotholeAhead(rangeMeters());

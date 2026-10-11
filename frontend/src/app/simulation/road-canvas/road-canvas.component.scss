@@ -494,7 +494,7 @@
   display: grid;
   justify-items: center;
   gap: 0.15rem;
-  transition: filter 140ms ease;
+  transition: filter 140ms ease, opacity 200ms ease;
 }
 
 .obj--vehicle {
@@ -565,6 +565,12 @@
 
 .obj--radar {
   filter: drop-shadow(0 0 0.5rem rgba(120, 224, 163, 0.55));
+}
+
+/* already behind the car: still drawn, but clearly out of play */
+.obj--passed {
+  opacity: 0.55;
+  filter: none;
 }
 
 .obj__badge {

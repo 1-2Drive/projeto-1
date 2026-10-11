@@ -214,6 +214,7 @@
       [class.obj--detected]="item.detectedByCamera || item.detectedByRadar"
       [class.obj--camera]="item.detectedByCamera"
       [class.obj--radar]="item.detectedByRadar"
+      [class.obj--passed]="item.relativeMeters <= 0"
       [attr.data-state]="item.state"
       [style.left.%]="item.xPercent"
       [style.top.%]="item.kind === 'speedRadar' ? 4 : item.yPercent"
@@ -315,7 +316,7 @@
         }
       }
 
-      @if (item.detectedByCamera || item.detectedByRadar) {
+      @if ((item.detectedByCamera || item.detectedByRadar) && item.relativeMeters > 0) {
         <span class="obj__badge" [class.obj__badge--radar]="item.detectedByRadar && !item.detectedByCamera">
           {{ item.detectedByCamera ? 'DETECTED' : 'RADAR' }}
         </span>

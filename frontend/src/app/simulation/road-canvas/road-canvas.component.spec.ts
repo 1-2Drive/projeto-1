@@ -402,4 +402,29 @@ describe('RoadCanvasComponent', () => {
       expect(host.querySelector('[data-testid="radar-fov"]')).toBeNull('no "FRONT RADAR FOV (0 m)" edge at the car');
     });
   });
+
+  it('renders a passed object behind the car with the PASSED label and the passed class', () => {
+    fixture.componentRef.setInput('snapshot', {
+      simulationTimeMillis: 3000,
+      status: 'RUNNING',
+      egoVehicle: { speedKmh: 60, positionMeters: 120, lane: 'RIGHT', lateralPositionMeters: 3.5, accelerationMps2: 0 },
+      environment: { weatherCondition: 'CLEAR', visibilityFactor: 1, gripFactor: 1 },
+      speedAdvisor: { currentKmh: 60, legalLimitKmh: 120, recommendedKmh: 60, action: 'MAINTAIN_SPEED' },
+      currentDecision: { action: 'MAINTAIN_SPEED', recommendedSpeedKmh: 60, riskLevel: 'LOW', reason: '', sourceRule: '', timestamp: 3000, evidence: [] },
+      sensorReadings: {},
+      sensors: {},
+      worldObjects: [
+        { id: 'r18-RIGHT', type: 'Pothole', positionMeters: -12, worldPositionMeters: 108, lane: 'RIGHT', details: 'severity=HIGH' }
+      ],
+      detectedObjectIds: ['r18-RIGHT'], cameraDetectedObjectIds: ['r18-RIGHT'], radarDetectedObjectIds: [],
+      sensorRanges: { cameraRangeMeters: 120, radarRangeMeters: 130, blindSpotRangeMeters: 30, cameraRateMillis: 200, radarRateMillis: 100 }
+    });
+    fixture.detectChanges();
+
+    const pothole = fixture.nativeElement.querySelector('[data-testid="road-pothole"]') as HTMLElement;
+    expect(pothole).toBeTruthy('a pothole 12 m behind the car is still rendered');
+    expect(pothole.classList.contains('obj--passed')).toBeTrue();
+    expect(pothole.textContent).toContain('PASSED');
+    expect(pothole.querySelector('.obj__badge')).toBeNull('a passed object keeps no DETECTED badge');
+  });
 });

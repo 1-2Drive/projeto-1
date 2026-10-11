@@ -14,8 +14,9 @@ global DroolsSupport droolsSupport
 
 // 0.1 km/h deadband around the limit. Without it the km/h <-> m/s round trip in the
 // actuator leaves the fact a few ulp above the limit, "exceeding" never deactivates and
-// the decision sticks on REDUCE_SPEED instead of settling on MAINTAIN_SPEED. It matches
-// the actuator, which snaps to the target for any excess of 0.1 km/h or less.
+// the decision sticks on REDUCE_SPEED instead of settling on MAINTAIN_SPEED. The actuator
+// holds the target inside a +/-0.5 km/h dead band (SPEED_DEAD_BAND_KMH in DecisionActuator),
+// so this 0.1 km/h rule threshold sits inside that band.
 // "exceeding" and "compliant" must stay exact complements so one of them always wins.
 rule "Decelerate approaching speed radar to comply with legal limit"
 salience 320

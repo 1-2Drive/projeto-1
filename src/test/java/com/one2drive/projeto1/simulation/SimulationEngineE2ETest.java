@@ -1029,4 +1029,36 @@ class SimulationEngineE2ETest {
                 "The overtaken vehicle catches up with the stopped ego and must have left the world");
         }
     }
+
+    @Test
+    @Timeout(30)
+    void rainSpeedSettlesOnTheRecommendedSpeedWithoutHunting() {
+        ScenarioLibrary library = ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json");
+        ScenarioDefinition scenario = library.findById("S11").orElseThrow();
+
+        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {})) {
+            engine.start();
+
+            SimulationSnapshot snapshot = null;
+            int stableTicks = 0;
+            int longestStreak = 0;
+            boolean settled = false;
+            for (int i = 0; i < 400; i++) {
+                snapshot = engine.tick();
+                boolean withinBand = Math.abs(snapshot.egoSpeedKmh() - snapshot.recommendedSpeedKmh()) <= 0.5;
+                if (settled) {
+                    assertTrue(withinBand, "tick " + i + ": speed " + snapshot.egoSpeedKmh()
+                        + " left the ±0.5 km/h band around " + snapshot.recommendedSpeedKmh());
+                }
+                stableTicks = withinBand ? stableTicks + 1 : 0;
+                longestStreak = Math.max(longestStreak, stableTicks);
+                settled |= stableTicks >= 50;
+            }
+
+            assertTrue(longestStreak >= 50,
+                "Once the car reaches the recommended rain speed it must stay within 0.5 km/h of it for 50 consecutive ticks");
+            assertEquals(52.0, snapshot.recommendedSpeedKmh(), 1e-9,
+                "the rain rules keep recommending 52 km/h, well below the 85 km/h entry speed");
+        }
+    }
 }

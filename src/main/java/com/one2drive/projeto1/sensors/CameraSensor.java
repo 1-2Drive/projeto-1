@@ -31,8 +31,9 @@ public class CameraSensor extends AbstractSensor<Object> {
     @Override
     public List<Object> observe(WorldState worldState, long timestampMillis) {
         List<Object> events = new ArrayList<>();
+        double range = effectiveRangeMeters(worldState);
 
-        Optional<SpeedLimitSign> sign = worldState.nearestSpeedLimitSign(rangeMeters());
+        Optional<SpeedLimitSign> sign = worldState.nearestSpeedLimitSign(range);
         sign.ifPresent(s -> events.add(new SpeedLimitDetectedEvent(
             timestampMillis,
             id(),
@@ -41,7 +42,7 @@ public class CameraSensor extends AbstractSensor<Object> {
             s.getId()
         )));
 
-        Optional<TrafficLight> light = worldState.nearestTrafficLight(rangeMeters());
+        Optional<TrafficLight> light = worldState.nearestTrafficLight(range);
         light.ifPresent(l -> events.add(new TrafficLightEvent(
             timestampMillis,
             id(),
@@ -50,7 +51,7 @@ public class CameraSensor extends AbstractSensor<Object> {
             l.getId()
         )));
 
-        Optional<StopSign> stopSign = worldState.nearestStopSign(rangeMeters());
+        Optional<StopSign> stopSign = worldState.nearestStopSign(range);
         stopSign.ifPresent(s -> events.add(new StopSignEvent(
             timestampMillis,
             id(),
@@ -58,7 +59,7 @@ public class CameraSensor extends AbstractSensor<Object> {
             s.getId()
         )));
 
-        Optional<Pedestrian> pedestrian = worldState.nearestPedestrianInLane(rangeMeters());
+        Optional<Pedestrian> pedestrian = worldState.nearestPedestrianInLane(range);
         pedestrian.ifPresent(p -> events.add(new PedestrianDetectedEvent(
             timestampMillis,
             id(),
@@ -67,7 +68,7 @@ public class CameraSensor extends AbstractSensor<Object> {
             true
         )));
 
-        Optional<Pothole> pothole = worldState.nearestPotholeAhead(rangeMeters());
+        Optional<Pothole> pothole = worldState.nearestPotholeAhead(range);
         pothole.ifPresent(p -> events.add(new PotholeDetectedEvent(
             timestampMillis,
             id(),
@@ -77,7 +78,7 @@ public class CameraSensor extends AbstractSensor<Object> {
             p.getLane()
         )));
 
-        Optional<Barrier> barrier = worldState.nearestBarrier(rangeMeters());
+        Optional<Barrier> barrier = worldState.nearestBarrier(range);
         barrier.ifPresent(b -> events.add(new BarrierDetectedEvent(
             timestampMillis,
             id(),
@@ -87,7 +88,7 @@ public class CameraSensor extends AbstractSensor<Object> {
             b.getLane()
         )));
 
-        Optional<StaticObstacle> obstacle = worldState.nearestObstacleAhead(rangeMeters());
+        Optional<StaticObstacle> obstacle = worldState.nearestObstacleAhead(range);
         obstacle.ifPresent(o -> events.add(new ObstacleDetectedEvent(
             timestampMillis,
             id(),
@@ -98,5 +99,18 @@ public class CameraSensor extends AbstractSensor<Object> {
         )));
 
         return events;
+    }
+
+    /**
+     * Rain and fog shorten what the camera can see. This is the same factor the
+     * environment telemetry publishes as the effective range, so the UI and the
+     * sensor always agree; a factor above 1 never extends the nominal range.
+     */
+    public double effectiveRangeMeters(WorldState worldState) {
+        double visibility = worldState.getWeatherState().getVisibilityFactor();
+        if (!Double.isFinite(visibility) || visibility <= 0.0) {
+            return rangeMeters();
+        }
+        return rangeMeters() * Math.min(1.0, visibility);
     }
 }

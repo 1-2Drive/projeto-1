@@ -74,6 +74,7 @@ public class SimulationEngine implements AutoCloseable {
     private final WorldPhysicsEngine physicsEngine;
     private final DecisionActuator actuator;
     private final SensorManager sensorManager;
+    private final CameraSensor cameraSensor;
     private final List<ScenarioTimedAction> timedActions;
     private final List<Runnable> pendingWorldMutations;
     private final Map<String, String> lastSensorValues;
@@ -144,10 +145,11 @@ public class SimulationEngine implements AutoCloseable {
         this.scenarioInitialSpeedKmh = scenarioDefinition.getInitialSpeedKmh();
         holdVehicleAtRest();
 
+        this.cameraSensor = new CameraSensor(config);
         this.sensorManager = new SensorManager(List.of(
             new SpeedSensor(config),
             new FrontRadarSensor(config, 42L),
-            new CameraSensor(config),
+            cameraSensor,
             new BlindSpotSensor(config),
             new EnvironmentSensor(config)
         ));
@@ -605,7 +607,7 @@ public class SimulationEngine implements AutoCloseable {
 
         SensorTelemetry.EnvironmentView environment = new SensorTelemetry.EnvironmentView(
             worldState.getWeatherState().getCondition().name(),
-            config.getCameraRangeMeters() * worldState.getWeatherState().getVisibilityFactor(),
+            cameraSensor.effectiveRangeMeters(worldState),
             worldState.getWeatherState().getGripFactor() * 100.0,
             worldState.getWeatherState().getCondition() != WeatherCondition.CLEAR
         );

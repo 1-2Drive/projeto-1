@@ -10,6 +10,7 @@ import com.one2drive.projeto1.drools.DroolsSupport
 import com.one2drive.projeto1.drools.facts.CurrentSpeedLimit
 import com.one2drive.projeto1.drools.facts.LaneChangeRequestState
 import com.one2drive.projeto1.drools.facts.MoveOffState
+import com.one2drive.projeto1.drools.facts.OvertakingStateFact
 import com.one2drive.projeto1.drools.facts.VehicleStateFact
 
 global DroolsSupport droolsSupport
@@ -81,15 +82,17 @@ end
 // Every rule that still requires the stop proposes with a higher priority and wins; a
 // stop sign's own "proceed" proposal is slower and wins the tie. While the driver asks
 // for a lane change this proposal steps aside, otherwise its speed would win the tie
-// against the lane change at the same priority.
+// against the lane change at the same priority. The same goes for a vehicle that is
+// going around a stationary vehicle and has not left its lane yet.
 rule "Move off when stopped and nothing holds the vehicle"
 salience -90
 when
     $ctx : DecisionContext()
     MoveOffState(active == true)
-    VehicleStateFact($speed : speedKmh)
+    VehicleStateFact($speed : speedKmh, $lane : lane)
     CurrentSpeedLimit($limit : limitKmh)
     not LaneChangeRequestState(active == true)
+    not OvertakingStateFact(active == true, passedTarget == false, originalLane == $lane)
 then
     double target = Math.min(30.0, $limit);
     droolsSupport.proposeDecision(

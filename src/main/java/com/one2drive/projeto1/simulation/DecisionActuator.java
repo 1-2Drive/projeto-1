@@ -74,6 +74,7 @@ public class DecisionActuator {
                     requestLaneChange(ego, ego.getLane().left());
                     ego.setIndicatorState(IndicatorState.LEFT);
                     ego.setSteeringState(SteeringState.LEFT);
+                    holdSpeedIfNoneRecommended(ego, decision);
                 } else {
                     ego.setAccelerationMps2(-config.getComfortableDecelerationMps2());
                 }
@@ -83,6 +84,7 @@ public class DecisionActuator {
                     requestLaneChange(ego, ego.getLane().right());
                     ego.setIndicatorState(IndicatorState.RIGHT);
                     ego.setSteeringState(SteeringState.RIGHT);
+                    holdSpeedIfNoneRecommended(ego, decision);
                 } else {
                     ego.setAccelerationMps2(-config.getComfortableDecelerationMps2());
                 }
@@ -141,6 +143,17 @@ public class DecisionActuator {
         }
 
         preserveIndicatorsAndState(ego, decision);
+    }
+
+    /**
+     * A lane change decision that names no speed keeps the current one. Without this the
+     * acceleration of whatever decision came before stayed in force for the whole maneuver,
+     * so one braking cycle before a lane change slowed the vehicle all the way through it.
+     */
+    private static void holdSpeedIfNoneRecommended(EgoVehicleState ego, DrivingDecision decision) {
+        if (Double.isNaN(decision.getRecommendedSpeedKmh())) {
+            ego.setAccelerationMps2(0);
+        }
     }
 
     private static void preserveIndicatorsAndState(EgoVehicleState ego, DrivingDecision decision) {

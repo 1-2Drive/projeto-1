@@ -7,6 +7,7 @@ import com.one2drive.projeto1.domain.Lane;
 import com.one2drive.projeto1.domain.LaneChangeDirection;
 import com.one2drive.projeto1.domain.OtherVehicle;
 import com.one2drive.projeto1.domain.Pedestrian;
+import com.one2drive.projeto1.domain.PedestrianCrossingState;
 import com.one2drive.projeto1.domain.Pothole;
 import com.one2drive.projeto1.domain.RoadElement;
 import com.one2drive.projeto1.domain.SpeedLimitSign;
@@ -57,6 +58,16 @@ public class WorldState {
     /** Shortest signed distance from the ego to a position on the loop; negative is behind. */
     public double signedDistance(double positionMeters) {
         return roadMap.signedDistance(ego.getPositionMeters(), positionMeters);
+    }
+
+    /**
+     * Signed distance from the ego to another vehicle along the road travelled, without
+     * wrapping around the loop: negative once the ego has passed it. Vehicles keep counting
+     * metres like the ego does, so a vehicle left behind stays behind until it actually
+     * catches up, instead of reappearing ahead half a lap later.
+     */
+    public double vehicleSignedDistance(DynamicActor vehicle) {
+        return vehicle.getPositionMeters() - ego.getPositionMeters();
     }
 
     public EgoVehicleState getEgo() {
@@ -139,7 +150,11 @@ public class WorldState {
     }
 
     public Optional<OtherVehicle> nearestFrontVehicleInLane(double maxDistance) {
-        Lane egoLane = ego.getLane();
+        return nearestFrontVehicleInLane(ego.getLane(), maxDistance);
+    }
+
+    /** Nearest vehicle ahead of the ego in the given lane, which need not be the ego's own. */
+    public Optional<OtherVehicle> nearestFrontVehicleInLane(Lane egoLane, double maxDistance) {
         OtherVehicle nearest = null;
         double best = Double.MAX_VALUE;
         for (DynamicActor actor : actors) {
@@ -149,7 +164,7 @@ public class WorldState {
             if (vehicle.getLane() != egoLane) {
                 continue;
             }
-            double d = signedDistance(vehicle.getPositionMeters());
+            double d = vehicleSignedDistance(vehicle);
             if (d > 0.0 && d <= maxDistance && d < best) {
                 best = d;
                 nearest = vehicle;
@@ -158,27 +173,73 @@ public class WorldState {
         return Optional.ofNullable(nearest);
     }
 
-    public Optional<Pedestrian> nearestPedestrianInLane(double maxDistance) {
+    /**
+     * What the camera can tell about a pedestrian ahead.
+     *
+     * @param inPath already in the ego's trajectory: same lane, or within a lane width of it
+     * @param crossingState WAITING: on the road but not crossing; CROSSING: walking across
+     *                      the road and not yet at the far side, in whatever lane it is now;
+     *                      CROSSED: it has reached the far side and left the road
+     */
+    public record PedestrianPerception(Pedestrian pedestrian, double distanceMeters, boolean inPath,
+                                       PedestrianCrossingState crossingState) {
+        /** In the ego's trajectory, or still crossing the road the ego is about to drive over. */
+        public boolean conflicts() {
+            return inPath || crossingState == PedestrianCrossingState.CROSSING;
+        }
+    }
+
+    /**
+     * The pedestrian ahead that matters most: the nearest one in the ego's trajectory or
+     * still crossing the road, otherwise the nearest one standing on the road, otherwise
+     * the nearest one that has just finished crossing.
+     */
+    public Optional<PedestrianPerception> nearestPedestrianAhead(double maxDistance) {
         double egoLateral = ego.getLateralPositionMeters();
-        Pedestrian nearest = null;
-        double best = Double.MAX_VALUE;
+        PedestrianPerception nearestConflict = null;
+        PedestrianPerception nearestVisible = null;
+        PedestrianPerception nearestCrossed = null;
         for (DynamicActor actor : actors) {
             if (!(actor instanceof Pedestrian pedestrian) || !pedestrian.isActive()) {
                 continue;
             }
-            if (!pedestrian.isInRoadway()) {
+            double d = signedDistance(pedestrian.getPositionMeters());
+            if (d <= 0.0 || d > maxDistance) {
                 continue;
             }
-            double d = signedDistance(pedestrian.getPositionMeters());
-            boolean inPath = (pedestrian.getLane() == ego.getLane())
-                || pedestrian.isCrossing()
+            if (pedestrian.getCrossingState() == PedestrianCrossingState.CROSSED) {
+                if (nearestCrossed == null || d < nearestCrossed.distanceMeters()) {
+                    nearestCrossed = new PedestrianPerception(pedestrian, d, false, PedestrianCrossingState.CROSSED);
+                }
+                continue;
+            }
+            // Leaving the ego's lane does not end a crossing: until the pedestrian reaches
+            // the far side the crossing is occupied, and it is reported as CROSSING.
+            boolean crossing = pedestrian.isCrossingInProgress();
+            if (!crossing && !pedestrian.isInRoadway()) {
+                continue;
+            }
+            boolean inPath = pedestrian.getLane() == ego.getLane()
                 || Math.abs(pedestrian.getLateralPositionMeters() - egoLateral) <= 3.5;
-            if (inPath && d > 0.0 && d <= maxDistance && d < best) {
-                best = d;
-                nearest = pedestrian;
+            PedestrianPerception seen = new PedestrianPerception(pedestrian, d, inPath,
+                crossing ? PedestrianCrossingState.CROSSING : PedestrianCrossingState.WAITING);
+            if (seen.conflicts()) {
+                if (nearestConflict == null || d < nearestConflict.distanceMeters()) {
+                    nearestConflict = seen;
+                }
+            } else if (nearestVisible == null || d < nearestVisible.distanceMeters()) {
+                nearestVisible = seen;
             }
         }
-        return Optional.ofNullable(nearest);
+        return Optional.ofNullable(nearestConflict != null ? nearestConflict
+            : nearestVisible != null ? nearestVisible : nearestCrossed);
+    }
+
+    /** Nearest pedestrian in the ego's trajectory or still crossing the road ahead. */
+    public Optional<Pedestrian> nearestPedestrianInLane(double maxDistance) {
+        return nearestPedestrianAhead(maxDistance)
+            .filter(PedestrianPerception::conflicts)
+            .map(PedestrianPerception::pedestrian);
     }
 
     public List<RoadElement> activeRoadElementsInFront(double maxDistance) {
@@ -369,7 +430,7 @@ public class WorldState {
                 continue;
             }
 
-            double signedDist = signedDistance(actor.getPositionMeters());
+            double signedDist = vehicleSignedDistance(actor);
             double absDist = Math.abs(signedDist);
             best = Math.min(best, absDist);
 

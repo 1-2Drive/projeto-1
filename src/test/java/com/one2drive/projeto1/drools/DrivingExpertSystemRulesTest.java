@@ -4,32 +4,52 @@ import com.one2drive.projeto1.decision.DrivingDecision;
 import com.one2drive.projeto1.domain.DrivingAction;
 import com.one2drive.projeto1.domain.HazardSeverity;
 import com.one2drive.projeto1.domain.Lane;
+import com.one2drive.projeto1.domain.PedestrianCrossingState;
 import com.one2drive.projeto1.domain.LaneChangeDirection;
 import com.one2drive.projeto1.domain.TrafficLightState;
 import com.one2drive.projeto1.domain.WeatherCondition;
 import com.one2drive.projeto1.drools.events.AccelerationRequestEvent;
 import com.one2drive.projeto1.drools.events.BarrierDetectedEvent;
+import com.one2drive.projeto1.drools.events.FrontDistanceEvent;
 import com.one2drive.projeto1.drools.events.LaneChangeRequestEvent;
 import com.one2drive.projeto1.drools.events.LaneOccupancyEvent;
+import com.one2drive.projeto1.drools.events.LeftLaneVehicleEvent;
 import com.one2drive.projeto1.drools.events.PedestrianDetectedEvent;
 import com.one2drive.projeto1.drools.events.PotholeDetectedEvent;
 import com.one2drive.projeto1.drools.events.ReducedGripEvent;
 import com.one2drive.projeto1.drools.events.ReducedVisibilityEvent;
+import com.one2drive.projeto1.drools.events.RelativeSpeedEvent;
 import com.one2drive.projeto1.drools.events.SpeedLimitDetectedEvent;
 import com.one2drive.projeto1.drools.events.StopSignEvent;
 import com.one2drive.projeto1.drools.events.TTCEvent;
 import com.one2drive.projeto1.drools.events.TrafficLightEvent;
 import com.one2drive.projeto1.drools.events.WeatherEvent;
 import com.one2drive.projeto1.explanation.TimelineEntryType;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.kie.api.KieServices;
 
+import java.time.Duration;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DrivingExpertSystemRulesTest {
+
+    /**
+     * The knowledge base is compiled once, on first use, and that takes several seconds.
+     * Doing it here keeps it out of the per-test timeouts: a compilation interrupted by a
+     * timeout leaves a broken knowledge base behind and fails every later test.
+     */
+    @BeforeAll
+    static void compileKnowledgeBaseOnce() {
+        new DroolsTestHarness(0.0).close();
+    }
 
     @Test
     @Timeout(10)
@@ -330,6 +350,453 @@ class DrivingExpertSystemRulesTest {
             );
             assertEquals(DrivingAction.BRAKE, decision.getAction());
         }
+    }
+
+    @Test
+    @Timeout(10)
+    void closingOnStationaryVehicleFollowsTheSafeDistanceCurve() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(60.0)) {
+            // 60 km/h, stationary vehicle 40 m ahead: 28 m of room before the 12 m gap.
+            DrivingDecision decision = harness.cycle(
+                1_000,
+                60.0,
+                new FrontDistanceEvent(1_000, "front-radar", 40.0, "front-1"),
+                new RelativeSpeedEvent(1_000, "front-radar", 60.0 / 3.6, "front-1")
+            );
+            assertEquals(DrivingAction.REDUCE_SPEED, decision.getAction());
+            assertEquals("Keep safe following distance behind front vehicle", decision.getSourceRule());
+            assertEquals(Math.sqrt(2.0 * 2.0 * 28.0) * 3.6, decision.getRecommendedSpeedKmh(), 0.1);
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void stoppedBehindStationaryVehicleHoldsTheStop() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(0.0)) {
+            // Both vehicles at rest 12 m apart, left lane not reported clear: nothing is closing
+            // in any more, and the stop must still hold.
+            DrivingDecision decision = harness.cycle(
+                1_000,
+                0.0,
+                new FrontDistanceEvent(1_000, "front-radar", 12.0, "front-1"),
+                new RelativeSpeedEvent(1_000, "front-radar", 0.0, "front-1")
+            );
+            assertEquals(DrivingAction.STOP, decision.getAction());
+            assertEquals("Keep safe following distance behind front vehicle", decision.getSourceRule());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void stoppedBehindStationaryVehicleGoesAroundWhenLeftLaneIsClear() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(0.0)) {
+            DrivingDecision decision = harness.cycle(
+                1_000,
+                0.0,
+                new FrontDistanceEvent(1_000, "front-radar", 12.0, "front-1"),
+                new RelativeSpeedEvent(1_000, "front-radar", 0.0, "front-1"),
+                new LaneOccupancyEvent(1_000, "blind", Lane.LEFT, false, Double.POSITIVE_INFINITY)
+            );
+            assertEquals(DrivingAction.CHANGE_LANE_LEFT, decision.getAction());
+            assertEquals("Go around stationary front vehicle from standstill", decision.getSourceRule());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void redLightAheadForbidsGoingAroundStationaryVehicle() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(0.0)) {
+            // A queue stopped at a red light is not an obstacle to go around (Art. 41 CE).
+            DrivingDecision decision = harness.cycle(
+                1_000,
+                0.0,
+                new FrontDistanceEvent(1_000, "front-radar", 12.0, "front-1"),
+                new RelativeSpeedEvent(1_000, "front-radar", 0.0, "front-1"),
+                new LaneOccupancyEvent(1_000, "blind", Lane.LEFT, false, Double.POSITIVE_INFINITY),
+                new TrafficLightEvent(1_000, "camera", TrafficLightState.RED, 30.0, "light-1")
+            );
+            assertEquals(DrivingAction.STOP, decision.getAction());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void distanceSamplesOfDifferentVehiclesAreNotCombinedIntoOneTrend() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(40.0)) {
+            // Two samples of one vehicle, then the radar switches to another vehicle that is
+            // closer. The drop from 48 m to 40 m is between two vehicles, not an approach.
+            harness.cycle(1_000, 40.0, new FrontDistanceEvent(1_000, "front-radar", 48.0, "front-1"));
+            harness.cycle(1_100, 40.0, new FrontDistanceEvent(1_100, "front-radar", 47.5, "front-1"));
+            DrivingDecision decision = harness.cycle(1_200, 40.0,
+                new FrontDistanceEvent(1_200, "front-radar", 40.0, "front-2"));
+            assertEquals("Default maintain speed baseline", decision.getSourceRule(),
+                "samples of two different vehicles must not form a closing trend");
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void distanceSamplesOfTheSameVehicleStillFormATrend() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(40.0)) {
+            harness.cycle(1_000, 40.0, new FrontDistanceEvent(1_000, "front-radar", 48.0, "front-1"));
+            harness.cycle(1_100, 40.0, new FrontDistanceEvent(1_100, "front-radar", 45.0, "front-1"));
+            DrivingDecision decision = harness.cycle(1_200, 40.0,
+                new FrontDistanceEvent(1_200, "front-radar", 42.0, "front-1"));
+            assertEquals("Approaching trend from sliding distance window", decision.getSourceRule());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void slowerVehicleInTheLeftLaneIsNotPassedOnItsRight() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(60.0)) {
+            // 60 km/h, a vehicle doing 30 km/h 20 m ahead in the lane to the left: the ego may
+            // not draw level with it, so it is slowed down to that vehicle's speed.
+            double relativeMps = 30.0 / 3.6;
+            DrivingDecision decision = harness.cycle(
+                1_000,
+                60.0,
+                new LeftLaneVehicleEvent(1_000, "front-radar", 20.0, relativeMps, "left-1")
+            );
+            assertEquals(DrivingAction.REDUCE_SPEED, decision.getAction());
+            assertEquals("Do not pass a slower left lane vehicle on its right", decision.getSourceRule());
+            // 20 m is inside the 35 m it must keep, so the target is the other vehicle's speed.
+            assertEquals(30.0, decision.getRecommendedSpeedKmh(), 0.1);
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void fasterVehicleInTheLeftLaneDoesNotSlowTheEgoDown() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(60.0)) {
+            DrivingDecision decision = harness.cycle(
+                1_000,
+                60.0,
+                new LeftLaneVehicleEvent(1_000, "front-radar", 20.0, -10.0 / 3.6, "left-1")
+            );
+            assertEquals("Default maintain speed baseline", decision.getSourceRule());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void pedestrianAt35MetersPrevailsOverRedLightApproach() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(60.0)) {
+            // At 70 m and 60 km/h the red light approach still allows the current speed.
+            DrivingDecision decision = harness.cycle(
+                1_000,
+                60.0,
+                new TrafficLightEvent(1_000, "camera", TrafficLightState.RED, 70.0, "light-1"),
+                new PedestrianDetectedEvent(1_000, "camera", 35.0, "ped-1", true)
+            );
+            assertEquals(DrivingAction.BRAKE, decision.getAction());
+            assertEquals("Brake for pedestrian proximity", decision.getSourceRule());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void pedestrianBetween10And20MetersStopsTheVehicleBeforeARedLight() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(60.0)) {
+            for (double distance : new double[]{10.0, 15.0, 20.0}) {
+                long now = 1_000 + (long) distance * 100;
+                DrivingDecision decision = harness.cycle(
+                    now,
+                    60.0,
+                    new TrafficLightEvent(now, "camera", TrafficLightState.RED, 70.0, "light-1"),
+                    new PedestrianDetectedEvent(now, "camera", distance, "ped-1", true)
+                );
+                assertEquals(DrivingAction.STOP, decision.getAction(), "pedestrian at " + distance + " m");
+                assertEquals("Stop for pedestrian in crossing zone", decision.getSourceRule());
+            }
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void pedestrianWithin6MetersTriggersEmergencyBrake() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(30.0)) {
+            DrivingDecision decision = harness.cycle(
+                1_000,
+                30.0,
+                new PedestrianDetectedEvent(1_000, "camera", 6.0, "ped-1", true)
+            );
+            assertEquals(DrivingAction.EMERGENCY_BRAKE, decision.getAction());
+            assertEquals("Emergency stop for pedestrian extremely close", decision.getSourceRule());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void pedestrianCrossingIntoThePathIsBrakedForBeforeItIsInThePath() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(60.0)) {
+            // Still in another lane (inPath false), but walking a path that crosses the ego's.
+            DrivingDecision decision = harness.cycle(
+                1_000,
+                60.0,
+                new PedestrianDetectedEvent(1_000, "camera", 70.0, "ped-1", false, PedestrianCrossingState.CROSSING)
+            );
+            assertEquals(DrivingAction.BRAKE, decision.getAction());
+            assertEquals("Brake for pedestrian proximity", decision.getSourceRule());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void visiblePedestrianWithoutConflictIsOnlyMonitored() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(60.0)) {
+            DrivingDecision decision = harness.cycle(
+                1_000,
+                60.0,
+                new PedestrianDetectedEvent(1_000, "camera", 15.0, "ped-1", false, PedestrianCrossingState.WAITING)
+            );
+            assertEquals("Default maintain speed baseline", decision.getSourceRule());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void pedestrianStillCrossingOutsideTheEgoLaneKeepsTheVehicleStopped() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(0.0)) {
+            // Out of the ego's lane (inPath false) but not yet across the road.
+            DrivingDecision near = harness.cycle(
+                1_000,
+                0.0,
+                new PedestrianDetectedEvent(1_000, "camera", 15.0, "ped-1", false, PedestrianCrossingState.CROSSING)
+            );
+            assertEquals(DrivingAction.STOP, near.getAction());
+            assertEquals("Stop for pedestrian in crossing zone", near.getSourceRule());
+
+            DrivingDecision furtherBack = harness.cycle(
+                1_200,
+                0.0,
+                new PedestrianDetectedEvent(1_200, "camera", 35.0, "ped-1", false, PedestrianCrossingState.CROSSING)
+            );
+            assertEquals(DrivingAction.STOP, furtherBack.getAction());
+            assertEquals("Hold for pedestrian still crossing", furtherBack.getSourceRule());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void pedestrianThatFinishedCrossingNoLongerHoldsTheVehicle() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(0.0)) {
+            DrivingDecision crossing = harness.cycle(
+                1_000,
+                0.0,
+                new PedestrianDetectedEvent(1_000, "camera", 15.0, "ped-1", false, PedestrianCrossingState.CROSSING)
+            );
+            assertEquals(DrivingAction.STOP, crossing.getAction());
+
+            DrivingDecision crossed = harness.cycle(
+                1_200,
+                0.0,
+                new PedestrianDetectedEvent(1_200, "camera", 15.0, "ped-1", false, PedestrianCrossingState.CROSSED)
+            );
+            assertNotEquals(DrivingAction.STOP, crossed.getAction());
+            assertFalse(crossed.getSourceRule().toLowerCase().contains("pedestrian"),
+                "a pedestrian that has crossed must not hold the vehicle: " + crossed.getSourceRule());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void crossingPedestrianWithin6MetersTriggersEmergencyBrakeEvenOutsideTheEgoLane() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(30.0)) {
+            DrivingDecision decision = harness.cycle(
+                1_000,
+                30.0,
+                new PedestrianDetectedEvent(1_000, "camera", 5.0, "ped-1", false, PedestrianCrossingState.CROSSING)
+            );
+            assertEquals(DrivingAction.EMERGENCY_BRAKE, decision.getAction());
+            assertEquals("Emergency stop for pedestrian extremely close", decision.getSourceRule());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void yellowLightWithRoomToStopCommitsToStopAndDoesNotChangeItsMind() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(60.0)) {
+            // 90 m at 60 km/h is more than the 76 m a comfortable stop before the line needs.
+            DrivingDecision far = harness.cycle(
+                1_000,
+                60.0,
+                new TrafficLightEvent(1_000, "camera", TrafficLightState.YELLOW, 90.0, "light-1")
+            );
+            assertEquals("Yellow traffic light: stop before the line", far.getSourceRule());
+            assertEquals(DrivingAction.MAINTAIN_SPEED, far.getAction());
+
+            // Closer than a stop would now need at this speed: the decision to stop stands.
+            DrivingDecision closer = harness.cycle(
+                1_200,
+                60.0,
+                new TrafficLightEvent(1_200, "camera", TrafficLightState.YELLOW, 50.0, "light-1")
+            );
+            assertEquals("Yellow traffic light: stop before the line", closer.getSourceRule());
+            assertEquals(DrivingAction.REDUCE_SPEED, closer.getAction());
+
+            DrivingDecision red = harness.cycle(
+                1_400,
+                40.0,
+                new TrafficLightEvent(1_400, "camera", TrafficLightState.RED, 45.0, "light-1")
+            );
+            assertTrue(red.getSourceRule().startsWith("Red traffic light"), red.getSourceRule());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void yellowLightTooCloseToStopCommitsToProceedAndDoesNotChangeItsMind() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(60.0)) {
+            // 50 m at 60 km/h is less than the 76 m a comfortable stop before the line needs.
+            DrivingDecision close = harness.cycle(
+                1_000,
+                60.0,
+                new TrafficLightEvent(1_000, "camera", TrafficLightState.YELLOW, 50.0, "light-1")
+            );
+            assertFalse(close.getSourceRule().toLowerCase().contains("traffic light"), close.getSourceRule());
+
+            // Slower now, so a stop would fit again, and then red: the decision to drive on stands.
+            DrivingDecision slower = harness.cycle(
+                1_200,
+                20.0,
+                new TrafficLightEvent(1_200, "camera", TrafficLightState.YELLOW, 45.0, "light-1")
+            );
+            assertFalse(slower.getSourceRule().toLowerCase().contains("traffic light"), slower.getSourceRule());
+
+            DrivingDecision red = harness.cycle(
+                1_400,
+                20.0,
+                new TrafficLightEvent(1_400, "camera", TrafficLightState.RED, 40.0, "light-1")
+            );
+            assertFalse(red.getSourceRule().toLowerCase().contains("traffic light"), red.getSourceRule());
+            assertNotEquals(DrivingAction.STOP, red.getAction());
+            assertNotEquals(DrivingAction.EMERGENCY_BRAKE, red.getAction());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void yellowLightDetectedFarAwayCommitsToStopAtTheFirstDetection() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(30.0)) {
+            // 110 m at 30 km/h: far beyond the 40 m at which the brakes start to matter. The
+            // decision to stop is made now; there is nothing to do about it yet.
+            DrivingDecision far = harness.cycle(
+                1_000,
+                30.0,
+                new TrafficLightEvent(1_000, "camera", TrafficLightState.YELLOW, 110.0, "light-1")
+            );
+            assertFalse(far.getSourceRule().toLowerCase().contains("traffic light"), far.getSourceRule());
+
+            // Faster and close: a stop would no longer fit if it were decided now. It was
+            // decided at the first detection, and it stands.
+            DrivingDecision close = harness.cycle(
+                1_200,
+                60.0,
+                new TrafficLightEvent(1_200, "camera", TrafficLightState.YELLOW, 50.0, "light-1")
+            );
+            assertEquals("Yellow traffic light: stop before the line", close.getSourceRule());
+            assertEquals(DrivingAction.REDUCE_SPEED, close.getAction());
+
+            DrivingDecision red = harness.cycle(
+                1_400,
+                50.0,
+                new TrafficLightEvent(1_400, "camera", TrafficLightState.RED, 45.0, "light-1")
+            );
+            assertTrue(red.getSourceRule().startsWith("Red traffic light"), red.getSourceRule());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void committedToProceedAtYellowStillStopsForAPedestrian() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(60.0)) {
+            DrivingDecision proceed = harness.cycle(
+                1_000,
+                60.0,
+                new TrafficLightEvent(1_000, "camera", TrafficLightState.YELLOW, 50.0, "light-1")
+            );
+            assertFalse(proceed.getSourceRule().toLowerCase().contains("traffic light"), proceed.getSourceRule());
+
+            DrivingDecision pedestrian = harness.cycle(
+                1_200,
+                60.0,
+                new TrafficLightEvent(1_200, "camera", TrafficLightState.YELLOW, 46.0, "light-1"),
+                new PedestrianDetectedEvent(1_200, "camera", 15.0, "ped-1", true)
+            );
+            assertEquals(DrivingAction.STOP, pedestrian.getAction());
+            assertEquals("Stop for pedestrian in crossing zone", pedestrian.getSourceRule());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void redLightAheadAndPastTheStopLineAtSpeedIsNeverLeftToTheBaseline() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(60.0)) {
+            // 15 m to the light: 3 m past the stop line, which is 18 m before it.
+            DrivingDecision moving = harness.cycle(
+                1_000,
+                60.0,
+                new TrafficLightEvent(1_000, "camera", TrafficLightState.RED, 15.0, "light-1")
+            );
+            assertNotEquals(DrivingAction.MAINTAIN_SPEED, moving.getAction());
+            assertEquals(DrivingAction.EMERGENCY_BRAKE, moving.getAction());
+            assertEquals("Hold at red traffic light", moving.getSourceRule());
+
+            DrivingDecision atRest = harness.cycle(
+                1_200,
+                0.0,
+                new TrafficLightEvent(1_200, "camera", TrafficLightState.RED, 6.0, "light-1")
+            );
+            assertEquals(DrivingAction.STOP, atRest.getAction());
+            assertEquals("Hold at red traffic light", atRest.getSourceRule());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void redLightPastTheStopLineIsStoppedForComfortablyWhenThatStillFitsBeforeTheLight() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(25.0)) {
+            // 15 m to the light at 25 km/h: a comfortable stop takes 8.6 m and 12 m are left
+            // once the 3 m tolerance is taken off. No emergency, and never the baseline.
+            DrivingDecision slow = harness.cycle(
+                1_000,
+                25.0,
+                new TrafficLightEvent(1_000, "camera", TrafficLightState.RED, 15.0, "light-1")
+            );
+            assertEquals(DrivingAction.STOP, slow.getAction());
+            assertEquals("Hold at red traffic light", slow.getSourceRule());
+        }
+        try (DroolsTestHarness harness = new DroolsTestHarness(45.0)) {
+            // At 45 km/h the comfortable stop takes 27.9 m: it no longer fits in those 12 m.
+            DrivingDecision fast = harness.cycle(
+                1_000,
+                45.0,
+                new TrafficLightEvent(1_000, "camera", TrafficLightState.RED, 15.0, "light-1")
+            );
+            assertEquals(DrivingAction.EMERGENCY_BRAKE, fast.getAction());
+            assertEquals("Hold at red traffic light", fast.getSourceRule());
+        }
+    }
+
+    @Test
+    void zeroRadarDistanceWithClosingSpeedDoesNotLoopForever() {
+        // A radar sample clamped to 0 m resets the front vehicle fact; the relative-speed and
+        // TTC updates must not re-adopt the target, or the three rules re-trigger each other
+        // without end and fireAllRules never returns.
+        assertTimeoutPreemptively(Duration.ofSeconds(5), () -> {
+            try (DroolsTestHarness harness = new DroolsTestHarness(5.0)) {
+                harness.cycle(1_000, 5.0,
+                    new FrontDistanceEvent(1_000, "front-radar", 3.0, "front-1"),
+                    new RelativeSpeedEvent(1_000, "front-radar", 0.5, "front-1"),
+                    new TTCEvent(1_000, "front-radar", 6.0, "front-1"));
+                DrivingDecision decision = harness.cycle(1_100, 5.0,
+                    new FrontDistanceEvent(1_100, "front-radar", 0.0, "front-1"),
+                    new RelativeSpeedEvent(1_100, "front-radar", 0.5, "front-1"),
+                    new TTCEvent(1_100, "front-radar", 0.0, "front-1"));
+                assertNotNull(decision.getAction());
+            }
+        });
     }
 
     @Test

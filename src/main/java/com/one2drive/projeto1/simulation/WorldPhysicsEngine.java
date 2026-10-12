@@ -1,6 +1,7 @@
 package com.one2drive.projeto1.simulation;
 
 import com.one2drive.projeto1.config.SimulationConfig;
+import com.one2drive.projeto1.decision.StoppingPolicy;
 import com.one2drive.projeto1.domain.DynamicActor;
 import com.one2drive.projeto1.domain.EgoVehicleState;
 import com.one2drive.projeto1.domain.LaneChangeState;
@@ -11,6 +12,9 @@ import com.one2drive.projeto1.domain.LaneChangeState;
  * visible as continuous movement rather than a jump.
  */
 public class WorldPhysicsEngine {
+    /** Below this speed the vehicle counts as stopped. */
+    private static final double AT_REST_SPEED_KMH = 0.1;
+
     private final SimulationConfig config;
 
     public WorldPhysicsEngine(SimulationConfig config) {
@@ -20,6 +24,8 @@ public class WorldPhysicsEngine {
     public void updateWorld(WorldState worldState, double dtSeconds) {
         // State representation vector: [x, y, vx, vy] for ego followed by active actors
         EgoVehicleState ego = worldState.getEgo();
+        // Whether the vehicle was at rest when this step began, before it is moved.
+        boolean egoAtRest = ego.getSpeedKmh() < AT_REST_SPEED_KMH;
         // No end of road: the map is a loop, so position keeps counting metres travelled.
         ego.advance(dtSeconds);
         advanceLaneChange(ego, dtSeconds);
@@ -30,6 +36,19 @@ public class WorldPhysicsEngine {
             }
             actor.advance(dtSeconds);
         }
+
+        // The traffic light cycle is part of the world: time passes for it like for the actors.
+        // The red time only runs while the vehicle is waiting at the light: at rest, before
+        // the light and no further back than the stop line and its tolerance.
+        worldState.getRoadMap().advanceTrafficLights(
+            Math.round(dtSeconds * 1000.0),
+            Math.round(config.getYellowLightSeconds() * 1000.0),
+            config.getRedHoldAfterStopMillis(),
+            light -> {
+                double distance = worldState.signedDistance(light.getPositionMeters());
+                return egoAtRest && distance > 0.0
+                    && distance <= StoppingPolicy.RED_LIGHT_STOP_LINE_OFFSET_METERS + StoppingPolicy.STOP_LINE_TOLERANCE_METERS;
+            });
     }
 
     /**

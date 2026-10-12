@@ -11,7 +11,11 @@ public class Pedestrian extends DynamicActor {
         super(positionMeters, lane, 0.0);
         this.lateralPositionMeters = lane != null ? lane.centreMeters() : 0.0;
         this.lateralSpeedMps = Math.abs(speedMps);
-        this.targetLateralMeters = -5.5; // cross towards the left sidewalk
+        // Cross the whole road to the far side: from the left lane towards the right
+        // sidewalk, from the centre or right lane towards the left sidewalk. Always heading
+        // left made a pedestrian in the left lane step straight off the road, so it could
+        // never cross towards a vehicle in the other lanes.
+        this.targetLateralMeters = lane == Lane.LEFT ? 5.5 : -5.5;
         this.crossingState = Math.abs(speedMps) > 0.01 ? PedestrianCrossingState.CROSSING : PedestrianCrossingState.WAITING;
         this.crossing = Math.abs(speedMps) > 0.01;
     }
@@ -64,6 +68,11 @@ public class Pedestrian extends DynamicActor {
 
     public void setCrossing(boolean crossing) {
         this.crossing = crossing;
+    }
+
+    /** Walking across the road and not yet at the far side: the crossing is occupied. */
+    public boolean isCrossingInProgress() {
+        return crossing && crossingState == PedestrianCrossingState.CROSSING;
     }
 
     public boolean isInRoadway() {

@@ -1,6 +1,7 @@
 package rules
 
 import com.one2drive.projeto1.domain.Lane
+import com.one2drive.projeto1.domain.PedestrianCrossingState
 import com.one2drive.projeto1.domain.TrafficLightState
 import com.one2drive.projeto1.drools.events.*
 import com.one2drive.projeto1.drools.facts.*
@@ -47,6 +48,10 @@ when
             || $state.getState() != $e.getState()
             || Math.abs($state.getDistanceMeters() - $e.getDistanceMeters()) > 0.01))
 then
+    // A decision to stop or to drive on is about one light and one yellow/red phase.
+    if (!$e.getLightId().equals($state.getLightId()) || $e.getState() == TrafficLightState.GREEN) {
+        $state.setCommitment(TrafficLightCommitment.NONE);
+    }
     $state.setLightId($e.getLightId());
     $state.setState($e.getState());
     $state.setDistanceMeters($e.getDistanceMeters());
@@ -123,7 +128,10 @@ salience 1000
 no-loop true
 when
     $e : RelativeSpeedEvent() from entry-point "PERCEPTION_STREAM"
-    $state : FrontVehicleState(targetId == $e.getTargetId() || targetId == "none")
+    // Only the distance rule may adopt a new target. Matching a fact reset to "none" here
+    // would re-adopt the target after a 0 m radar sample reset it, the distance rule would
+    // reset it again, and the two rules would re-trigger each other without end.
+    $state : FrontVehicleState(targetId == $e.getTargetId())
     eval($e.getTimestamp() >= $state.getTimestamp()
         && ($e.getTimestamp() > $state.getTimestamp()
             || Math.abs($state.getRelativeSpeedMps() - $e.getRelativeSpeedMps()) > 0.01))
@@ -139,7 +147,10 @@ salience 1000
 no-loop true
 when
     $e : TTCEvent() from entry-point "PERCEPTION_STREAM"
-    $state : FrontVehicleState(targetId == $e.getTargetId() || targetId == "none")
+    // Only the distance rule may adopt a new target. Matching a fact reset to "none" here
+    // would re-adopt the target after a 0 m radar sample reset it, the distance rule would
+    // reset it again, and the two rules would re-trigger each other without end.
+    $state : FrontVehicleState(targetId == $e.getTargetId())
     eval($e.getTimestamp() >= $state.getTimestamp()
         && ($e.getTimestamp() > $state.getTimestamp()
             || (Double.isInfinite($state.getTtcSeconds()) && !Double.isInfinite($e.getTtcSeconds()))
@@ -162,16 +173,19 @@ when
         && ($e.getTimestamp() > $state.getTimestamp()
             || !$e.getPedestrianId().equals($state.getPedestrianId())
             || Math.abs($state.getDistanceMeters() - $e.getDistanceMeters()) > 0.01
-            || $state.isInPath() != $e.isInPath()))
+            || $state.isInPath() != $e.isInPath()
+            || $state.getCrossingState() != $e.getCrossingState()))
 then
     if ($e.getDistanceMeters() <= 0 || "none".equals($e.getPedestrianId()) || Double.isInfinite($e.getDistanceMeters())) {
         $state.setPedestrianId("none");
         $state.setDistanceMeters(Double.POSITIVE_INFINITY);
         $state.setInPath(false);
+        $state.setCrossingState(PedestrianCrossingState.WAITING);
     } else {
         $state.setPedestrianId($e.getPedestrianId());
         $state.setDistanceMeters($e.getDistanceMeters());
         $state.setInPath($e.isInPath());
+        $state.setCrossingState($e.getCrossingState());
     }
     $state.setTimestamp($e.getTimestamp());
     update($state);
@@ -317,18 +331,56 @@ then
     update($state);
 end
 
+// The front radar reports every 100 ms while a vehicle is ahead in the ego lane, so two
+// missed samples mean it is gone (the ego changed lane, or the vehicle did). Holding the
+// old target for a full second made the rules keep reacting to a vehicle that was no
+// longer in front.
 rule "Clear stale front vehicle perception"
 no-loop true
 salience 900
 when
     $state : FrontVehicleState(targetId != "none", $timestamp : timestamp)
     VehicleStateFact($now : timestamp)
-    eval($now - $timestamp > 1000)
+    eval($now - $timestamp > 250)
 then
     $state.setTargetId("none");
     $state.setDistanceMeters(Double.POSITIVE_INFINITY);
     $state.setRelativeSpeedMps(0.0);
     $state.setTtcSeconds(Double.POSITIVE_INFINITY);
+    $state.setTimestamp($now);
+    update($state);
+end
+
+rule "Update left lane vehicle state"
+salience 1000
+no-loop true
+when
+    $e : LeftLaneVehicleEvent() from entry-point "PERCEPTION_STREAM"
+    $state : LeftLaneVehicleState()
+    eval($e.getTimestamp() >= $state.getTimestamp()
+        && ($e.getTimestamp() > $state.getTimestamp()
+            || !$e.getTargetId().equals($state.getTargetId())
+            || Math.abs($state.getDistanceMeters() - $e.getDistanceMeters()) > 0.01))
+then
+    $state.setTargetId($e.getTargetId());
+    $state.setDistanceMeters($e.getDistanceMeters());
+    $state.setRelativeSpeedMps($e.getRelativeSpeedMps());
+    $state.setTimestamp($e.getTimestamp());
+    update($state);
+end
+
+// Same two-sample rule as the front vehicle: the radar reports every 100 ms.
+rule "Clear stale left lane vehicle perception"
+no-loop true
+salience 900
+when
+    $state : LeftLaneVehicleState(targetId != "none", $timestamp : timestamp)
+    VehicleStateFact($now : timestamp)
+    eval($now - $timestamp > 250)
+then
+    $state.setTargetId(LeftLaneVehicleState.NO_TARGET);
+    $state.setDistanceMeters(Double.POSITIVE_INFINITY);
+    $state.setRelativeSpeedMps(0.0);
     $state.setTimestamp($now);
     update($state);
 end
@@ -381,6 +433,29 @@ then
     $state.setPedestrianId("none");
     $state.setDistanceMeters(Double.POSITIVE_INFINITY);
     $state.setInPath(false);
+    $state.setCrossingState(PedestrianCrossingState.WAITING);
+    $state.setTimestamp($now);
+    update($state);
+end
+
+// Once the vehicle has passed a traffic light the camera no longer reports it, and that
+// light has nothing more to say about this passage. Without this the last state seen, a
+// yellow or a red included, stayed in working memory and kept its rules firing behind the
+// light. The camera reports a light every 200 ms for as long as it is ahead, so two missed
+// readings are enough to know it is behind: waiting longer kept a vehicle that was braking
+// for a red light braking after it had passed it.
+rule "Clear stale traffic light perception"
+no-loop true
+salience 900
+when
+    $state : TrafficLightStateFact(lightId != "none", $timestamp : timestamp)
+    VehicleStateFact($now : timestamp)
+    eval($now - $timestamp > 400)
+then
+    $state.setLightId("none");
+    $state.setState(TrafficLightState.GREEN);
+    $state.setDistanceMeters(Double.POSITIVE_INFINITY);
+    $state.setCommitment(TrafficLightCommitment.NONE);
     $state.setTimestamp($now);
     update($state);
 end

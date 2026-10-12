@@ -5,6 +5,7 @@ import com.one2drive.projeto1.drools.events.BarrierDetectedEvent
 import com.one2drive.projeto1.drools.events.FrontDistanceEvent
 import com.one2drive.projeto1.drools.events.LaneChangeRequestEvent
 import com.one2drive.projeto1.drools.events.LaneOccupancyEvent
+import com.one2drive.projeto1.drools.events.LeftLaneVehicleEvent
 import com.one2drive.projeto1.drools.events.ObstacleDetectedEvent
 import com.one2drive.projeto1.drools.events.PedestrianDetectedEvent
 import com.one2drive.projeto1.drools.events.PotholeDetectedEvent
@@ -84,6 +85,12 @@ declare BarrierDetectedEvent
     @role( event )
     @timestamp( timestamp )
     @expires( 20s )
+end
+
+declare LeftLaneVehicleEvent
+    @role( event )
+    @timestamp( timestamp )
+    @expires( 10s )
 end
 
 declare LaneOccupancyEvent

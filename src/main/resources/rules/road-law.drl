@@ -3,6 +3,7 @@ package rules
 import com.one2drive.projeto1.decision.DecisionContext
 import com.one2drive.projeto1.decision.DecisionPriority
 import com.one2drive.projeto1.domain.DrivingAction
+import com.one2drive.projeto1.domain.PedestrianCrossingState
 import com.one2drive.projeto1.domain.Lane
 import com.one2drive.projeto1.domain.LaneChangeState
 import com.one2drive.projeto1.domain.RiskLevel
@@ -34,12 +35,12 @@ no-loop true
 when
     $ctx : DecisionContext()
     VehicleStateFact(lane != Lane.RIGHT, presentationDemo == false, laneChangeState == LaneChangeState.IDLE, rightMarking != RoadMarkingType.CONTINUOUS, rightLaneBlockedAhead == false, timestamp >= 4000)
-    LaneOccupancyState(lane == Lane.RIGHT, occupied == false)
+    LaneOccupancyState(lane == Lane.RIGHT, occupied == false, frontDistanceMeters > 80.0)
     not MoveOffState(active == true)
     not ObstacleStateFact(obstacleId != "none", distanceMeters > 0)
     not PotholeStateFact(potholeId != "none", distanceMeters > 0)
     not BarrierStateFact(barrierId != "none", open == false, distanceMeters > 0)
-    not PedestrianStateFact(pedestrianId != "none", inPath == true, distanceMeters > 0)
+    not PedestrianStateFact(pedestrianId != "none", inPath == true || crossingState == PedestrianCrossingState.CROSSING, distanceMeters > 0)
     not FrontVehicleState(targetId != "none", distanceMeters > 0, distanceMeters <= 80.0)
     not LaneChangeRequestState(active == true)
     not OvertakingStateFact(active == true)

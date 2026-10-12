@@ -1,6 +1,9 @@
 package com.one2drive.projeto1.config;
 
 public class SimulationConfig {
+    /** Default red time of a traffic light, counted from the moment the vehicle has stopped at it. */
+    public static final long RED_HOLD_AFTER_STOP_MS = 5000;
+
     private final long tickMillis;
     /** Length of one road map block (one matrix row). */
     private final double mapBlockLengthMeters;
@@ -26,6 +29,9 @@ public class SimulationConfig {
 
     private final double distanceNoiseStdMeters;
 
+    private final double yellowLightSeconds;
+    private final long redHoldAfterStopMillis;
+
     public SimulationConfig(long tickMillis,
                             double mapBlockLengthMeters,
                             int defaultMapRows,
@@ -44,7 +50,9 @@ public class SimulationConfig {
                             long blindSpotRateMillis,
                             long environmentRateMillis,
                             long speedSensorRateMillis,
-                            double distanceNoiseStdMeters) {
+                            double distanceNoiseStdMeters,
+                            double yellowLightSeconds,
+                            long redHoldAfterStopMillis) {
         this.tickMillis = tickMillis;
         this.mapBlockLengthMeters = mapBlockLengthMeters;
         this.defaultMapRows = defaultMapRows;
@@ -64,6 +72,8 @@ public class SimulationConfig {
         this.environmentRateMillis = environmentRateMillis;
         this.speedSensorRateMillis = speedSensorRateMillis;
         this.distanceNoiseStdMeters = distanceNoiseStdMeters;
+        this.yellowLightSeconds = yellowLightSeconds;
+        this.redHoldAfterStopMillis = redHoldAfterStopMillis;
     }
 
     public static SimulationConfig defaultConfig() {
@@ -86,7 +96,9 @@ public class SimulationConfig {
             200,
             400,
             100,
-            0.7
+            0.7,
+            3.0,
+            RED_HOLD_AFTER_STOP_MS
         );
     }
 
@@ -164,5 +176,18 @@ public class SimulationConfig {
 
     public double getDistanceNoiseStdMeters() {
         return distanceNoiseStdMeters;
+    }
+
+    /** How long a traffic light stays yellow before it turns red. */
+    public double getYellowLightSeconds() {
+        return yellowLightSeconds;
+    }
+
+    /**
+     * How long a traffic light that came from yellow stays red once the vehicle is at rest
+     * at its stop line. The time the vehicle takes to get there does not count.
+     */
+    public long getRedHoldAfterStopMillis() {
+        return redHoldAfterStopMillis;
     }
 }

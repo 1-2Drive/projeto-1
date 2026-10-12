@@ -9,6 +9,8 @@ import com.one2drive.projeto1.scenario.ScenarioLibrary;
 import com.one2drive.projeto1.simulation.SimulationEngine;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.NoSuchElementException;
@@ -18,6 +20,8 @@ import java.util.concurrent.TimeUnit;
 
 @Service
 public class SimulationRuntimeService {
+    private static final Logger LOGGER = LoggerFactory.getLogger(SimulationRuntimeService.class);
+
     private final SimulationEngine simulationEngine;
     private final ScenarioLibrary scenarioLibrary;
     private final ApiModelMapper apiModelMapper;
@@ -45,9 +49,15 @@ public class SimulationRuntimeService {
             return thread;
         });
         scheduler.scheduleAtFixedRate(() -> {
-            synchronized (this) {
-                simulationEngine.tick();
-                publisher.publish(snapshot());
+            // A scheduled task that throws is never run again, which would freeze the
+            // simulation silently: log the failure and keep ticking.
+            try {
+                synchronized (this) {
+                    simulationEngine.tick();
+                    publisher.publish(snapshot());
+                }
+            } catch (RuntimeException e) {
+                LOGGER.error("Simulation tick failed", e);
             }
         }, 0, config.getTickMillis(), TimeUnit.MILLISECONDS);
     }

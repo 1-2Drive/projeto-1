@@ -65,6 +65,8 @@ import java.util.function.Consumer;
 public class SimulationEngine implements AutoCloseable {
     /** Objects closer than this behind the car are drawn behind it; anything further back is drawn as coming up. */
     private static final double RENDER_BEHIND_METERS = 50.0;
+    /** Upper bound on rule firings in one tick; a normal tick fires well under a hundred. */
+    private static final int MAX_RULE_FIRINGS_PER_TICK = 5000;
 
     private final SimulationConfig config;
     private final SimulationClock simulationClock;
@@ -87,6 +89,8 @@ public class SimulationEngine implements AutoCloseable {
     private final Map<String, Long> cameraDetectedObjectTimestamps;
     private final Map<String, Long> radarDetectedObjectTimestamps;
     private final Set<String> detectedWorldObjectIds;
+    private String trackedPedestrianId = "none";
+    private boolean trackedPedestrianReportedCrossed;
     private final Set<String> demoEvidence;
     private final boolean pseudoClock;
     private final Consumer<DrivingDecision> decisionConsumer;
@@ -247,6 +251,8 @@ public class SimulationEngine implements AutoCloseable {
         cameraDetectedObjectTimestamps.clear();
         radarDetectedObjectTimestamps.clear();
         detectedWorldObjectIds.clear();
+        trackedPedestrianId = "none";
+        trackedPedestrianReportedCrossed = false;
         demoEvidence.clear();
         scenarioInitialSpeedKmh = scenarioDefinition.getInitialSpeedKmh();
         holdVehicleAtRest();
@@ -295,7 +301,12 @@ public class SimulationEngine implements AutoCloseable {
         updateActiveRadarFact();
         refreshSensorTelemetry(events);
 
-        knowledgeSession.getKieSession().fireAllRules();
+        // Circuit breaker: rules that re-trigger each other must never freeze the tick.
+        int fired = knowledgeSession.getKieSession().fireAllRules(MAX_RULE_FIRINGS_PER_TICK);
+        if (fired >= MAX_RULE_FIRINGS_PER_TICK) {
+            knowledgeSession.getTrace().add(simTimeMillis, TimelineEntryType.INFO,
+                "Rule firing limit reached (" + MAX_RULE_FIRINGS_PER_TICK + "): possible rule loop");
+        }
         knowledgeSession.getDecisionContext().applyTo(currentDecision);
 
         FactHandle decisionHandle = findFactHandle(currentDecision);
@@ -397,8 +408,21 @@ public class SimulationEngine implements AutoCloseable {
             }
         }
         for (DynamicActor actor : List.copyOf(worldState.getActors())) {
-            if (worldState.signedDistance(actor.getPositionMeters()) <= 0.0
-                && detectedWorldObjectIds.contains(actor.getId())) {
+            // An overtaken vehicle stays in the world behind the ego; only pedestrians are
+            // retired once passed.
+            if (actor instanceof com.one2drive.projeto1.domain.OtherVehicle) {
+                continue;
+            }
+            // A pedestrian that has reached the sidewalk has left the road: kept in the world
+            // it would still be drawn in the lane next to that sidewalk, as if in the way. The
+            // one the camera is tracking stays until the camera has reported it as crossed,
+            // so that the rules see the crossing end instead of the pedestrian vanishing.
+            boolean leftTheRoad = actor instanceof com.one2drive.projeto1.domain.Pedestrian pedestrian
+                && pedestrian.getCrossingState() == com.one2drive.projeto1.domain.PedestrianCrossingState.CROSSED
+                && (!pedestrian.getId().equals(trackedPedestrianId) || trackedPedestrianReportedCrossed);
+            if (leftTheRoad
+                || (worldState.signedDistance(actor.getPositionMeters()) <= 0.0
+                    && detectedWorldObjectIds.contains(actor.getId()))) {
                 worldState.removeActorById(actor.getId());
             }
         }
@@ -762,7 +786,12 @@ public class SimulationEngine implements AutoCloseable {
         if (event instanceof SpeedLimitDetectedEvent e) objectId = e.getSignId();
         else if (event instanceof TrafficLightEvent e) objectId = e.getLightId();
         else if (event instanceof StopSignEvent e) objectId = e.getSignId();
-        else if (event instanceof PedestrianDetectedEvent e) objectId = e.getPedestrianId();
+        else if (event instanceof PedestrianDetectedEvent e) {
+            objectId = e.getPedestrianId();
+            trackedPedestrianId = e.getPedestrianId();
+            trackedPedestrianReportedCrossed =
+                e.getCrossingState() == com.one2drive.projeto1.domain.PedestrianCrossingState.CROSSED;
+        }
         else if (event instanceof PotholeDetectedEvent e) objectId = e.getPotholeId();
         else if (event instanceof BarrierDetectedEvent e) objectId = e.getBarrierId();
         else if (event instanceof ObstacleDetectedEvent e) objectId = e.getObstacleId();
@@ -1116,9 +1145,20 @@ public class SimulationEngine implements AutoCloseable {
                     element.getLane(), element.toString(), length, behindWindow, forwardMeters);
             }
         });
-        worldState.getActors().forEach(actor -> addRoadItem(items, actor.getClass().getSimpleName(),
-            actor.getId(), actor.getPositionMeters(), actor.getLane(), actor.toString(),
-            length, behindWindow, forwardMeters));
+        worldState.getActors().forEach(actor -> {
+            if (actor instanceof com.one2drive.projeto1.domain.OtherVehicle) {
+                // Vehicles are positioned by metres travelled, not around the loop.
+                double relative = worldState.vehicleSignedDistance(actor);
+                if (relative >= -behindWindow && relative <= forwardMeters) {
+                    items.add(new RoadRenderItem(actor.getClass().getSimpleName(), actor.getId(), relative,
+                        actor.getLane().name(), actor.toString(), actor.getPositionMeters()));
+                }
+                return;
+            }
+            addRoadItem(items, actor.getClass().getSimpleName(),
+                actor.getId(), actor.getPositionMeters(), actor.getLane(), actor.toString(),
+                length, behindWindow, forwardMeters);
+        });
         return items;
     }
 

@@ -192,6 +192,26 @@ public class RoadMap {
         return true;
     }
 
+    /**
+     * Lets time pass for the traffic lights that are running their cycle, and keeps the
+     * cell code in step with a light that changed state. The element itself is kept, with
+     * its id, so what the vehicle is tracking does not change under it.
+     */
+    public void advanceTrafficLights(long dtMillis, long yellowMillis, long redHoldAfterStopMillis,
+                                     java.util.function.Predicate<com.one2drive.projeto1.domain.TrafficLight> vehicleStoppedAt) {
+        for (int row = 0; row < cells.length; row++) {
+            for (Lane lane : LANES) {
+                if (elements[row][lane.ordinal()] instanceof com.one2drive.projeto1.domain.TrafficLight light
+                    && light.advance(dtMillis, yellowMillis, redHoldAfterStopMillis, vehicleStoppedAt.test(light))) {
+                    ScenarioRoadElementDefinition definition = new ScenarioRoadElementDefinition();
+                    definition.setType(ScenarioRoadElementType.TRAFFIC_LIGHT);
+                    definition.setTrafficLightState(light.getState());
+                    cells[row][lane.ordinal()] = legend.codeFor(definition);
+                }
+            }
+        }
+    }
+
     public Optional<RoadElement> findElement(String elementId) {
         return elements().stream().filter(e -> e.getId().equals(elementId)).findFirst();
     }

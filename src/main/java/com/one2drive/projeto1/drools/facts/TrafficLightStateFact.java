@@ -7,6 +7,7 @@ public class TrafficLightStateFact {
     private TrafficLightState state;
     private double distanceMeters;
     private long timestamp;
+    private TrafficLightCommitment commitment = TrafficLightCommitment.NONE;
 
     public TrafficLightStateFact(String lightId, TrafficLightState state, double distanceMeters, long timestamp) {
         this.lightId = lightId;
@@ -39,6 +40,15 @@ public class TrafficLightStateFact {
         this.distanceMeters = distanceMeters;
     }
 
+    /** What the rules decided to do about this light: stop before the line, or drive on. */
+    public TrafficLightCommitment getCommitment() {
+        return commitment;
+    }
+
+    public void setCommitment(TrafficLightCommitment commitment) {
+        this.commitment = commitment;
+    }
+
     public long getTimestamp() {
         return timestamp;
     }
@@ -50,6 +60,6 @@ public class TrafficLightStateFact {
     @Override
     public String toString() {
         return "TrafficLightStateFact{lightId='" + lightId + "', state=" + state +
-            ", distanceMeters=" + distanceMeters + "}";
+            ", distanceMeters=" + distanceMeters + ", commitment=" + commitment + "}";
     }
 }

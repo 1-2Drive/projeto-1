@@ -614,6 +614,172 @@ class DrivingExpertSystemRulesTest {
     }
 
     @Test
+    @Timeout(10)
+    void yellowLightWithRoomToStopCommitsToStopAndDoesNotChangeItsMind() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(60.0)) {
+            // 90 m at 60 km/h is more than the 76 m a comfortable stop before the line needs.
+            DrivingDecision far = harness.cycle(
+                1_000,
+                60.0,
+                new TrafficLightEvent(1_000, "camera", TrafficLightState.YELLOW, 90.0, "light-1")
+            );
+            assertEquals("Yellow traffic light: stop before the line", far.getSourceRule());
+            assertEquals(DrivingAction.MAINTAIN_SPEED, far.getAction());
+
+            // Closer than a stop would now need at this speed: the decision to stop stands.
+            DrivingDecision closer = harness.cycle(
+                1_200,
+                60.0,
+                new TrafficLightEvent(1_200, "camera", TrafficLightState.YELLOW, 50.0, "light-1")
+            );
+            assertEquals("Yellow traffic light: stop before the line", closer.getSourceRule());
+            assertEquals(DrivingAction.REDUCE_SPEED, closer.getAction());
+
+            DrivingDecision red = harness.cycle(
+                1_400,
+                40.0,
+                new TrafficLightEvent(1_400, "camera", TrafficLightState.RED, 45.0, "light-1")
+            );
+            assertTrue(red.getSourceRule().startsWith("Red traffic light"), red.getSourceRule());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void yellowLightTooCloseToStopCommitsToProceedAndDoesNotChangeItsMind() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(60.0)) {
+            // 50 m at 60 km/h is less than the 76 m a comfortable stop before the line needs.
+            DrivingDecision close = harness.cycle(
+                1_000,
+                60.0,
+                new TrafficLightEvent(1_000, "camera", TrafficLightState.YELLOW, 50.0, "light-1")
+            );
+            assertFalse(close.getSourceRule().toLowerCase().contains("traffic light"), close.getSourceRule());
+
+            // Slower now, so a stop would fit again, and then red: the decision to drive on stands.
+            DrivingDecision slower = harness.cycle(
+                1_200,
+                20.0,
+                new TrafficLightEvent(1_200, "camera", TrafficLightState.YELLOW, 45.0, "light-1")
+            );
+            assertFalse(slower.getSourceRule().toLowerCase().contains("traffic light"), slower.getSourceRule());
+
+            DrivingDecision red = harness.cycle(
+                1_400,
+                20.0,
+                new TrafficLightEvent(1_400, "camera", TrafficLightState.RED, 40.0, "light-1")
+            );
+            assertFalse(red.getSourceRule().toLowerCase().contains("traffic light"), red.getSourceRule());
+            assertNotEquals(DrivingAction.STOP, red.getAction());
+            assertNotEquals(DrivingAction.EMERGENCY_BRAKE, red.getAction());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void yellowLightDetectedFarAwayCommitsToStopAtTheFirstDetection() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(30.0)) {
+            // 110 m at 30 km/h: far beyond the 40 m at which the brakes start to matter. The
+            // decision to stop is made now; there is nothing to do about it yet.
+            DrivingDecision far = harness.cycle(
+                1_000,
+                30.0,
+                new TrafficLightEvent(1_000, "camera", TrafficLightState.YELLOW, 110.0, "light-1")
+            );
+            assertFalse(far.getSourceRule().toLowerCase().contains("traffic light"), far.getSourceRule());
+
+            // Faster and close: a stop would no longer fit if it were decided now. It was
+            // decided at the first detection, and it stands.
+            DrivingDecision close = harness.cycle(
+                1_200,
+                60.0,
+                new TrafficLightEvent(1_200, "camera", TrafficLightState.YELLOW, 50.0, "light-1")
+            );
+            assertEquals("Yellow traffic light: stop before the line", close.getSourceRule());
+            assertEquals(DrivingAction.REDUCE_SPEED, close.getAction());
+
+            DrivingDecision red = harness.cycle(
+                1_400,
+                50.0,
+                new TrafficLightEvent(1_400, "camera", TrafficLightState.RED, 45.0, "light-1")
+            );
+            assertTrue(red.getSourceRule().startsWith("Red traffic light"), red.getSourceRule());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void committedToProceedAtYellowStillStopsForAPedestrian() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(60.0)) {
+            DrivingDecision proceed = harness.cycle(
+                1_000,
+                60.0,
+                new TrafficLightEvent(1_000, "camera", TrafficLightState.YELLOW, 50.0, "light-1")
+            );
+            assertFalse(proceed.getSourceRule().toLowerCase().contains("traffic light"), proceed.getSourceRule());
+
+            DrivingDecision pedestrian = harness.cycle(
+                1_200,
+                60.0,
+                new TrafficLightEvent(1_200, "camera", TrafficLightState.YELLOW, 46.0, "light-1"),
+                new PedestrianDetectedEvent(1_200, "camera", 15.0, "ped-1", true)
+            );
+            assertEquals(DrivingAction.STOP, pedestrian.getAction());
+            assertEquals("Stop for pedestrian in crossing zone", pedestrian.getSourceRule());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void redLightAheadAndPastTheStopLineAtSpeedIsNeverLeftToTheBaseline() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(60.0)) {
+            // 15 m to the light: 3 m past the stop line, which is 18 m before it.
+            DrivingDecision moving = harness.cycle(
+                1_000,
+                60.0,
+                new TrafficLightEvent(1_000, "camera", TrafficLightState.RED, 15.0, "light-1")
+            );
+            assertNotEquals(DrivingAction.MAINTAIN_SPEED, moving.getAction());
+            assertEquals(DrivingAction.EMERGENCY_BRAKE, moving.getAction());
+            assertEquals("Hold at red traffic light", moving.getSourceRule());
+
+            DrivingDecision atRest = harness.cycle(
+                1_200,
+                0.0,
+                new TrafficLightEvent(1_200, "camera", TrafficLightState.RED, 6.0, "light-1")
+            );
+            assertEquals(DrivingAction.STOP, atRest.getAction());
+            assertEquals("Hold at red traffic light", atRest.getSourceRule());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void redLightPastTheStopLineIsStoppedForComfortablyWhenThatStillFitsBeforeTheLight() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(25.0)) {
+            // 15 m to the light at 25 km/h: a comfortable stop takes 8.6 m and 12 m are left
+            // once the 3 m tolerance is taken off. No emergency, and never the baseline.
+            DrivingDecision slow = harness.cycle(
+                1_000,
+                25.0,
+                new TrafficLightEvent(1_000, "camera", TrafficLightState.RED, 15.0, "light-1")
+            );
+            assertEquals(DrivingAction.STOP, slow.getAction());
+            assertEquals("Hold at red traffic light", slow.getSourceRule());
+        }
+        try (DroolsTestHarness harness = new DroolsTestHarness(45.0)) {
+            // At 45 km/h the comfortable stop takes 27.9 m: it no longer fits in those 12 m.
+            DrivingDecision fast = harness.cycle(
+                1_000,
+                45.0,
+                new TrafficLightEvent(1_000, "camera", TrafficLightState.RED, 15.0, "light-1")
+            );
+            assertEquals(DrivingAction.EMERGENCY_BRAKE, fast.getAction());
+            assertEquals("Hold at red traffic light", fast.getSourceRule());
+        }
+    }
+
+    @Test
     void zeroRadarDistanceWithClosingSpeedDoesNotLoopForever() {
         // A radar sample clamped to 0 m resets the front vehicle fact; the relative-speed and
         // TTC updates must not re-adopt the target, or the three rules re-trigger each other

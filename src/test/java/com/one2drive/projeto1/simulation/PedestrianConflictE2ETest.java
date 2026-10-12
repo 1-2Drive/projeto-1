@@ -253,28 +253,52 @@ class PedestrianConflictE2ETest {
             boolean reactedToPedestrian = false;
             boolean passedCrossingWhilePedestrianOnRoad = false;
             boolean sawEmergencyBrake = false;
+            com.one2drive.projeto1.domain.TrafficLight light = engine.getWorldState().getRoadElements().stream()
+                .filter(com.one2drive.projeto1.domain.TrafficLight.class::isInstance)
+                .map(com.one2drive.projeto1.domain.TrafficLight.class::cast).findFirst().orElse(null);
+            double stopLine = lightPosition - com.one2drive.projeto1.decision.StoppingPolicy.RED_LIGHT_STOP_LINE_OFFSET_METERS;
+            // The light turns green once the ego has waited at it, so the red light is
+            // judged while it is red: where the ego came to rest, and why.
+            boolean ranTheRedLight = false;
+            int stoppedAtRedCycles = 0;
+            double restPositionAtRed = Double.NaN;
+            String ruleHoldingAtRed = "";
             for (int i = 0; i < 500; i++) {
                 SimulationSnapshot snapshot = engine.tick();
+                if (light == null) {
+                    light = engine.getWorldState().getRoadElements().stream()
+                        .filter(com.one2drive.projeto1.domain.TrafficLight.class::isInstance)
+                        .map(com.one2drive.projeto1.domain.TrafficLight.class::cast).findFirst().orElse(null);
+                }
                 boolean onTheRoad = pedestrian(engine, id).map(Pedestrian::isInRoadway).orElse(false);
                 if (onTheRoad) {
                     reactedToPedestrian |= isBraking(snapshot) && snapshot.sourceRule().toLowerCase().contains("pedestrian");
                     passedCrossingWhilePedestrianOnRoad |= ego.getPositionMeters() >= crossingPosition - 6.0;
                 }
                 sawEmergencyBrake |= snapshot.currentDecision().equals(DrivingAction.EMERGENCY_BRAKE.name());
+                if (light != null && light.getState() == TrafficLightState.RED) {
+                    ranTheRedLight |= ego.getPositionMeters() >= lightPosition;
+                    if (!onTheRoad && ego.getSpeedKmh() < 0.05 && ego.getPositionMeters() > crossingPosition) {
+                        stoppedAtRedCycles++;
+                        restPositionAtRed = ego.getPositionMeters();
+                        ruleHoldingAtRed = snapshot.sourceRule();
+                    }
+                }
             }
 
-            SimulationSnapshot last = engine.snapshot();
             assertTrue(reactedToPedestrian, "the pedestrian must prevail over the approach to the red light");
             assertFalse(passedCrossingWhilePedestrianOnRoad, "the ego must not reach the crossing while the pedestrian is on the road");
             assertFalse(sawEmergencyBrake, "neither the pedestrian nor the red light should need an emergency brake here");
-            assertTrue(ego.getPositionMeters() > crossingPosition,
-                "once the pedestrian has crossed the ego must move on, it stayed at " + ego.getPositionMeters());
-            assertTrue(ego.getPositionMeters() < lightPosition,
-                "the ego must not run the red light, light at " + lightPosition + ", ego at " + ego.getPositionMeters());
-            assertEquals(0.0, ego.getSpeedKmh(), 0.5, "the ego must be stopped at the red light");
-            assertEquals(DrivingAction.STOP.name(), last.currentDecision());
-            assertTrue(last.sourceRule().toLowerCase().contains("red traffic light"),
-                "the stop must come from the red light rules, it came from: " + last.sourceRule());
+            assertFalse(ranTheRedLight, "the ego must not pass the light while it is red");
+            assertTrue(stoppedAtRedCycles >= 45,
+                "once the pedestrian has crossed the ego must move on and wait at the red light, it waited "
+                    + stoppedAtRedCycles + " cycles");
+            assertTrue(restPositionAtRed <= stopLine,
+                "the ego must be at rest before the stop line at " + stopLine + ", it stopped at " + restPositionAtRed);
+            assertTrue(ruleHoldingAtRed.toLowerCase().contains("red traffic light"),
+                "the stop must come from the red light rules, it came from: " + ruleHoldingAtRed);
+            assertTrue(ego.getPositionMeters() > lightPosition,
+                "once the light is green the ego must drive on, it is at " + ego.getPositionMeters());
         }
     }
 }

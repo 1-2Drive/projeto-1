@@ -48,6 +48,10 @@ when
             || $state.getState() != $e.getState()
             || Math.abs($state.getDistanceMeters() - $e.getDistanceMeters()) > 0.01))
 then
+    // A decision to stop or to drive on is about one light and one yellow/red phase.
+    if (!$e.getLightId().equals($state.getLightId()) || $e.getState() == TrafficLightState.GREEN) {
+        $state.setCommitment(TrafficLightCommitment.NONE);
+    }
     $state.setLightId($e.getLightId());
     $state.setState($e.getState());
     $state.setDistanceMeters($e.getDistanceMeters());
@@ -430,6 +434,28 @@ then
     $state.setDistanceMeters(Double.POSITIVE_INFINITY);
     $state.setInPath(false);
     $state.setCrossingState(PedestrianCrossingState.WAITING);
+    $state.setTimestamp($now);
+    update($state);
+end
+
+// Once the vehicle has passed a traffic light the camera no longer reports it, and that
+// light has nothing more to say about this passage. Without this the last state seen, a
+// yellow or a red included, stayed in working memory and kept its rules firing behind the
+// light. The camera reports a light every 200 ms for as long as it is ahead, so two missed
+// readings are enough to know it is behind: waiting longer kept a vehicle that was braking
+// for a red light braking after it had passed it.
+rule "Clear stale traffic light perception"
+no-loop true
+salience 900
+when
+    $state : TrafficLightStateFact(lightId != "none", $timestamp : timestamp)
+    VehicleStateFact($now : timestamp)
+    eval($now - $timestamp > 400)
+then
+    $state.setLightId("none");
+    $state.setState(TrafficLightState.GREEN);
+    $state.setDistanceMeters(Double.POSITIVE_INFINITY);
+    $state.setCommitment(TrafficLightCommitment.NONE);
     $state.setTimestamp($now);
     update($state);
 end

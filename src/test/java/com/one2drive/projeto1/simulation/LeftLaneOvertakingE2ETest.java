@@ -59,9 +59,11 @@ class LeftLaneOvertakingE2ETest {
         return engine.addActorAheadAndGetId(vehicle);
     }
 
+    /** An overtaken vehicle leaves the world once it is out of the rendered window behind the car. */
     private static double gapTo(SimulationEngine engine, String actorId) {
-        DynamicActor actor = engine.getWorldState().findActorById(actorId).orElseThrow();
-        return actor.getPositionMeters() - engine.getWorldState().getEgo().getPositionMeters();
+        return engine.getWorldState().findActorById(actorId)
+            .map(actor -> actor.getPositionMeters() - engine.getWorldState().getEgo().getPositionMeters())
+            .orElse(Double.NEGATIVE_INFINITY);
     }
 
     /** True when the ego is physically in a lane to the right of the given vehicle's lane. */

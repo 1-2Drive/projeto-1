@@ -40,20 +40,6 @@
   }
 }
 
-.road--rain::after {
-  content: '';
-  position: absolute;
-  inset: 11.5% 0;
-  z-index: 5;
-  pointer-events: none;
-  background-image:
-    repeating-linear-gradient(108deg, transparent 0 17px, rgba(172, 210, 235, 0.38) 18px, transparent 19px 31px),
-    repeating-linear-gradient(103deg, transparent 0 39px, rgba(172, 210, 235, 0.22) 40px, transparent 41px 58px);
-  background-size: 100% 100%;
-  opacity: 0.58;
-  animation: rain-fall 650ms linear infinite;
-}
-
 .speed-control-zone {
   position: absolute;
   top: 11.5%;
@@ -80,29 +66,86 @@
   white-space: nowrap;
 }
 
+/* ===================== rain ===================== */
+/* Rain reads from the asphalt: darker, bluish, with soft reflections, and sparse
+   drops that fall under the sensors and the objects. Nothing is drawn over the HUD. */
+.road--rain .surface__asphalt {
+  background: linear-gradient(180deg, #1c2b3a 0%, #15232f 50%, #0f1a24 100%);
+}
+
+.road--rain .surface__lane--dashed,
+.road--rain .surface__lane--continuous {
+  opacity: 0.55;
+}
+
+.road--rain .surface__edge {
+  opacity: 0.7;
+}
+
 .rain-overlay {
   position: absolute;
   inset: 11.5% 0;
-  z-index: 2;
+  z-index: 1;
+  overflow: hidden;
   pointer-events: none;
 }
 
-.rain-overlay__label {
+.rain-overlay__sheen {
   position: absolute;
-  top: 0.5rem;
-  left: 0.65rem;
+  left: 0;
+  right: 0;
+  height: 9%;
+  background: radial-gradient(ellipse at center, rgba(156, 203, 232, 0.12), transparent 70%);
+}
+
+.rain-overlay__sheen--1 { top: 16%; left: 30%; right: 10%; }
+.rain-overlay__sheen--2 { top: 47%; left: 5%; right: 35%; }
+.rain-overlay__sheen--3 { top: 79%; left: 45%; right: 0; }
+
+/* Vertical hairlines chopped into short dashes by the mask, then tilted 12°.
+   The animation moves one mask period (36px) along the tilt, so the loop is seamless.
+   The rotation plus the 36px travel must stay inside the layer for any aspect ratio, so the
+   layer is a square sized from the width (percentage margins resolve against the width),
+   centred on the overlay: it covers the corners whenever W >= H + 73px, every layout here. */
+.rain-overlay__drops {
+  position: absolute;
+  top: 50%;
+  left: -10%;
+  width: 120%;
+  aspect-ratio: 1;
+  margin-top: -60%;
+  background-image:
+    repeating-linear-gradient(90deg, transparent 0 22px, rgba(191, 224, 245, 0.14) 22px 23px, transparent 23px 34px),
+    repeating-linear-gradient(90deg, transparent 0 41px, rgba(191, 224, 245, 0.09) 41px 42px, transparent 42px 57px);
+  background-position: 0 0, 17px 0;
+  -webkit-mask-image: repeating-linear-gradient(180deg, #000 0 11px, transparent 11px 36px);
+  mask-image: repeating-linear-gradient(180deg, #000 0 11px, transparent 11px 36px);
+  transform: rotate(12deg) translateY(-36px);
+  animation: rain-drops 1.6s linear infinite;
+}
+
+@keyframes rain-drops {
+  from { transform: rotate(12deg) translateY(-36px); }
+  to { transform: rotate(12deg) translateY(0); }
+}
+
+.rain-chip {
+  position: absolute;
+  top: calc(11.5% + 0.5rem);
+  right: 3.4rem;
+  z-index: 7;
   padding: 0.2rem 0.45rem;
   border: 1px solid rgba(144, 199, 229, 0.55);
   border-radius: 0.25rem;
-  background: rgba(13, 35, 51, 0.82);
+  background: rgba(13, 35, 51, 0.9);
   color: #b9e5fa;
   font: 600 0.58rem var(--ds-font-mono);
   letter-spacing: 0.1em;
+  pointer-events: none;
 }
 
-@keyframes rain-fall {
-  from { background-position: 0 0, 12px 8px; }
-  to { background-position: -22px 34px, -9px 48px; }
+@media (prefers-reduced-motion: reduce) {
+  .rain-overlay__drops { animation: none; }
 }
 
 /* ===================== roadside ===================== */
@@ -153,7 +196,6 @@
 }
 
 .speed-control-zone,
-.sensor-zone,
 .sensor-edge,
 .scale,
 .lanes,
@@ -273,47 +315,48 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 1;
+  z-index: 2;
 }
 
-.sensor-zone {
+.sensor-layer {
   position: absolute;
-  top: 11.5%;
-  bottom: 11.5%;
+  inset: 0;
+  width: 100%;
+  height: 100%;
 }
 
-/* radar: long forward corridor along the ego lane */
-.sensor-zone--radar {
-  background: linear-gradient(90deg, rgba(94, 214, 148, 0.16) 0%, rgba(94, 214, 148, 0.03) 72%, transparent 100%);
-  border-top: 1px solid rgba(94, 214, 148, 0.22);
-  border-bottom: 1px solid rgba(94, 214, 148, 0.22);
-  mask-image: linear-gradient(90deg, #000 0%, #000 78%, transparent 100%);
+/* camera: cone from the car's nose, fading with distance */
+.sensor-camera {
+  fill: url(#sensorCameraFill);
 }
 
-/* camera: widening frustum */
-.sensor-zone--camera {
-  clip-path: polygon(0% 32%, 100% 0%, 100% 100%, 0% 68%);
-  background: linear-gradient(90deg, rgba(96, 176, 226, 0.17) 0%, rgba(96, 176, 226, 0.02) 78%, transparent 100%);
-  mask-image: linear-gradient(90deg, #000 0%, #000 82%, transparent 100%);
+/* range the camera lost to rain or fog: drawn hollow so it reads as "not seen" */
+.sensor-camera-lost {
+  fill: rgba(96, 176, 226, 0.06);
+  stroke: rgba(96, 176, 226, 0.45);
+  stroke-width: 1px;
+  stroke-dasharray: 3 3;
 }
 
-/* blind spot: lateral bands beside the ego */
-.sensor-zone--blind {
-  height: 8%;
-  top: auto;
-  bottom: auto;
-  background: rgba(198, 212, 226, 0.11);
-  border: 1px dashed rgba(198, 212, 226, 0.26);
-  border-radius: 3px;
-  mask-image: none;
+/* radar: corridor inside the ego lane */
+.sensor-radar {
+  fill: url(#sensorRadarFill);
+  stroke: rgba(94, 214, 148, 0.35);
+  stroke-width: 1px;
 }
 
-.sensor-zone--blind-left {
-  top: 11.5%;
+/* blind spot: pad in the adjacent lane, beside the car */
+.sensor-blind {
+  fill: rgba(198, 212, 226, 0.12);
+  stroke: rgba(198, 212, 226, 0.4);
+  stroke-width: 1px;
+  stroke-dasharray: 3 2;
+  transition: fill 160ms ease, stroke 160ms ease;
 }
 
-.sensor-zone--blind-right {
-  bottom: 11.5%;
+.sensor-blind--occupied {
+  fill: rgba(240, 138, 58, 0.22);
+  stroke: rgba(240, 138, 58, 0.8);
 }
 
 .sensor-edge {
@@ -330,6 +373,11 @@
 
 .sensor-edge--radar {
   border-left: 1px dashed rgba(94, 214, 148, 0.6);
+}
+
+.sensor-edge--ghost {
+  border-left-style: dotted;
+  opacity: 0.4;
 }
 
 .sensor-edge__label {
@@ -489,7 +537,7 @@
   display: grid;
   justify-items: center;
   gap: 0.15rem;
-  transition: filter 140ms ease;
+  transition: filter 140ms ease, opacity 200ms ease;
 }
 
 .obj--vehicle {
@@ -560,6 +608,12 @@
 
 .obj--radar {
   filter: drop-shadow(0 0 0.5rem rgba(120, 224, 163, 0.55));
+}
+
+/* already behind the car: still drawn, but clearly out of play */
+.obj--passed {
+  opacity: 0.55;
+  filter: none;
 }
 
 .obj__badge {
@@ -739,14 +793,6 @@
   width: 100%;
   height: auto;
   overflow: visible;
-}
-
-.road--rain .surface__asphalt {
-  background: linear-gradient(180deg, #1b2b37 0%, #182631 45%, #131e27 100%);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .road--rain::after { animation: none; }
 }
 
 .person__head {

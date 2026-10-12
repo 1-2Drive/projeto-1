@@ -23,8 +23,12 @@
 
   @if (raining()) {
     <div class="rain-overlay" aria-hidden="true" data-testid="rain-overlay">
-      <span class="rain-overlay__label">RAIN · WET ROAD</span>
+      <div class="rain-overlay__sheen rain-overlay__sheen--1"></div>
+      <div class="rain-overlay__sheen rain-overlay__sheen--2"></div>
+      <div class="rain-overlay__sheen rain-overlay__sheen--3"></div>
+      <div class="rain-overlay__drops"></div>
     </div>
+    <span class="rain-chip" data-testid="rain-chip">{{ rainChipText() }}</span>
   }
 
   <!-- ============ lane direction ============ -->
@@ -57,30 +61,54 @@
 
   <!-- ============ sensor fields of view ============ -->
   <div class="sensors" aria-hidden="true">
-    <div class="sensor-zone sensor-zone--radar"
-         [style.left.%]="egoXPercent()"
-         [style.width.%]="radarEdgePercent() - egoXPercent()"></div>
-    <div class="sensor-zone sensor-zone--camera"
-         [style.left.%]="egoXPercent()"
-         [style.width.%]="cameraEdgePercent() - egoXPercent()"></div>
-    <div class="sensor-zone sensor-zone--blind sensor-zone--blind-left"
-         [style.left.%]="egoXPercent()"
-         [style.width.%]="blindSpotEdgePercent() - egoXPercent()"></div>
-    <div class="sensor-zone sensor-zone--blind sensor-zone--blind-right"
-         [style.left.%]="egoXPercent()"
-         [style.width.%]="blindSpotEdgePercent() - egoXPercent()"></div>
+    <!-- Nothing to draw before the first snapshot: without ranges every shape would sit on the car. -->
+    @if (snapshot()) {
+      <svg class="sensor-layer" viewBox="0 0 100 100" preserveAspectRatio="none" data-testid="canvas-sensor-layer">
+        <defs>
+          <linearGradient id="sensorCameraFill" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#60b0e2" stop-opacity="0.30" />
+            <stop offset="100%" stop-color="#60b0e2" stop-opacity="0.03" />
+          </linearGradient>
+          <linearGradient id="sensorRadarFill" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#5ed694" stop-opacity="0.34" />
+            <stop offset="100%" stop-color="#5ed694" stop-opacity="0.04" />
+          </linearGradient>
+        </defs>
+        <polygon class="sensor-camera" [attr.points]="sensorGeometry().cameraPoints" data-testid="canvas-sensor-camera" />
+        @if (sensorGeometry().cameraLost; as lost) {
+          <rect class="sensor-camera-lost" [attr.x]="lost.x" [attr.y]="lost.y" [attr.width]="lost.width" [attr.height]="lost.height"
+                vector-effect="non-scaling-stroke" data-testid="canvas-sensor-camera-lost" />
+        }
+        <rect class="sensor-radar" [attr.x]="sensorGeometry().radar.x" [attr.y]="sensorGeometry().radar.y"
+              [attr.width]="sensorGeometry().radar.width" [attr.height]="sensorGeometry().radar.height"
+              rx="1" vector-effect="non-scaling-stroke" data-testid="canvas-sensor-radar" />
+        @if (sensorGeometry().blindLeft; as pad) {
+          <rect class="sensor-blind" [class.sensor-blind--occupied]="pad.occupied"
+                [attr.x]="pad.x" [attr.y]="pad.y" [attr.width]="pad.width" [attr.height]="pad.height"
+                rx="1" vector-effect="non-scaling-stroke" data-testid="canvas-sensor-blind-left" />
+        }
+        @if (sensorGeometry().blindRight; as pad) {
+          <rect class="sensor-blind" [class.sensor-blind--occupied]="pad.occupied"
+                [attr.x]="pad.x" [attr.y]="pad.y" [attr.width]="pad.width" [attr.height]="pad.height"
+                rx="1" vector-effect="non-scaling-stroke" data-testid="canvas-sensor-blind-right" />
+        }
+      </svg>
 
-    @if (cameraEdgePercent() <= 100) {
-      <div class="sensor-edge sensor-edge--camera" [style.left.%]="cameraEdgePercent()">
-        <span class="sensor-edge__label"
-              [class.sensor-edge__label--flip]="cameraEdgePercent() > 70">CAMERA FOV ({{ ranges().cameraRangeMeters | number: '1.0-0' }} m)</span>
-      </div>
-    }
-    @if (radarEdgePercent() <= 100) {
-      <div class="sensor-edge sensor-edge--radar" [style.left.%]="radarEdgePercent()" data-testid="radar-fov">
-        <span class="sensor-edge__label"
-              [class.sensor-edge__label--flip]="radarEdgePercent() > 70">FRONT RADAR FOV ({{ ranges().radarRangeMeters | number: '1.0-0' }} m)</span>
-      </div>
+      @if (cameraEdgePercent() <= 100) {
+        <div class="sensor-edge sensor-edge--camera" [style.left.%]="cameraEdgePercent()" data-testid="camera-fov">
+          <span class="sensor-edge__label"
+                [class.sensor-edge__label--flip]="cameraEdgePercent() > 70">{{ cameraLabel() }}</span>
+        </div>
+      }
+      @if (cameraDegraded() && cameraNominalEdgePercent() <= 100) {
+        <div class="sensor-edge sensor-edge--camera sensor-edge--ghost" [style.left.%]="cameraNominalEdgePercent()" data-testid="camera-fov-nominal"></div>
+      }
+      @if (radarEdgePercent() <= 100) {
+        <div class="sensor-edge sensor-edge--radar" [style.left.%]="radarEdgePercent()" data-testid="radar-fov">
+          <span class="sensor-edge__label"
+                [class.sensor-edge__label--flip]="radarEdgePercent() > 70">FRONT RADAR FOV ({{ ranges().radarRangeMeters | number: '1.0-0' }} m)</span>
+        </div>
+      }
     }
   </div>
 
@@ -190,6 +218,7 @@
       [class.obj--detected]="item.detectedByCamera || item.detectedByRadar"
       [class.obj--camera]="item.detectedByCamera"
       [class.obj--radar]="item.detectedByRadar"
+      [class.obj--passed]="item.relativeMeters <= 0"
       [attr.data-state]="item.state"
       [style.left.%]="item.xPercent"
       [style.top.%]="item.kind === 'speedRadar' ? 4 : item.yPercent"
@@ -291,7 +320,7 @@
         }
       }
 
-      @if (item.detectedByCamera || item.detectedByRadar) {
+      @if ((item.detectedByCamera || item.detectedByRadar) && item.relativeMeters > 0) {
         <span class="obj__badge" [class.obj__badge--radar]="item.detectedByRadar && !item.detectedByCamera">
           {{ item.detectedByCamera ? 'DETECTED' : 'RADAR' }}
         </span>

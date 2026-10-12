@@ -67,6 +67,8 @@ public class SimulationEngine implements AutoCloseable {
     private static final double RENDER_BEHIND_METERS = 50.0;
     /** Upper bound on rule firings in one tick; a normal tick fires well under a hundred. */
     private static final int MAX_RULE_FIRINGS_PER_TICK = 5000;
+    /** Roughly one car length: a passed vehicle catching up from behind vanishes just before the bumpers meet. */
+    private static final double CATCH_UP_GAP_METERS = 6.0;
 
     private final SimulationConfig config;
     private final SimulationClock simulationClock;
@@ -74,6 +76,7 @@ public class SimulationEngine implements AutoCloseable {
     private final WorldPhysicsEngine physicsEngine;
     private final DecisionActuator actuator;
     private final SensorManager sensorManager;
+    private final CameraSensor cameraSensor;
     private final List<ScenarioTimedAction> timedActions;
     private final List<Runnable> pendingWorldMutations;
     private final Map<String, String> lastSensorValues;
@@ -91,6 +94,7 @@ public class SimulationEngine implements AutoCloseable {
     private final Set<String> detectedWorldObjectIds;
     private String trackedPedestrianId = "none";
     private boolean trackedPedestrianReportedCrossed;
+    private final Set<String> passedActorIds;
     private final Set<String> demoEvidence;
     private final boolean pseudoClock;
     private final Consumer<DrivingDecision> decisionConsumer;
@@ -126,6 +130,7 @@ public class SimulationEngine implements AutoCloseable {
         this.cameraDetectedObjectTimestamps = new HashMap<>();
         this.radarDetectedObjectTimestamps = new HashMap<>();
         this.detectedWorldObjectIds = new HashSet<>();
+        this.passedActorIds = new HashSet<>();
         this.demoEvidence = new HashSet<>();
 
         this.knowledgeSession = createKnowledgeSession();
@@ -144,10 +149,11 @@ public class SimulationEngine implements AutoCloseable {
         this.scenarioInitialSpeedKmh = scenarioDefinition.getInitialSpeedKmh();
         holdVehicleAtRest();
 
+        this.cameraSensor = new CameraSensor(config);
         this.sensorManager = new SensorManager(List.of(
             new SpeedSensor(config),
             new FrontRadarSensor(config, 42L),
-            new CameraSensor(config),
+            cameraSensor,
             new BlindSpotSensor(config),
             new EnvironmentSensor(config)
         ));
@@ -253,6 +259,7 @@ public class SimulationEngine implements AutoCloseable {
         detectedWorldObjectIds.clear();
         trackedPedestrianId = "none";
         trackedPedestrianReportedCrossed = false;
+        passedActorIds.clear();
         demoEvidence.clear();
         scenarioInitialSpeedKmh = scenarioDefinition.getInitialSpeedKmh();
         holdVehicleAtRest();
@@ -407,23 +414,39 @@ public class SimulationEngine implements AutoCloseable {
                 }
             }
         }
+        // Overtaken vehicles and crossed pedestrians keep moving behind the car, where the
+        // blind-spot sensor still sees them, and only leave the world once they are out of
+        // the rendered window, so they never come back around the loop.
         for (DynamicActor actor : List.copyOf(worldState.getActors())) {
-            // An overtaken vehicle stays in the world behind the ego; only pedestrians are
-            // retired once passed.
-            if (actor instanceof com.one2drive.projeto1.domain.OtherVehicle) {
-                continue;
-            }
+            String id = actor.getId();
+            // Vehicles are positioned by metres travelled, everything else around the loop.
+            double distance = actor instanceof com.one2drive.projeto1.domain.OtherVehicle
+                ? worldState.vehicleSignedDistance(actor)
+                : worldState.signedDistance(actor.getPositionMeters());
             // A pedestrian that has reached the sidewalk has left the road: kept in the world
             // it would still be drawn in the lane next to that sidewalk, as if in the way. The
             // one the camera is tracking stays until the camera has reported it as crossed,
             // so that the rules see the crossing end instead of the pedestrian vanishing.
             boolean leftTheRoad = actor instanceof com.one2drive.projeto1.domain.Pedestrian pedestrian
                 && pedestrian.getCrossingState() == com.one2drive.projeto1.domain.PedestrianCrossingState.CROSSED
-                && (!pedestrian.getId().equals(trackedPedestrianId) || trackedPedestrianReportedCrossed);
-            if (leftTheRoad
-                || (worldState.signedDistance(actor.getPositionMeters()) <= 0.0
-                    && detectedWorldObjectIds.contains(actor.getId()))) {
-                worldState.removeActorById(actor.getId());
+                && (!id.equals(trackedPedestrianId) || trackedPedestrianReportedCrossed);
+            boolean detected = detectedWorldObjectIds.contains(id);
+            if (detected && distance <= 0.0) {
+                passedActorIds.add(id);
+            }
+            // Actors keep their own speed and follow nothing: if the car slows below a vehicle
+            // it already passed, that vehicle catches up and would drive through the car from
+            // behind, so it leaves the world once it closes to within one car length, before it
+            // touches the car. Right after an overtake the vehicle joins the set at about -1 m,
+            // inside that gap, but the car is the faster one then, so the speed test keeps it.
+            boolean passed = passedActorIds.contains(id);
+            boolean catchingUp = passed && distance > -CATCH_UP_GAP_METERS
+                && actor.getSpeedMps() > worldState.getEgo().getSpeedMps();
+            // Safety net: a passed vehicle never reappears ahead of the car.
+            boolean drivingThroughCar = passed && distance > 0.0;
+            if (leftTheRoad || (detected && distance < -RENDER_BEHIND_METERS) || catchingUp || drivingThroughCar) {
+                worldState.removeActorById(id);
+                passedActorIds.remove(id);
             }
         }
     }
@@ -605,7 +628,7 @@ public class SimulationEngine implements AutoCloseable {
 
         SensorTelemetry.EnvironmentView environment = new SensorTelemetry.EnvironmentView(
             worldState.getWeatherState().getCondition().name(),
-            config.getCameraRangeMeters() * worldState.getWeatherState().getVisibilityFactor(),
+            cameraSensor.effectiveRangeMeters(worldState),
             worldState.getWeatherState().getGripFactor() * 100.0,
             worldState.getWeatherState().getCondition() != WeatherCondition.CLEAR
         );
@@ -1126,13 +1149,14 @@ public class SimulationEngine implements AutoCloseable {
     /**
      * World objects positioned relative to the ego. The road loops, so an object is
      * drawn ahead of the car unless it lies within {@code backwardMeters} behind it.
+     * Passed elements are inactive for the sensors but keep being rendered until
+     * {@link #RENDER_BEHIND_METERS}, so the UI can show them sliding behind the car.
      */
     private List<RoadRenderItem> roadItems(double backwardMeters, double forwardMeters) {
         double length = worldState.getRoadMap().lengthMeters();
         double behindWindow = Math.min(backwardMeters, length / 2);
         List<RoadRenderItem> items = new ArrayList<>();
         worldState.getRoadElements().forEach(element -> {
-            if (!element.isActive() && !(element instanceof com.one2drive.projeto1.domain.SpeedRadar)) return;
             if (element instanceof com.one2drive.projeto1.domain.SpeedRadar radar) {
                 String details = "SpeedRadar{speedLimitKmh=" + radar.getSpeedLimitKmh() + ", scope=ALL_LANES}";
                 double relative = worldState.signedDistance(radar.getPositionMeters());
@@ -1165,7 +1189,7 @@ public class SimulationEngine implements AutoCloseable {
     private void addRoadItem(List<RoadRenderItem> items, String type, String id, double positionMeters, Lane lane,
                              String details, double length, double behindWindow, double forwardMeters) {
         double ahead = worldState.distanceAhead(positionMeters);
-        double relative = ahead > length - behindWindow ? ahead - length : ahead;
+        double relative = ahead >= length - behindWindow ? ahead - length : ahead;
         if (relative >= -behindWindow && relative <= forwardMeters) {
             double worldPositionMeters = worldState.getEgo().getPositionMeters() + relative;
             items.add(new RoadRenderItem(type, id, relative, lane.name(), details, worldPositionMeters));

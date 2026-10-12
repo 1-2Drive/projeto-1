@@ -17,6 +17,14 @@ import java.util.Optional;
 import java.util.Random;
 
 public class FrontRadarSensor extends AbstractSensor<Object> {
+    /**
+     * Smallest distance the radar publishes for a tracked vehicle. The rule that updates the
+     * front vehicle treats a distance of 0 or less as "no target", while the relative-speed and
+     * TTC rules adopt the target again from the same sample; a vehicle that is really ahead but
+     * whose noisy reading came out at 0 m would make them undo each other without end.
+     */
+    private static final double MIN_MEASURED_DISTANCE_METERS = 0.1;
+
     private final Random random;
     private final SimulationConfig config;
 
@@ -39,7 +47,10 @@ public class FrontRadarSensor extends AbstractSensor<Object> {
         Optional<OtherVehicle> front = worldState.nearestFrontVehicleInLane(rangeMeters());
         front.ifPresent(vehicle -> {
             double trueDistance = worldState.vehicleSignedDistance(vehicle);
-            double measuredDistance = Math.max(0, trueDistance + random.nextGaussian() * config.getDistanceNoiseStdMeters());
+            // nearestFrontVehicleInLane only returns vehicles ahead (d > 0), so noise must not
+            // publish one at 0 m or behind the car.
+            double measuredDistance = Math.max(MIN_MEASURED_DISTANCE_METERS,
+                trueDistance + random.nextGaussian() * config.getDistanceNoiseStdMeters());
             double relativeSpeed = worldState.getEgo().getSpeedMps() - vehicle.getSpeedMps();
             double ttc = relativeSpeed > 0.05 ? measuredDistance / relativeSpeed : Double.POSITIVE_INFINITY;
 

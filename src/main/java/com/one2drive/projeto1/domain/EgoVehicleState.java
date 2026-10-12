@@ -183,13 +183,15 @@ public class EgoVehicleState {
             return;
         }
 
-        if (action == DrivingAction.EMERGENCY_BRAKE || (accelerationMps2 < -3.0)) {
+        // Braking actions always read as BRAKING; everything else reports what the
+        // car is physically doing, so the HUD never says DECELERATING while it accelerates.
+        if (action == DrivingAction.EMERGENCY_BRAKE || action == DrivingAction.BRAKE) {
             drivingState = DrivingState.BRAKING;
-        } else if (action == DrivingAction.BRAKE || (accelerationMps2 < -1.0)) {
+        } else if (accelerationMps2 < -1.0) {
             drivingState = DrivingState.BRAKING;
-        } else if (action == DrivingAction.REDUCE_SPEED || (accelerationMps2 < -0.2)) {
+        } else if (accelerationMps2 < -0.2) {
             drivingState = DrivingState.DECELERATING;
-        } else if (action == DrivingAction.ACCELERATE || action == DrivingAction.RESUME || (accelerationMps2 > 0.2)) {
+        } else if (accelerationMps2 > 0.2 || action == DrivingAction.ACCELERATE || action == DrivingAction.RESUME) {
             drivingState = DrivingState.ACCELERATING;
         } else {
             drivingState = DrivingState.CRUISING;

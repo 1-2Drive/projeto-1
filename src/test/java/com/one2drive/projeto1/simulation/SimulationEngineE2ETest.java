@@ -18,7 +18,9 @@ import com.one2drive.projeto1.scenario.ScenarioRoadElementType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -892,6 +894,171 @@ class SimulationEngineE2ETest {
             assertTrue(snapshot.timeline().stream()
                     .anyMatch(line -> line.contains("Build back up to the scenario cruise speed")),
                 "the cruise recovery rule must be visible in the inference timeline");
+        }
+    }
+
+    @Test
+    @Timeout(30)
+    void passedPotholeStaysInRoadItemsUntilFiftyMetresBehind() {
+        ScenarioLibrary library = ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json");
+        ScenarioDefinition scenario = library.findById("S6").orElseThrow();
+
+        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {})) {
+            List<String> potholeIds = engine.getWorldState().getRoadElements().stream()
+                .filter(com.one2drive.projeto1.domain.Pothole.class::isInstance)
+                .map(element -> element.getId())
+                .toList();
+            assertEquals(List.of("r18-CENTER"), potholeIds, "S6 has a single pothole");
+            String potholeId = potholeIds.get(0);
+            engine.start();
+
+            boolean sawPassed = false;
+            boolean removed = false;
+            for (int i = 0; i < 400 && !removed; i++) {
+                engine.tick();
+                var pothole = engine.getAllRoadItemsRelativeToEgo().stream()
+                    .filter(item -> item.id().equals(potholeId))
+                    .findFirst();
+                if (sawPassed && pothole.isPresent()) {
+                    assertTrue(pothole.get().positionMeters() < 0.0,
+                        "A passed pothole must never reappear ahead of the car");
+                }
+                if (pothole.isPresent() && pothole.get().positionMeters() < 0.0) {
+                    sawPassed = true;
+                    assertTrue(pothole.get().positionMeters() >= -50.0,
+                        "A passed pothole is rendered no further than 50 m behind the car");
+                } else if (sawPassed && pothole.isEmpty()) {
+                    removed = true;
+                }
+            }
+
+            assertTrue(sawPassed, "The pothole must stay in the render list after the ego passes it");
+            assertTrue(removed, "The pothole must leave the render list once it is more than 50 m behind");
+        }
+    }
+
+    @Test
+    @Timeout(30)
+    void overtakenVehicleStaysInWorldUntilFiftyMetresBehind() {
+        ScenarioLibrary library = ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json");
+        ScenarioDefinition scenario = library.findById("S16_SLOW_VEHICLE_OVERTAKE").orElseThrow();
+
+        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {})) {
+            engine.start();
+
+            boolean sawBehind = false;
+            boolean removed = false;
+            for (int i = 0; i < 500 && !removed; i++) {
+                engine.tick();
+                var actors = engine.getWorldState().getActors();
+                if (!actors.isEmpty()) {
+                    String actorId = actors.get(0).getId();
+                    double distance = engine.getWorldState().signedDistance(actors.get(0).getPositionMeters());
+                    if (distance < 0.0) {
+                        sawBehind = true;
+                        assertTrue(distance >= -50.0, "An overtaken vehicle is kept no further than 50 m behind the car");
+                        assertTrue(engine.getAllRoadItemsRelativeToEgo().stream()
+                                .anyMatch(item -> item.id().equals(actorId) && item.positionMeters() < 0.0),
+                            "An overtaken vehicle still in the world is drawn behind the car");
+                    }
+                } else if (sawBehind) {
+                    removed = true;
+                }
+            }
+
+            assertTrue(sawBehind, "The overtaken vehicle must remain in the world after being passed");
+            assertTrue(removed, "The overtaken vehicle must be removed once it is more than 50 m behind");
+        }
+    }
+
+    /**
+     * Actors keep a constant speed and follow nothing. When the ego stops behind a red light
+     * while the vehicle it just overtook is still in the rendered window behind it, that
+     * vehicle catches up; it must leave the world before it reaches the car instead of driving
+     * through it, so the radar never sees it on the bumper and the rule engine never locks.
+     */
+    @Test
+    @Timeout(value = 30, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
+    void stoppedEgoIsNotDrivenThroughByOvertakenVehicle() {
+        ScenarioLibrary library = ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json");
+        ScenarioDefinition scenario = library.findById("S16_SLOW_VEHICLE_OVERTAKE").orElseThrow();
+        ScenarioRoadElementDefinition red = new ScenarioRoadElementDefinition();
+        red.setType(ScenarioRoadElementType.TRAFFIC_LIGHT);
+        red.setLane(Lane.RIGHT);
+        red.setPositionMeters(30);
+        red.setTrafficLightState(com.one2drive.projeto1.domain.TrafficLightState.RED);
+
+        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {})) {
+            engine.start();
+
+            // Same value as SimulationEngine.CATCH_UP_GAP_METERS, about one car length. Right after
+            // the overtake the vehicle legitimately sits inside this gap while it falls back, so the
+            // gap is only enforced once the vehicle has been seen beyond it.
+            double catchUpGap = 6.0;
+            Set<String> seenBehind = new HashSet<>();
+            Set<String> seenBeyondGap = new HashSet<>();
+            boolean stopped = false;
+            for (int i = 0; i < 400; i++) {
+                if (i == 125) {
+                    engine.addRoadElementAheadAndGetId(red);
+                }
+                engine.tick();
+                stopped |= engine.getWorldState().getEgo().getSpeedKmh() < 0.1;
+                for (var actor : engine.getWorldState().getActors()) {
+                    double distance = engine.getWorldState().signedDistance(actor.getPositionMeters());
+                    if (distance <= -catchUpGap) {
+                        seenBeyondGap.add(actor.getId());
+                    } else {
+                        assertFalse(seenBeyondGap.contains(actor.getId()),
+                            "A vehicle that fell behind the car must leave before closing back within one car length, tick "
+                                + i + ", distance " + distance);
+                    }
+                    if (distance < 0.0) {
+                        seenBehind.add(actor.getId());
+                    } else if (distance > 0.0) {
+                        assertFalse(seenBehind.contains(actor.getId()),
+                            "A vehicle seen behind the car must never reappear ahead of it, tick " + i
+                                + ", distance " + distance);
+                    }
+                }
+            }
+
+            assertFalse(seenBeyondGap.isEmpty(), "The ego must overtake the slow vehicle before the light");
+            assertTrue(stopped, "The red light must stop the ego");
+            assertTrue(engine.getWorldState().getActors().isEmpty(),
+                "The overtaken vehicle catches up with the stopped ego and must have left the world");
+        }
+    }
+
+    @Test
+    @Timeout(30)
+    void rainSpeedSettlesOnTheRecommendedSpeedWithoutHunting() {
+        ScenarioLibrary library = ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json");
+        ScenarioDefinition scenario = library.findById("S11").orElseThrow();
+
+        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {})) {
+            engine.start();
+
+            SimulationSnapshot snapshot = null;
+            int stableTicks = 0;
+            int longestStreak = 0;
+            boolean settled = false;
+            for (int i = 0; i < 400; i++) {
+                snapshot = engine.tick();
+                boolean withinBand = Math.abs(snapshot.egoSpeedKmh() - snapshot.recommendedSpeedKmh()) <= 0.5;
+                if (settled) {
+                    assertTrue(withinBand, "tick " + i + ": speed " + snapshot.egoSpeedKmh()
+                        + " left the ±0.5 km/h band around " + snapshot.recommendedSpeedKmh());
+                }
+                stableTicks = withinBand ? stableTicks + 1 : 0;
+                longestStreak = Math.max(longestStreak, stableTicks);
+                settled |= stableTicks >= 50;
+            }
+
+            assertTrue(longestStreak >= 50,
+                "Once the car reaches the recommended rain speed it must stay within 0.5 km/h of it for 50 consecutive ticks");
+            assertEquals(52.0, snapshot.recommendedSpeedKmh(), 1e-9,
+                "the rain rules keep recommending 52 km/h, well below the 85 km/h entry speed");
         }
     }
 }

@@ -192,7 +192,7 @@ overtake or a stop never leaves the car stranded below the speed the road asks f
 |---|---|---|---|
 | Speed | 100 ms | - | `VehicleSpeedEvent` |
 | Front radar | 100 ms | 130 m | `FrontDistanceEvent`, `RelativeSpeedEvent`, `TTCEvent` |
-| Camera | 200 ms | 120 m | signs, lights, pedestrian, pothole, barrier, obstacle |
+| Camera | 200 ms | 120 m × visibility factor (84 m in rain) | signs, lights, pedestrian, pothole, barrier, obstacle |
 | Blind spot | 200 ms | 30 m | `LaneOccupancyEvent` per side of the car: vehicles alongside, fixed hazards up to 60 m ahead in that lane; past the road edge the side is occupied |
 | Environment | 400 ms | 200 m | weather, visibility, grip |
 
@@ -698,7 +698,7 @@ Integration tests validate dynamic behavior end-to-end without injecting final d
 - weather mutation impact,
 - reset isolation and KieSession rebuild.
 
-The direct integration suite covers 81 backend tests: 23 rule/CEP tests, 7 fact description tests, 13 SimulationEngine flows, 7 lane change flows, 21 road-law and overtaking flows, 5 road map integration tests, and 5 road map unit tests. Angular has 24 Karma unit tests. Browser E2E has 16 Playwright tests covering startup, runtime speed-limit, pedestrian, pothole progressive lane change, blocked lane change fallback, sensor groups, and presentation-demo paths with the real stack.
+The direct integration suite covers 81 backend tests: 23 rule/CEP tests, 7 fact description tests, 13 SimulationEngine flows, 7 lane change flows, 21 road-law and overtaking flows, 5 road map integration tests, and 5 road map unit tests. In total `mvn test` runs 110 backend tests (JUnit 5), and Angular has 38 Karma unit tests (`npm test`). Browser E2E has 16 Playwright tests covering startup, runtime speed-limit, pedestrian, pothole progressive lane change, blocked lane change fallback, sensor groups, and presentation-demo paths with the real stack.
 
 ## Manual Test
 

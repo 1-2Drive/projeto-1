@@ -23,6 +23,9 @@ import com.one2drive.projeto1.domain.SteeringState;
 public class DecisionActuator {
     private final SimulationConfig config;
 
+    /** Half-width of the band around the recommended speed in which the car just holds it. */
+    private static final double SPEED_DEAD_BAND_KMH = 0.5;
+
     public DecisionActuator(SimulationConfig config) {
         this.config = config;
     }
@@ -60,7 +63,11 @@ public class DecisionActuator {
                 ego.setIndicatorState(IndicatorState.HAZARD);
             }
             case BRAKE, STOP, WAIT -> ego.setAccelerationMps2(-config.getComfortableDecelerationMps2());
-            case REDUCE_SPEED -> ego.setAccelerationMps2(-config.getComfortableDecelerationMps2());
+            // REDUCE_SPEED without a target is a plain slow-down; with a target the
+            // speed-tracking block below decides how hard to brake, or whether to brake at all.
+            case REDUCE_SPEED -> ego.setAccelerationMps2(Double.isNaN(decision.getRecommendedSpeedKmh())
+                ? -config.getComfortableDecelerationMps2()
+                : 0.0);
             case ACCELERATE, RESUME -> ego.setAccelerationMps2(config.getMaxAccelerationMps2());
             case CHANGE_LANE_LEFT -> {
                 if (worldState.getMarkingBetween(ego.getLane(), ego.getLane().left()) != RoadMarkingType.CONTINUOUS) {
@@ -104,16 +111,13 @@ public class DecisionActuator {
         }
         if (decision.getAction() != DrivingAction.EMERGENCY_BRAKE && !Double.isNaN(recommendedSpeed)) {
             double current = ego.getSpeedKmh();
-            if (current > recommendedSpeed) {
+            if (current > recommendedSpeed + SPEED_DEAD_BAND_KMH) {
                 if (current > recommendedSpeed + 2.0) {
                     ego.setAccelerationMps2(-config.getComfortableDecelerationMps2());
-                } else if (current > recommendedSpeed + 0.1) {
-                    ego.setAccelerationMps2(-Math.max(1.0, (current - recommendedSpeed) * 1.5));
                 } else {
-                    ego.setSpeedKmh(recommendedSpeed);
-                    ego.setAccelerationMps2(0);
+                    ego.setAccelerationMps2(-Math.max(1.0, (current - recommendedSpeed) * 1.5));
                 }
-            } else if (current < recommendedSpeed - 0.5) {
+            } else if (current < recommendedSpeed - SPEED_DEAD_BAND_KMH) {
                 double accel = (decision.getAction() == DrivingAction.RESUME || decision.getAction() == DrivingAction.ACCELERATE || current < 5.0)
                     ? config.getMaxAccelerationMps2()
                     : config.getMaxAccelerationMps2() * 0.5;
@@ -121,10 +125,13 @@ public class DecisionActuator {
                 double maxAccel = ((recommendedSpeed / 3.6) - ego.getSpeedMps()) / Math.max(dt, 0.01);
                 ego.setAccelerationMps2(Math.max(0.0, Math.min(accel, maxAccel)));
             } else {
-                if (decision.getAction() == DrivingAction.MAINTAIN_SPEED || decision.getAction() == DrivingAction.CONTINUE) {
-                    ego.setSpeedKmh(Math.min(current, recommendedSpeed));
-                    ego.setAccelerationMps2(0);
-                }
+                // Inside the dead band: hold the recommended speed instead of hunting around it.
+                // A braking decision may hold but never raise the speed.
+                boolean braking = decision.getAction() == DrivingAction.BRAKE
+                    || decision.getAction() == DrivingAction.STOP
+                    || decision.getAction() == DrivingAction.WAIT;
+                ego.setSpeedKmh(braking ? Math.min(current, recommendedSpeed) : recommendedSpeed);
+                ego.setAccelerationMps2(0);
             }
         }
 

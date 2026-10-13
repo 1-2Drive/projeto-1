@@ -222,7 +222,7 @@
     >
       @switch (item.kind) {
         @case ('speedLimit') {
-          <svg class="sign sign--speed" viewBox="0 0 40 40" role="img">
+          <svg class="sign sign--speed limit-mark" viewBox="0 0 40 40" role="img">
             <circle class="sign__disc" cx="20" cy="20" r="19" />
             <circle class="sign__ring" cx="20" cy="20" r="15.5" />
             <text class="sign__value" x="20" y="20">{{ item.label }}</text>
@@ -306,6 +306,19 @@
         <span class="obj__distance obj__distance--passed">PASSED</span>
       }
     </div>
+    @if (item.kind === 'speedLimit') {
+      @for (y of otherLaneYs(item); track y) {
+        <div class="obj obj--speedLimit" aria-hidden="true" data-testid="road-speed-limit-mark"
+             [class.obj--passed]="item.relativeMeters <= 0"
+             [style.left.%]="item.xPercent" [style.top.%]="y">
+          <svg class="sign sign--speed limit-mark" viewBox="0 0 40 40">
+            <circle class="sign__disc" cx="20" cy="20" r="19" />
+            <circle class="sign__ring" cx="20" cy="20" r="15.5" />
+            <text class="sign__value" x="20" y="20">{{ item.label }}</text>
+          </svg>
+        </div>
+      }
+    }
     @if (item.kind === 'pedestrian') {
       <div class="crosswalk" aria-hidden="true" [style.left.%]="item.xPercent" data-testid="crosswalk">
       </div>

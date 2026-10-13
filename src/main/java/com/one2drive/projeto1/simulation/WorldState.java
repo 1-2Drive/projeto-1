@@ -256,16 +256,21 @@ public class WorldState {
         return result;
     }
 
+    /** A speed limit holds for the whole road, so the next sign ahead counts whatever lane it stands in. */
     public Optional<SpeedLimitSign> nearestSpeedLimitSign(double maxDistance) {
-        return nearestByType(SpeedLimitSign.class, maxDistance);
+        return activeRoadElementsInFront(maxDistance).stream()
+            .filter(SpeedLimitSign.class::isInstance)
+            .map(SpeedLimitSign.class::cast)
+            .min(java.util.Comparator.comparingDouble(sign -> signedDistance(sign.getPositionMeters())));
     }
 
     public Optional<TrafficLight> nearestTrafficLight(double maxDistance) {
         return nearestByType(TrafficLight.class, maxDistance);
     }
 
+    /** A stop sign only binds the lane it stands in: one in another lane is not the vehicle's to obey. */
     public Optional<StopSign> nearestStopSign(double maxDistance) {
-        return nearestByType(StopSign.class, maxDistance);
+        return nearestByType(StopSign.class, maxDistance).filter(sign -> sign.getLane() == ego.getLane());
     }
 
     public Optional<Pothole> nearestPothole(double maxDistance) {

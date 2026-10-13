@@ -2,11 +2,13 @@ package rules
 
 import com.one2drive.projeto1.decision.DecisionContext
 import com.one2drive.projeto1.decision.DecisionPriority
+import com.one2drive.projeto1.decision.StoppingPolicy
 import com.one2drive.projeto1.domain.DrivingAction
 import com.one2drive.projeto1.domain.RiskLevel
 import com.one2drive.projeto1.drools.DroolsSupport
 import com.one2drive.projeto1.drools.facts.AccelerationRequestState
 import com.one2drive.projeto1.drools.facts.CurrentSpeedLimit
+import com.one2drive.projeto1.drools.facts.PendingSpeedLimit
 import com.one2drive.projeto1.drools.facts.VehicleStateFact
 
 global DroolsSupport droolsSupport
@@ -34,6 +36,37 @@ then
         "Vehicle exceeds current legal speed limit",
         drools.getRule().getName(),
         "speed=" + $speed + " km/h, limit=" + $limit + " km/h"
+    );
+end
+
+// A lower limit ahead is not in force yet, but the vehicle has to be down to it when it
+// gets to the sign. StoppingPolicy.approachSpeedKmh is the fastest it may still be going
+// at this distance: far from the sign that is above any speed and this rule stays out, so
+// the vehicle keeps the current limit and only starts to slow where it has to. From there
+// the recommendation follows that speed down to the new limit, and holds it over the last
+// metres before the sign.
+rule "Slow down in time for the speed limit ahead"
+salience 310
+when
+    $ctx : DecisionContext()
+    PendingSpeedLimit( signId != PendingSpeedLimit.NONE, $next : limitKmh, $signPosition : positionMeters )
+    CurrentSpeedLimit( $limit : limitKmh )
+    VehicleStateFact( $speed : speedKmh, $position : positionMeters )
+    eval(StoppingPolicy.approachSpeedKmh($next, $signPosition - $position) <= $speed + 1.0)
+then
+    double distance = $signPosition - $position;
+    double approach = Math.min($limit, StoppingPolicy.approachSpeedKmh($next, distance));
+    boolean slowing = $speed > approach + 0.1;
+    droolsSupport.proposeDecision(
+        $ctx,
+        slowing ? DrivingAction.REDUCE_SPEED : DrivingAction.MAINTAIN_SPEED,
+        approach,
+        slowing ? RiskLevel.MODERATE : RiskLevel.LOW,
+        DecisionPriority.SPEED_COMPLIANCE,
+        "Speed limit " + $next + " km/h ahead; slowing to reach it at the sign",
+        drools.getRule().getName(),
+        "next limit=" + $next + " km/h in " + Math.round(distance) + "m, current limit=" + $limit
+            + " km/h, speed=" + Math.round($speed) + " km/h"
     );
 end
 

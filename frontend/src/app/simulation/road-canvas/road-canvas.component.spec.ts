@@ -61,6 +61,53 @@ describe('RoadCanvasComponent', () => {
     expect(text).toContain('35 m');
   });
 
+  it('paints one speed limit on the pavement of all three lanes at the same road position', () => {
+    for (const limit of [30, 90]) {
+      fixture.componentRef.setInput('snapshot', {
+        simulationTimeMillis: 1000,
+        status: 'RUNNING',
+        egoVehicle: { speedKmh: 60, positionMeters: 10, lane: 'RIGHT', accelerationMps2: 0 },
+        sensors: {},
+        worldObjects: [
+          { id: 'r20-CENTER', type: 'SpeedLimitSign', positionMeters: 90, lane: 'CENTER', details: `limitKmh=${limit}` }
+        ],
+        sensorRanges: { cameraRangeMeters: 120, radarRangeMeters: 130, blindSpotRangeMeters: 30, cameraRateMillis: 200, radarRateMillis: 100 }
+      });
+      fixture.detectChanges();
+
+      const root = fixture.nativeElement as HTMLElement;
+      expect(root.querySelectorAll('[data-testid="road-speed-limit"]').length).toBe(1, 'one logical speed limit');
+      const marks = Array.from(root.querySelectorAll('.limit-mark')) as SVGElement[];
+      expect(marks.length).toBe(3);
+      expect(marks.map((mark) => mark.textContent?.trim())).toEqual([`${limit}`, `${limit}`, `${limit}`]);
+
+      const holders = marks.map((mark) => mark.parentElement as HTMLElement);
+      expect(new Set(holders.map((holder) => holder.style.left)).size).toBe(1, 'same longitudinal position');
+      expect(holders.map((holder) => parseFloat(holder.style.top)).sort((a, b) => a - b)).toEqual([25, 50, 75]);
+    }
+  });
+
+  it('draws a stop sign once, in the lane it stands in', () => {
+    const laneY: Record<string, number> = { LEFT: 25, CENTER: 50, RIGHT: 75 };
+    for (const lane of ['LEFT', 'CENTER', 'RIGHT']) {
+      fixture.componentRef.setInput('snapshot', {
+        simulationTimeMillis: 1000,
+        status: 'RUNNING',
+        egoVehicle: { speedKmh: 50, positionMeters: 10, lane: 'RIGHT', accelerationMps2: 0 },
+        sensors: {},
+        worldObjects: [
+          { id: `r20-${lane}`, type: 'StopSign', positionMeters: 90, lane, details: '' }
+        ],
+        sensorRanges: { cameraRangeMeters: 120, radarRangeMeters: 130, blindSpotRangeMeters: 30, cameraRateMillis: 200, radarRateMillis: 100 }
+      });
+      fixture.detectChanges();
+
+      const signs = (fixture.nativeElement as HTMLElement).querySelectorAll('[data-testid="road-stop-sign"]');
+      expect(signs.length).toBe(1, `a stop sign in ${lane} is not repeated in the other lanes`);
+      expect(parseFloat((signs[0] as HTMLElement).style.top)).toBe(laneY[lane]);
+    }
+  });
+
   it('should keep all four wheels rigidly inside the ego chassis group with zero independent world translation', () => {
     fixture.componentRef.setInput('snapshot', {
       simulationTimeMillis: 2000,

@@ -2,6 +2,7 @@ package com.one2drive.projeto1.simulation;
 
 import com.one2drive.projeto1.config.SimulationConfig;
 import com.one2drive.projeto1.decision.DrivingDecision;
+import com.one2drive.projeto1.decision.StoppingPolicy;
 import com.one2drive.projeto1.domain.LaneChangeDirection;
 import com.one2drive.projeto1.domain.DrivingAction;
 import com.one2drive.projeto1.domain.DrivingState;
@@ -28,6 +29,9 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SimulationEngineE2ETest {
+    /** Where a stop sign makes the vehicle stop, measured back from the sign. */
+    private static final double STOP_LINE_METERS = StoppingPolicy.STOP_SIGN_OFFSET_METERS;
+
     @Test
     @Timeout(15)
     void speedSignFlowWorldToSensorToDroolsToVehicleResponse() {
@@ -55,28 +59,26 @@ class SimulationEngineE2ETest {
             boolean detected = false;
             boolean ruleFired = false;
             boolean decisionReduce = false;
-            for (int i = 0; i < 45; i++) {
+            SimulationSnapshot atSign = null;
+            for (int i = 0; i < 200 && atSign == null; i++) {
                 SimulationSnapshot s = engine.tick();
                 detected = detected || s.timeline().stream().anyMatch(line -> line.contains("Camera read speed limit 50 km/h"));
-                ruleFired = ruleFired || s.timeline().stream().anyMatch(line -> line.contains("Reduce speed when exceeding detected limit"));
+                ruleFired = ruleFired || s.timeline().stream().anyMatch(line -> line.contains("Slow down in time for the speed limit ahead"));
                 decisionReduce = decisionReduce || DrivingAction.REDUCE_SPEED.name().equals(s.currentDecision());
-                if (detected && ruleFired && decisionReduce) {
-                    break;
+                if (s.legalLimitKmh() <= 50.0) {
+                    atSign = s;
+                } else {
+                    assertEquals(120.0, s.legalLimitKmh(), 0.01, "a sign that is only seen ahead is not yet the limit in force");
                 }
             }
 
-            SimulationSnapshot snapshot = engine.snapshot();
             assertTrue(detected);
             assertTrue(ruleFired);
-            assertTrue(decisionReduce || snapshot.currentDecision().equals(DrivingAction.MAINTAIN_SPEED.name()));
-            assertTrue(snapshot.recommendedSpeedKmh() <= 50.1);
-
-            double speedBefore = snapshot.egoSpeedKmh();
-            for (int i = 0; i < 25; i++) {
-                engine.tick();
-            }
-            double speedAfter = engine.snapshot().egoSpeedKmh();
-            assertTrue(speedAfter < speedBefore);
+            assertTrue(decisionReduce);
+            assertTrue(atSign != null, "the limit must come into force when the vehicle reaches the sign");
+            assertTrue(atSign.egoSpeedKmh() <= 50.1,
+                "the vehicle must be down to the limit at the sign, was at " + atSign.egoSpeedKmh() + " km/h");
+            assertTrue(atSign.recommendedSpeedKmh() <= 50.1);
 
             for (int i = 0; i < 40; i++) {
                 engine.tick();
@@ -85,6 +87,125 @@ class SimulationEngineE2ETest {
             assertTrue(engine.snapshot().currentDecision().equals(DrivingAction.MAINTAIN_SPEED.name())
                 || engine.snapshot().currentDecision().equals(DrivingAction.CONTINUE.name())
                 || engine.snapshot().currentDecision().equals(DrivingAction.REDUCE_SPEED.name()));
+        }
+    }
+
+    /**
+     * A limit starts at its sign. Each sign is read well ahead and waits as pending: the
+     * limit in force stays the previous one up to the sign, the vehicle is down to a lower
+     * limit when it gets there, and a higher one lets it speed up only from the sign on.
+     * The signs stand in different lanes and the vehicle changes lane on the way.
+     */
+    @Test
+    @Timeout(30)
+    void speedLimitsTakeEffectAtTheirSignsInSequence() {
+        ScenarioDefinition scenario = new ScenarioDefinition();
+        scenario.setId("LIMIT_SEQUENCE");
+        scenario.setInitialSpeedKmh(60);
+        scenario.setInitialLane(Lane.RIGHT);
+        double[] positions = {100.0, 250.0, 400.0};
+        int[] limits = {30, 50, 70};
+        Lane[] lanes = {Lane.CENTER, Lane.LEFT, Lane.RIGHT};
+        for (int i = 0; i < limits.length; i++) {
+            ScenarioRoadElementDefinition sign = new ScenarioRoadElementDefinition();
+            sign.setType(ScenarioRoadElementType.SPEED_LIMIT);
+            sign.setLane(lanes[i]);
+            sign.setPositionMeters(positions[i]);
+            sign.setSpeedLimitKmh(limits[i]);
+            scenario.getRoadElements().add(sign);
+        }
+
+        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> { })) {
+            engine.start();
+            double[] speedAtSign = {Double.NaN, Double.NaN, Double.NaN};
+            double fastestAfterFifty = 0.0;
+            double fastestAfterSeventy = 0.0;
+            boolean laneChangeRequested = false;
+            boolean changedLane = false;
+            for (int i = 0; i < 700 && engine.snapshot().egoPositionMeters() < 480.0; i++) {
+                SimulationSnapshot s = engine.tick();
+                double position = s.egoPositionMeters();
+                double speed = s.egoSpeedKmh();
+                String where = "at " + position + " m, " + speed + " km/h";
+
+                if (position < 30.0) {
+                    assertTrue(speed >= 59.0, "a 30 sign read 70 m or more ahead must not slow the vehicle yet: " + where);
+                }
+                if (position < positions[0]) {
+                    assertEquals(120.0, s.legalLimitKmh(), 0.01, "no limit is in force before the first sign: " + where);
+                } else if (position < positions[1]) {
+                    assertEquals(30.0, s.legalLimitKmh(), 0.01, "30 holds from its sign up to the 50 sign: " + where);
+                    assertTrue(speed <= 30.6, "the vehicle keeps to 30 between the signs: " + where);
+                } else if (position < positions[2]) {
+                    assertEquals(50.0, s.legalLimitKmh(), 0.01, "50 replaces 30 at the 50 sign: " + where);
+                    assertTrue(speed <= 50.6, "the vehicle keeps to 50 between the signs: " + where);
+                    fastestAfterFifty = Math.max(fastestAfterFifty, speed);
+                } else {
+                    assertEquals(70.0, s.legalLimitKmh(), 0.01, "70 replaces 50 at the 70 sign: " + where);
+                    fastestAfterSeventy = Math.max(fastestAfterSeventy, speed);
+                }
+                for (int sign = 0; sign < positions.length; sign++) {
+                    if (Double.isNaN(speedAtSign[sign]) && position >= positions[sign]) {
+                        speedAtSign[sign] = speed;
+                    }
+                }
+
+                if (!laneChangeRequested && position > 130.0) {
+                    engine.requestLaneChange(LaneChangeDirection.LEFT);
+                    laneChangeRequested = true;
+                }
+                changedLane |= engine.getWorldState().getEgo().getLane() != Lane.RIGHT;
+            }
+
+            assertTrue(speedAtSign[0] <= 30.1, "the vehicle must be down to 30 at the 30 sign, was at " + speedAtSign[0]);
+            assertTrue(speedAtSign[1] <= 30.6, "and still at 30 when it reaches the 50 sign, was at " + speedAtSign[1]);
+            assertTrue(fastestAfterFifty >= 49.0, "past the 50 sign it may build up to 50, reached " + fastestAfterFifty);
+            assertTrue(fastestAfterSeventy > 50.6, "past the 70 sign it may speed up again, reached " + fastestAfterSeventy);
+            assertTrue(changedLane, "the vehicle changed lane on the way without losing the limit");
+        }
+    }
+
+    /**
+     * A speed limit is one sign in the map but holds for the whole road: the vehicle
+     * reads it from any lane, once, and keeps it when it changes lane.
+     */
+    @Test
+    @Timeout(30)
+    void singleSpeedLimitSignGovernsEveryLaneAndSurvivesALaneChange() {
+        for (Lane lane : List.of(Lane.LEFT, Lane.CENTER, Lane.RIGHT)) {
+            ScenarioDefinition scenario = new ScenarioDefinition();
+            scenario.setId("LIMIT_ALL_LANES_" + lane);
+            scenario.setInitialSpeedKmh(90);
+            scenario.setInitialLane(lane);
+            ScenarioRoadElementDefinition sign = new ScenarioRoadElementDefinition();
+            sign.setType(ScenarioRoadElementType.SPEED_LIMIT);
+            sign.setLane(Lane.CENTER);
+            sign.setPositionMeters(100.0);
+            sign.setSpeedLimitKmh(50);
+            scenario.getRoadElements().add(sign);
+
+            try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> { })) {
+                assertEquals(1, engine.getWorldState().getRoadElements().stream()
+                    .filter(com.one2drive.projeto1.domain.SpeedLimitSign.class::isInstance).count(),
+                    "One sign in the world stands for the limit of all three lanes");
+                engine.start();
+                for (int i = 0; i < 150; i++) {
+                    engine.tick();
+                }
+                assertEquals(50.0, engine.snapshot().legalLimitKmh(), 0.01, "Ego in " + lane + " must read the limit");
+                assertTrue(engine.snapshot().egoSpeedKmh() <= 51.5,
+                    "Ego in " + lane + " must slow down to the limit, got " + engine.snapshot().egoSpeedKmh());
+
+                engine.requestLaneChange(lane == Lane.LEFT ? LaneChangeDirection.RIGHT : LaneChangeDirection.LEFT);
+                boolean leftItsLane = false;
+                for (int i = 0; i < 80; i++) {
+                    engine.tick();
+                    leftItsLane |= engine.getWorldState().getEgo().getLane() != lane;
+                    assertEquals(50.0, engine.snapshot().legalLimitKmh(), 0.01,
+                        "The limit must hold while and after changing lane from " + lane);
+                }
+                assertTrue(leftItsLane, "Ego must have changed lane from " + lane);
+            }
         }
     }
 
@@ -134,6 +255,59 @@ class SimulationEngineE2ETest {
         }
     }
 
+    /**
+     * A stop sign belongs to the lane it stands in. The continuous markings keep the
+     * vehicle in its lane, so each run shows one lane against one sign.
+     */
+    @Test
+    @Timeout(60)
+    void stopSignStopsOnlyTheVehicleDrivingInItsLane() {
+        List<Lane> lanes = List.of(Lane.LEFT, Lane.CENTER, Lane.RIGHT);
+        for (Lane signLane : lanes) {
+            for (Lane egoLane : lanes) {
+                ScenarioDefinition scenario = new ScenarioDefinition();
+                scenario.setId("STOP_" + signLane + "_EGO_" + egoLane);
+                scenario.setInitialSpeedKmh(50);
+                scenario.setInitialLane(egoLane);
+                scenario.setLeftMarking(com.one2drive.projeto1.domain.RoadMarkingType.CONTINUOUS);
+                scenario.setRightMarking(com.one2drive.projeto1.domain.RoadMarkingType.CONTINUOUS);
+                ScenarioRoadElementDefinition sign = new ScenarioRoadElementDefinition();
+                sign.setType(ScenarioRoadElementType.STOP_SIGN);
+                sign.setLane(signLane);
+                sign.setPositionMeters(80.0);
+                scenario.getRoadElements().add(sign);
+
+                try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> { })) {
+                    StopSign placed = (StopSign) engine.getWorldState().getRoadElements().stream()
+                        .filter(StopSign.class::isInstance).findFirst().orElseThrow();
+                    assertEquals(signLane, placed.getLane(), "The sign stands in the lane it was given");
+                    engine.start();
+
+                    boolean stopped = false;
+                    double slowest = Double.MAX_VALUE;
+                    for (int i = 0; i < 300 && !stopped && engine.snapshot().egoPositionMeters() < 130.0; i++) {
+                        SimulationSnapshot snapshot = engine.tick();
+                        slowest = Math.min(slowest, snapshot.egoSpeedKmh());
+                        stopped = snapshot.egoSpeedKmh() < 0.6;
+                        assertEquals(egoLane, engine.getWorldState().getEgo().getLane());
+                    }
+                    String where = "sign in " + signLane + ", ego in " + egoLane;
+                    if (signLane == egoLane) {
+                        assertTrue(stopped, "The vehicle must stop at the sign of its own lane: " + where);
+                        double rest = engine.getWorldState().signedDistance(placed.getPositionMeters());
+                        assertTrue(rest >= STOP_LINE_METERS - 1.0 && rest <= STOP_LINE_METERS + 4.0,
+                            "and come to rest at the stop line before the sign, not on it: " + rest + " m short, " + where);
+                    } else {
+                        assertFalse(stopped, "A sign in another lane must not stop the vehicle: " + where);
+                        assertTrue(slowest > 40.0, "and must not slow it down either, slowest " + slowest + " km/h: " + where);
+                        assertFalse(engine.snapshot().detectedObjectIds().contains(placed.getId()),
+                            "and is not reported as detected: " + where);
+                    }
+                }
+            }
+        }
+    }
+
     @Test
     @Timeout(20)
     void stopSignFlowBringsVehicleToFullStopThenProceeds() {
@@ -160,7 +334,7 @@ class SimulationEngineE2ETest {
                 approached = approached || snapshot.timeline().stream().anyMatch(
                     line -> line.contains("Stop sign requires progressive deceleration")
                         || line.contains("Stop sign requires full stop near line"));
-                if (snapshot.egoSpeedKmh() < 0.6 && distance <= 4.0) {
+                if (snapshot.egoSpeedKmh() < 0.6 && distance <= STOP_LINE_METERS + 4.0) {
                     stoppedTicks++;
                     stoppedAtLine = stoppedTicks >= 10;
                 } else {
@@ -171,7 +345,7 @@ class SimulationEngineE2ETest {
             assertTrue(approached, "the stop sign must be perceived and acted on during the approach");
             assertTrue(stoppedAtLine,
                 "the vehicle must come to a full stop at the stop sign, closest distance " + closestDistance);
-            assertTrue(closestDistance >= -1.0 && closestDistance <= 4.0,
+            assertTrue(closestDistance >= STOP_LINE_METERS - 1.0 && closestDistance <= STOP_LINE_METERS + 4.0,
                 "the vehicle must stop at the line instead of crossing it, closest distance " + closestDistance);
 
             boolean proceeded = false;
@@ -207,7 +381,7 @@ class SimulationEngineE2ETest {
 
             ScenarioRoadElementDefinition sign = new ScenarioRoadElementDefinition();
             sign.setType(ScenarioRoadElementType.STOP_SIGN);
-            sign.setLane(Lane.CENTER);
+            sign.setLane(Lane.RIGHT);
             sign.setPositionMeters(60.0);
             engine.addRoadElementAhead(sign);
             // The element is queued while the simulation runs and lands in the world on the
@@ -251,7 +425,7 @@ class SimulationEngineE2ETest {
                 approaching = approaching || fromStopRule;
                 previousWasEmergency = emergency;
 
-                if (snapshot.egoSpeedKmh() < 0.6 && distance <= 4.0) {
+                if (snapshot.egoSpeedKmh() < 0.6 && distance <= STOP_LINE_METERS + 4.0) {
                     stoppedTicks++;
                     stopped = stoppedTicks >= 10;
                 } else {
@@ -261,11 +435,11 @@ class SimulationEngineE2ETest {
 
             assertTrue(stopped, "the vehicle must come to a full stop at the sign, closest distance "
                 + closestDistance);
-            assertTrue(closestDistance >= -1.0 && closestDistance <= 4.0,
+            assertTrue(closestDistance >= STOP_LINE_METERS - 1.0 && closestDistance <= STOP_LINE_METERS + 4.0,
                 "the vehicle must stop at the line instead of undershooting or crossing it, closest distance "
                     + closestDistance);
             assertFalse(Double.isNaN(firstRestDistance), "the vehicle must come to rest at the sign");
-            assertTrue(firstRestDistance >= -1.0 && firstRestDistance <= 4.0,
+            assertTrue(firstRestDistance >= STOP_LINE_METERS - 1.0 && firstRestDistance <= STOP_LINE_METERS + 4.0,
                 "the first rest must be at the line, not a stall short of it that has to be crept away from: "
                     + firstRestDistance);
             assertTrue(emergencyBursts <= 2,
@@ -537,7 +711,7 @@ class SimulationEngineE2ETest {
                 engine.tick();
             }
             boolean sawDetection = engine.getWorkingMemoryFactViews().stream()
-                .anyMatch(view -> view.type().equals("CurrentSpeedLimit") && view.value().contains("limitKmh=50"));
+                .anyMatch(view -> view.type().endsWith("SpeedLimit") && view.value().contains("limitKmh=50"));
             assertTrue(sawDetection, "Signed scenario should be perceived during the run");
             assertFalse(engine.getWorldState().getRoadElements().isEmpty());
 
@@ -546,7 +720,7 @@ class SimulationEngineE2ETest {
             assertEquals(0, engine.snapshot().simTimeMillis());
             assertEquals(0, engine.getWorldState().getRoadElements().size());
             assertTrue(engine.getWorkingMemoryFactViews().stream()
-                .noneMatch(view -> view.type().equals("CurrentSpeedLimit") && view.value().contains("limitKmh=50")));
+                .noneMatch(view -> view.type().endsWith("SpeedLimit") && view.value().contains("limitKmh=50")));
             assertTrue(engine.getWorldState().getActors().isEmpty());
             assertTrue(engine.getDemoEvidence().isEmpty());
         }

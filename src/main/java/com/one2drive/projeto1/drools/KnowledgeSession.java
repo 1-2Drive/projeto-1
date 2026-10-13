@@ -101,6 +101,7 @@ public class KnowledgeSession implements AutoCloseable {
         kieSession.insert(decision);
         // Seed limit: the placeholder every session starts with, until a sign is seen.
         kieSession.insert(new CurrentSpeedLimit(120, CurrentSpeedLimit.DEFAULT_SOURCE, 0L));
+        kieSession.insert(new com.one2drive.projeto1.drools.facts.PendingSpeedLimit());
         kieSession.insert(new WeatherStateFact(com.one2drive.projeto1.domain.WeatherCondition.CLEAR, 1.0, 1.0, 0L));
         // Lane occupancy starts pessimistic: an adjacent lane is treated as occupied
         // until the blind-spot sensor has actually reported it clear. A vehicle must

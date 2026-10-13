@@ -25,8 +25,8 @@ interface ActionDefinition {
 
 const ACTIONS: Record<ToolboxAction, ActionDefinition> = {
   SPEED_LIMIT: {
-    title: 'Add speed limit', hint: 'Camera detects the sign only inside its range.',
-    needsLane: true, needsSeverity: false, needsSpeedLimit: true,
+    title: 'Add speed limit', hint: 'Applies to all three lanes. Camera detects it only inside its range.',
+    needsLane: false, needsSeverity: false, needsSpeedLimit: true,
     needsLightState: false, needsBarrierState: false, needsActorSpeed: false
   },
   STOP_SIGN: {
@@ -165,9 +165,10 @@ export class ElementPropertiesComponent {
 
     switch (action) {
       case 'SPEED_LIMIT':
+        // One sign in the map, valid for the whole road: the road view repeats it in every lane.
         this.createRoadElement.emit({
           type: 'SPEED_LIMIT',
-          lane: this.lane(),
+          lane: 'CENTER',
           distanceAheadMeters: this.distanceAheadMeters(),
           speedLimitKmh: this.speedLimitKmh()
         });

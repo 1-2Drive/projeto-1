@@ -526,6 +526,21 @@
   width: 2.5rem;
 }
 
+/* A speed limit is painted on the asphalt of every lane, under vehicles and pedestrians. */
+.obj--speedLimit {
+  z-index: 3;
+}
+
+/* Out of the flow, so the marking of the sign's own lane lines up with the other two. */
+.obj--speedLimit .obj__distance {
+  position: absolute;
+  top: 100%;
+}
+
+.limit-mark {
+  opacity: 0.85;
+}
+
 .obj--trafficLight {
   width: 1.35rem;
 }

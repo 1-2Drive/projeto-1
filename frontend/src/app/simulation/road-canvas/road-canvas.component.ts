@@ -420,6 +420,14 @@ export class RoadCanvasComponent {
       * (LANE_CENTER_Y.RIGHT - LANE_CENTER_Y.CENTER);
   }
 
+  /**
+   * A speed limit holds for the whole road, so its marking is painted in every lane:
+   * these are the lanes other than the one the item itself is drawn in.
+   */
+  protected otherLaneYs(item: RoadRenderItem): number[] {
+    return this.laneLabels.map((lane) => lane.y).filter((y) => Math.abs(y - item.yPercent) > 0.5);
+  }
+
   /** Retained for test compatibility */
   protected toPercentX(relativeMeters: number): number {
     return this.worldToPercentX(this.egoPosition() + relativeMeters);

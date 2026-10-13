@@ -73,6 +73,45 @@ test.describe('Driving expert simulation UI', () => {
     await expect(page.locator('[data-testid="timeline-panel"]')).toContainText(/50 km\/h|speed limit/i, { timeout: 20000 });
   });
 
+  test('speed limit has no lane selector and is painted on all three lanes', async ({ page }) => {
+    await page.goto('/');
+    await loadScenario(page, 'S1 Empty safe road');
+
+    for (const limit of ['30', '90']) {
+      await page.locator('[data-testid="reset-btn"]').click();
+      await page.locator(`[data-testid="add-speed-${limit}"]`).click();
+      await expect(page.locator('[data-testid="config-panel"]')).toBeVisible();
+      await expect(page.locator('[data-testid="lane-select"]')).toHaveCount(0);
+      await page.locator('[data-testid="drawer-distance-input"]').fill('60');
+      await page.locator('[data-testid="apply-config"]').click();
+
+      await expect(page.locator('[data-testid="road-speed-limit"]')).toHaveCount(1);
+      const marks = page.locator('.limit-mark');
+      await expect(marks).toHaveCount(3);
+      await expect(marks).toHaveText([limit, limit, limit]);
+      const boxes = await marks.evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().x));
+      expect(Math.max(...boxes) - Math.min(...boxes)).toBeLessThan(1);
+    }
+  });
+
+  test('stop sign is placed only in the lane chosen in the drawer', async ({ page }) => {
+    await page.goto('/');
+    await loadScenario(page, 'S1 Empty safe road');
+
+    for (const lane of ['LEFT', 'CENTER', 'RIGHT']) {
+      await page.locator('[data-testid="reset-btn"]').click();
+      await page.locator('[data-testid="add-stop-sign"]').click();
+      await expect(page.locator('[data-testid="config-panel"]')).toBeVisible();
+      await page.locator('[data-testid="drawer-distance-input"]').fill('60');
+      await page.locator('[data-testid="lane-select"]').selectOption(lane);
+      await page.locator('[data-testid="apply-config"]').click();
+
+      const sign = page.locator('[data-testid="road-stop-sign"]');
+      await expect(sign).toHaveCount(1);
+      await expect(sign).toHaveAttribute('data-object-id', `r12-${lane}`);
+    }
+  });
+
   test('pedestrian interaction produces a safety decision', async ({ page }) => {
     test.setTimeout(90000);
 

@@ -338,21 +338,6 @@ public class WorldState {
         return Optional.ofNullable(nearestOwnLane != null ? nearestOwnLane : nearestAnyLane);
     }
 
-    public Optional<com.one2drive.projeto1.domain.SpeedRadar> findNearestSpeedRadarAhead(double maxDistance) {
-        com.one2drive.projeto1.domain.SpeedRadar nearest = null;
-        double nearestDistance = Double.POSITIVE_INFINITY;
-        for (RoadElement element : getRoadElements()) {
-            if (element instanceof com.one2drive.projeto1.domain.SpeedRadar radar && radar.isActive()) {
-                double distance = signedDistance(radar.getPositionMeters());
-                if (distance > 0 && distance <= maxDistance && distance < nearestDistance) {
-                    nearest = radar;
-                    nearestDistance = distance;
-                }
-            }
-        }
-        return Optional.ofNullable(nearest);
-    }
-
     public Optional<Pothole> nearestPotholeAhead(double maxDistance) {
         return nearestHazardAhead(Pothole.class, maxDistance);
     }

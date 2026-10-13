@@ -278,61 +278,6 @@ test.describe('Driving expert simulation UI', () => {
     expect(egoText).not.toContain('CRUISING');
   });
 
-  test('speed radar scenario: physical radar object rendered, speed decelerates to legal limit, passes without avoiding or stopping', async ({ page }) => {
-    test.setTimeout(90000);
-
-    await page.goto('/');
-    await page.locator('[data-testid="reset-btn"]').click();
-    await page.locator('button:has-text("S18_SPEED_RADAR_APPROACH")').click();
-
-    // Physical radar object is visible BEFORE starting simulation
-    const speedRadar = page.locator('[data-testid="speed-radar"]');
-    await expect(speedRadar).toBeVisible({ timeout: 15000 });
-
-    // Radar FOV sensor edge is separate
-    const radarFov = page.locator('[data-testid="radar-fov"]');
-    if (await radarFov.count() > 0) {
-      await expect(radarFov).not.toHaveAttribute('data-testid', 'speed-radar');
-    }
-
-    // Capture initial visual bounding box at t1
-    const ego = page.locator('[data-testid="road-ego"]');
-    await expect(ego).toBeVisible();
-
-    const egoBox1 = await ego.boundingBox();
-    const radarBox1 = await speedRadar.boundingBox();
-    expect(egoBox1).not.toBeNull();
-    expect(radarBox1).not.toBeNull();
-    const initialVisualDistance = Math.abs(radarBox1!.x - egoBox1!.x);
-
-    await page.locator('[data-testid="start-btn"]').click();
-    await expect(page.locator('[data-testid="simulation-status"]')).toContainText('RUNNING');
-
-    // Wait simulation time for vehicle to advance visibly
-    await page.waitForTimeout(2500);
-
-    const egoBox2 = await ego.boundingBox();
-    const radarBox2 = await speedRadar.boundingBox();
-    expect(egoBox2).not.toBeNull();
-    expect(radarBox2).not.toBeNull();
-
-    // Assert: radar moves toward ego on screen as car drives forward
-    expect(radarBox2!.x).toBeLessThan(radarBox1!.x);
-    // Assert: pixel distance car <-> radar strictly decreases!
-    const visualDistance2 = Math.abs(radarBox2!.x - egoBox2!.x);
-    expect(visualDistance2).toBeLessThan(initialVisualDistance);
-
-    // Speed decelerates towards legal 50 km/h limit as ego approaches
-    await expect(page.locator('[data-testid="decision-action"]'))
-      .toContainText('REDUCE_SPEED', { timeout: 25000 });
-
-    // Ego stays in right lane (no avoidance lane change triggered)
-    await expect(ego).toHaveAttribute('data-lane', 'RIGHT');
-
-    // Ego vehicle passes radar and continues driving past 330m
-    await expect(page.locator('[data-testid="hud-position"]')).toContainText(/\d{3}\.\d m/, { timeout: 35000 });
-  });
-
   test('capture evidence screenshots for viewports, toolbox objects, and clean EGO badge', async ({ page }) => {
     test.setTimeout(60000);
 

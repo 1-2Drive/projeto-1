@@ -94,9 +94,6 @@ public final class ScenarioFactory {
                 lane,
                 definition.getBarrierOpen() == null || definition.getBarrierOpen()
             );
-            case SPEED_RADAR -> new com.one2drive.projeto1.domain.SpeedRadar(
-                definition.getPositionMeters(),
-                definition.getSpeedLimitKmh() > 0 ? definition.getSpeedLimitKmh() : 50.0);
         };
     }
 

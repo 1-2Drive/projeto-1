@@ -178,9 +178,7 @@ public class ApiModelMapper {
                 telemetry.frontRadar().distanceMeters(),
                 telemetry.frontRadar().relativeSpeedKmh(),
                 telemetry.frontRadar().ttcSeconds(),
-                telemetry.frontRadar().status(),
-                telemetry.frontRadar().speedRadarDistanceMeters(),
-                telemetry.frontRadar().speedRadarLimitKmh()
+                telemetry.frontRadar().status()
             ),
             new ApiSimulationSnapshot.CameraTelemetryView(
                 telemetry.frontCamera().rangeMeters(),

@@ -3,11 +3,9 @@ package com.one2drive.projeto1.sensors;
 import com.one2drive.projeto1.config.SimulationConfig;
 import com.one2drive.projeto1.domain.Lane;
 import com.one2drive.projeto1.domain.OtherVehicle;
-import com.one2drive.projeto1.domain.SpeedRadar;
 import com.one2drive.projeto1.drools.events.FrontDistanceEvent;
 import com.one2drive.projeto1.drools.events.LeftLaneVehicleEvent;
 import com.one2drive.projeto1.drools.events.RelativeSpeedEvent;
-import com.one2drive.projeto1.drools.events.SpeedRadarEvent;
 import com.one2drive.projeto1.drools.events.TTCEvent;
 import com.one2drive.projeto1.simulation.WorldState;
 
@@ -37,12 +35,6 @@ public class FrontRadarSensor extends AbstractSensor<Object> {
     @Override
     public List<Object> observe(WorldState worldState, long timestampMillis) {
         List<Object> events = new ArrayList<>();
-
-        Optional<SpeedRadar> speedRadar = worldState.findNearestSpeedRadarAhead(Math.max(rangeMeters(), 250.0));
-        speedRadar.ifPresent(radar -> {
-            double distanceToRadar = worldState.signedDistance(radar.getPositionMeters());
-            events.add(new SpeedRadarEvent(timestampMillis, radar.getId(), distanceToRadar, radar.getSpeedLimitKmh()));
-        });
 
         Optional<OtherVehicle> front = worldState.nearestFrontVehicleInLane(rangeMeters());
         front.ifPresent(vehicle -> {

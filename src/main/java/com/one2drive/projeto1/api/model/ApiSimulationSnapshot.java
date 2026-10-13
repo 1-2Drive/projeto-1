@@ -93,9 +93,7 @@ public record ApiSimulationSnapshot(
         double distanceMeters,
         double relativeSpeedKmh,
         double ttcSeconds,
-        String status,
-        double speedRadarDistanceMeters,
-        double speedRadarLimitKmh
+        String status
     ) {
     }
 

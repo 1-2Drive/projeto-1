@@ -7,7 +7,6 @@ import com.one2drive.projeto1.domain.RiskLevel
 import com.one2drive.projeto1.drools.DroolsSupport
 import com.one2drive.projeto1.drools.facts.AccelerationRequestState
 import com.one2drive.projeto1.drools.facts.CurrentSpeedLimit
-import com.one2drive.projeto1.drools.facts.SpeedRadarFact
 import com.one2drive.projeto1.drools.facts.VehicleStateFact
 
 global DroolsSupport droolsSupport
@@ -18,52 +17,6 @@ global DroolsSupport droolsSupport
 // holds the target inside a +/-0.5 km/h dead band (SPEED_DEAD_BAND_KMH in DecisionActuator),
 // so this 0.1 km/h rule threshold sits inside that band.
 // "exceeding" and "compliant" must stay exact complements so one of them always wins.
-rule "Decelerate approaching speed radar to comply with legal limit"
-salience 320
-no-loop true
-when
-    $ctx : DecisionContext()
-    $radar : SpeedRadarFact(radarId != "none", detected == true, passed == false,
-        $distance : distanceMeters > 0, distanceMeters <= 250.0, $limit : speedLimitKmh)
-    VehicleStateFact( $speed : speedKmh > $limit + 0.1 )
-then
-    droolsSupport.proposeDecision(
-        $ctx,
-        DrivingAction.REDUCE_SPEED,
-        $limit,
-        RiskLevel.MODERATE,
-        DecisionPriority.SPEED_COMPLIANCE,
-        "Radar detects speed-control zone ahead; configured limit " + Math.round($limit) + " km/h",
-        drools.getRule().getName(),
-        "radar=" + $radar.getRadarId() + ", distance=" + Math.round($distance) + "m, configured limit="
-            + Math.round($limit) + " km/h, current vehicle speed=" + Math.round($speed) + " km/h"
-    );
-end
-
-rule "Maintain speed at or below the configured radar limit while approaching"
-salience 215
-when
-    $ctx : DecisionContext()
-    SpeedRadarFact(radarId != "none", detected == true, passed == false,
-        $distance : distanceMeters >= 0, distanceMeters <= 250.0, $limit : speedLimitKmh)
-    CurrentSpeedLimit($legalLimit : limitKmh)
-    VehicleStateFact($speed : speedKmh <= $limit + 0.1)
-then
-    double target = Math.min($limit, $legalLimit);
-    droolsSupport.proposeDecision(
-        $ctx,
-        DrivingAction.MAINTAIN_SPEED,
-        target,
-        RiskLevel.LOW,
-        DecisionPriority.SPEED_COMPLIANCE,
-        "Radar speed-control zone ahead; maintaining speed at or below the effective limit",
-        drools.getRule().getName(),
-        "distance=" + Math.round($distance) + "m, radar limit=" + Math.round($limit)
-            + " km/h, effective limit=" + Math.round(target)
-            + " km/h, current vehicle speed=" + Math.round($speed) + " km/h"
-    );
-end
-
 rule "Reduce speed when exceeding detected limit"
 salience 300
 when

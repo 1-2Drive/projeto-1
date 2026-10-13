@@ -29,7 +29,6 @@ import com.one2drive.projeto1.drools.events.TTCEvent;
 import com.one2drive.projeto1.drools.events.TrafficLightEvent;
 import com.one2drive.projeto1.drools.facts.CruiseTargetFact;
 import com.one2drive.projeto1.drools.facts.CurrentSpeedLimit;
-import com.one2drive.projeto1.drools.facts.SpeedRadarFact;
 import com.one2drive.projeto1.drools.facts.VehicleStateFact;
 import com.one2drive.projeto1.explanation.ExplanationTrace;
 import com.one2drive.projeto1.explanation.TimelineEntry;
@@ -305,7 +304,6 @@ public class SimulationEngine implements AutoCloseable {
             recordDetectedObject(event);
         }
         updateVehicleStateFact();
-        updateActiveRadarFact();
         refreshSensorTelemetry(events);
 
         // Circuit breaker: rules that re-trigger each other must never freeze the tick.
@@ -330,7 +328,6 @@ public class SimulationEngine implements AutoCloseable {
         recordManeuverStart(stateBefore);
         recordActuatorChange();
         settleManeuver();
-        recordRadarPassage();
         consumePassedRoadElements();
         markDemoEvidence(events);
         purgeExpiredDetections();
@@ -338,80 +335,16 @@ public class SimulationEngine implements AutoCloseable {
         return snapshot();
     }
 
-    private void recordRadarPassage() {
-        SpeedRadarFact radarFact = null;
-        FactHandle radarHandle = null;
-        for (Object fact : knowledgeSession.getKieSession().getObjects(new ClassObjectFilter(SpeedRadarFact.class))) {
-            radarFact = (SpeedRadarFact) fact;
-            break;
-        }
-        if (radarFact != null) radarHandle = findFactHandle(radarFact);
-        if (radarFact != null && radarHandle != null && radarFact.isDetected() && !radarFact.isPassed()) {
-            String activeRadarId = radarFact.getRadarId();
-            var radar = worldState.getRoadElements().stream()
-                .filter(com.one2drive.projeto1.domain.SpeedRadar.class::isInstance)
-                .map(com.one2drive.projeto1.domain.SpeedRadar.class::cast)
-                .filter(candidate -> candidate.getId().equals(activeRadarId))
-                .findFirst();
-            if (radar.isPresent() && worldState.signedDistance(radar.get().getPositionMeters()) <= 0.0) {
-                radarFact.setPassed(true);
-                radarFact.setDistanceMeters(0.0);
-                radarFact.setTimestamp(simTimeMillis);
-                knowledgeSession.getKieSession().update(radarHandle, radarFact);
-                knowledgeSession.getTrace().add(simTimeMillis, TimelineEntryType.INFO,
-                    "Speed radar passed at " + Math.round(worldState.getEgo().getSpeedKmh())
-                        + " km/h — legal limit " + Math.round(radarFact.getSpeedLimitKmh()) + " km/h");
-            }
-        }
-    }
-
-    /** Makes the nearest lane-independent enforcement device authoritative for the decision cycle. */
-    private void updateActiveRadarFact() {
-        SpeedRadarFact state = null;
-        FactHandle handle = null;
-        for (FactHandle candidate : knowledgeSession.getKieSession().getFactHandles(new ClassObjectFilter(SpeedRadarFact.class))) {
-            state = (SpeedRadarFact) knowledgeSession.getKieSession().getObject(candidate);
-            handle = candidate;
-            break;
-        }
-        if (state == null || handle == null || state.isPassed()) return;
-        var radar = worldState.findNearestSpeedRadarAhead(250.0);
-        if (radar.isEmpty()) return;
-
-        var device = radar.get();
-        double distance = worldState.signedDistance(device.getPositionMeters());
-        if (!device.getId().equals(state.getRadarId()) || Math.abs(distance - state.getDistanceMeters()) > 0.01
-            || Math.abs(state.getSpeedLimitKmh() - device.getSpeedLimitKmh()) > 0.01 || !state.isDetected()) {
-            state.setRadarId(device.getId());
-            state.setDistanceMeters(distance);
-            state.setSpeedLimitKmh(device.getSpeedLimitKmh());
-            state.setTimestamp(simTimeMillis);
-            state.setDetected(true);
-            knowledgeSession.getKieSession().update(handle, state);
-        }
-    }
-
     /** Retires single-use static objects after passing while retaining their visual as it moves behind the car. */
     private void consumePassedRoadElements() {
         for (RoadElement element : List.copyOf(worldState.getRoadElements())) {
             double distance = worldState.signedDistance(element.getPositionMeters());
-            if (worldState.isLoopWorldObjects()
-                && !(element instanceof com.one2drive.projeto1.domain.SpeedRadar)) continue;
+            if (worldState.isLoopWorldObjects()) continue;
             if (distance <= 0.0 && detectedWorldObjectIds.contains(element.getId())) {
                 element.setActive(false);
             }
             if (distance < -RENDER_BEHIND_METERS && detectedWorldObjectIds.contains(element.getId())) {
-                if (worldState.isLoopWorldObjects()) {
-                    if (element instanceof com.one2drive.projeto1.domain.SpeedRadar radar) {
-                        worldState.getRoadMap().clearInfrastructureRow(
-                            worldState.getRoadMap().rowAt(radar.getPositionMeters()));
-                        worldState.removeRoadElementById(radar.getId());
-                    } else {
-                        worldState.removeRoadElementById(element.getId());
-                    }
-                } else {
-                    worldState.removeRoadElementById(element.getId());
-                }
+                worldState.removeRoadElementById(element.getId());
             }
         }
         // Overtaken vehicles and crossed pedestrians keep moving behind the car, where the
@@ -481,34 +414,6 @@ public class SimulationEngine implements AutoCloseable {
     private void refreshSensorTelemetry(List<Object> events) {
         SensorTelemetry previous = sensorTelemetry;
 
-        double speedRadarDist = previous.frontRadar().speedRadarDistanceMeters();
-        double speedRadarLimit = previous.frontRadar().speedRadarLimitKmh();
-        var radarAhead = worldState.findNearestSpeedRadarAhead(config.getRadarRangeMeters());
-        Optional<SpeedRadarFact> activeRadar = activeSpeedRadarFact();
-        if (activeRadar.isPresent()) {
-            speedRadarDist = activeRadar.get().getDistanceMeters();
-            speedRadarLimit = activeRadar.get().getSpeedLimitKmh();
-        } else if (radarAhead.isPresent()) {
-            com.one2drive.projeto1.domain.SpeedRadar sr = radarAhead.get();
-            speedRadarDist = worldState.distanceAhead(sr.getPositionMeters());
-            speedRadarLimit = sr.getSpeedLimitKmh();
-        } else {
-            speedRadarDist = Double.POSITIVE_INFINITY;
-            speedRadarLimit = 0.0;
-        }
-        if (activeRadar.isPresent()) {
-            speedRadarDist = activeRadar.get().getDistanceMeters();
-            speedRadarLimit = activeRadar.get().getSpeedLimitKmh();
-        }
-        for (Object event : events) {
-            if (event instanceof com.one2drive.projeto1.drools.events.SpeedRadarEvent sre) {
-                if (activeRadar.isEmpty()) {
-                    speedRadarDist = sre.getDistanceMeters();
-                    speedRadarLimit = sre.getSpeedLimitKmh();
-                }
-            }
-        }
-
         SensorTelemetry.RadarView radar = previous.frontRadar();
         if (!"none".equals(radar.targetId())
             && !radarDetectedObjectTimestamps.containsKey(radar.targetId())) {
@@ -524,9 +429,7 @@ public class SimulationEngine implements AutoCloseable {
                     distance.getDistanceMeters(),
                     previous.frontRadar().relativeSpeedKmh(),
                     previous.frontRadar().ttcSeconds(),
-                    "TRACKING",
-                    speedRadarDist,
-                    speedRadarLimit
+                    "TRACKING"
                 );
             } else if (event instanceof RelativeSpeedEvent relative) {
                 radarUpdated = true;
@@ -536,9 +439,7 @@ public class SimulationEngine implements AutoCloseable {
                     radar.distanceMeters(),
                     relative.getRelativeSpeedMps() * 3.6,
                     radar.ttcSeconds(),
-                    "TRACKING",
-                    speedRadarDist,
-                    speedRadarLimit
+                    "TRACKING"
                 );
             } else if (event instanceof TTCEvent ttc) {
                 radarUpdated = true;
@@ -548,9 +449,7 @@ public class SimulationEngine implements AutoCloseable {
                     radar.distanceMeters(),
                     radar.relativeSpeedKmh(),
                     ttc.getTtcSeconds(),
-                    radarStatus(ttc.getTtcSeconds()),
-                    speedRadarDist,
-                    speedRadarLimit
+                    radarStatus(ttc.getTtcSeconds())
                 );
             }
         }
@@ -562,9 +461,7 @@ public class SimulationEngine implements AutoCloseable {
                 radar.distanceMeters(),
                 radar.relativeSpeedKmh(),
                 radar.ttcSeconds(),
-                radar.status(),
-                speedRadarDist,
-                speedRadarLimit
+                radar.status()
             );
         }
 
@@ -724,16 +621,6 @@ public class SimulationEngine implements AutoCloseable {
         return worldState.isLaneSafe(lane, config.getBlindSpotRangeMeters(), 60.0);
     }
 
-    public synchronized Optional<SpeedRadarFact> activeSpeedRadarFact() {
-        for (Object fact : knowledgeSession.getKieSession().getObjects(new ClassObjectFilter(SpeedRadarFact.class))) {
-            SpeedRadarFact radar = (SpeedRadarFact) fact;
-            if (radar.isDetected() && !radar.isPassed() && !"none".equals(radar.getRadarId())) {
-                return Optional.of(radar);
-            }
-        }
-        return Optional.empty();
-    }
-
     /**
      * Settles a finished maneuver: the committed lane becomes the lane the vehicle
      * physically reached, so sensors and rules reason about where the car actually is.
@@ -891,18 +778,16 @@ public class SimulationEngine implements AutoCloseable {
     private String writeRoadElementAhead(ScenarioRoadElementDefinition definition, String replacedId) {
         RoadMap map = worldState.getRoadMap();
         double position = worldState.getEgo().getPositionMeters() + definition.getPositionMeters();
-        Lane lane = definition.isAllLaneInfrastructure() ? Lane.CENTER
-            : (definition.getLane() == null ? Lane.CENTER : definition.getLane());
+        Lane lane = definition.getLane() == null ? Lane.CENTER : definition.getLane();
         int row = map.rowAt(position);
         int code = map.legend().codeFor(definition);
         enqueueWorldMutation(() -> {
             if (replacedId != null) {
                 map.clear(replacedId);
             }
-            if (definition.isAllLaneInfrastructure()) map.setInfrastructureRow(row, code);
-            else map.set(row, lane, code);
+            map.set(row, lane, code);
         });
-        return definition.isAllLaneInfrastructure() ? "r" + row + "-ALL" : RoadMap.cellId(row, lane);
+        return RoadMap.cellId(row, lane);
     }
 
     /** Sets one road map cell to a legend code (0 frees it). */
@@ -947,7 +832,7 @@ public class SimulationEngine implements AutoCloseable {
         int row = worldState.getRoadMap().rowAt(position);
         int code = worldState.getRoadMap().legend().codeFor(update);
         enqueueWorldMutation(() -> worldState.getRoadMap().updateElement(id, update, position));
-        return Optional.of(update.isAllLaneInfrastructure() ? "r" + row + "-ALL" : RoadMap.cellId(row, update.getLane()));
+        return Optional.of(RoadMap.cellId(row, update.getLane()));
     }
 
     public synchronized boolean updateActorById(String id, ScenarioActorDefinition definition) {
@@ -1156,19 +1041,9 @@ public class SimulationEngine implements AutoCloseable {
         double length = worldState.getRoadMap().lengthMeters();
         double behindWindow = Math.min(backwardMeters, length / 2);
         List<RoadRenderItem> items = new ArrayList<>();
-        worldState.getRoadElements().forEach(element -> {
-            if (element instanceof com.one2drive.projeto1.domain.SpeedRadar radar) {
-                String details = "SpeedRadar{speedLimitKmh=" + radar.getSpeedLimitKmh() + ", scope=ALL_LANES}";
-                double relative = worldState.signedDistance(radar.getPositionMeters());
-                if (relative >= -behindWindow && relative <= forwardMeters) {
-                    items.add(new RoadRenderItem("SpeedRadar", radar.getId(), relative, "ALL", details,
-                        worldState.getEgo().getPositionMeters() + relative));
-                }
-            } else {
-                addRoadItem(items, element.getClass().getSimpleName(), element.getId(), element.getPositionMeters(),
-                    element.getLane(), element.toString(), length, behindWindow, forwardMeters);
-            }
-        });
+        worldState.getRoadElements().forEach(element -> addRoadItem(items, element.getClass().getSimpleName(),
+            element.getId(), element.getPositionMeters(), element.getLane(), element.toString(),
+            length, behindWindow, forwardMeters));
         worldState.getActors().forEach(actor -> {
             if (actor instanceof com.one2drive.projeto1.domain.OtherVehicle) {
                 // Vehicles are positioned by metres travelled, not around the loop.

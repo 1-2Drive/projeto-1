@@ -4,7 +4,6 @@ import com.one2drive.projeto1.api.model.ApiSimulationSnapshot;
 import com.one2drive.projeto1.drools.FactDescription;
 import com.one2drive.projeto1.drools.KnowledgeSession;
 import com.one2drive.projeto1.domain.DrivingAction;
-import com.one2drive.projeto1.drools.facts.SpeedRadarFact;
 import com.one2drive.projeto1.explanation.ExplanationTrace;
 import com.one2drive.projeto1.explanation.TimelineEntry;
 import com.one2drive.projeto1.explanation.TimelineEntryType;
@@ -63,14 +62,6 @@ final class InferenceNarrator {
                                                TimelineEntry lastImportant) {
         List<String> steps = new ArrayList<>();
         SensorTelemetry telemetry = engine.getSensorTelemetry();
-
-        SpeedRadarFact speedRadar = engine.activeSpeedRadarFact().orElse(null);
-        if (speedRadar != null) {
-            steps.add("Speed-control camera detects all-lane zone: configured radar limit "
-                + round(speedRadar.getSpeedLimitKmh()) + " km/h at "
-                + round(speedRadar.getDistanceMeters()) + "m; current vehicle speed "
-                + round(snapshot.egoSpeedKmh()) + " km/h");
-        }
 
         if (lastImportant != null && lastImportant.getType() == TimelineEntryType.PERCEPTION_CHANGE) {
             steps.add(lastImportant.getMessage());

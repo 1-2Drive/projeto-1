@@ -11,8 +11,7 @@ export type RoadObjectKind =
   | 'pothole'
   | 'obstacle'
   | 'vehicle'
-  | 'pedestrian'
-  | 'speedRadar';
+  | 'pedestrian';
 
 export interface RoadRenderItem {
   id: string;
@@ -170,7 +169,7 @@ export class RoadCanvasComponent {
 
   /**
    * Deterministic conversion from world meters to screen percentage across the viewport.
-   * Shared by ego vehicle, speed radar, distance ticks, sensor cones, and all road obstacles.
+   * Shared by ego vehicle, distance ticks, sensor cones, and all road obstacles.
    */
   protected worldToPercentX(worldMeters: number): number {
     const offset = this.cameraOffset();
@@ -182,50 +181,6 @@ export class RoadCanvasComponent {
    */
   protected readonly egoXPercent = computed(() => {
     return Math.max(0, Math.min(100, this.worldToPercentX(this.egoPosition())));
-  });
-
-  protected readonly speedRadarDist = computed(() => {
-    const speedControlDistance = this.snapshot()?.sensors?.frontRadar?.speedRadarDistanceMeters;
-    if (speedControlDistance != null && Number.isFinite(speedControlDistance) && speedControlDistance >= 0) {
-      return speedControlDistance;
-    }
-    const d = this.snapshot()?.sensors?.frontRadar?.speedRadarDistanceMeters;
-    if (d != null && Number.isFinite(d) && d > 0 && d <= 135) {
-      return d;
-    }
-    const egoPos = this.egoPosition();
-    const radar = this.snapshot()?.worldObjects?.find((o) => o.type.includes('SpeedRadar'));
-    if (radar) {
-      const worldPos = radar.worldPositionMeters != null && Number.isFinite(radar.worldPositionMeters)
-        ? radar.worldPositionMeters
-        : (egoPos + radar.positionMeters);
-      const diff = worldPos - egoPos;
-      if (diff > 0 && diff <= 135) {
-        return diff;
-      }
-    }
-    return null;
-  });
-
-  protected readonly speedRadarLimit = computed(() => {
-    const l = this.snapshot()?.sensors?.frontRadar?.speedRadarLimitKmh;
-    if (l != null && l > 0) return l;
-    const radar = this.snapshot()?.worldObjects?.find((o) => o.type.includes('SpeedRadar'));
-    if (radar?.details) {
-      const match = radar.details.match(/speedLimitKmh=([\d.]+)/);
-      if (match) return Math.round(parseFloat(match[1]));
-    }
-    return 50;
-  });
-
-  protected readonly speedRadarPassed = computed(() => {
-    const egoPos = this.egoPosition();
-    const radar = this.snapshot()?.worldObjects?.find((o) => o.type.includes('SpeedRadar'));
-    if (!radar) return false;
-    const worldPos = radar.worldPositionMeters != null && Number.isFinite(radar.worldPositionMeters)
-      ? radar.worldPositionMeters
-      : (egoPos + radar.positionMeters);
-    return egoPos >= worldPos;
   });
 
   /** Dynamic ticks in world metres. Completely static while camera is static; scrolls when camera scrolls. */
@@ -287,11 +242,10 @@ export class RoadCanvasComponent {
           relativeMeters: item.positionMeters,
           worldPositionMeters: worldPos,
           xPercent: xPct,
-          yPercent: kind === 'speedRadar' ? 6 : this.lateralToY(LANE_CENTRE_METRES[item.lane as LaneName] ?? 0),
+          yPercent: this.lateralToY(LANE_CENTRE_METRES[item.lane as LaneName] ?? 0),
           detectedByCamera: snapshot.cameraDetectedObjectIds?.includes(item.id) ?? false,
           detectedByRadar: snapshot.radarDetectedObjectIds?.includes(item.id) ?? false,
-          visible: (kind === 'speedRadar' ? item.positionMeters >= -36 && item.positionMeters <= 250
-            : item.positionMeters >= -36 && item.positionMeters <= this.worldForwardMeters) && xPct >= -10 && xPct <= 110
+          visible: item.positionMeters >= -36 && item.positionMeters <= this.worldForwardMeters && xPct >= -10 && xPct <= 110
         };
       })
       .filter((item) => item.visible);
@@ -473,7 +427,6 @@ export class RoadCanvasComponent {
 
   protected testIdFor(kind: RoadObjectKind): string {
     switch (kind) {
-      case 'speedRadar': return 'speed-radar';
       case 'obstacle': return 'road-obstacle';
       case 'pothole': return 'road-pothole';
       case 'barrier': return 'road-barrier';
@@ -504,8 +457,6 @@ export class RoadCanvasComponent {
         return 'Vehicle';
       case 'pedestrian':
         return 'Pedestrian';
-      case 'speedRadar':
-        return 'Speed radar';
     }
   }
 
@@ -524,7 +475,6 @@ export class RoadCanvasComponent {
 
   private kindOf(item: ApiRoadElement): RoadObjectKind {
     const type = item.type;
-    if (type.includes('SpeedRadar')) return 'speedRadar';
     if (type.includes('SpeedLimit')) return 'speedLimit';
     if (type.includes('StopSign')) return 'stopSign';
     if (type.includes('TrafficLight')) return 'trafficLight';
@@ -538,9 +488,6 @@ export class RoadCanvasComponent {
 
   private labelOf(item: ApiRoadElement): string {
     const details = item.details ?? '';
-    if (item.type.includes('SpeedRadar')) {
-      return details.match(/speedLimitKmh=([\d.]+)/)?.[1] ?? '50';
-    }
     if (item.type.includes('SpeedLimit')) {
       return details.match(/limitKmh=(\d+)/)?.[1] ?? '';
     }

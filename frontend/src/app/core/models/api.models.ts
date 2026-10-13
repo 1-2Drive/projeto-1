@@ -27,7 +27,7 @@ export interface ApiRoadElement {
   id: string;
   type: string;
   positionMeters: number;
-  lane: 'LEFT' | 'CENTER' | 'RIGHT' | 'ALL';
+  lane: 'LEFT' | 'CENTER' | 'RIGHT';
   details: string;
   worldPositionMeters?: number;
 }
@@ -170,8 +170,6 @@ export interface ApiRadarTelemetryView {
   relativeSpeedKmh: number;
   ttcSeconds: number;
   status: SensorStatus;
-  speedRadarDistanceMeters?: number;
-  speedRadarLimitKmh?: number;
 }
 
 export interface ApiCameraDetectionView {

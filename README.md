@@ -683,7 +683,6 @@ Defined in `src/main/resources/scenarios/scenarios.json`.
 - `S15_MATRIX_COURSE` Matrix obstacle course: a slalom through obstacles and a pothole that repeats every lap
 - `S16_SLOW_VEHICLE_OVERTAKE` Slow vehicle overtake and return to the right lane
 - `S17_CONTINUOUS_LINE_BLOCKED` Continuous line blocks avoidance to the right
-- `S18_SPEED_RADAR_APPROACH` Speed radar approach and compliant pass
 
 ## Validation focus
 

@@ -264,8 +264,12 @@ public class WorldState {
             .min(java.util.Comparator.comparingDouble(sign -> signedDistance(sign.getPositionMeters())));
     }
 
+    /** A traffic light governs the whole road, so the next one ahead counts whatever lane it stands in. */
     public Optional<TrafficLight> nearestTrafficLight(double maxDistance) {
-        return nearestByType(TrafficLight.class, maxDistance);
+        return activeRoadElementsInFront(maxDistance).stream()
+            .filter(TrafficLight.class::isInstance)
+            .map(TrafficLight.class::cast)
+            .min(java.util.Comparator.comparingDouble(light -> signedDistance(light.getPositionMeters())));
     }
 
     /** A stop sign only binds the lane it stands in: one in another lane is not the vehicle's to obey. */

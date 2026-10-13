@@ -532,7 +532,8 @@
 }
 
 /* Out of the flow, so the marking of the sign's own lane lines up with the other two. */
-.obj--speedLimit .obj__distance {
+.obj--speedLimit .obj__distance,
+.obj--trafficLight .obj__distance {
   position: absolute;
   top: 100%;
 }

@@ -319,6 +319,20 @@
         </div>
       }
     }
+    @if (item.kind === 'trafficLight') {
+      @for (y of otherLaneYs(item); track y) {
+        <div class="obj obj--trafficLight" aria-hidden="true" data-testid="road-traffic-light-copy"
+             [class.obj--passed]="item.relativeMeters <= 0" [attr.data-state]="item.state"
+             [style.left.%]="item.xPercent" [style.top.%]="y">
+          <svg class="light" viewBox="0 0 26 54">
+            <rect class="light__case" x="1" y="1" width="24" height="52" rx="5" />
+            <circle class="light__lamp light__lamp--red" cx="13" cy="13" r="7" />
+            <circle class="light__lamp light__lamp--amber" cx="13" cy="27" r="7" />
+            <circle class="light__lamp light__lamp--green" cx="13" cy="41" r="7" />
+          </svg>
+        </div>
+      }
+    }
     @if (item.kind === 'pedestrian') {
       <div class="crosswalk" aria-hidden="true" [style.left.%]="item.xPercent" data-testid="crosswalk">
       </div>

@@ -87,6 +87,63 @@ describe('RoadCanvasComponent', () => {
     }
   });
 
+  it('draws one traffic light in all three lanes at the same road position, with its state', () => {
+    for (const state of ['RED', 'GREEN']) {
+      fixture.componentRef.setInput('snapshot', {
+        simulationTimeMillis: 1000,
+        status: 'RUNNING',
+        egoVehicle: { speedKmh: 50, positionMeters: 10, lane: 'RIGHT', accelerationMps2: 0 },
+        sensors: {},
+        worldObjects: [
+          { id: 'r20-CENTER', type: 'TrafficLight', positionMeters: 90, lane: 'CENTER', details: `TrafficLight state=${state}` }
+        ],
+        sensorRanges: { cameraRangeMeters: 120, radarRangeMeters: 130, blindSpotRangeMeters: 30, cameraRateMillis: 200, radarRateMillis: 100 }
+      });
+      fixture.detectChanges();
+
+      const root = fixture.nativeElement as HTMLElement;
+      expect(root.querySelectorAll('[data-testid="road-traffic-light"]').length).toBe(1, 'one logical traffic light');
+      const lights = Array.from(root.querySelectorAll('.obj--trafficLight')) as HTMLElement[];
+      expect(lights.length).toBe(3);
+      expect(lights.map((light) => light.getAttribute('data-state'))).toEqual([state, state, state]);
+      expect(new Set(lights.map((light) => light.style.left)).size).toBe(1, 'same longitudinal position');
+      expect(lights.map((light) => parseFloat(light.style.top)).sort((a, b) => a - b)).toEqual([25, 50, 75]);
+    }
+  });
+
+  it('shows the badge and distance of a road-wide element in the lane the ego drives in', () => {
+    const laneY: Record<string, number> = { LEFT: 25, CENTER: 50, RIGHT: 75 };
+    const elements = [
+      { testId: 'road-traffic-light', object: { id: 'r20-CENTER', type: 'TrafficLight', positionMeters: 90, lane: 'CENTER', details: 'TrafficLight state=RED' } },
+      { testId: 'road-speed-limit', object: { id: 'r20-CENTER', type: 'SpeedLimitSign', positionMeters: 90, lane: 'CENTER', details: 'limitKmh=50' } }
+    ];
+    for (const element of elements) {
+      for (const egoLane of ['LEFT', 'CENTER', 'RIGHT']) {
+        fixture.componentRef.setInput('snapshot', {
+          simulationTimeMillis: 1000,
+          status: 'RUNNING',
+          egoVehicle: { speedKmh: 50, positionMeters: 10, lane: egoLane, accelerationMps2: 0 },
+          sensors: {},
+          worldObjects: [element.object],
+          cameraDetectedObjectIds: ['r20-CENTER'],
+          sensorRanges: { cameraRangeMeters: 120, radarRangeMeters: 130, blindSpotRangeMeters: 30, cameraRateMillis: 200, radarRateMillis: 100 }
+        });
+        fixture.detectChanges();
+
+        const root = fixture.nativeElement as HTMLElement;
+        const main = root.querySelector(`[data-testid="${element.testId}"]`) as HTMLElement;
+        expect(parseFloat(main.style.top)).toBe(laneY[egoLane], `${element.testId} with ego in ${egoLane}`);
+        expect(main.textContent).toContain('DETECTED');
+        expect(main.textContent).toContain('90 m');
+        expect(root.querySelectorAll('.obj__badge').length).toBe(1, 'the badge is shown once');
+
+        const kindClass = main.className.split(' ').find((name) => name.startsWith('obj--') && name !== 'obj--detected' && name !== 'obj--camera');
+        const tops = (Array.from(root.querySelectorAll(`.${kindClass}`)) as HTMLElement[]).map((el) => parseFloat(el.style.top));
+        expect(tops.sort((a, b) => a - b)).toEqual([25, 50, 75]);
+      }
+    }
+  });
+
   it('draws a stop sign once, in the lane it stands in', () => {
     const laneY: Record<string, number> = { LEFT: 25, CENTER: 50, RIGHT: 75 };
     for (const lane of ['LEFT', 'CENTER', 'RIGHT']) {

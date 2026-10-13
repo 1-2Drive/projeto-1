@@ -94,6 +94,30 @@ test.describe('Driving expert simulation UI', () => {
     }
   });
 
+  test('traffic light has no lane selector and is drawn on all three lanes', async ({ page }) => {
+    await page.goto('/');
+    await loadScenario(page, 'S1 Empty safe road');
+
+    await page.locator('[data-testid="add-traffic-light"]').click();
+    await expect(page.locator('[data-testid="config-panel"]')).toBeVisible();
+    await expect(page.locator('[data-testid="lane-select"]')).toHaveCount(0);
+    await page.locator('[data-testid="drawer-distance-input"]').fill('100');
+    await page.locator('[data-testid="light-state-select"]').selectOption('RED');
+    await page.locator('[data-testid="apply-config"]').click();
+
+    await expect(page.locator('[data-testid="road-traffic-light"]')).toHaveCount(1);
+    const lights = page.locator('.obj--trafficLight');
+    await expect(lights).toHaveCount(3);
+    for (let i = 0; i < 3; i++) {
+      await expect(lights.nth(i)).toHaveAttribute('data-state', 'RED');
+    }
+    const xs = await lights.evaluateAll((nodes) => nodes.map((node) => {
+      const box = node.getBoundingClientRect();
+      return box.x + box.width / 2;
+    }));
+    expect(Math.max(...xs) - Math.min(...xs)).toBeLessThan(1);
+  });
+
   test('stop sign is placed only in the lane chosen in the drawer', async ({ page }) => {
     await page.goto('/');
     await loadScenario(page, 'S1 Empty safe road');

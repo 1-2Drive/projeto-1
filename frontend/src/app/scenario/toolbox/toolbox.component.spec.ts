@@ -131,6 +131,28 @@ describe('ToolboxComponent', () => {
     expect(compiled.querySelector('[data-testid="lane-select"]')).toBeTruthy();
   });
 
+  it('offers no lane for a traffic light, which governs the whole road', async () => {
+    const component = fixture.componentInstance;
+    const emitted: unknown[] = [];
+    component.createRoadElement.subscribe((payload) => emitted.push(payload));
+    const compiled = fixture.nativeElement as HTMLElement;
+
+    (compiled.querySelector('[data-testid="add-traffic-light"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(compiled.querySelector('[data-testid="drawer-distance-input"]')).toBeTruthy();
+    expect(compiled.querySelector('[data-testid="light-state-select"]')).toBeTruthy();
+    expect(compiled.querySelector('[data-testid="lane-select"]')).toBeNull();
+
+    (compiled.querySelector('[data-testid="apply-config"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(emitted).toEqual([jasmine.objectContaining({
+      type: 'TRAFFIC_LIGHT', lane: 'CENTER', trafficLightState: 'RED', distanceAheadMeters: 150
+    })]);
+  });
+
   it('adds a stop sign to the lane chosen in the drawer', async () => {
     const component = fixture.componentInstance;
     const emitted: unknown[] = [];

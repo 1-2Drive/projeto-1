@@ -242,7 +242,11 @@ export class RoadCanvasComponent {
           relativeMeters: item.positionMeters,
           worldPositionMeters: worldPos,
           xPercent: xPct,
-          yPercent: this.lateralToY(LANE_CENTRE_METRES[item.lane as LaneName] ?? 0),
+          // A speed limit and a traffic light are drawn in every lane; the copy that carries
+          // the detection badge and the distance is the one in the lane the ego drives in.
+          yPercent: kind === 'speedLimit' || kind === 'trafficLight'
+            ? LANE_CENTER_Y[this.currentLane()]
+            : this.lateralToY(LANE_CENTRE_METRES[item.lane as LaneName] ?? 0),
           detectedByCamera: snapshot.cameraDetectedObjectIds?.includes(item.id) ?? false,
           detectedByRadar: snapshot.radarDetectedObjectIds?.includes(item.id) ?? false,
           visible: item.positionMeters >= -36 && item.positionMeters <= this.worldForwardMeters && xPct >= -10 && xPct <= 110
@@ -421,8 +425,8 @@ export class RoadCanvasComponent {
   }
 
   /**
-   * A speed limit holds for the whole road, so its marking is painted in every lane:
-   * these are the lanes other than the one the item itself is drawn in.
+   * A speed limit and a traffic light hold for the whole road, so they are drawn in every
+   * lane: these are the lanes other than the one the item itself is drawn in.
    */
   protected otherLaneYs(item: RoadRenderItem): number[] {
     return this.laneLabels.map((lane) => lane.y).filter((y) => Math.abs(y - item.yPercent) > 0.5);

@@ -35,8 +35,8 @@ const ACTIONS: Record<ToolboxAction, ActionDefinition> = {
     needsLightState: false, needsBarrierState: false, needsActorSpeed: false
   },
   TRAFFIC_LIGHT: {
-    title: 'Add traffic light', hint: 'Red requires a stop, yellow decelerates, green allows progress.',
-    needsLane: true, needsSeverity: false, needsSpeedLimit: false,
+    title: 'Add traffic light', hint: 'Applies to all three lanes. Red requires a stop, yellow decelerates, green allows progress.',
+    needsLane: false, needsSeverity: false, needsSpeedLimit: false,
     needsLightState: true, needsBarrierState: false, needsActorSpeed: false
   },
   POTHOLE: {
@@ -177,8 +177,10 @@ export class ElementPropertiesComponent {
         this.createRoadElement.emit(this.simpleElement('STOP_SIGN'));
         break;
       case 'TRAFFIC_LIGHT':
+        // One light in the map, valid for the whole road: the road view repeats it in every lane.
         this.createRoadElement.emit({
           ...this.simpleElement('TRAFFIC_LIGHT'),
+          lane: 'CENTER',
           trafficLightState: this.trafficLightState()
         });
         break;

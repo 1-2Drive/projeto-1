@@ -78,7 +78,7 @@ class RoadLawAndOvertakingE2ETest {
     @DisplayName("Overtaking: slow vehicle ahead triggers left lane change, pass, and return right (Art. 35/38 CE)")
     void overtakingSlowVehiclePassesAndReturnsToRightLane() {
         ScenarioLibrary library = ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json");
-        ScenarioDefinition scenario = library.findById("S16_SLOW_VEHICLE_OVERTAKE").orElseThrow();
+        ScenarioDefinition scenario = library.findById("S14_SLOW_VEHICLE_OVERTAKE").orElseThrow();
 
         try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {})) {
             engine.start();
@@ -134,7 +134,7 @@ class RoadLawAndOvertakingE2ETest {
     @DisplayName("Continuous line: continuous road marking prohibits lane change; vehicle brakes before obstacle")
     void continuousLineBlocksLaneChangeAndBrakesBeforeObstacle() {
         ScenarioLibrary library = ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json");
-        ScenarioDefinition scenario = library.findById("S17_CONTINUOUS_LINE_BLOCKED").orElseThrow();
+        ScenarioDefinition scenario = library.findById("S15_CONTINUOUS_LINE_BLOCKED").orElseThrow();
 
         try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {})) {
             engine.start();
@@ -172,7 +172,7 @@ class RoadLawAndOvertakingE2ETest {
     @DisplayName("Pedestrian crossing: vehicle brakes/stops while pedestrian crosses roadway, then resumes")
     void pedestrianCrossingBrakesThenResumesAfterCrossingClears() {
         ScenarioLibrary library = ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json");
-        ScenarioDefinition scenario = library.findById("S8").orElseThrow();
+        ScenarioDefinition scenario = library.findById("S7").orElseThrow();
 
         try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {})) {
             engine.start();

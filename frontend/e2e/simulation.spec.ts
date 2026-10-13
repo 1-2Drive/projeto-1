@@ -241,7 +241,7 @@ test.describe('Driving expert simulation UI', () => {
 
     await page.goto('/');
     await page.locator('[data-testid="reset-btn"]').click();
-    await page.locator('button:has-text("S16_SLOW_VEHICLE_OVERTAKE")').click();
+    await page.locator('button:has-text("S14_SLOW_VEHICLE_OVERTAKE")').click();
     await page.locator('[data-testid="start-btn"]').click();
     await expect(page.locator('[data-testid="simulation-status"]')).toContainText('RUNNING');
 

@@ -993,14 +993,14 @@ class SimulationEngineE2ETest {
     @Timeout(30)
     void passedPotholeStaysInRoadItemsUntilFiftyMetresBehind() {
         ScenarioLibrary library = ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json");
-        ScenarioDefinition scenario = library.findById("S6").orElseThrow();
+        ScenarioDefinition scenario = library.findById("S5").orElseThrow();
 
         try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {})) {
             List<String> potholeIds = engine.getWorldState().getRoadElements().stream()
                 .filter(com.one2drive.projeto1.domain.Pothole.class::isInstance)
                 .map(element -> element.getId())
                 .toList();
-            assertEquals(List.of("r18-CENTER"), potholeIds, "S6 has a single pothole");
+            assertEquals(List.of("r18-CENTER"), potholeIds, "S5 has a single pothole");
             String potholeId = potholeIds.get(0);
             engine.start();
 
@@ -1033,7 +1033,7 @@ class SimulationEngineE2ETest {
     @Timeout(30)
     void overtakenVehicleStaysInWorldUntilFiftyMetresBehind() {
         ScenarioLibrary library = ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json");
-        ScenarioDefinition scenario = library.findById("S16_SLOW_VEHICLE_OVERTAKE").orElseThrow();
+        ScenarioDefinition scenario = library.findById("S14_SLOW_VEHICLE_OVERTAKE").orElseThrow();
 
         try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {})) {
             engine.start();
@@ -1073,7 +1073,7 @@ class SimulationEngineE2ETest {
     @Timeout(value = 30, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
     void stoppedEgoIsNotDrivenThroughByOvertakenVehicle() {
         ScenarioLibrary library = ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json");
-        ScenarioDefinition scenario = library.findById("S16_SLOW_VEHICLE_OVERTAKE").orElseThrow();
+        ScenarioDefinition scenario = library.findById("S14_SLOW_VEHICLE_OVERTAKE").orElseThrow();
         ScenarioRoadElementDefinition red = new ScenarioRoadElementDefinition();
         red.setType(ScenarioRoadElementType.TRAFFIC_LIGHT);
         red.setLane(Lane.RIGHT);
@@ -1126,7 +1126,7 @@ class SimulationEngineE2ETest {
     @Timeout(30)
     void rainSpeedSettlesOnTheRecommendedSpeedWithoutHunting() {
         ScenarioLibrary library = ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json");
-        ScenarioDefinition scenario = library.findById("S11").orElseThrow();
+        ScenarioDefinition scenario = library.findById("S10").orElseThrow();
 
         try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {})) {
             engine.start();

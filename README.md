@@ -470,7 +470,7 @@ shows `Press START to begin` until the first tick, so nothing is simulated befor
 
 ### Optional: scripted demo
 
-The **RUN DEMO** button in the top-right corner replays the `S14_PRESENTATION_DEMO`
+The **RUN DEMO** button in the top-right corner replays the `S12_PRESENTATION_DEMO`
 scenario end to end with a phase strip. It is optional — manual mode is the default
 path and demo chrome stays hidden unless the demo is running.
 
@@ -662,7 +662,7 @@ The left Toolbox supports speed limits, stop signs, traffic lights, potholes, ob
 
 ## Presentation Demo
 
-`S14_PRESENTATION_DEMO` is a backend timed scenario for a 90-second classroom walkthrough. It schedules world mutations only: a speed sign, rain, a slower front vehicle, a pedestrian, and weather recovery. The backend marks phases from observed sensor/rule/decision evidence; Angular only displays those statuses.
+`S12_PRESENTATION_DEMO` is a backend timed scenario for a 90-second classroom walkthrough. It schedules world mutations only: a speed sign, rain, a slower front vehicle, a pedestrian, and weather recovery. The backend marks phases from observed sensor/rule/decision evidence; Angular only displays those statuses.
 
 ## Predefined Scenarios
 
@@ -672,17 +672,17 @@ Defined in `src/main/resources/scenarios/scenarios.json`.
 - `S2` 90 to 50 speed limit
 - `S3` Red traffic light
 - `S4` Stop sign
-- `S6` Pothole
-- `S7` Closed barrier
-- `S8` Pedestrian crossing
-- `S9` Critical TTC
-- `S10` Lane change blocked
-- `S11` Rain low grip
-- `S12` Complex sequential scenario
-- `S14_PRESENTATION_DEMO` Presentation demo end-to-end
-- `S15_MATRIX_COURSE` Matrix obstacle course: a slalom through obstacles and a pothole that repeats every lap
-- `S16_SLOW_VEHICLE_OVERTAKE` Slow vehicle overtake and return to the right lane
-- `S17_CONTINUOUS_LINE_BLOCKED` Continuous line blocks avoidance to the right
+- `S5` Pothole
+- `S6` Closed barrier
+- `S7` Pedestrian crossing
+- `S8` Critical TTC
+- `S9` Lane change blocked
+- `S10` Rain low grip
+- `S11` Complex sequential scenario
+- `S12_PRESENTATION_DEMO` Presentation demo end-to-end
+- `S13_MATRIX_COURSE` Matrix obstacle course: a slalom through obstacles and a pothole that repeats every lap
+- `S14_SLOW_VEHICLE_OVERTAKE` Slow vehicle overtake and return to the right lane
+- `S15_CONTINUOUS_LINE_BLOCKED` Continuous line blocks avoidance to the right
 
 ## Validation focus
 

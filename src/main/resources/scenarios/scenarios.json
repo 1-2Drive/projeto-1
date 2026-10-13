@@ -338,7 +338,7 @@
     "timedActions": []
   },
   {
-    "id": "S6",
+    "id": "S5",
     "name": "Pothole",
     "initialLane": "CENTER",
     "initialSpeedKmh": 70,
@@ -449,7 +449,7 @@
     "timedActions": []
   },
   {
-    "id": "S7",
+    "id": "S6",
     "name": "Closed barrier",
     "initialSpeedKmh": 65,
     "initialWeather": "CLEAR",
@@ -559,7 +559,7 @@
     "timedActions": []
   },
   {
-    "id": "S8",
+    "id": "S7",
     "name": "Pedestrian crossing",
     "initialLane": "CENTER",
     "initialSpeedKmh": 60,
@@ -575,7 +575,7 @@
     "timedActions": []
   },
   {
-    "id": "S9",
+    "id": "S8",
     "name": "Critical TTC",
     "initialSpeedKmh": 95,
     "initialWeather": "CLEAR",
@@ -590,7 +590,7 @@
     "timedActions": []
   },
   {
-    "id": "S10",
+    "id": "S9",
     "name": "Lane change blocked",
     "initialSpeedKmh": 75,
     "initialWeather": "CLEAR",
@@ -610,7 +610,7 @@
     ]
   },
   {
-    "id": "S11",
+    "id": "S10",
     "name": "Rain low grip",
     "initialSpeedKmh": 85,
     "initialWeather": "RAIN",
@@ -618,7 +618,50 @@
     "timedActions": []
   },
   {
-    "id": "S14_PRESENTATION_DEMO",
+    "id": "S11",
+    "name": "Complex sequential scenario",
+    "initialSpeedKmh": 90,
+    "initialWeather": "CLEAR",
+    "actors": [],
+    "timedActions": [
+      {
+        "triggerTimeMillis": 1500,
+        "type": "ADD_ROAD_ELEMENT",
+        "roadElement": {
+          "type": "SPEED_LIMIT",
+          "positionMeters": 140,
+          "lane": "CENTER",
+          "speedLimitKmh": 70
+        }
+      },
+      {
+        "triggerTimeMillis": 3500,
+        "type": "SET_RAIN"
+      },
+      {
+        "triggerTimeMillis": 4500,
+        "type": "ADD_ACTOR",
+        "actor": {
+          "type": "FRONT_VEHICLE",
+          "positionMeters": 95,
+          "lane": "CENTER",
+          "speedKmh": 35
+        }
+      },
+      {
+        "triggerTimeMillis": 9300,
+        "type": "ADD_ACTOR",
+        "actor": {
+          "type": "PEDESTRIAN",
+          "positionMeters": 70,
+          "lane": "CENTER",
+          "speedKmh": 3
+        }
+      }
+    ]
+  },
+  {
+    "id": "S12_PRESENTATION_DEMO",
     "name": "Presentation demo end-to-end",
     "initialLane": "CENTER",
     "initialSpeedKmh": 90,
@@ -666,50 +709,7 @@
     ]
   },
   {
-    "id": "S12",
-    "name": "Complex sequential scenario",
-    "initialSpeedKmh": 90,
-    "initialWeather": "CLEAR",
-    "actors": [],
-    "timedActions": [
-      {
-        "triggerTimeMillis": 1500,
-        "type": "ADD_ROAD_ELEMENT",
-        "roadElement": {
-          "type": "SPEED_LIMIT",
-          "positionMeters": 140,
-          "lane": "CENTER",
-          "speedLimitKmh": 70
-        }
-      },
-      {
-        "triggerTimeMillis": 3500,
-        "type": "SET_RAIN"
-      },
-      {
-        "triggerTimeMillis": 4500,
-        "type": "ADD_ACTOR",
-        "actor": {
-          "type": "FRONT_VEHICLE",
-          "positionMeters": 95,
-          "lane": "CENTER",
-          "speedKmh": 35
-        }
-      },
-      {
-        "triggerTimeMillis": 9300,
-        "type": "ADD_ACTOR",
-        "actor": {
-          "type": "PEDESTRIAN",
-          "positionMeters": 70,
-          "lane": "CENTER",
-          "speedKmh": 3
-        }
-      }
-    ]
-  },
-  {
-    "id": "S15_MATRIX_COURSE",
+    "id": "S13_MATRIX_COURSE",
     "name": "Matrix obstacle course",
     "loopWorldObjects": true,
     "initialSpeedKmh": 60,
@@ -821,7 +821,7 @@
     "timedActions": []
   },
   {
-    "id": "S16_SLOW_VEHICLE_OVERTAKE",
+    "id": "S14_SLOW_VEHICLE_OVERTAKE",
     "name": "Slow vehicle overtake and return right",
     "initialSpeedKmh": 50,
     "initialLane": "RIGHT",
@@ -837,7 +837,7 @@
     "timedActions": []
   },
   {
-    "id": "S17_CONTINUOUS_LINE_BLOCKED",
+    "id": "S15_CONTINUOUS_LINE_BLOCKED",
     "name": "Continuous line prohibits avoidance",
     "initialSpeedKmh": 50,
     "initialLane": "RIGHT",

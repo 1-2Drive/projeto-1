@@ -613,7 +613,7 @@ public class SimulationEngine implements AutoCloseable {
         vehicleStateFact.setRightLaneBlockedAhead(worldState.hasHazardAheadInLane(com.one2drive.projeto1.domain.Lane.RIGHT, 150.0));
         vehicleStateFact.setLeftAdjacentLaneSafe(worldState.isLaneSafe(ego.getLane().left(), config.getBlindSpotRangeMeters(), 60.0));
         vehicleStateFact.setRightAdjacentLaneSafe(worldState.isLaneSafe(ego.getLane().right(), config.getBlindSpotRangeMeters(), 60.0));
-        vehicleStateFact.setPresentationDemo("S14_PRESENTATION_DEMO".equals(scenarioId));
+        vehicleStateFact.setPresentationDemo("S12_PRESENTATION_DEMO".equals(scenarioId));
         knowledgeSession.getKieSession().update(vehicleStateHandle, vehicleStateFact);
     }
 

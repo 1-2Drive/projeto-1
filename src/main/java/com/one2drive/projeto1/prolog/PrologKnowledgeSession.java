@@ -47,7 +47,7 @@ public class PrologKnowledgeSession implements AutoCloseable {
         try {
             process = new PrologProcess(MAPPER, DEFAULT_TIMEOUT_MILLIS);
         } catch (IOException e) {
-            throw new PrologEngineException("Unable to start SWI-Prolog (is 'swipl' on PATH?): " + e.getMessage(), e);
+            throw new PrologEngineException("Unable to start SWI-Prolog (is 'swipl' on PATH, or set -Dprolog.executable?): " + e.getMessage(), e);
         }
         PrologKnowledgeSession session = new PrologKnowledgeSession(process);
         try {

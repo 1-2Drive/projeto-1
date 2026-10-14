@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -13,7 +14,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -35,6 +38,8 @@ final class PrologProcess implements AutoCloseable {
     /** Overrides the {@code swipl} found on PATH. */
     static final String EXECUTABLE_PROPERTY = "prolog.executable";
 
+    private static final String DEFAULT_EXECUTABLE = "swipl";
+
     private final ObjectMapper mapper;
     private final Path workDir;
     private final Process process;
@@ -47,8 +52,7 @@ final class PrologProcess implements AutoCloseable {
         this.mapper = mapper;
         this.timeoutMillis = timeoutMillis;
         this.workDir = copySources();
-        String executable = System.getProperty(EXECUTABLE_PROPERTY, "swipl");
-        this.process = new ProcessBuilder(executable, "-q", "-g", "main", "-t", "halt",
+        this.process = new ProcessBuilder(executable(), "-q", "-g", "main", "-t", "halt",
             workDir.resolve("server.pl").toString())
             .redirectError(ProcessBuilder.Redirect.INHERIT)
             .start();
@@ -97,6 +101,76 @@ final class PrologProcess implements AutoCloseable {
             throw new PrologEngineException("Interrupted while waiting for SWI-Prolog", e);
         } catch (ExecutionException e) {
             throw new PrologEngineException("SWI-Prolog communication failed: " + e.getCause().getMessage(), e.getCause());
+        }
+    }
+
+    /**
+     * The {@code swipl} to run: the {@value #EXECUTABLE_PROPERTY} property if set, else
+     * {@code swipl} when it is on PATH. The Windows installer leaves PATH alone unless asked
+     * to, so on Windows the usual install folders are tried next. Failing all of that it is
+     * plain {@code swipl}, and starting it reports the missing executable.
+     */
+    static String executable() {
+        String configured = System.getProperty(EXECUTABLE_PROPERTY);
+        if (configured != null && !configured.isBlank()) {
+            return configured;
+        }
+        if (onPath()) {
+            return DEFAULT_EXECUTABLE;
+        }
+        if (System.getProperty("os.name", "").toLowerCase(Locale.ROOT).startsWith("windows")) {
+            for (Path candidate : windowsInstallCandidates()) {
+                if (Files.isRegularFile(candidate)) {
+                    return candidate.toString();
+                }
+            }
+        }
+        return DEFAULT_EXECUTABLE;
+    }
+
+    private static boolean onPath() {
+        String path = System.getenv("PATH");
+        if (path == null) {
+            return false;
+        }
+        for (String dir : path.split(File.pathSeparator)) {
+            if (dir.isBlank()) {
+                continue;
+            }
+            try {
+                Path folder = Path.of(dir.trim().replace("\"", ""));
+                if (Files.isRegularFile(folder.resolve(DEFAULT_EXECUTABLE))
+                    || Files.isRegularFile(folder.resolve(DEFAULT_EXECUTABLE + ".exe"))) {
+                    return true;
+                }
+            } catch (RuntimeException e) {
+                // A malformed PATH entry: skip it.
+            }
+        }
+        return false;
+    }
+
+    /** Where the SWI-Prolog installer (all users or current user), Scoop and SWI_HOME_DIR put it. */
+    private static List<Path> windowsInstallCandidates() {
+        List<Path> candidates = new ArrayList<>();
+        addCandidate(candidates, System.getenv("SWI_HOME_DIR"), "bin", "swipl.exe");
+        addCandidate(candidates, System.getenv("ProgramFiles"), "swipl", "bin", "swipl.exe");
+        addCandidate(candidates, System.getenv("ProgramW6432"), "swipl", "bin", "swipl.exe");
+        addCandidate(candidates, System.getenv("ProgramFiles(x86)"), "swipl", "bin", "swipl.exe");
+        addCandidate(candidates, System.getenv("LOCALAPPDATA"), "Programs", "swipl", "bin", "swipl.exe");
+        addCandidate(candidates, System.getenv("USERPROFILE"), "scoop", "apps", "swipl", "current", "bin", "swipl.exe");
+        addCandidate(candidates, "C:\\Program Files", "swipl", "bin", "swipl.exe");
+        return candidates;
+    }
+
+    private static void addCandidate(List<Path> candidates, String base, String... more) {
+        if (base == null || base.isBlank()) {
+            return;
+        }
+        try {
+            candidates.add(Path.of(base, more));
+        } catch (RuntimeException e) {
+            // An unusable environment value: skip it.
         }
     }
 

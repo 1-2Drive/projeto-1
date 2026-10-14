@@ -44,7 +44,7 @@ public class PrologTestHarness implements AutoCloseable {
     public static void assumeSwiplAvailable() {
         boolean available;
         try {
-            Process process = new ProcessBuilder(System.getProperty(PrologProcess.EXECUTABLE_PROPERTY, "swipl"), "--version")
+            Process process = new ProcessBuilder(PrologProcess.executable(), "--version")
                 .redirectErrorStream(true).start();
             available = process.waitFor(5, TimeUnit.SECONDS) && process.exitValue() == 0;
         } catch (IOException e) {

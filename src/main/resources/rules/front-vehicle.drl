@@ -24,13 +24,15 @@ import com.one2drive.projeto1.drools.events.FrontDistanceEvent
 
 global DroolsSupport droolsSupport
 
-// The rules that slow the vehicle down behind a front vehicle step aside in the one
-// cycle in which an overtake starts (OvertakingStateFact stamped with the current
-// time): the overtake proposes at the maneuver priority and would otherwise always lose
-// to them, so the lane change would never begin. From the next cycle on they apply
-// again, also while the vehicle is still moving out of the lane, so it keeps slowing
-// down for the vehicle ahead until it has left the lane. The short-range brake below
-// and every emergency rule never step aside.
+// The rules that slow the vehicle down behind a front vehicle step aside while an
+// overtake is under way: in the cycle in which it starts (OvertakingStateFact stamped
+// with the current time), when the overtake proposes at the maneuver priority and would
+// otherwise always lose to them, and for as long as the vehicle is moving out of the
+// lane. Art. 38 CE: the overtake only starts once it can be completed safely, and is then
+// carried out without delay; braking behind the vehicle being left would only drag the
+// manoeuvre out. Whether it can be completed is checked before it starts (see "Overtake
+// slow front vehicle via left lane"). The short-range brake below and every emergency rule
+// never step aside.
 
 rule "Brake when front vehicle distance low"
 salience 520
@@ -66,9 +68,10 @@ rule "Keep safe following distance behind front vehicle"
 salience 510
 when
     $ctx : DecisionContext()
-    VehicleStateFact($speed : speedKmh, $now : timestamp)
+    VehicleStateFact($speed : speedKmh, $now : timestamp, $laneChange : laneChangeState)
     FrontVehicleState(targetId != "none", $distance : distanceMeters > 0, $relative : relativeSpeedMps)
-    not OvertakingStateFact(active == true, passedTarget == false, timestamp == $now)
+    not OvertakingStateFact(active == true, passedTarget == false, (timestamp == $now
+        || $laneChange == LaneChangeState.REQUESTED || $laneChange == LaneChangeState.CHANGING))
     eval(($relative > 0.3
             && $speed / 3.6 > Math.sqrt(Math.pow(Math.max(0.0, $speed / 3.6 - $relative), 2)
                 + 2.0 * 2.0 * Math.max(0.0, $distance - 12.0)))
@@ -104,9 +107,10 @@ rule "Reduce speed when closing front vehicle"
 salience 500
 when
     $ctx : DecisionContext()
-    VehicleStateFact($now : timestamp)
+    VehicleStateFact($now : timestamp, $laneChange : laneChangeState)
     FrontVehicleState(targetId != "none", $distance : distanceMeters >= 14.0, distanceMeters < 35.0, $relative : relativeSpeedMps > 0.8)
-    not OvertakingStateFact(active == true, passedTarget == false, timestamp == $now)
+    not OvertakingStateFact(active == true, passedTarget == false, (timestamp == $now
+        || $laneChange == LaneChangeState.REQUESTED || $laneChange == LaneChangeState.CHANGING))
 then
     double target = Math.max(20.0, $distance * 1.2);
     droolsSupport.proposeDecision(
@@ -162,6 +166,26 @@ end
 // else clears it while the vehicle is still in the original lane, and the overtake
 // rules only start from an inactive state. One second is longer than the cycle a
 // maneuver needs to start, and a started maneuver is no longer IDLE.
+// Art. 38 CE: an overtake that can no longer be completed is given up. Once out of the
+// original lane, the vehicle can only get past the vehicle it set out to overtake if the
+// overtaking lane lets it go faster; with a vehicle ahead in that lane going no slower
+// (not closing in by more than 0.5 m/s), it never will. After the lane change has had its
+// time (4 s from the start), the overtake is dropped, so the keep-right rules can take the
+// vehicle back to the right. The state remembers when (target ABANDONED, stamped now): for
+// 20 s no new overtake starts, so the vehicle does not weave in and out of a lane it has
+// just found blocked (Art. 35 CE: manoeuvres without danger or hindrance to other traffic).
+rule "Abandon overtaking blocked by traffic in the overtaking lane"
+salience 540
+no-loop true
+when
+    $state : OvertakingStateFact(active == true, passedTarget == false, $origin : originalLane, $started : timestamp)
+    VehicleStateFact(lane != $origin, laneChangeState == LaneChangeState.IDLE, $now : timestamp)
+    FrontVehicleState(targetId != "none", distanceMeters > 0, distanceMeters <= 80.0, relativeSpeedMps <= 0.5)
+    eval($now - $started > 4000)
+then
+    modify($state) { setActive(false), setPassedTarget(false), setTargetId(OvertakingStateFact.ABANDONED), setTimestamp($now) }
+end
+
 rule "Cancel overtaking that never left its original lane"
 salience 540
 no-loop true
@@ -192,6 +216,14 @@ end
 // slower. A stationary vehicle is only passed on the move with that full margin;
 // closer than that the vehicle stops behind it first and goes around from a standstill.
 //
+// Art. 38 CE: an overtake may only start if it can be completed safely. The following
+// rules step aside while the vehicle moves out of the lane, and until the lane change is
+// complete the radar still measures the vehicle being left. So after the 3 s of the lane
+// change at the current closing speed the gap must still be at least 16 m (the 14 m
+// short-range zone plus 2 m) and 3 s of time to collision (the emergency rules act below
+// 2.5 s). Closer than that the vehicle keeps following and slows down; as the closing
+// speed drops, the overtake becomes possible.
+//
 // Art. 41 CE forbids overtaking right before pedestrian crossings and junctions: no
 // overtake with a pedestrian in the path or a red or yellow traffic light ahead.
 rule "Overtake slow front vehicle via left lane"
@@ -199,15 +231,17 @@ salience 525
 no-loop true
 when
     $ctx : DecisionContext()
-    $state : OvertakingStateFact($active : active, $tracked : targetId, $origin : originalLane)
+    $state : OvertakingStateFact($active : active, $tracked : targetId, $origin : originalLane, $stateTime : timestamp)
     VehicleStateFact(lane == Lane.RIGHT || lane == Lane.CENTER, $currentLane : lane, laneChangeState == LaneChangeState.IDLE, leftMarking != RoadMarkingType.CONTINUOUS, $speed : speedKmh, $now : timestamp)
     FrontVehicleState($target : targetId != "none", $distance : distanceMeters > 15.0, $relative : relativeSpeedMps > 0.5, timestamp == $now)
     LaneOccupancyState(lane == Lane.LEFT, occupied == false, $leftFront : frontDistanceMeters)
     not PedestrianStateFact(pedestrianId != "none", inPath == true || crossingState == PedestrianCrossingState.CROSSING)
     not TrafficLightStateFact(lightId != "none", state != TrafficLightState.GREEN, distanceMeters <= 125.0)
     eval((!$active || !$target.equals($tracked) || $currentLane != $origin)
+        && !(OvertakingStateFact.ABANDONED.equals($tracked) && $now - $stateTime < 20000)
         && ($currentLane != Lane.CENTER || $leftFront > $distance + 20.0)
         && $distance <= Math.max(50.0, $relative * 5.5 + 10.0)
+        && $distance - $relative * 3.0 >= Math.max(16.0, $relative * 3.0)
         && ($speed / 3.6 - $relative >= 1.0 || $distance >= $relative * 5.5))
 then
     // Guard against a match that outlived a state change made earlier in this cycle.
@@ -245,7 +279,7 @@ salience 525
 no-loop true
 when
     $ctx : DecisionContext()
-    $state : OvertakingStateFact($active : active, $tracked : targetId)
+    $state : OvertakingStateFact($active : active, $tracked : targetId, $stateTime : timestamp)
     VehicleStateFact(lane == Lane.RIGHT, $currentLane : lane, laneChangeState == LaneChangeState.IDLE, rightMarking != RoadMarkingType.CONTINUOUS, $speed : speedKmh, $now : timestamp)
     LeftLaneVehicleState($target : targetId != "none", $distance : distanceMeters > 15.0, $relative : relativeSpeedMps > -0.5, timestamp == $now)
     CruiseTargetFact($cruise : targetKmh)
@@ -255,6 +289,7 @@ when
     not PedestrianStateFact(pedestrianId != "none", inPath == true || crossingState == PedestrianCrossingState.CROSSING)
     not TrafficLightStateFact(lightId != "none", state != TrafficLightState.GREEN, distanceMeters <= 125.0)
     eval((!$active || !$target.equals($tracked))
+        && !(OvertakingStateFact.ABANDONED.equals($tracked) && $now - $stateTime < 20000)
         && $speed / 3.6 - $relative >= 1.4
         && (CurrentSpeedLimit.DEFAULT_SOURCE.equals($source) && $cruise > 0 ? Math.min($cruise, $limit) : $limit) / 3.6
             > $speed / 3.6 - $relative + 1.4
@@ -333,13 +368,15 @@ salience 525
 no-loop true
 when
     $ctx : DecisionContext()
-    $state : OvertakingStateFact($active : active, $tracked : targetId)
+    $state : OvertakingStateFact($active : active, $tracked : targetId, $stateTime : timestamp)
     VehicleStateFact(lane == Lane.RIGHT || lane == Lane.CENTER, $currentLane : lane, laneChangeState == LaneChangeState.IDLE, leftMarking != RoadMarkingType.CONTINUOUS, $speed : speedKmh < 3.0, $now : timestamp)
     FrontVehicleState($target : targetId != "none", $distance : distanceMeters > 6.0, distanceMeters <= 20.0, $relative : relativeSpeedMps > -0.3)
     LaneOccupancyState(lane == Lane.LEFT, occupied == false)
     not PedestrianStateFact(pedestrianId != "none", inPath == true || crossingState == PedestrianCrossingState.CROSSING)
     not TrafficLightStateFact(lightId != "none", state != TrafficLightState.GREEN, distanceMeters <= 125.0)
-    eval((!$active || !$target.equals($tracked)) && Math.max(0.0, $speed / 3.6 - $relative) < 0.5)
+    eval((!$active || !$target.equals($tracked))
+        && !(OvertakingStateFact.ABANDONED.equals($tracked) && $now - $stateTime < 20000)
+        && Math.max(0.0, $speed / 3.6 - $relative) < 0.5)
 then
     // Guard against a match that outlived a state change made earlier in this cycle.
     if ($state.isActive() && $target.equals($state.getTargetId())) {

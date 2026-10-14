@@ -293,9 +293,11 @@ rule('Green traffic light releases red-light hold',
 % As regras que abrandam atrás do veículo da frente afastam-se no ciclo em que começa uma
 % ultrapassagem: a ultrapassagem propõe com a prioridade de manobra e perderia sempre para
 % elas, pelo que a mudança de faixa nunca começaria. A sua precedência é inferior à das
-% regras de ultrapassagem, por isso a ultrapassagem já é conhecida quando são avaliadas. A
-% partir do ciclo seguinte voltam a aplicar-se, também enquanto o veículo ainda está a sair
-% da faixa. A travagem a curta distância nunca se afasta.
+% regras de ultrapassagem, por isso a ultrapassagem já é conhecida quando são avaliadas.
+% Continuam afastadas enquanto o veículo está a sair da faixa (overtake_underway): pelo
+% art. 38.º do CE a ultrapassagem só começa se puder ser concluída em segurança e faz-se
+% sem demoras; travar atrás do veículo que se está a deixar só a prolongaria. A travagem a
+% curta distância e as regras de emergência nunca se afastam.
 
 rule('Brake when front vehicle distance low',
      520,
@@ -310,7 +312,7 @@ rule('Brake when front vehicle distance low',
 % 2 m past the stopping point, so radar noise does not release it.
 rule('Keep safe following distance behind front vehicle (stop)',
      510,
-     [ not(overtake_started(_, _, _)),
+     [ not(test(overtake_underway)),
        front_vehicle(_, D, Rel),
        ego_speed(V),
        test(D > 0),
@@ -322,7 +324,7 @@ rule('Keep safe following distance behind front vehicle (stop)',
 
 rule('Keep safe following distance behind front vehicle (reduce)',
      510,
-     [ not(overtake_started(_, _, _)),
+     [ not(test(overtake_underway)),
        front_vehicle(_, D, Rel),
        ego_speed(V),
        test(D > 0),
@@ -334,7 +336,7 @@ rule('Keep safe following distance behind front vehicle (reduce)',
 
 rule('Reduce speed when closing front vehicle',
      500,
-     [ not(overtake_started(_, _, _)),
+     [ not(test(overtake_underway)),
        front_vehicle(_, D, Rel),
        test((D >= 14.0, D < 35.0, Rel > 0.8)),
        test(Target is max(20.0, D * 1.2)) ],
@@ -359,7 +361,7 @@ rule('Approaching trend from sliding distance window',
 % Ultrapassagem
 %
 % O estado da ultrapassagem vem do ciclo anterior (overtaking/5). As regras nunca o alteram:
-% concluem o que mudou (overtake_started/3, overtake_cancelled, overtake_target_passed,
+% concluem o que mudou (overtake_started/3, overtake_cancelled, overtake_abandoned/1, overtake_target_passed,
 % overtake_finished), current_overtaking/5 deriva o estado resultante e driving_state.pl
 % guarda-o no fim do ciclo.
 
@@ -373,6 +375,24 @@ rule('Cancel overtaking that never left its original lane',
        time_ms(Now),
        test(Now - Start > 1000) ],
      [ assert(overtake_cancelled) ]).
+
+% Art. 38 CE: an overtake that can no longer be completed is given up. Out of the original
+% lane, with a vehicle ahead in the overtaking lane going no slower (not closing in by more
+% than 0.5 m/s), the ego never gets past its target; after the 4 s of the lane change the
+% overtake is dropped, so the keep-right rules can take it back to the right. The state
+% remembers when (target abandoned): for 20 s no new overtake starts, so the ego does not
+% weave in and out of a lane it has just found blocked (Art. 35 CE).
+rule('Abandon overtaking blocked by traffic in the overtaking lane',
+     540,
+     [ overtaking(true, Origin, false, Start, _),
+       ego_lane(Lane),
+       test(Lane \== Origin),
+       lane_change_state(idle),
+       time_ms(Now),
+       test(Now - Start > 4000),
+       front_vehicle(_, D, Rel),
+       test((D > 0, D =< 80.0, Rel =< 0.5)) ],
+     [ assert(overtake_abandoned(Now)) ]).
 
 % Passed once the ego has left the origin lane, the right lane is clear 80 m ahead (the
 % passed vehicle is no longer there) and the radar no longer has it ahead.
@@ -398,7 +418,11 @@ rule('Deactivate overtaking state once return right completes',
 % with the closing speed (5.5 s of TTC plus 10 m). A stopped vehicle is only overtaken on
 % the move with that whole margin. Towards the LEFT lane (the last one) it is only worth it
 % if the next vehicle there is clearly further away. Art. 41 CE: never with a pedestrian in
-% the way or a red or yellow light ahead.
+% the way or a red or yellow light ahead. Art. 38 CE: only if it can be completed safely;
+% the following rules step aside during the lane change and the radar still measures the
+% vehicle being left, so after the 3 s lane change at the closing speed the gap must still
+% be 16 m (the 14 m short-range zone plus 2 m) and 3 s of time to collision (the emergency
+% rules act below 2.5 s).
 rule('Overtake slow front vehicle via left lane',
      525,
      [ ego_lane(Lane),
@@ -417,6 +441,7 @@ rule('Overtake slow front vehicle via left lane',
        test(may_start_overtaking(Target, Lane)),
        test((Lane \== center ; LeftFront > D + 20.0)),
        test(D =< max(50.0, Rel * 5.5 + 10.0)),
+       test(D - Rel * 3.0 >= max(16.0, Rel * 3.0)),
        test((V / 3.6 - Rel >= 1.0 ; D >= Rel * 5.5)) ],
      [ assert(overtake_started(Target, Lane, Now)),
        assert(proposal(change_lane_left, no_target, low, maneuver_safety,
@@ -518,6 +543,40 @@ rule('Enforce keep right road law when right lane is safe',
        not(test(current_overtaking(true, _, _, _, _))) ],
      [ assert(proposal(return_right, no_target, low, maneuver_safety,
                        'Portuguese Highway Code Art. 13: Drive on the rightmost available safe lane')) ]).
+
+% Art. 13 e 14 CE, filas paralelas: o ego segue um veículo na sua via e a via da direita
+% também tem trânsito à frente, pelo que a regra anterior (que quer 80 m livres) nunca se
+% aplica. A via mais à direita tem de ser usada sempre que haja lugar: com o espaço ao lado
+% livre (a leitura do ângulo morto já exclui um veículo ao lado, atrás a aproximar-se ou à
+% frente a aproximar-se depressa) e o veículo da frente nessa via a pelo menos a distância
+% de segurança (2 s à velocidade atual, nunca menos de 15 m), o ego passa para a direita
+% atrás dele. Só se aplica exatamente nesta situação.
+rule('Keep right behind the vehicle in the right lane when following in parallel queues',
+     455,
+     [ ego_lane(Lane),
+       test(Lane \== right),
+       not(presentation_demo),
+       lane_change_state(idle),
+       right_marking(RightMarking),
+       test(RightMarking \== continuous),
+       not(right_lane_blocked_ahead),
+       time_ms(Now),
+       test(Now >= 4000),
+       ego_speed(V),
+       front_vehicle(_, D, _),
+       test((D > 0, D =< 80.0)),
+       lane_occupancy(right, false, RightFront),
+       test(RightFront =< 80.0),
+       test(RightFront >= max(15.0, 2.0 * V / 3.6)),
+       not(move_off_state(true, _)),
+       not(obstacle(_, _, _, _)),
+       not(pothole(_, _, _, _)),
+       not(barrier(_, _, false, _)),
+       not(pedestrian_conflict(_)),
+       not(lane_change_request(_)),
+       not(test(current_overtaking(true, _, _, _, _))) ],
+     [ assert(proposal(return_right, no_target, low, maneuver_safety,
+                       'Portuguese Highway Code Art. 13/14: keep right behind the vehicle in the right lane')) ]).
 
 % Art. 36 CE: while not yet behind a slower vehicle in the left lane, the ego must not draw
 % level with it. It follows the curve that matches that vehicle's speed 35 m behind it (just
@@ -1212,6 +1271,9 @@ current_overtaking(Active, Origin, Passed, Start, Target) :-
 
 effective_overtaking(true, Origin, false, Start, Target) :-
     known(overtake_started(Target, Origin, Start)), !.
+effective_overtaking(false, Origin, false, Since, abandoned) :-
+    known(overtake_abandoned(Since)), !,
+    known(overtaking(_, Origin, _, _, _)).
 effective_overtaking(false, Origin, false, Start, none) :-
     (   known(overtake_cancelled) ; known(overtake_finished) ), !,
     known(overtaking(_, Origin, _, Start, _)).
@@ -1221,13 +1283,31 @@ effective_overtaking(Active, Origin, true, Start, Target) :-
 effective_overtaking(Active, Origin, Passed, Start, Target) :-
     known(overtaking(Active, Origin, Passed, Start, Target)).
 
+% An overtake under way: one starts this cycle, or the one in progress (target not yet
+% passed) is still moving the ego out of its lane. The rules that slow down behind the
+% front vehicle step aside meanwhile (Art. 38 CE).
+overtake_underway :-
+    known(overtake_started(_, _, _)), !.
+overtake_underway :-
+    known(overtaking(true, _, false, _, _)),
+    known(lane_change_state(State)),
+    memberchk(State, [requested, changing]), !.
+
+% An overtake given up less than 20 s ago (Art. 35 CE): no new one starts meanwhile.
+recently_abandoned :-
+    current_overtaking(false, _, _, Since, abandoned),
+    known(time_ms(Now)),
+    Now - Since < 20000.
+
 % May start overtaking Target from Lane: no overtake active, or another target, or (only for
 % the front vehicle) another origin lane.
 may_start_overtaking(Target, Lane) :-
+    \+ recently_abandoned,
     current_overtaking(Active, Origin, _, _, Followed),
     (   Active == false -> true ; Target \== Followed -> true ; Lane \== Origin ).
 
 may_start_overtaking(Target) :-
+    \+ recently_abandoned,
     current_overtaking(Active, _, _, _, Followed),
     (   Active == false -> true ; Target \== Followed ).
 

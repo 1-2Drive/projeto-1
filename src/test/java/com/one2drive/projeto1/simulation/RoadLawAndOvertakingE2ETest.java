@@ -133,6 +133,256 @@ class RoadLawAndOvertakingE2ETest {
         }
     }
 
+    /** Ego in CENTER behind one vehicle per lane, all side by side {@code gap} metres ahead. */
+    private static ScenarioDefinition parallelQueues(double speedKmh, double gap) {
+        ScenarioDefinition scenario = new ScenarioDefinition();
+        scenario.setId("PARALLEL_QUEUES");
+        scenario.setInitialSpeedKmh(speedKmh);
+        scenario.setInitialLane(Lane.CENTER);
+        scenario.setInitialWeather(WeatherCondition.CLEAR);
+        for (Lane lane : new Lane[]{Lane.LEFT, Lane.CENTER, Lane.RIGHT}) {
+            ScenarioActorDefinition vehicle = new ScenarioActorDefinition();
+            vehicle.setType(ScenarioActorType.FRONT_VEHICLE);
+            vehicle.setLane(lane);
+            vehicle.setPositionMeters(gap);
+            vehicle.setSpeedKmh(speedKmh);
+            scenario.getActors().add(vehicle);
+        }
+        return scenario;
+    }
+
+    /**
+     * Art. 13 and 14 CE, parallel queues: with traffic in every lane the ego cannot overtake,
+     * but there is room in the right lane behind the vehicle there, so it signals right and
+     * moves in behind it, keeping a safe distance.
+     */
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
+    @Timeout(30)
+    @DisplayName("Keep right: in parallel queues the ego moves right behind the vehicle in the right lane (Art. 13/14 CE)")
+    void parallelQueuesKeepRightBehindTheRightLaneVehicle(ExpertBackendType backend) {
+        try (SimulationEngine engine = BackendTestSupport.engine(parallelQueues(30.0, 35.0), backend)) {
+            engine.start();
+            boolean signalledRight = false;
+            boolean reachedRight = false;
+            double closestInOwnLane = Double.MAX_VALUE;
+            for (int i = 0; i < 150 && !reachedRight; i++) {
+                SimulationSnapshot snapshot = engine.tick();
+                var ego = engine.getWorldState().getEgo();
+                assertNotEquals(DrivingAction.EMERGENCY_BRAKE.name(), snapshot.currentDecision());
+                assertNotEquals(DrivingAction.CHANGE_LANE_LEFT.name(), snapshot.currentDecision(),
+                    "with the left lane taken there is nothing to overtake");
+                signalledRight |= ego.getIndicatorState() == IndicatorState.RIGHT;
+                for (var actor : engine.getWorldState().getActors()) {
+                    double gap = engine.getWorldState().vehicleSignedDistance(actor);
+                    if (actor.getLane() == ego.getLane() && gap > 0) {
+                        closestInOwnLane = Math.min(closestInOwnLane, gap);
+                    }
+                }
+                reachedRight = ego.getLane() == Lane.RIGHT && ego.getLaneChangeState() == LaneChangeState.IDLE;
+            }
+            assertTrue(signalledRight, "the ego signals right before moving");
+            assertTrue(reachedRight, "the ego moves into the right lane behind the vehicle there");
+            assertTrue(closestInOwnLane >= 15.0, "and keeps a safe distance, closest " + closestInOwnLane + " m");
+        }
+    }
+
+    /**
+     * The situation reported from the app: the ego, faster, comes up behind the vehicle in the
+     * right lane and moves out to overtake it, but the centre and left lanes carry vehicles
+     * level with it at the same speed. The overtake can never be completed, so (Art. 38 CE) it
+     * is given up and the ego goes back right behind the vehicle it meant to pass (Art. 13/14
+     * CE), instead of staying in the centre lane for ever.
+     */
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
+    @Timeout(40)
+    @DisplayName("Overtaking blocked by parallel traffic is abandoned and the ego returns right (Art. 38 and 13/14 CE)")
+    void blockedOvertakeIsAbandonedAndEgoReturnsRight(ExpertBackendType backend) {
+        ScenarioDefinition scenario = new ScenarioDefinition();
+        scenario.setId("BLOCKED_OVERTAKE");
+        scenario.setInitialSpeedKmh(50.0);
+        scenario.setInitialLane(Lane.RIGHT);
+        scenario.setInitialWeather(WeatherCondition.CLEAR);
+        for (Lane lane : new Lane[]{Lane.LEFT, Lane.CENTER, Lane.RIGHT}) {
+            ScenarioActorDefinition vehicle = new ScenarioActorDefinition();
+            vehicle.setType(ScenarioActorType.FRONT_VEHICLE);
+            vehicle.setLane(lane);
+            vehicle.setPositionMeters(60.0);
+            vehicle.setSpeedKmh(30.0);
+            scenario.getActors().add(vehicle);
+        }
+
+        try (SimulationEngine engine = BackendTestSupport.engine(scenario, backend)) {
+            engine.start();
+            boolean leftRightLane = false;
+            boolean backRight = false;
+            double closestInOwnLane = Double.MAX_VALUE;
+            for (int i = 0; i < 400 && !backRight; i++) {
+                SimulationSnapshot snapshot = engine.tick();
+                var ego = engine.getWorldState().getEgo();
+                assertNotEquals(DrivingAction.EMERGENCY_BRAKE.name(), snapshot.currentDecision(), "tick " + i);
+                for (var actor : engine.getWorldState().getActors()) {
+                    double gap = engine.getWorldState().vehicleSignedDistance(actor);
+                    if (actor.getLane() == ego.getLane() && gap > 0) {
+                        closestInOwnLane = Math.min(closestInOwnLane, gap);
+                    }
+                }
+                leftRightLane |= ego.getLane() != Lane.RIGHT;
+                backRight = leftRightLane && ego.getLane() == Lane.RIGHT && ego.getLaneChangeState() == LaneChangeState.IDLE;
+            }
+            assertTrue(leftRightLane, "the ego first moves out to overtake the slower vehicle on the right");
+            assertTrue(backRight, "the blocked overtake is given up and the ego returns to the right lane");
+            assertTrue(closestInOwnLane >= 14.0, "the ego keeps its distance throughout, closest " + closestInOwnLane + " m");
+
+            // Art. 35 CE: no weaving. With the traffic unchanged the ego stays behind the vehicle
+            // on the right instead of moving out again straight away.
+            for (int i = 0; i < 150; i++) {
+                SimulationSnapshot snapshot = engine.tick();
+                assertEquals(Lane.RIGHT, engine.getWorldState().getEgo().getLane(),
+                    "the ego must not move out again " + (i / 10.0) + " s after returning right");
+                assertNotEquals(DrivingAction.CHANGE_LANE_LEFT.name(), snapshot.currentDecision(),
+                    (i / 10.0) + " s after returning right");
+            }
+        }
+    }
+
+    /**
+     * The same parallel queues, starting with the vehicle in the right lane closer than a safe
+     * following distance for the speed (2 s at 50 km/h is about 28 m): the ego only moves right
+     * once the gap to that vehicle has become a safe following distance, never before.
+     */
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
+    @Timeout(30)
+    @DisplayName("Keep right: in parallel queues the ego only moves right once there is safe room behind the right lane vehicle (Art. 13/14 CE)")
+    void parallelQueuesMoveRightOnlyWithSafeRoom(ExpertBackendType backend) {
+        try (SimulationEngine engine = BackendTestSupport.engine(parallelQueues(50.0, 24.0), backend)) {
+            engine.start();
+            boolean stayedWhileTooClose = false;
+            for (int i = 0; i < 150; i++) {
+                SimulationSnapshot snapshot = engine.tick();
+                var ego = engine.getWorldState().getEgo();
+                double rightGap = Double.MAX_VALUE;
+                for (var actor : engine.getWorldState().getActors()) {
+                    if (actor.getLane() == Lane.RIGHT) {
+                        rightGap = engine.getWorldState().vehicleSignedDistance(actor);
+                    }
+                }
+                double safeGap = Math.max(15.0, 2.0 * ego.getSpeedKmh() / 3.6);
+                if (rightGap < safeGap - 0.5) {
+                    stayedWhileTooClose = true;
+                    assertNotEquals(DrivingAction.RETURN_RIGHT.name(), snapshot.currentDecision(),
+                        "no move right with " + rightGap + " m to the right lane vehicle at " + ego.getSpeedKmh() + " km/h");
+                }
+            }
+            assertTrue(stayedWhileTooClose, "the scenario must start with too little room on the right");
+        }
+    }
+
+    /**
+     * Art. 38 CE: once an overtake has started it is carried out without delay. While the
+     * vehicle moves out to the left it does not brake behind the vehicle it is leaving: the
+     * decision stays the lane change for the whole manoeuvre, with the left indicator on, and
+     * the speed is kept. The gap never falls into the 14 m short-range zone.
+     */
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
+    @Timeout(30)
+    @DisplayName("Overtaking: moving out to the left keeps speed and the lane change decision (Art. 38 CE)")
+    void overtakingLaneChangeKeepsSpeedAndDecision(ExpertBackendType backend) {
+        ScenarioDefinition scenario = ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json")
+            .findById("S14_SLOW_VEHICLE_OVERTAKE").orElseThrow();
+
+        try (SimulationEngine engine = BackendTestSupport.engine(scenario, backend)) {
+            engine.start();
+            double startSpeed = Double.NaN;
+            int laneOutTicks = 0;
+            boolean reachedCenter = false;
+            double closestInOwnLane = Double.MAX_VALUE;
+
+            for (int i = 0; i < 250 && !reachedCenter; i++) {
+                SimulationSnapshot snapshot = engine.tick();
+                var ego = engine.getWorldState().getEgo();
+                for (var actor : engine.getWorldState().getActors()) {
+                    if (actor.getLane() == ego.getLane()) {
+                        closestInOwnLane = Math.min(closestInOwnLane, engine.getWorldState().vehicleSignedDistance(actor));
+                    }
+                }
+                if (ego.getLaneChangeState() == LaneChangeState.CHANGING) {
+                    if (Double.isNaN(startSpeed)) {
+                        startSpeed = ego.getSpeedKmh();
+                    }
+                    laneOutTicks++;
+                    String where = "tick " + i + ", lateral " + ego.getLateralPositionMeters();
+                    assertEquals(DrivingAction.CHANGE_LANE_LEFT.name(), snapshot.currentDecision(),
+                        "the lane change stays the decision while moving out: " + where);
+                    assertEquals(IndicatorState.LEFT, ego.getIndicatorState(), "left indicator on: " + where);
+                    assertTrue(ego.getSpeedKmh() >= startSpeed - 1.0,
+                        "no braking behind the vehicle being left: " + ego.getSpeedKmh() + " km/h at " + where);
+                }
+                reachedCenter = ego.getLane() == Lane.CENTER && ego.getLaneChangeState() == LaneChangeState.IDLE;
+            }
+
+            assertTrue(laneOutTicks >= 20, "the lane change must take its full time, took " + laneOutTicks + " ticks");
+            assertTrue(reachedCenter, "the vehicle must reach the overtaking lane");
+            assertTrue(closestInOwnLane >= 14.0,
+                "the vehicle being passed must stay out of the 14 m short-range zone, closest " + closestInOwnLane + " m");
+        }
+    }
+
+    /**
+     * Art. 38 CE: an overtake only starts if it can be completed safely. A slow vehicle so
+     * close that the 3 s lane change would end inside the 14 m short-range zone is not
+     * overtaken straight away: the vehicle slows down behind it first.
+     */
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
+    @Timeout(30)
+    @DisplayName("Overtaking: does not start when the lane change could not be completed with room to spare (Art. 38 CE)")
+    void overtakingDoesNotStartWithoutRoomToComplete(ExpertBackendType backend) {
+        ScenarioDefinition scenario = new ScenarioDefinition();
+        scenario.setId("OVERTAKE_TOO_CLOSE");
+        scenario.setInitialSpeedKmh(50.0);
+        scenario.setInitialLane(Lane.RIGHT);
+        scenario.setInitialWeather(WeatherCondition.CLEAR);
+        ScenarioActorDefinition slow = new ScenarioActorDefinition();
+        slow.setType(ScenarioActorType.FRONT_VEHICLE);
+        slow.setLane(Lane.RIGHT);
+        slow.setPositionMeters(28.0);
+        slow.setSpeedKmh(18.0);
+        scenario.getActors().add(slow);
+
+        try (SimulationEngine engine = BackendTestSupport.engine(scenario, backend)) {
+            engine.start();
+            double closestInOwnLane = Double.MAX_VALUE;
+            boolean emergency = false;
+            for (int i = 0; i < 200; i++) {
+                SimulationSnapshot snapshot = engine.tick();
+                var ego = engine.getWorldState().getEgo();
+                for (var actor : engine.getWorldState().getActors()) {
+                    double gap = engine.getWorldState().vehicleSignedDistance(actor);
+                    if (actor.getLane() == ego.getLane() && gap > 0) {
+                        closestInOwnLane = Math.min(closestInOwnLane, gap);
+                        double closingMps = ego.getSpeedMps() - actor.getSpeedMps();
+                        if (snapshot.currentDecision().equals(DrivingAction.CHANGE_LANE_LEFT.name())
+                            && ego.getLaneChangeState() == LaneChangeState.REQUESTED) {
+                            assertTrue(gap - closingMps * 3.0 >= 15.0,
+                                "an overtake may only start with room to finish the lane change: gap " + gap
+                                    + " m closing at " + closingMps + " m/s");
+                            assertTrue(gap - closingMps * 3.0 >= closingMps * 3.0 - 1.0,
+                                "and with 3 s of time to collision left after it: gap " + gap
+                                    + " m closing at " + closingMps + " m/s");
+                        }
+                    }
+                }
+                emergency |= snapshot.currentDecision().equals(DrivingAction.EMERGENCY_BRAKE.name());
+            }
+            assertFalse(emergency, "following the slow vehicle must never come to an emergency stop");
+            assertTrue(closestInOwnLane > 4.5, "the vehicle never reaches the slow vehicle, closest " + closestInOwnLane + " m");
+        }
+    }
+
     @ParameterizedTest(name = "{0}")
     @EnumSource(ExpertBackendType.class)
     @Timeout(15)

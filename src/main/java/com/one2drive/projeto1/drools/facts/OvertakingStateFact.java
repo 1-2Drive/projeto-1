@@ -11,6 +11,8 @@ import com.one2drive.projeto1.domain.Lane;
  */
 public class OvertakingStateFact {
     public static final String NO_TARGET = "none";
+    /** targetId of an overtake given up because it could not be completed; timestamp is when. */
+    public static final String ABANDONED = "abandoned";
 
     private boolean active;
     private Lane originalLane;

@@ -56,3 +56,41 @@ then
         "Right lane is clear and safe; returning to rightmost lane"
     );
 end
+
+// Art. 13 and 14 CE, parallel queues: the ego follows a vehicle in its own lane and the
+// lane to its right also has traffic ahead, so the rule above (which wants 80 m clear)
+// never applies. The rightmost lane must still be used whenever there is room in it: if
+// the space alongside on the right is free (the blind-spot reading already rules out a
+// vehicle alongside, behind closing in, or ahead closing fast) and the vehicle ahead in that
+// lane is at least a safe following distance away (2 s at the current speed, never less
+// than 15 m), the ego moves right behind it. It only applies in exactly this situation, so
+// every other case keeps the rule above.
+rule "Keep right behind the vehicle in the right lane when following in parallel queues"
+salience 455
+no-loop true
+when
+    $ctx : DecisionContext()
+    VehicleStateFact(lane != Lane.RIGHT, presentationDemo == false, laneChangeState == LaneChangeState.IDLE, rightMarking != RoadMarkingType.CONTINUOUS, rightLaneBlockedAhead == false, timestamp >= 4000, $speed : speedKmh)
+    FrontVehicleState(targetId != "none", distanceMeters > 0, distanceMeters <= 80.0)
+    LaneOccupancyState(lane == Lane.RIGHT, occupied == false, $rightFront : frontDistanceMeters, frontDistanceMeters <= 80.0)
+    eval($rightFront >= Math.max(15.0, 2.0 * $speed / 3.6))
+    not MoveOffState(active == true)
+    not ObstacleStateFact(obstacleId != "none", distanceMeters > 0)
+    not PotholeStateFact(potholeId != "none", distanceMeters > 0)
+    not BarrierStateFact(barrierId != "none", open == false, distanceMeters > 0)
+    not PedestrianStateFact(pedestrianId != "none", inPath == true || crossingState == PedestrianCrossingState.CROSSING, distanceMeters > 0)
+    not LaneChangeRequestState(active == true)
+    not OvertakingStateFact(active == true)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.RETURN_RIGHT,
+        Double.NaN,
+        RiskLevel.LOW,
+        DecisionPriority.MANEUVER_SAFETY,
+        "Portuguese Highway Code Art. 13/14: keep right behind the vehicle in the right lane",
+        drools.getRule().getName(),
+        "Following in parallel queues; right lane free alongside, vehicle ahead there at "
+            + Math.round($rightFront) + " m"
+    );
+end

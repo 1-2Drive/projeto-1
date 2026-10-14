@@ -165,14 +165,16 @@ class MultiVehicleOvertakingE2ETest {
     @ParameterizedTest(name = "{0}")
     @EnumSource(ExpertBackendType.class)
     @Timeout(30)
-    @DisplayName("same case with LEFT occupied: the ego stays in CENTER and adapts its speed")
-    void staysInCenterAndAdaptsSpeedWhenLeftIsOccupied(ExpertBackendType backend) {
+    @DisplayName("same case with LEFT occupied: the blocked overtake is given up and the ego goes back RIGHT (Art. 38, 13/14 CE)")
+    void givesUpBlockedOvertakeAndReturnsRightWhenLeftIsOccupied(ExpertBackendType backend) {
         try (SimulationEngine engine = runningEngine(backend)) {
             EgoVehicleState ego = engine.getWorldState().getEgo();
-            // Three slow vehicles nearly abreast: once in CENTER the ego has the RIGHT vehicle
-            // alongside and a LEFT vehicle just behind the CENTER one, so neither side helps.
-            addVehicle(engine, Lane.RIGHT, 90.0, SLOW_SPEED_KMH);
-            String center = addVehicle(engine, Lane.CENTER, 100.0, SLOW_SPEED_KMH);
+            // Three slow vehicles nearly abreast: once in CENTER the ego is stuck behind the CENTER
+            // vehicle with a LEFT vehicle level with it, so the overtake can never be completed.
+            // Art. 38 CE: it is given up; Art. 13/14 CE: the ego goes back to the right lane behind
+            // the vehicle there, keeping a safe distance, and adapts its speed.
+            String right = addVehicle(engine, Lane.RIGHT, 90.0, SLOW_SPEED_KMH);
+            addVehicle(engine, Lane.CENTER, 100.0, SLOW_SPEED_KMH);
             addVehicle(engine, Lane.LEFT, 95.0, SLOW_SPEED_KMH);
 
             boolean reachedCenter = false;
@@ -189,10 +191,10 @@ class MultiVehicleOvertakingE2ETest {
 
             assertTrue(reachedCenter, "ego must move to CENTER to pass the vehicle in RIGHT");
             assertFalse(enteredLeft, "ego must not enter LEFT while it is occupied");
-            assertEquals(Lane.CENTER, ego.getLane(), "ego must remain in CENTER behind the slower vehicle");
-            assertTrue(gapTo(engine, center) > 8.0, "ego must stay behind the CENTER vehicle at a safe distance, gap was "
-                + gapTo(engine, center) + " m");
-            assertEquals(SLOW_SPEED_KMH, ego.getSpeedKmh(), 6.0, "ego must adapt its speed to the CENTER vehicle");
+            assertEquals(Lane.RIGHT, ego.getLane(), "ego must give up the blocked overtake and return RIGHT");
+            assertTrue(gapTo(engine, right) > 8.0, "ego must stay behind the RIGHT vehicle at a safe distance, gap was "
+                + gapTo(engine, right) + " m");
+            assertEquals(SLOW_SPEED_KMH, ego.getSpeedKmh(), 6.0, "ego must adapt its speed to the vehicle ahead");
             assertFalse(sawEmergencyBrake, "adapting to the CENTER vehicle must not need emergency braking");
             assertTrue(closest > 5.0, "ego must keep clear of vehicles in its own lane, closest was " + closest + " m");
         }

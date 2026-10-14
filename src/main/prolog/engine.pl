@@ -26,10 +26,19 @@
 % testes através dos predicados auxiliares. Só essas regras são avaliadas de novo, pelo que
 % as suas ativações aparecem, mudam ou são canceladas assim que um facto novo lhes diz
 % respeito. Dentro de um ciclo, nunca se retiram factos.
+%
+% Meta-conhecimento: conhecimento sobre as próprias regras, não sobre a condução, usado
+% para controlar e acelerar a inferência. Está assinalado com "Meta-conhecimento" e é de
+% dois tipos:
+%   - índice de dependências (rule_reads/2): que tipos de facto cada regra lê, derivado
+%     automaticamente das regras; limita a nova avaliação às regras afetadas (rapidez);
+%   - conhecimento de controlo (rule_precedence/2, rule_rank/2, fired/2): que ativação
+%     dispara primeiro e quais já dispararam (resolução de conflitos e refração).
 
-:- dynamic wm_fact/2, wm_support/3, wm_next_id/1,
-           activation/5, fired/2,
-           rule_reads/2, rule_rank/2, rule_precedence/2, index_built/0.
+:- dynamic wm_fact/2, wm_support/3, wm_next_id/1,                     % memória de trabalho
+           activation/5,                                                  % agenda
+           fired/2,                                                       % Meta-conhecimento: refração
+           rule_reads/2, rule_rank/2, rule_precedence/2, index_built/0.   % Meta-conhecimento: índice e controlo
 
 % Guard against a rule set that keeps producing new instantiations.
 max_firings_per_cycle(5000).
@@ -68,7 +77,16 @@ store_fact(Fact, Support, true) :-
     ).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Índice de dependências (construído uma vez, a partir das regras e auxiliares carregados)
+% Meta-conhecimento: índice de dependências (construído uma vez, a partir das regras e
+% auxiliares carregados)
+%
+% As regras são lidas como dados e analisadas estaticamente. Para cada regra regista-se:
+%   rule_reads(Nome/Aridade, Regra)   os tipos de facto que a regra lê (padrões, padrões
+%                                     negados e chamadas a known/1 nos auxiliares dos testes)
+%   rule_precedence(Regra, P)         a sua precedência
+%   rule_rank(Regra, Ordem)           a sua posição na base de conhecimento
+% O primeiro é usado em fire/2 para avaliar de novo só as regras afetadas por um facto
+% novo; os outros dois, em best_activation/2, para resolver conflitos.
 
 ensure_index :-
     index_built, !.
@@ -166,6 +184,7 @@ holds(Pattern, Id) :-
     wm_fact(Id, Pattern).
 
 % Replaces the rule's activations with its current matches, leaving out what already fired.
+% Meta-conhecimento: precedência e ordem da regra (do índice) e refração (already_fired/2).
 rematch(Id) :-
     retractall(activation(Id, _, _, _, _)),
     rule_precedence(Id, Precedence),
@@ -175,12 +194,17 @@ rematch(Id) :-
              \+ already_fired(Id, Inst) ),
            assertz(activation(Id, Precedence, Rank, Order, Inst))).
 
+% Meta-conhecimento (refração): an instantiation that already fired in this cycle.
 already_fired(Id, inst(Conditions, _, _)) :-
     fired(Id, Done),
     Done =@= Conditions, !.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Agenda e disparo
+%
+% Meta-conhecimento de controlo: best_activation/2 escolhe a ativação pela precedência e
+% pela ordem da regra; fire/2 regista o disparo para a refração e usa o índice de
+% dependências para avaliar de novo apenas as regras que leem os tipos de facto novos.
 
 run_rules :-
     ensure_index,
@@ -200,6 +224,7 @@ fire_loop(Count, Max) :-
     ;   true
     ).
 
+% Meta-conhecimento (resolução de conflitos): highest precedence, then rule rank, then match order.
 best_activation(Id, Inst) :-
     findall(key(Neg, Rank, Order)-Id,
             ( activation(Id, Precedence, Rank, Order, _), Neg is -Precedence ),
@@ -214,6 +239,7 @@ fire(Id, Inst) :-
     assertz(fired(Id, Conditions)),
     foldl(perform(Id, Evidence), Actions, [], Changed0),
     sort(Changed0, Changed),
+    % Meta-conhecimento (índice de dependências): only the rules that read a new fact type.
     findall(Reader, ( member(Key, Changed), rule_reads(Key, Reader) ), Readers0),
     sort(Readers0, Readers),
     maplist(rematch, Readers).

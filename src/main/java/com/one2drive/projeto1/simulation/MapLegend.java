@@ -32,7 +32,6 @@ public final class MapLegend {
                 case POTHOLE, STATIC_OBSTACLE -> template.getSeverity().name();
                 case BARRIER -> Boolean.TRUE.equals(template.getBarrierOpen()) ? "OPEN" : "CLOSED";
                 case STOP_SIGN -> "";
-                case SPEED_RADAR -> String.valueOf((int) template.getSpeedLimitKmh());
             };
         }
     }
@@ -51,7 +50,6 @@ public final class MapLegend {
         for (int limit : DEFAULT_SPEED_LIMITS) {
             legend.put(code++, speedLimit(limit));
         }
-        legend.put(14, speedRadar(50));
         return legend;
     }
 
@@ -119,9 +117,6 @@ public final class MapLegend {
             case BARRIER -> template.setBarrierOpen(source.getBarrierOpen() == null || source.getBarrierOpen());
             case STOP_SIGN -> {
             }
-            case SPEED_RADAR -> {
-                template.setSpeedLimitKmh(source.getSpeedLimitKmh() != null ? source.getSpeedLimitKmh() : 50);
-            }
         }
         return template;
     }
@@ -146,7 +141,6 @@ public final class MapLegend {
                 case GREEN -> "Green light";
             };
             case SPEED_LIMIT -> "Limit " + template.getSpeedLimitKmh() + " km/h";
-            case SPEED_RADAR -> "Speed radar " + (int) template.getSpeedLimitKmh() + " km/h";
         };
     }
 
@@ -180,12 +174,6 @@ public final class MapLegend {
 
     private static ScenarioRoadElementDefinition speedLimit(int limitKmh) {
         ScenarioRoadElementDefinition template = element(ScenarioRoadElementType.SPEED_LIMIT);
-        template.setSpeedLimitKmh(limitKmh);
-        return template;
-    }
-
-    private static ScenarioRoadElementDefinition speedRadar(int limitKmh) {
-        ScenarioRoadElementDefinition template = element(ScenarioRoadElementType.SPEED_RADAR);
         template.setSpeedLimitKmh(limitKmh);
         return template;
     }

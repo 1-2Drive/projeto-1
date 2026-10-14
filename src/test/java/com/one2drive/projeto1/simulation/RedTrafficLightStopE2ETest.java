@@ -104,6 +104,44 @@ class RedTrafficLightStopE2ETest {
     @ParameterizedTest(name = "{0}")
     @EnumSource(ExpertBackendType.class)
     @Timeout(60)
+    @DisplayName("one red light governs the whole road: the ego stops at its stop line whichever lane it drives in")
+    void oneLightStopsTheEgoInEveryLane() {
+        for (Lane egoLane : new Lane[]{Lane.LEFT, Lane.CENTER, Lane.RIGHT}) {
+            ScenarioDefinition scenario = new ScenarioDefinition();
+            scenario.setId("RED_LIGHT_ALL_LANES_" + egoLane);
+            scenario.setInitialSpeedKmh(50.0);
+            scenario.setInitialLane(egoLane);
+            // Keeps the ego in its lane, so each run shows one lane against the one light.
+            scenario.setLeftMarking(com.one2drive.projeto1.domain.RoadMarkingType.CONTINUOUS);
+            scenario.setRightMarking(com.one2drive.projeto1.domain.RoadMarkingType.CONTINUOUS);
+            ScenarioRoadElementDefinition red = new ScenarioRoadElementDefinition();
+            red.setType(ScenarioRoadElementType.TRAFFIC_LIGHT);
+            red.setLane(Lane.CENTER);
+            red.setPositionMeters(LIGHT_POSITION_METERS);
+            red.setTrafficLightState(TrafficLightState.RED);
+            scenario.getRoadElements().add(red);
+
+            try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> { })) {
+                assertEquals(1, engine.getWorldState().getRoadElements().stream()
+                    .filter(TrafficLight.class::isInstance).count(), "one light in the world stands for all three lanes");
+                engine.start();
+                Approach approach = driveUntilStopped(engine);
+
+                assertEquals(egoLane, engine.getWorldState().getEgo().getLane());
+                assertTrue(approach.stopped(), "ego in " + egoLane + " must stop for the light");
+                assertTrue(approach.furthestPositionMeters() <= STOP_LINE_METERS,
+                    "ego in " + egoLane + " must not pass the stop line at " + STOP_LINE_METERS
+                        + " m, it reached " + approach.furthestPositionMeters() + " m");
+                assertTrue(approach.restPositionMeters() >= STOP_LINE_METERS - 2.0 * StoppingPolicy.STOP_LINE_TOLERANCE_METERS,
+                    "ego in " + egoLane + " must stop at the line, it stopped at " + approach.restPositionMeters() + " m");
+            }
+        }
+    }
+
+    @ParameterizedTest(name = "{0}")
+
+    @EnumSource(ExpertBackendType.class)
+    @Timeout(60)
     @DisplayName("red light at 30, 50, 70 and 90 km/h: the ego never passes the stop line and does not stop needlessly far from it")
     void neverPassesTheStopLineAtAnySpeed(ExpertBackendType backend) {
         for (double speedKmh : new double[]{30.0, 50.0, 70.0, 90.0}) {

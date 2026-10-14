@@ -61,70 +61,108 @@ describe('RoadCanvasComponent', () => {
     expect(text).toContain('35 m');
   });
 
-  it('renders an all-lane speed enforcement station above the road with its configured limit', () => {
-    fixture.componentRef.setInput('snapshot', {
-      simulationTimeMillis: 1000,
-      status: 'RUNNING',
-      egoVehicle: { speedKmh: 80, positionMeters: 0, lane: 'RIGHT', accelerationMps2: -1.5 },
-      environment: { weatherCondition: 'CLEAR', visibilityFactor: 1, gripFactor: 1 },
-      speedAdvisor: { currentKmh: 80, legalLimitKmh: 50, recommendedKmh: 50, action: 'REDUCE_SPEED' },
-      currentDecision: {
-        action: 'REDUCE_SPEED',
-        recommendedSpeedKmh: 50,
-        riskLevel: 'MODERATE',
-        reason: 'Approaching speed radar',
-        sourceRule: 'Decelerate approaching speed radar',
-        timestamp: 1000,
-        evidence: []
-      },
-      sensorReadings: {},
-      sensors: {
-        frontRadar: {
-          rangeMeters: 130,
-          targetId: 'none',
-          distanceMeters: Infinity,
-          relativeSpeedKmh: 0,
-          ttcSeconds: Infinity,
-          status: 'CLEAR',
-          speedRadarDistanceMeters: 130,
-          speedRadarLimitKmh: 50
-        }
-      },
-      worldObjects: [
-        { id: 'radar_1', type: 'SpeedRadar', positionMeters: 130, lane: 'ALL', details: 'SpeedRadar{speedLimitKmh=50, scope=ALL_LANES}' }
-      ],
-      workingMemory: [],
-      recentTimeline: [],
-      recentRules: [],
-      recentFacts: [],
-      activeStage: 'SENSORS',
-      tickMillis: 50,
-      detectedObjectIds: [],
-      cameraDetectedObjectIds: [],
-      radarDetectedObjectIds: [],
-      sensorRanges: {
-        cameraRangeMeters: 100,
-        radarRangeMeters: 130,
-        blindSpotRangeMeters: 25,
-        cameraRateMillis: 200,
-        radarRateMillis: 50
-      },
-      demoPhases: []
-    });
+  it('paints one speed limit on the pavement of all three lanes at the same road position', () => {
+    for (const limit of [30, 90]) {
+      fixture.componentRef.setInput('snapshot', {
+        simulationTimeMillis: 1000,
+        status: 'RUNNING',
+        egoVehicle: { speedKmh: 60, positionMeters: 10, lane: 'RIGHT', accelerationMps2: 0 },
+        sensors: {},
+        worldObjects: [
+          { id: 'r20-CENTER', type: 'SpeedLimitSign', positionMeters: 90, lane: 'CENTER', details: `limitKmh=${limit}` }
+        ],
+        sensorRanges: { cameraRangeMeters: 120, radarRangeMeters: 130, blindSpotRangeMeters: 30, cameraRateMillis: 200, radarRateMillis: 100 }
+      });
+      fixture.detectChanges();
 
-    fixture.detectChanges();
+      const root = fixture.nativeElement as HTMLElement;
+      expect(root.querySelectorAll('[data-testid="road-speed-limit"]').length).toBe(1, 'one logical speed limit');
+      const marks = Array.from(root.querySelectorAll('.limit-mark')) as SVGElement[];
+      expect(marks.length).toBe(3);
+      expect(marks.map((mark) => mark.textContent?.trim())).toEqual([`${limit}`, `${limit}`, `${limit}`]);
 
-    const radarStation = fixture.nativeElement.querySelector('.radar-station');
-    expect(radarStation).toBeTruthy('Physical speed radar SVG must be rendered on the road');
-    expect(radarStation.textContent).toContain('RADAR');
-    expect(radarStation.getAttribute('aria-label')).toContain('All-lane speed radar');
-    const radarObject = fixture.nativeElement.querySelector('.obj--speedRadar') as HTMLElement;
-    expect(radarObject.style.top).toBe('4%');
-    expect(radarObject.querySelector('.car--other')).toBeNull('Radar infrastructure must never use the vehicle renderer');
+      const holders = marks.map((mark) => mark.parentElement as HTMLElement);
+      expect(new Set(holders.map((holder) => holder.style.left)).size).toBe(1, 'same longitudinal position');
+      expect(holders.map((holder) => parseFloat(holder.style.top)).sort((a, b) => a - b)).toEqual([25, 50, 75]);
+    }
+  });
 
-    const hudRadar = fixture.nativeElement.querySelector('[data-testid="hud-radar"]');
-    expect(hudRadar).toBeTruthy('Speed radar HUD telemetry must display');
-    expect(hudRadar.textContent).toContain('130 m (50 km/h)');
+  it('draws one traffic light in all three lanes at the same road position, with its state', () => {
+    for (const state of ['RED', 'GREEN']) {
+      fixture.componentRef.setInput('snapshot', {
+        simulationTimeMillis: 1000,
+        status: 'RUNNING',
+        egoVehicle: { speedKmh: 50, positionMeters: 10, lane: 'RIGHT', accelerationMps2: 0 },
+        sensors: {},
+        worldObjects: [
+          { id: 'r20-CENTER', type: 'TrafficLight', positionMeters: 90, lane: 'CENTER', details: `TrafficLight state=${state}` }
+        ],
+        sensorRanges: { cameraRangeMeters: 120, radarRangeMeters: 130, blindSpotRangeMeters: 30, cameraRateMillis: 200, radarRateMillis: 100 }
+      });
+      fixture.detectChanges();
+
+      const root = fixture.nativeElement as HTMLElement;
+      expect(root.querySelectorAll('[data-testid="road-traffic-light"]').length).toBe(1, 'one logical traffic light');
+      const lights = Array.from(root.querySelectorAll('.obj--trafficLight')) as HTMLElement[];
+      expect(lights.length).toBe(3);
+      expect(lights.map((light) => light.getAttribute('data-state'))).toEqual([state, state, state]);
+      expect(new Set(lights.map((light) => light.style.left)).size).toBe(1, 'same longitudinal position');
+      expect(lights.map((light) => parseFloat(light.style.top)).sort((a, b) => a - b)).toEqual([25, 50, 75]);
+    }
+  });
+
+  it('shows the badge and distance of a road-wide element in the lane the ego drives in', () => {
+    const laneY: Record<string, number> = { LEFT: 25, CENTER: 50, RIGHT: 75 };
+    const elements = [
+      { testId: 'road-traffic-light', object: { id: 'r20-CENTER', type: 'TrafficLight', positionMeters: 90, lane: 'CENTER', details: 'TrafficLight state=RED' } },
+      { testId: 'road-speed-limit', object: { id: 'r20-CENTER', type: 'SpeedLimitSign', positionMeters: 90, lane: 'CENTER', details: 'limitKmh=50' } }
+    ];
+    for (const element of elements) {
+      for (const egoLane of ['LEFT', 'CENTER', 'RIGHT']) {
+        fixture.componentRef.setInput('snapshot', {
+          simulationTimeMillis: 1000,
+          status: 'RUNNING',
+          egoVehicle: { speedKmh: 50, positionMeters: 10, lane: egoLane, accelerationMps2: 0 },
+          sensors: {},
+          worldObjects: [element.object],
+          cameraDetectedObjectIds: ['r20-CENTER'],
+          sensorRanges: { cameraRangeMeters: 120, radarRangeMeters: 130, blindSpotRangeMeters: 30, cameraRateMillis: 200, radarRateMillis: 100 }
+        });
+        fixture.detectChanges();
+
+        const root = fixture.nativeElement as HTMLElement;
+        const main = root.querySelector(`[data-testid="${element.testId}"]`) as HTMLElement;
+        expect(parseFloat(main.style.top)).toBe(laneY[egoLane], `${element.testId} with ego in ${egoLane}`);
+        expect(main.textContent).toContain('DETECTED');
+        expect(main.textContent).toContain('90 m');
+        expect(root.querySelectorAll('.obj__badge').length).toBe(1, 'the badge is shown once');
+
+        const kindClass = main.className.split(' ').find((name) => name.startsWith('obj--') && name !== 'obj--detected' && name !== 'obj--camera');
+        const tops = (Array.from(root.querySelectorAll(`.${kindClass}`)) as HTMLElement[]).map((el) => parseFloat(el.style.top));
+        expect(tops.sort((a, b) => a - b)).toEqual([25, 50, 75]);
+      }
+    }
+  });
+
+  it('draws a stop sign once, in the lane it stands in', () => {
+    const laneY: Record<string, number> = { LEFT: 25, CENTER: 50, RIGHT: 75 };
+    for (const lane of ['LEFT', 'CENTER', 'RIGHT']) {
+      fixture.componentRef.setInput('snapshot', {
+        simulationTimeMillis: 1000,
+        status: 'RUNNING',
+        egoVehicle: { speedKmh: 50, positionMeters: 10, lane: 'RIGHT', accelerationMps2: 0 },
+        sensors: {},
+        worldObjects: [
+          { id: `r20-${lane}`, type: 'StopSign', positionMeters: 90, lane, details: '' }
+        ],
+        sensorRanges: { cameraRangeMeters: 120, radarRangeMeters: 130, blindSpotRangeMeters: 30, cameraRateMillis: 200, radarRateMillis: 100 }
+      });
+      fixture.detectChanges();
+
+      const signs = (fixture.nativeElement as HTMLElement).querySelectorAll('[data-testid="road-stop-sign"]');
+      expect(signs.length).toBe(1, `a stop sign in ${lane} is not repeated in the other lanes`);
+      expect(parseFloat((signs[0] as HTMLElement).style.top)).toBe(laneY[lane]);
+    }
   });
 
   it('should keep all four wheels rigidly inside the ego chassis group with zero independent world translation', () => {
@@ -169,78 +207,6 @@ describe('RoadCanvasComponent', () => {
 
     // Wheels must be inside the SVG container of .ego, sharing the same parent world transform
     expect(egoElement.contains(wheelGroup)).toBeTrue();
-  });
-
-  it('should visibly advance ego screen X toward static speed radar across time and separate radar from FOV', () => {
-    // Initial state at 200m
-    fixture.componentRef.setInput('snapshot', {
-      simulationTimeMillis: 0,
-      status: 'RUNNING',
-      egoVehicle: { speedKmh: 80, positionMeters: 200, lane: 'RIGHT', accelerationMps2: -1.5 },
-      environment: { weatherCondition: 'CLEAR', visibilityFactor: 1, gripFactor: 1 },
-      speedAdvisor: { currentKmh: 80, legalLimitKmh: 50, recommendedKmh: 50, action: 'REDUCE_SPEED' },
-      currentDecision: { action: 'REDUCE_SPEED', recommendedSpeedKmh: 50, riskLevel: 'MODERATE', reason: '', sourceRule: '', timestamp: 0, evidence: [] },
-      sensorReadings: {},
-      sensors: {
-        frontRadar: {
-          rangeMeters: 130, targetId: 'none', distanceMeters: Infinity, relativeSpeedKmh: 0,
-          ttcSeconds: Infinity, status: 'CLEAR', speedRadarDistanceMeters: 130, speedRadarLimitKmh: 50
-        }
-      },
-      worldObjects: [
-        { id: 'radar_1', type: 'SpeedRadar', positionMeters: 130, worldPositionMeters: 330, lane: 'ALL', details: 'SpeedRadar{speedLimitKmh=50, scope=ALL_LANES}' }
-      ],
-      sensorRanges: { cameraRangeMeters: 100, radarRangeMeters: 130, blindSpotRangeMeters: 25, cameraRateMillis: 200, radarRateMillis: 50 }
-    });
-    fixture.detectChanges();
-
-    const speedRadar = fixture.nativeElement.querySelector('[data-testid="speed-radar"]');
-    const radarFov = fixture.nativeElement.querySelector('[data-testid="radar-fov"]');
-    expect(speedRadar).toBeTruthy('Physical speed radar object must exist and be visible');
-    expect(radarFov).toBeTruthy('Radar FOV sensor edge must exist');
-    expect(speedRadar).not.toBe(radarFov, 'Physical radar and radar FOV must be distinct elements');
-
-    const egoT1 = fixture.nativeElement.querySelector('[data-testid="road-ego"]') as HTMLElement;
-    const egoT1Left = parseFloat(egoT1.style.left);
-    const radarT1 = speedRadar as HTMLElement;
-    const radarT1Left = parseFloat(radarT1.style.left);
-    const distT1 = Math.abs(radarT1Left - egoT1Left);
-
-    // Advanced state at 260m
-    fixture.componentRef.setInput('snapshot', {
-      simulationTimeMillis: 3000,
-      status: 'RUNNING',
-      egoVehicle: { speedKmh: 60, positionMeters: 260, lane: 'RIGHT', accelerationMps2: -1.0 },
-      environment: { weatherCondition: 'CLEAR', visibilityFactor: 1, gripFactor: 1 },
-      speedAdvisor: { currentKmh: 60, legalLimitKmh: 50, recommendedKmh: 50, action: 'REDUCE_SPEED' },
-      currentDecision: { action: 'REDUCE_SPEED', recommendedSpeedKmh: 50, riskLevel: 'MODERATE', reason: '', sourceRule: '', timestamp: 3000, evidence: [] },
-      sensorReadings: {},
-      sensors: {
-        frontRadar: {
-          rangeMeters: 130, targetId: 'none', distanceMeters: Infinity, relativeSpeedKmh: 0,
-          ttcSeconds: Infinity, status: 'CLEAR', speedRadarDistanceMeters: 70, speedRadarLimitKmh: 50
-        }
-      },
-      worldObjects: [
-        { id: 'radar_1', type: 'SpeedRadar', positionMeters: 70, worldPositionMeters: 330, lane: 'ALL', details: 'SpeedRadar{speedLimitKmh=50, scope=ALL_LANES}' }
-      ],
-      sensorRanges: { cameraRangeMeters: 100, radarRangeMeters: 130, blindSpotRangeMeters: 25, cameraRateMillis: 200, radarRateMillis: 50 }
-    });
-    fixture.detectChanges();
-
-    const egoT2 = fixture.nativeElement.querySelector('[data-testid="road-ego"]') as HTMLElement;
-    const egoT2Left = parseFloat(egoT2.style.left);
-    const radarT2 = fixture.nativeElement.querySelector('[data-testid="speed-radar"]') as HTMLElement;
-    const radarT2Left = parseFloat(radarT2.style.left);
-    const distT2 = Math.abs(radarT2Left - egoT2Left);
-
-    // Assert visual distance between car and radar visibly decreased
-    expect(distT2).toBeLessThan(distT1, 'Visual distance between ego and speed radar must decrease');
-    // Assert radar approached ego on screen
-    expect(radarT2Left).toBeLessThan(radarT1Left, 'Radar screen position must move toward ego as car approaches');
-    // Assert ego stays in stable tracking region
-    expect(egoT1Left).toBeCloseTo(20, 1);
-    expect(egoT2Left).toBeCloseTo(20, 1);
   });
 
   it('should render clean EGO badge without concatenating state text like EGOCRUISING', () => {

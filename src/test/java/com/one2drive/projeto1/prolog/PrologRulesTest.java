@@ -27,9 +27,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PrologRulesTest {
+    /** Stop sign events measure to the sign; the vehicle stops at the line this far before it. */
+    private static final double STOP_LINE = com.one2drive.projeto1.decision.StoppingPolicy.STOP_SIGN_OFFSET_METERS;
 
     @Test
     @Timeout(10)
@@ -37,9 +40,30 @@ class PrologRulesTest {
         try (PrologTestHarness harness = new PrologTestHarness()) {
             DrivingDecision decision = harness.cycle(1_000, 90.0,
                 new SpeedLimitDetectedEvent(1_000, "camera", 50, 20, "sign-50"));
+            // 20 m before the sign the limit is still pending: the vehicle slows towards it,
+            // and it only becomes the limit in force at the sign.
             assertEquals(DrivingAction.REDUCE_SPEED, decision.getAction());
-            assertEquals(50.0, decision.getRecommendedSpeedKmh(), 0.01);
-            assertEquals("Reduce speed when exceeding detected limit", decision.getSourceRule());
+            assertTrue(decision.getSourceRule().startsWith("Slow down in time for the speed limit ahead"));
+            assertTrue(decision.getRecommendedSpeedKmh() > 50.0 && decision.getRecommendedSpeedKmh() < 60.0,
+                "recommended " + decision.getRecommendedSpeedKmh());
+
+            harness.moveTo(20.0);
+            DrivingDecision atSign = harness.cycle(1_200, 60.0);
+            assertEquals(DrivingAction.REDUCE_SPEED, atSign.getAction());
+            assertEquals(50.0, atSign.getRecommendedSpeedKmh(), 0.01);
+            assertEquals("Reduce speed when exceeding detected limit", atSign.getSourceRule());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void lowerLimitFarAheadDoesNotSlowTheVehicleYet() {
+        try (PrologTestHarness harness = new PrologTestHarness()) {
+            DrivingDecision decision = harness.cycle(1_000, 60.0,
+                new SpeedLimitDetectedEvent(1_000, "camera", 30, 110, "sign-30"));
+            assertEquals(DrivingAction.MAINTAIN_SPEED, decision.getAction());
+            assertEquals(60.0, decision.getRecommendedSpeedKmh(), 0.01);
+            assertEquals("Default maintain speed baseline", decision.getSourceRule());
         }
     }
 
@@ -60,6 +84,11 @@ class PrologRulesTest {
         try (PrologTestHarness harness = new PrologTestHarness()) {
             DrivingDecision decision = harness.cycle(1_000, 60.0,
                 new SpeedLimitDetectedEvent(1_000, "camera", 90, 80, "sign-90"));
+            assertEquals(60.0, decision.getRecommendedSpeedKmh(), 0.01,
+                "a higher limit ahead is not a target before its sign");
+
+            harness.moveTo(80.0);
+            decision = harness.cycle(1_200, 60.0);
             assertEquals(DrivingAction.MAINTAIN_SPEED, decision.getAction());
             assertEquals(90.0, decision.getRecommendedSpeedKmh(), 0.01);
             assertEquals("Maintain speed when compliant with detected limit", decision.getSourceRule());
@@ -71,6 +100,8 @@ class PrologRulesTest {
     void limitPersistsAfterTheSignIsNoLongerSeen() {
         try (PrologTestHarness harness = new PrologTestHarness()) {
             harness.cycle(1_000, 70.0, new SpeedLimitDetectedEvent(1_000, "camera", 50, 20, "sign-50"));
+            harness.moveTo(20.0);
+            harness.cycle(1_200, 70.0);
             DrivingDecision decision = harness.cycle(5_000, 70.0);
             assertEquals(DrivingAction.REDUCE_SPEED, decision.getAction());
             assertEquals(50.0, decision.getRecommendedSpeedKmh(), 0.01);
@@ -255,18 +286,18 @@ class PrologRulesTest {
         try (PrologTestHarness harness = new PrologTestHarness()) {
             // 35 m is the closest point at which comfortable braking (2.8 m/s2) can still
             // stop from 50 km/h, so the approach must be a plain reduction.
-            DrivingDecision approach = harness.cycle(1_000, 50.0, new StopSignEvent(1_000, "camera", 35, "stop-1"));
+            DrivingDecision approach = harness.cycle(1_000, 50.0, new StopSignEvent(1_000, "camera", STOP_LINE + 35, "stop-1"));
             assertEquals(DrivingAction.REDUCE_SPEED, approach.getAction());
 
-            DrivingDecision near = harness.cycle(2_000, 4.0, new StopSignEvent(2_000, "camera", 3.0, "stop-1"));
+            DrivingDecision near = harness.cycle(2_000, 4.0, new StopSignEvent(2_000, "camera", STOP_LINE + 3.0, "stop-1"));
             assertEquals(DrivingAction.STOP, near.getAction());
 
-            harness.cycle(2_200, 0.0, new StopSignEvent(2_200, "camera", 2.5, "stop-1"));
+            harness.cycle(2_200, 0.0, new StopSignEvent(2_200, "camera", STOP_LINE + 2.5, "stop-1"));
             assertTrue(factPresent(harness, "stop_hold_started(stop-1,2200)"), "the stop timer starts at rest");
-            DrivingDecision stillHeld = harness.cycle(3_000, 0.0, new StopSignEvent(3_000, "camera", 2.5, "stop-1"));
+            DrivingDecision stillHeld = harness.cycle(3_000, 0.0, new StopSignEvent(3_000, "camera", STOP_LINE + 2.5, "stop-1"));
             assertEquals(DrivingAction.STOP, stillHeld.getAction(), "1.2 s at rest are required");
 
-            DrivingDecision proceed = harness.cycle(3_600, 0.0, new StopSignEvent(3_600, "camera", 1.0, "stop-1"));
+            DrivingDecision proceed = harness.cycle(3_600, 0.0, new StopSignEvent(3_600, "camera", STOP_LINE + 1.0, "stop-1"));
             assertEquals(DrivingAction.CONTINUE, proceed.getAction());
             assertEquals("Proceed after stop sign condition satisfied", proceed.getSourceRule());
             assertEquals(25.0, proceed.getRecommendedSpeedKmh(), 0.01);
@@ -277,7 +308,7 @@ class PrologRulesTest {
     @Timeout(10)
     void stopSignTooCloseForComfortableBrakingTriggersEmergencyBrake() {
         try (PrologTestHarness harness = new PrologTestHarness()) {
-            DrivingDecision approach = harness.cycle(1_000, 50.0, new StopSignEvent(1_000, "camera", 25, "stop-1"));
+            DrivingDecision approach = harness.cycle(1_000, 50.0, new StopSignEvent(1_000, "camera", STOP_LINE + 25, "stop-1"));
             assertEquals(DrivingAction.EMERGENCY_BRAKE, approach.getAction());
         }
     }
@@ -288,13 +319,13 @@ class PrologRulesTest {
         // At 40 km/h and 22 m comfortable braking ends 2 m past the margin: a reduction for a
         // vehicle arriving here, but a vehicle already braking hard for the sign keeps doing so.
         try (PrologTestHarness fresh = new PrologTestHarness()) {
-            DrivingDecision decision = fresh.cycle(1_000, 40.0, new StopSignEvent(1_000, "camera", 22, "stop-1"));
+            DrivingDecision decision = fresh.cycle(1_000, 40.0, new StopSignEvent(1_000, "camera", STOP_LINE + 22, "stop-1"));
             assertEquals(DrivingAction.REDUCE_SPEED, decision.getAction());
         }
         try (PrologTestHarness braking = new PrologTestHarness()) {
             assertEquals(DrivingAction.EMERGENCY_BRAKE,
-                braking.cycle(1_000, 50.0, new StopSignEvent(1_000, "camera", 25, "stop-1")).getAction());
-            DrivingDecision decision = braking.cycle(1_100, 40.0, new StopSignEvent(1_100, "camera", 22, "stop-1"));
+                braking.cycle(1_000, 50.0, new StopSignEvent(1_000, "camera", STOP_LINE + 25, "stop-1")).getAction());
+            DrivingDecision decision = braking.cycle(1_100, 40.0, new StopSignEvent(1_100, "camera", STOP_LINE + 22, "stop-1"));
             assertEquals(DrivingAction.EMERGENCY_BRAKE, decision.getAction());
         }
     }
@@ -303,7 +334,7 @@ class PrologRulesTest {
     @Timeout(10)
     void stopSignIsForgottenOnceNoLongerSeen() {
         try (PrologTestHarness harness = new PrologTestHarness()) {
-            harness.cycle(1_000, 50.0, new StopSignEvent(1_000, "camera", 35, "stop-1"));
+            harness.cycle(1_000, 50.0, new StopSignEvent(1_000, "camera", STOP_LINE + 35, "stop-1"));
             DrivingDecision decision = harness.cycle(2_600, 50.0);
             assertEquals("Default maintain speed baseline", decision.getSourceRule());
         }
@@ -458,13 +489,12 @@ class PrologRulesTest {
         return decision;
     }
 
-    /** A cycle with the radar facts Java reads from the world, as PrologBackend sends them. */
-    private static PrologCycleResult radarCycle(PrologTestHarness harness, DecisionContext context, long timestamp,
-                                                double speedKmh, PrologKnowledgeSession.RadarInput radar,
-                                                Object... events) {
+    /** A cycle with the vehicle at {@code positionMeters} along the road. */
+    private static PrologCycleResult cycleAt(PrologTestHarness harness, DecisionContext context, long timestamp,
+                                             double speedKmh, double positionMeters, Object... events) {
         context.beginCycle(timestamp, speedKmh);
         return harness.session().cycle(context,
-            PrologKnowledgeSession.VehicleInput.keepingLane(timestamp, speedKmh, Lane.CENTER), radar,
+            PrologKnowledgeSession.VehicleInput.keepingLane(timestamp, speedKmh, Lane.CENTER).at(positionMeters),
             java.util.List.of(events), null);
     }
 
@@ -474,76 +504,53 @@ class PrologRulesTest {
         return decision;
     }
 
-    private static PrologKnowledgeSession.RadarInput radarAhead(String id, double distance, double limit) {
-        return new PrologKnowledgeSession.RadarInput(id, distance, limit, null);
+    private static SpeedLimitDetectedEvent limitSign(long timestamp, int limitKmh, double distanceMeters) {
+        return new SpeedLimitDetectedEvent(timestamp, "camera", limitKmh, distanceMeters, "limit-1");
     }
 
     @Test
     @Timeout(10)
-    void speedRadarAheadBringsTheVehicleDownToItsLimit() {
+    void speedLimitAheadIsPendingUntilTheVehicleReachesTheSign() {
         try (PrologTestHarness harness = new PrologTestHarness()) {
             DecisionContext context = new DecisionContext();
-            PrologCycleResult result = radarCycle(harness, context, 1_000, 90.0, radarAhead("radar-1", 200.0, 70.0));
+            PrologCycleResult result = cycleAt(harness, context, 1_000, 50.0, 100.0, limitSign(1_000, 30, 100.0));
+            assertEquals(120.0, result.speedLimitKmh(), 0.01, "a sign ahead is not in force yet");
+            result = cycleAt(harness, context, 1_100, 30.0, 200.0, limitSign(1_100, 30, 0.0));
+            assertEquals(30.0, result.speedLimitKmh(), 0.01, "the limit applies from the sign on");
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void vehicleSlowsDownInTimeForALowerLimitAhead() {
+        try (PrologTestHarness harness = new PrologTestHarness()) {
+            DecisionContext context = new DecisionContext();
+            // Far from the sign the approach speed is above the current speed: nothing slows yet.
+            cycleAt(harness, context, 1_000, 90.0, 0.0, limitSign(1_000, 50, 150.0));
+            assertTrue(decisionOf(context).getSourceRule() == null
+                    || !decisionOf(context).getSourceRule().startsWith("Slow down in time for the speed limit ahead"),
+                "150 m from a 50 km/h sign, 90 km/h is still below the approach speed");
+            // 40 m from the sign: sqrt((50/3.6)^2 + 2*2*(40-8)) * 3.6 = 78.9 km/h.
+            cycleAt(harness, context, 1_100, 90.0, 110.0, limitSign(1_100, 50, 40.0));
             DrivingDecision decision = decisionOf(context);
             assertEquals(DrivingAction.REDUCE_SPEED, decision.getAction());
-            assertEquals(70.0, decision.getRecommendedSpeedKmh(), 0.01);
-            assertEquals("Decelerate approaching speed radar to comply with legal limit", decision.getSourceRule());
-            assertEquals("Radar detects speed-control zone ahead; configured limit 70 km/h", decision.getReason());
-            assertTrue(result.radar().active(), "the radar is detected and not yet passed: " + result.radar());
+            assertEquals(com.one2drive.projeto1.decision.StoppingPolicy.approachSpeedKmh(50, 40.0),
+                decision.getRecommendedSpeedKmh(), 0.01);
+            assertTrue(decision.getSourceRule().startsWith("Slow down in time for the speed limit ahead"));
+            assertEquals("Speed limit 50 km/h ahead; slowing to reach it at the sign", decision.getReason());
         }
     }
 
     @Test
     @Timeout(10)
-    void compliantVehicleHoldsAtOrBelowTheRadarLimit() {
+    void pendingLimitIsDroppedOneSecondAfterTheCameraLastSawIt() {
         try (PrologTestHarness harness = new PrologTestHarness()) {
             DecisionContext context = new DecisionContext();
-            radarCycle(harness, context, 1_000, 60.0, radarAhead("radar-1", 200.0, 70.0));
-            DrivingDecision decision = decisionOf(context);
-            assertEquals(DrivingAction.MAINTAIN_SPEED, decision.getAction());
-            assertEquals(70.0, decision.getRecommendedSpeedKmh(), 0.01);
-            assertEquals("Maintain speed at or below the configured radar limit while approaching", decision.getSourceRule());
-        }
-    }
-
-    @Test
-    @Timeout(10)
-    void passedRadarNoLongerConstrainsTheVehicleEvenForALaterRadar() {
-        try (PrologTestHarness harness = new PrologTestHarness()) {
-            DecisionContext context = new DecisionContext();
-            radarCycle(harness, context, 1_000, 90.0, radarAhead("radar-1", 20.0, 70.0));
-            PrologCycleResult result = radarCycle(harness, context, 1_100, 70.0,
-                new PrologKnowledgeSession.RadarInput(null, 0.0, 0.0, "radar-1"));
-            assertTrue(result.radar().passed(), "the radar is recorded as passed: " + result.radar());
-            assertEquals("Default maintain speed baseline", decisionOf(context).getSourceRule());
-            // As in Drools, a passed radar fact is not updated again in this session.
-            radarCycle(harness, context, 1_200, 90.0, radarAhead("radar-2", 200.0, 50.0));
-            assertEquals("Default maintain speed baseline", decisionOf(context).getSourceRule());
-        }
-    }
-
-    @Test
-    @Timeout(10)
-    void radarIsForgottenOneSecondAfterItWasLastSeen() {
-        try (PrologTestHarness harness = new PrologTestHarness()) {
-            DecisionContext context = new DecisionContext();
-            radarCycle(harness, context, 1_000, 90.0, radarAhead("radar-1", 200.0, 70.0));
-            PrologCycleResult result = radarCycle(harness, context, 2_100, 90.0, PrologKnowledgeSession.RadarInput.NONE);
-            assertEquals("none", result.radar().radarId());
-            assertEquals("Default maintain speed baseline", decisionOf(context).getSourceRule());
-        }
-    }
-
-    @Test
-    @Timeout(10)
-    void radarSensorReadingUpdatesTheDetectedRadar() {
-        try (PrologTestHarness harness = new PrologTestHarness()) {
-            DecisionContext context = new DecisionContext();
-            radarCycle(harness, context, 1_000, 90.0, radarAhead("radar-1", 200.0, 70.0));
-            PrologCycleResult result = radarCycle(harness, context, 1_100, 90.0, PrologKnowledgeSession.RadarInput.NONE,
-                new com.one2drive.projeto1.drools.events.SpeedRadarEvent(1_100, "radar-1", 197.5, 70.0));
-            assertEquals(197.5, result.radar().distanceMeters(), 0.01);
-            assertEquals(DrivingAction.REDUCE_SPEED, decisionOf(context).getAction());
+            cycleAt(harness, context, 1_000, 90.0, 0.0, limitSign(1_000, 50, 40.0));
+            assertTrue(decisionOf(context).getSourceRule().startsWith("Slow down in time for the speed limit ahead"));
+            PrologCycleResult result = cycleAt(harness, context, 2_100, 90.0, 10.0);
+            assertEquals(120.0, result.speedLimitKmh(), 0.01, "a sign no longer seen never takes effect");
+            assertFalse(result.workingMemory().stream().anyMatch(fact -> fact.fact().startsWith("pending_speed_limit(")));
         }
     }
 
@@ -551,7 +558,7 @@ class PrologRulesTest {
     @Timeout(10)
     void closedBarrierIsAvoidedThroughAVerifiedSafeLane() {
         try (PrologTestHarness harness = new PrologTestHarness()) {
-            var vehicle = new PrologKnowledgeSession.VehicleInput(1_000, 40.0, Lane.CENTER, LaneChangeState.IDLE,
+            var vehicle = new PrologKnowledgeSession.VehicleInput(1_000, 40.0, 0.0, Lane.CENTER, LaneChangeState.IDLE,
                 Lane.CENTER, RoadMarkingType.DASHED, RoadMarkingType.DASHED, false, true, false, false);
             DrivingDecision decision = decide(harness, vehicle,
                 new BarrierDetectedEvent(1_000, "camera", 40.0, "barrier-1", false, Lane.CENTER));
@@ -564,7 +571,7 @@ class PrologRulesTest {
     @Timeout(10)
     void continuousLineOnTheLeftStopsBeforeTheObstacle() {
         try (PrologTestHarness harness = new PrologTestHarness()) {
-            var vehicle = new PrologKnowledgeSession.VehicleInput(1_000, 30.0, Lane.RIGHT, LaneChangeState.IDLE,
+            var vehicle = new PrologKnowledgeSession.VehicleInput(1_000, 30.0, 0.0, Lane.RIGHT, LaneChangeState.IDLE,
                 Lane.RIGHT, RoadMarkingType.CONTINUOUS, RoadMarkingType.DASHED, false, false, false, false);
             DrivingDecision decision = decide(harness, vehicle,
                 new ObstacleDetectedEvent(1_000, "camera", 40.0, "obstacle-1", HazardSeverity.MEDIUM, Lane.RIGHT),
@@ -580,7 +587,7 @@ class PrologRulesTest {
     @Timeout(10)
     void ongoingLaneChangeKeepsItsDecision() {
         try (PrologTestHarness harness = new PrologTestHarness()) {
-            var vehicle = new PrologKnowledgeSession.VehicleInput(1_000, 50.0, Lane.CENTER, LaneChangeState.CHANGING,
+            var vehicle = new PrologKnowledgeSession.VehicleInput(1_000, 50.0, 0.0, Lane.CENTER, LaneChangeState.CHANGING,
                 Lane.LEFT, RoadMarkingType.DASHED, RoadMarkingType.DASHED, false, false, false, false);
             DrivingDecision decision = decide(harness, vehicle);
             assertEquals(DrivingAction.CHANGE_LANE_LEFT, decision.getAction());
@@ -662,7 +669,7 @@ class PrologRulesTest {
 
     private static PrologKnowledgeSession.VehicleInput inCenter(long timestamp, boolean rightLaneBlockedAhead,
                                                                 boolean presentationDemo) {
-        return new PrologKnowledgeSession.VehicleInput(timestamp, 60.0, Lane.CENTER, LaneChangeState.IDLE,
+        return new PrologKnowledgeSession.VehicleInput(timestamp, 60.0, 0.0, Lane.CENTER, LaneChangeState.IDLE,
             Lane.CENTER, RoadMarkingType.DASHED, RoadMarkingType.DASHED, false, false,
             rightLaneBlockedAhead, presentationDemo);
     }
@@ -702,7 +709,7 @@ class PrologRulesTest {
     @Timeout(10)
     void whyNotNamesTheConditionThatFailed() {
         try (PrologTestHarness harness = new PrologTestHarness()) {
-            harness.cycle(1_000, 40.0, new SpeedLimitDetectedEvent(1_000, "camera", 50, 20, "sign-50"));
+            harness.cycle(1_000, 40.0, new SpeedLimitDetectedEvent(1_000, "camera", 50, 0, "sign-50"));
             assertEquals(java.util.List.of("test(40.0>50+0.1)"),
                 harness.session().whyNot("Reduce speed when exceeding detected limit"));
         }

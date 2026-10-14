@@ -133,7 +133,7 @@ export class SimulationStateService {
     });
   }
 
-  runPresentationDemo(scenarioId = 'S14_PRESENTATION_DEMO'): void {
+  runPresentationDemo(scenarioId = 'S12_PRESENTATION_DEMO'): void {
     this.api.loadScenario(scenarioId).subscribe({
       next: (response) => response.success ? this.start() : this.patch({ error: response.message }),
       error: (err) => this.patch({ error: this.errorMessage(err, `Unable to run demo scenario ${scenarioId}.`) })

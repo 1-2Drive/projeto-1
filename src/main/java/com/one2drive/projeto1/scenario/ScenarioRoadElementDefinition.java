@@ -80,8 +80,4 @@ public class ScenarioRoadElementDefinition {
         copy.setBarrierOpen(barrierOpen);
         return copy;
     }
-
-    public boolean isAllLaneInfrastructure() {
-        return type == ScenarioRoadElementType.SPEED_RADAR;
-    }
 }

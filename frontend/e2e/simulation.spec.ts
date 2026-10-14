@@ -73,6 +73,69 @@ test.describe('Driving expert simulation UI', () => {
     await expect(page.locator('[data-testid="timeline-panel"]')).toContainText(/50 km\/h|speed limit/i, { timeout: 20000 });
   });
 
+  test('speed limit has no lane selector and is painted on all three lanes', async ({ page }) => {
+    await page.goto('/');
+    await loadScenario(page, 'S1 Empty safe road');
+
+    for (const limit of ['30', '90']) {
+      await page.locator('[data-testid="reset-btn"]').click();
+      await page.locator(`[data-testid="add-speed-${limit}"]`).click();
+      await expect(page.locator('[data-testid="config-panel"]')).toBeVisible();
+      await expect(page.locator('[data-testid="lane-select"]')).toHaveCount(0);
+      await page.locator('[data-testid="drawer-distance-input"]').fill('60');
+      await page.locator('[data-testid="apply-config"]').click();
+
+      await expect(page.locator('[data-testid="road-speed-limit"]')).toHaveCount(1);
+      const marks = page.locator('.limit-mark');
+      await expect(marks).toHaveCount(3);
+      await expect(marks).toHaveText([limit, limit, limit]);
+      const boxes = await marks.evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().x));
+      expect(Math.max(...boxes) - Math.min(...boxes)).toBeLessThan(1);
+    }
+  });
+
+  test('traffic light has no lane selector and is drawn on all three lanes', async ({ page }) => {
+    await page.goto('/');
+    await loadScenario(page, 'S1 Empty safe road');
+
+    await page.locator('[data-testid="add-traffic-light"]').click();
+    await expect(page.locator('[data-testid="config-panel"]')).toBeVisible();
+    await expect(page.locator('[data-testid="lane-select"]')).toHaveCount(0);
+    await page.locator('[data-testid="drawer-distance-input"]').fill('100');
+    await page.locator('[data-testid="light-state-select"]').selectOption('RED');
+    await page.locator('[data-testid="apply-config"]').click();
+
+    await expect(page.locator('[data-testid="road-traffic-light"]')).toHaveCount(1);
+    const lights = page.locator('.obj--trafficLight');
+    await expect(lights).toHaveCount(3);
+    for (let i = 0; i < 3; i++) {
+      await expect(lights.nth(i)).toHaveAttribute('data-state', 'RED');
+    }
+    const xs = await lights.evaluateAll((nodes) => nodes.map((node) => {
+      const box = node.getBoundingClientRect();
+      return box.x + box.width / 2;
+    }));
+    expect(Math.max(...xs) - Math.min(...xs)).toBeLessThan(1);
+  });
+
+  test('stop sign is placed only in the lane chosen in the drawer', async ({ page }) => {
+    await page.goto('/');
+    await loadScenario(page, 'S1 Empty safe road');
+
+    for (const lane of ['LEFT', 'CENTER', 'RIGHT']) {
+      await page.locator('[data-testid="reset-btn"]').click();
+      await page.locator('[data-testid="add-stop-sign"]').click();
+      await expect(page.locator('[data-testid="config-panel"]')).toBeVisible();
+      await page.locator('[data-testid="drawer-distance-input"]').fill('60');
+      await page.locator('[data-testid="lane-select"]').selectOption(lane);
+      await page.locator('[data-testid="apply-config"]').click();
+
+      const sign = page.locator('[data-testid="road-stop-sign"]');
+      await expect(sign).toHaveCount(1);
+      await expect(sign).toHaveAttribute('data-object-id', `r12-${lane}`);
+    }
+  });
+
   test('pedestrian interaction produces a safety decision', async ({ page }) => {
     test.setTimeout(90000);
 
@@ -178,7 +241,7 @@ test.describe('Driving expert simulation UI', () => {
 
     await page.goto('/');
     await page.locator('[data-testid="reset-btn"]').click();
-    await page.locator('button:has-text("S16_SLOW_VEHICLE_OVERTAKE")').click();
+    await page.locator('button:has-text("S14_SLOW_VEHICLE_OVERTAKE")').click();
     await page.locator('[data-testid="start-btn"]').click();
     await expect(page.locator('[data-testid="simulation-status"]')).toContainText('RUNNING');
 
@@ -276,61 +339,6 @@ test.describe('Driving expert simulation UI', () => {
     expect(egoText?.trim()).toBe('EGO');
     expect(egoText).not.toContain('EGOCRUISING');
     expect(egoText).not.toContain('CRUISING');
-  });
-
-  test('speed radar scenario: physical radar object rendered, speed decelerates to legal limit, passes without avoiding or stopping', async ({ page }) => {
-    test.setTimeout(90000);
-
-    await page.goto('/');
-    await page.locator('[data-testid="reset-btn"]').click();
-    await page.locator('button:has-text("S18_SPEED_RADAR_APPROACH")').click();
-
-    // Physical radar object is visible BEFORE starting simulation
-    const speedRadar = page.locator('[data-testid="speed-radar"]');
-    await expect(speedRadar).toBeVisible({ timeout: 15000 });
-
-    // Radar FOV sensor edge is separate
-    const radarFov = page.locator('[data-testid="radar-fov"]');
-    if (await radarFov.count() > 0) {
-      await expect(radarFov).not.toHaveAttribute('data-testid', 'speed-radar');
-    }
-
-    // Capture initial visual bounding box at t1
-    const ego = page.locator('[data-testid="road-ego"]');
-    await expect(ego).toBeVisible();
-
-    const egoBox1 = await ego.boundingBox();
-    const radarBox1 = await speedRadar.boundingBox();
-    expect(egoBox1).not.toBeNull();
-    expect(radarBox1).not.toBeNull();
-    const initialVisualDistance = Math.abs(radarBox1!.x - egoBox1!.x);
-
-    await page.locator('[data-testid="start-btn"]').click();
-    await expect(page.locator('[data-testid="simulation-status"]')).toContainText('RUNNING');
-
-    // Wait simulation time for vehicle to advance visibly
-    await page.waitForTimeout(2500);
-
-    const egoBox2 = await ego.boundingBox();
-    const radarBox2 = await speedRadar.boundingBox();
-    expect(egoBox2).not.toBeNull();
-    expect(radarBox2).not.toBeNull();
-
-    // Assert: radar moves toward ego on screen as car drives forward
-    expect(radarBox2!.x).toBeLessThan(radarBox1!.x);
-    // Assert: pixel distance car <-> radar strictly decreases!
-    const visualDistance2 = Math.abs(radarBox2!.x - egoBox2!.x);
-    expect(visualDistance2).toBeLessThan(initialVisualDistance);
-
-    // Speed decelerates towards legal 50 km/h limit as ego approaches
-    await expect(page.locator('[data-testid="decision-action"]'))
-      .toContainText('REDUCE_SPEED', { timeout: 25000 });
-
-    // Ego stays in right lane (no avoidance lane change triggered)
-    await expect(ego).toHaveAttribute('data-lane', 'RIGHT');
-
-    // Ego vehicle passes radar and continues driving past 330m
-    await expect(page.locator('[data-testid="hud-position"]')).toContainText(/\d{3}\.\d m/, { timeout: 35000 });
   });
 
   test('capture evidence screenshots for viewports, toolbox objects, and clean EGO badge', async ({ page }) => {

@@ -106,6 +106,79 @@ describe('ToolboxComponent', () => {
     expect(compiled.querySelector('[data-testid="config-panel"]')).toBeNull();
   });
 
+  it('offers no lane for a speed limit, which holds for the whole road', async () => {
+    const component = fixture.componentInstance;
+    const emitted: unknown[] = [];
+    component.createRoadElement.subscribe((payload) => emitted.push(payload));
+    const compiled = fixture.nativeElement as HTMLElement;
+
+    (compiled.querySelector('[data-testid="add-speed-30"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(compiled.querySelector('[data-testid="limit-input"]')).toBeTruthy();
+    expect(compiled.querySelector('[data-testid="drawer-distance-input"]')).toBeTruthy();
+    expect(compiled.querySelector('[data-testid="lane-select"]')).toBeNull();
+
+    (compiled.querySelector('[data-testid="apply-config"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(emitted).toEqual([jasmine.objectContaining({ type: 'SPEED_LIMIT', speedLimitKmh: 30, lane: 'CENTER' })]);
+
+    (compiled.querySelector('[data-testid="add-stop-sign"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(compiled.querySelector('[data-testid="lane-select"]')).toBeTruthy();
+  });
+
+  it('offers no lane for a traffic light, which governs the whole road', async () => {
+    const component = fixture.componentInstance;
+    const emitted: unknown[] = [];
+    component.createRoadElement.subscribe((payload) => emitted.push(payload));
+    const compiled = fixture.nativeElement as HTMLElement;
+
+    (compiled.querySelector('[data-testid="add-traffic-light"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(compiled.querySelector('[data-testid="drawer-distance-input"]')).toBeTruthy();
+    expect(compiled.querySelector('[data-testid="light-state-select"]')).toBeTruthy();
+    expect(compiled.querySelector('[data-testid="lane-select"]')).toBeNull();
+
+    (compiled.querySelector('[data-testid="apply-config"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(emitted).toEqual([jasmine.objectContaining({
+      type: 'TRAFFIC_LIGHT', lane: 'CENTER', trafficLightState: 'RED', distanceAheadMeters: 150
+    })]);
+  });
+
+  it('adds a stop sign to the lane chosen in the drawer', async () => {
+    const component = fixture.componentInstance;
+    const emitted: unknown[] = [];
+    component.createRoadElement.subscribe((payload) => emitted.push(payload));
+    const compiled = fixture.nativeElement as HTMLElement;
+
+    for (const lane of ['LEFT', 'CENTER', 'RIGHT']) {
+      (compiled.querySelector('[data-testid="add-stop-sign"]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const select = compiled.querySelector('[data-testid="lane-select"]') as HTMLSelectElement;
+      expect(Array.from(select.options).map((option) => option.value)).toEqual(['LEFT', 'CENTER', 'RIGHT']);
+      select.value = lane;
+      select.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      (compiled.querySelector('[data-testid="apply-config"]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+    }
+
+    expect(emitted).toEqual(['LEFT', 'CENTER', 'RIGHT'].map((lane) =>
+      jasmine.objectContaining({ type: 'STOP_SIGN', lane, distanceAheadMeters: 150 })));
+  });
+
   it('blocks confirmation when the distance is out of range', async () => {
     const component = fixture.componentInstance;
     const emitted: unknown[] = [];

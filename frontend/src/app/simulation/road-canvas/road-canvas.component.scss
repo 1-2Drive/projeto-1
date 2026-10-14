@@ -40,32 +40,6 @@
   }
 }
 
-.speed-control-zone {
-  position: absolute;
-  top: 11.5%;
-  bottom: 11.5%;
-  width: clamp(3.4rem, 4vw, 5rem);
-  transform: translateX(-50%);
-  z-index: 4;
-  pointer-events: none;
-  border-left: 1px dashed rgba(104, 224, 250, 0.9);
-  border-right: 1px dashed rgba(104, 224, 250, 0.9);
-  background: linear-gradient(90deg, rgba(54, 179, 215, 0.12), rgba(54, 179, 215, 0.04));
-}
-
-.speed-control-zone span {
-  position: absolute;
-  top: 12%;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 0.18rem 0.3rem;
-  border-radius: 0.2rem;
-  color: #c7f4ff;
-  background: rgba(8, 29, 39, 0.9);
-  font: 600 0.52rem var(--ds-font-mono);
-  white-space: nowrap;
-}
-
 /* ===================== rain ===================== */
 /* Rain reads from the asphalt: darker, bluish, with soft reflections, and sparse
    drops that fall under the sensors and the objects. Nothing is drawn over the HUD. */
@@ -195,7 +169,6 @@
   z-index: 0;
 }
 
-.speed-control-zone,
 .sensor-edge,
 .scale,
 .lanes,
@@ -553,6 +526,22 @@
   width: 2.5rem;
 }
 
+/* A speed limit is painted on the asphalt of every lane, under vehicles and pedestrians. */
+.obj--speedLimit {
+  z-index: 3;
+}
+
+/* Out of the flow, so the marking of the sign's own lane lines up with the other two. */
+.obj--speedLimit .obj__distance,
+.obj--trafficLight .obj__distance {
+  position: absolute;
+  top: 100%;
+}
+
+.limit-mark {
+  opacity: 0.85;
+}
+
 .obj--trafficLight {
   width: 1.35rem;
 }
@@ -585,20 +574,6 @@
 
 .obj--obstacle {
   width: 1.9rem;
-}
-
-.obj--speedRadar {
-  width: clamp(6rem, 8vw, 8.5rem);
-  z-index: 8;
-}
-
-.obj--speedRadar .obj__distance { color: #c3f4ff; }
-
-.physical-radar {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  width: 100%;
 }
 
 /* detection highlight (not colour-only: badge text too) */
@@ -1029,52 +1004,9 @@
   white-space: nowrap;
 }
 
-.radar-station {
-  width: 100%;
-  height: auto;
-  overflow: visible;
-  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.6));
-}
-
-@keyframes radar-beam-pulse {
-  0%, 100% { opacity: 0.3; }
-  50% { opacity: 0.9; }
-}
-
-.radar-station__beam {
-  position: relative;
-  fill: rgba(80, 198, 242, 0.14);
-  stroke: #61cef4;
-  stroke-width: 1.5;
-  stroke-dasharray: 3 3;
-  animation: radar-beam-pulse 900ms ease-in-out infinite;
-}
-
-.radar-station__post { fill: #687d8e; stroke: #c1d1db; stroke-width: 1; }
-.radar-station__base { fill: #384b5b; stroke: #94a7b5; stroke-width: 1; }
-.radar-station__arm { fill: #6b8090; }
-.radar-station__housing { fill: #152737; stroke: #64cff4; stroke-width: 1.8; }
-.radar-station__lens { fill: #08131d; stroke: #b9eaff; stroke-width: 1.4; }
-.radar-station__lens-core { fill: #48bdea; }
-.radar-station__display { fill: #06212b; stroke: #58d7ef; stroke-width: 0.8; }
-.radar-station__limit { fill: #86ffda; font: 700 8px var(--ds-font-mono); text-anchor: middle; }
-.radar-station__sign { fill: #14283a; stroke: #86cde8; stroke-width: 1.2; }
-.radar-station__word { fill: #e8f7ff; font: 700 6px var(--ds-font-mono); text-anchor: middle; letter-spacing: 0.5px; }
-.radar-station__unit { fill: #9bd7ee; font: 5px var(--ds-font-mono); text-anchor: middle; }
-
-.hud-item--radar {
-  border-left: 1px solid rgba(56, 189, 248, 0.4);
-  padding-left: 0.5rem;
-}
-
-.text-sky {
-  color: #38bdf8 !important;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .ego--indicator-left .car__indicator--left rect,
   .ego--indicator-right .car__indicator--right rect {
     animation: none;
   }
-  .radar-station__beam { animation: none; }
 }

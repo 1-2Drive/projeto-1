@@ -33,7 +33,6 @@ public class EventRouter {
             kieSession.getEntryPoint(DroolsEntryPoints.VEHICLE_STREAM).insert(event);
         } else if (event instanceof FrontDistanceEvent || event instanceof RelativeSpeedEvent || event instanceof TTCEvent
             || event instanceof PedestrianDetectedEvent || event instanceof LaneOccupancyEvent
-            || event instanceof com.one2drive.projeto1.drools.events.SpeedRadarEvent
             || event instanceof com.one2drive.projeto1.drools.events.LeftLaneVehicleEvent) {
             kieSession.getEntryPoint(DroolsEntryPoints.PERCEPTION_STREAM).insert(event);
         } else if (event instanceof SpeedLimitDetectedEvent || event instanceof StopSignEvent

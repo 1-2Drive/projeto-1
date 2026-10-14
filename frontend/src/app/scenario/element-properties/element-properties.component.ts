@@ -9,7 +9,6 @@ export type ToolboxAction =
   | 'POTHOLE'
   | 'STATIC_OBSTACLE'
   | 'BARRIER'
-  | 'SPEED_RADAR'
   | 'FRONT_VEHICLE'
   | 'PEDESTRIAN';
 
@@ -26,8 +25,8 @@ interface ActionDefinition {
 
 const ACTIONS: Record<ToolboxAction, ActionDefinition> = {
   SPEED_LIMIT: {
-    title: 'Add speed limit', hint: 'Camera detects the sign only inside its range.',
-    needsLane: true, needsSeverity: false, needsSpeedLimit: true,
+    title: 'Add speed limit', hint: 'Applies to all three lanes. Camera detects it only inside its range.',
+    needsLane: false, needsSeverity: false, needsSpeedLimit: true,
     needsLightState: false, needsBarrierState: false, needsActorSpeed: false
   },
   STOP_SIGN: {
@@ -36,8 +35,8 @@ const ACTIONS: Record<ToolboxAction, ActionDefinition> = {
     needsLightState: false, needsBarrierState: false, needsActorSpeed: false
   },
   TRAFFIC_LIGHT: {
-    title: 'Add traffic light', hint: 'Red requires a stop, yellow decelerates, green allows progress.',
-    needsLane: true, needsSeverity: false, needsSpeedLimit: false,
+    title: 'Add traffic light', hint: 'Applies to all three lanes. Red requires a stop, yellow decelerates, green allows progress.',
+    needsLane: false, needsSeverity: false, needsSpeedLimit: false,
     needsLightState: true, needsBarrierState: false, needsActorSpeed: false
   },
   POTHOLE: {
@@ -54,11 +53,6 @@ const ACTIONS: Record<ToolboxAction, ActionDefinition> = {
     title: 'Add barrier', hint: 'A closed barrier produces a mandatory stop decision.',
     needsLane: true, needsSeverity: false, needsSpeedLimit: false,
     needsLightState: false, needsBarrierState: true, needsActorSpeed: false
-  },
-  SPEED_RADAR: {
-    title: 'Add speed radar', hint: 'Roadside enforcement device; its configured limit governs all three lanes at this road position.',
-    needsLane: false, needsSeverity: false, needsSpeedLimit: true,
-    needsLightState: false, needsBarrierState: false, needsActorSpeed: false
   },
   FRONT_VEHICLE: {
     title: 'Add vehicle', hint: 'Radar measures distance, relative speed and time-to-collision.',
@@ -171,22 +165,22 @@ export class ElementPropertiesComponent {
 
     switch (action) {
       case 'SPEED_LIMIT':
+        // One sign in the map, valid for the whole road: the road view repeats it in every lane.
         this.createRoadElement.emit({
           type: 'SPEED_LIMIT',
-          lane: this.lane(),
+          lane: 'CENTER',
           distanceAheadMeters: this.distanceAheadMeters(),
           speedLimitKmh: this.speedLimitKmh()
         });
-        break;
-      case 'SPEED_RADAR':
-        this.createRoadElement.emit({ type: 'SPEED_RADAR', lane: 'ALL', distanceAheadMeters: this.distanceAheadMeters(), speedLimitKmh: this.speedLimitKmh() });
         break;
       case 'STOP_SIGN':
         this.createRoadElement.emit(this.simpleElement('STOP_SIGN'));
         break;
       case 'TRAFFIC_LIGHT':
+        // One light in the map, valid for the whole road: the road view repeats it in every lane.
         this.createRoadElement.emit({
           ...this.simpleElement('TRAFFIC_LIGHT'),
+          lane: 'CENTER',
           trafficLightState: this.trafficLightState()
         });
         break;

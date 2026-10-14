@@ -2,16 +2,16 @@
 %
 % A memória de trabalho do motor é refeita em cada ciclo de 100 ms. O que tem de sobreviver
 % de um ciclo para o seguinte fica aqui: a última leitura de cada sensor, o limite de
-% velocidade em vigor, as amostras recentes de TTC e o compromisso assumido perante um
+% velocidade em vigor e o sinal de limite lido à frente, as amostras recentes de TTC e o compromisso assumido perante um
 % semáforo. Cada evento dos sensores atualiza este estado; depois, load_cycle_facts/0
 % transforma-o nos factos iniciais do ciclo, e store_conclusions/0 guarda o que as regras
 % concluíram e tem de persistir.
 
 :- dynamic ego_state/3, lane_change/1, markings/2, target_lane_state/1, safe_lanes/2,
-           road_flags/2, lane_request/3, accel_request/2, radar/6,
+           road_flags/2, lane_request/3, accel_request/2, ego_position/1,
            weather_state/4, visibility_reading/2, grip_reading/2,
            obstacle_track/5, obstacle_reading/5, pothole_track/5, barrier_track/5,
-           limit_state/3, light_track/5, pedestrian_track/5, ttc_reading/3, stop_track/5,
+           limit_state/3, pending_limit/4, light_track/5, pedestrian_track/5, ttc_reading/3, stop_track/5,
            front_track/4, front_distance_reading/3, occupancy/3, left_vehicle_track/4,
            overtaking_state/5, last_decision/2, last_priority/1, move_off/2, cruise/1,
            param/2, priority_value/2.
@@ -31,17 +31,18 @@ left_vehicle_validity_ms(250).
 hazard_validity_ms(1000).
 % Window of the emergency brake for an obstacle (window:time(300ms) in Drools).
 obstacle_window_ms(300).
-radar_validity_ms(1000).
+% A pending speed limit sign the camera stops reporting while still ahead is dropped.
+pending_limit_validity_ms(1000).
 % A driver request lasts 1.5 s.
 request_validity_ms(1500).
 % Window of the reduced visibility and grip readings (window:time(500ms) in Drools).
 weather_window_ms(500).
 
 state_predicates([ego_state/3, lane_change/1, markings/2, target_lane_state/1, safe_lanes/2,
-                  road_flags/2, lane_request/3, accel_request/2, radar/6,
+                  road_flags/2, lane_request/3, accel_request/2, ego_position/1,
                   weather_state/4, visibility_reading/2, grip_reading/2,
                   obstacle_track/5, obstacle_reading/5, pothole_track/5, barrier_track/5,
-                  limit_state/3, light_track/5, pedestrian_track/5, ttc_reading/3, stop_track/5,
+                  limit_state/3, pending_limit/4, light_track/5, pedestrian_track/5, ttc_reading/3, stop_track/5,
                   front_track/4, front_distance_reading/3, occupancy/3, left_vehicle_track/4,
                   overtaking_state/5, last_decision/2, last_priority/1, move_off/2, cruise/1,
                   param/2, priority_value/2]).
@@ -65,8 +66,7 @@ reset_state(Cruise, Params, Priorities) :-
     % Driver requests: lane_request(Active, Direction, Ms), accel_request(TargetKmh, Ms).
     assertz(lane_request(false, left, -1)),
     assertz(accel_request(0.0, 0)),
-    % radar(Id, DistanceM, LimitKmh, Ms, Detected, Passed), like the SpeedRadarFact.
-    assertz(radar(none, inf, 50.0, 0, false, false)),
+    assertz(ego_position(0.0)),
     % weather_state(Condition, Visibility, Grip, Ms): clear-weather seed, as in Drools.
     assertz(weather_state(clear, 1.0, 1.0, 0)),
     % The adjacent lanes start occupied: the vehicle never moves into a lane only because it
@@ -76,6 +76,8 @@ reset_state(Cruise, Params, Priorities) :-
     % overtaking_state(Active, OriginLane, TargetPassed, StartMs, Target)
     assertz(overtaking_state(false, right, false, 0, none)),
     assertz(limit_state(120, default, 0)),
+    % pending_limit(SignId, LimitKmh, SignPositionM, Ms): Drools' PendingSpeedLimit.
+    assertz(pending_limit(none, 0, inf, -1)),
     assertz(last_decision(continue, 'Default continue decision')),
     assertz(last_priority(0)),
     % move_off(Active, Ms): Drools' MoveOffState.
@@ -87,16 +89,16 @@ reset_state(Cruise, Params, Priorities) :-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Ciclo: estado do veículo, eventos e esquecimento do que deixou de ser visto
 
-% vehicle_input(Now, SpeedKmh, Lane, LaneChange, Left-Right markings, TargetLane,
+% vehicle_input(Now, SpeedKmh, PositionM, Lane, LaneChange, Left-Right markings, TargetLane,
 %               SafeLeft-SafeRight, RightBlocked-Demo)
 % The previous decision, already arbitrated by Java: Drools also sees it, as the
 % DrivingDecision fact, and the STOP rule uses it to keep hard braking already under way.
-update_state(vehicle_input(Now, Speed, Lane, LaneChange, Markings, Target, Safe, Flags),
-             Radar, Events, previous(Action, Rule, Priority)) :-
+update_state(vehicle_input(Now, Speed, Position, Lane, LaneChange, Markings, Target, Safe, Flags),
+             Events, previous(Action, Rule, Priority)) :-
     Flags = RightBlocked-Demo,
     replace(road_flags(_, _), road_flags(RightBlocked, Demo)),
     replace(last_priority(_), last_priority(Priority)),
-    update_radar(Now, Radar),
+    replace(ego_position(_), ego_position(Position)),
     downcase_atom(Target, TargetLower),
     replace(target_lane_state(_), target_lane_state(TargetLower)),
     % The adjacent lanes Java finds the ego may enter (WorldState.isLaneSafe), like
@@ -115,10 +117,26 @@ update_state(vehicle_input(Now, Speed, Lane, LaneChange, Markings, Target, Safe,
     % Only a distance adopts a new front vehicle; relative speed and TTC only update the one
     % already followed. Distances go first so the order of events in the cycle does not
     % matter, as in Drools, which re-evaluates after every update.
+    % "Activate the pending speed limit at its sign" runs before the new readings, so a sign
+    % just passed takes effect before the camera's reading of the next one replaces it.
+    activate_pending_limit(Now),
     partition(distance_event, Events, Distances, Others),
     maplist(record_event, Distances),
     maplist(record_event, Others),
     expire_old_readings(Now).
+
+% "Activate the pending speed limit at its sign": the pending limit becomes the limit in force
+% once the vehicle reaches the sign; the pending sign is forgotten, keeping its reading time
+% so an older reading cannot bring it back.
+activate_pending_limit(Now) :-
+    (   pending_limit(SignId, Limit, SignPosition, Ms),
+        SignId \== none,
+        ego_position(Position),
+        Position >= SignPosition
+    ->  replace(limit_state(_, _, _), limit_state(Limit, SignId, Now)),
+        replace(pending_limit(_, _, _, _), pending_limit(none, 0, inf, Ms))
+    ;   true
+    ).
 
 replace(Old, New) :-
     retractall(Old),
@@ -140,14 +158,17 @@ valid_hazard(Id, D) :-
 distance_event(Event) :-
     get_dict(type, Event, 'FrontDistanceEvent').
 
-% "Update current speed limit from latest sign": a lower limit applies at once, a higher one
-% only when the sign is less than 12 m away.
+% "Track the speed limit sign ahead as pending": a limit only starts at its sign, so a sign
+% read ahead is kept with its position on the road until the vehicle gets there.
 on_event('SpeedLimitDetectedEvent', E) :-
-    limit_state(Current, _, Since),
+    pending_limit(_, _, _, Since),
     (   number(E.distanceMeters),
-        E.timestamp >= Since,
-        ( E.limitKmh =< Current ; E.distanceMeters < 12 )
-    ->  replace(limit_state(_, _, _), limit_state(E.limitKmh, E.signId, E.timestamp))
+        E.timestamp > Since
+    ->  ego_position(Position),
+        SignPosition is Position + E.distanceMeters,
+        replace(pending_limit(_, _, _, _), pending_limit(E.signId, E.limitKmh, SignPosition, E.timestamp)),
+        ego_state(_, _, Now),
+        activate_pending_limit(Now)
     ;   true
     ).
 
@@ -181,12 +202,16 @@ on_event('StopSignEvent', E) :-
     ->  E.timestamp >= Since
     ;   Start0 = -1, Done0 = false
     ),
-    (   E.distanceMeters > 8
+    % The camera measures to the sign; the state keeps the distance to the stop line, which
+    % lies StoppingPolicy.STOP_SIGN_OFFSET_METERS before it.
+    param(stopSignOffsetMeters, Offset),
+    ToStopLine is E.distanceMeters - Offset,
+    (   ToStopLine > 8
     ->  Start = -1, Done = false
     ;   Start = Start0, Done = Done0
     ),
     replace(stop_track(_, _, _, _, _),
-            stop_track(E.signId, E.distanceMeters, E.timestamp, Start, Done)).
+            stop_track(E.signId, ToStopLine, E.timestamp, Start, Done)).
 
 % "Update obstacle/pothole/barrier state": one reading per hazard type; a reading with no
 % hazard (none, distance not positive or infinite) clears it. Each obstacle reading also
@@ -217,20 +242,6 @@ on_event('BarrierDetectedEvent', E) :-
         assertz(barrier_track(E.barrierId, E.distanceMeters, E.open, Lane, E.timestamp))
     ;   true
     ).
-
-% "Update speed radar perception": only while the radar has not been passed, and only when
-% the reading brings something new. A reading with no radar clears it, keeping "detected".
-on_event('SpeedRadarEvent', E) :-
-    radar(Id0, D0, L0, Since, Detected, false),
-    E.timestamp >= Since,
-    (   E.timestamp > Since ; E.radarId \== Id0 ; abs(D0 - E.distanceMeters) > 0.01 ),
-    !,
-    (   valid_hazard(E.radarId, E.distanceMeters)
-    ->  Id = E.radarId, D = E.distanceMeters, L = E.speedLimitKmh
-    ;   Id = none, D = inf, L = L0
-    ),
-    replace(radar(_, _, _, _, _, _), radar(Id, D, L, E.timestamp, Detected, false)).
-on_event('SpeedRadarEvent', _).
 
 % "Update weather state": the environment sensor's latest reading; it does not expire.
 on_event('WeatherEvent', E) :-
@@ -328,7 +339,7 @@ expire_old_readings(Now) :-
     left_vehicle_validity_ms(LeftValidity),
     expire_track(left_vehicle_track(_, _, _, T6), T6, LeftValidity, Now),
     expire_lane_request(Now),
-    expire_radar(Now),
+    expire_pending_limit(Now),
     weather_window_ms(WeatherWindow),
     expire_window(visibility_reading(T7, _), T7, WeatherWindow, Now),
     expire_window(grip_reading(T8, _), T8, WeatherWindow, Now),
@@ -349,26 +360,13 @@ expire_lane_request(Now) :-
     ;   true
     ).
 
-expire_radar(Now) :-
-    radar_validity_ms(Validity),
-    (   radar(Id, _, L, Since, Detected, false), Id \== none, Now - Since > Validity
-    ->  replace(radar(_, _, _, _, _, _), radar(none, inf, L, Now, Detected, false))
-    ;   true
-    ).
-
-% What Java does to the SpeedRadarFact for Drools (DroolsBackend), received with the cycle:
-%   Passed   the ego passed radar Passed after the previous cycle's actuation, or none;
-%   Ahead    the nearest radar within 250 m in the world, or none.
-% A passed radar never changes again in this session, as in Drools.
-update_radar(Now, Passed-Ahead) :-
-    (   Passed \== none, radar(Passed, _, L, _, Detected, false)
-    ->  replace(radar(_, _, _, _, _, _), radar(Passed, 0.0, L, Now, Detected, true))
-    ;   true
-    ),
-    (   Ahead = radar_ahead(Id, D, Limit),
-        radar(Id0, D0, L0, _, Detected0, false),
-        (   Id \== Id0 ; abs(D - D0) > 0.01 ; abs(Limit - L0) > 0.01 ; Detected0 == false )
-    ->  replace(radar(_, _, _, _, _, _), radar(Id, D, Limit, Now, true, false))
+% "Drop a pending speed limit the camera no longer sees": the camera reports a sign on every
+% reading until the vehicle is past it, so a sign no longer reported while still ahead is
+% gone or out of sight (rain shortens the camera range).
+expire_pending_limit(Now) :-
+    pending_limit_validity_ms(Validity),
+    (   pending_limit(SignId, _, _, Since), SignId \== none, Now - Since > Validity
+    ->  replace(pending_limit(_, _, _, _), pending_limit(none, 0, inf, Since))
     ;   true
     ).
 
@@ -408,9 +406,10 @@ load_cycle_facts :-
     add_fact(time_ms(Now)),
     add_fact(ego_speed(Speed)),
     add_fact(ego_lane(Lane)),
+    ego_position(Position),
+    add_fact(ego_position(Position)),
     load_vehicle,
     load_hazards(Now),
-    load_radar,
     load_driver_requests(Now),
     load_weather(Now),
     load_road,
@@ -443,12 +442,6 @@ load_hazards(Now) :-
     forall(barrier_track(Id, D, Open, Lane, _),
            add_fact(barrier(Id, D, Open, Lane))).
 
-load_radar :-
-    (   radar(Id, D, Limit, _, true, false), Id \== none
-    ->  add_fact(speed_radar(Id, D, Limit))
-    ;   true
-    ).
-
 load_driver_requests(Now) :-
     (   lane_request(true, Direction, _) -> add_fact(lane_change_request(Direction)) ; true ),
     accel_request(Target, Since),
@@ -480,6 +473,10 @@ load_speed_limit :-
     (   Source == default
     ->  add_fact(no_speed_sign)
     ;   add_fact(signed_speed_limit(Limit))
+    ),
+    (   pending_limit(SignId, Next, SignPosition, _), SignId \== none
+    ->  add_fact(pending_speed_limit(Next, SignPosition))
+    ;   true
     ),
     cruise(Cruise),
     add_fact(cruise_speed(Cruise)).

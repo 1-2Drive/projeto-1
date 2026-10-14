@@ -119,7 +119,7 @@ class RoadMapE2ETest {
     @DisplayName("the matrix obstacle course is driven lap after lap without touching an obstacle")
     void obstacleCourseIsDrivenWithoutCollisions(ExpertBackendType backend) {
         ScenarioDefinition course = ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json")
-            .findById("S15_MATRIX_COURSE").orElseThrow();
+            .findById("S13_MATRIX_COURSE").orElseThrow();
 
         try (SimulationEngine engine = BackendTestSupport.engine(course, backend)) {
             engine.start();

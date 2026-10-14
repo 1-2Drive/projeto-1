@@ -180,9 +180,7 @@ public class ApiModelMapper {
                 telemetry.frontRadar().distanceMeters(),
                 telemetry.frontRadar().relativeSpeedKmh(),
                 telemetry.frontRadar().ttcSeconds(),
-                telemetry.frontRadar().status(),
-                telemetry.frontRadar().speedRadarDistanceMeters(),
-                telemetry.frontRadar().speedRadarLimitKmh()
+                telemetry.frontRadar().status()
             ),
             new ApiSimulationSnapshot.CameraTelemetryView(
                 telemetry.frontCamera().rangeMeters(),
@@ -264,7 +262,7 @@ public class ApiModelMapper {
      * empty list keeps the manual workflow free of demo chrome.
      */
     private List<ApiSimulationSnapshot.DemoPhaseView> demoPhases(SimulationEngine engine) {
-        if (!"S14_PRESENTATION_DEMO".equals(engine.getScenarioId())) {
+        if (!"S12_PRESENTATION_DEMO".equals(engine.getScenarioId())) {
             return List.of();
         }
 

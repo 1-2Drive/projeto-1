@@ -4,6 +4,7 @@ import com.one2drive.projeto1.config.SimulationConfig;
 import com.one2drive.projeto1.domain.Lane;
 import com.one2drive.projeto1.domain.WeatherCondition;
 import com.one2drive.projeto1.drools.events.SpeedLimitDetectedEvent;
+import com.one2drive.projeto1.drools.events.StopSignEvent;
 import com.one2drive.projeto1.scenario.ScenarioDefinition;
 import com.one2drive.projeto1.scenario.ScenarioFactory;
 import com.one2drive.projeto1.scenario.ScenarioRoadElementDefinition;
@@ -79,5 +80,32 @@ class CameraSensorTest {
 
         world.getWeatherState().setVisibilityFactor(0.2);
         assertEquals(24.0, camera.effectiveRangeMeters(world), 1e-9, "dense fog at 0.2 leaves 24 m of the 120 m range");
+    }
+
+    @Test
+    void reportsAStopSignOnlyWhileTheVehicleIsInItsLane() {
+        ScenarioDefinition scenario = new ScenarioDefinition();
+        scenario.setId("STOP_LANE");
+        scenario.setInitialLane(Lane.RIGHT);
+        scenario.setInitialWeather(WeatherCondition.CLEAR);
+        ScenarioRoadElementDefinition sign = new ScenarioRoadElementDefinition();
+        sign.setType(ScenarioRoadElementType.STOP_SIGN);
+        sign.setLane(Lane.CENTER);
+        sign.setPositionMeters(60.0);
+        scenario.getRoadElements().add(sign);
+        WorldState world = ScenarioFactory.buildWorld(scenario, SimulationConfig.defaultConfig());
+        CameraSensor camera = new CameraSensor(SimulationConfig.defaultConfig());
+
+        assertFalse(seesStopSign(camera, world), "a stop sign in CENTER is not for a vehicle in RIGHT");
+
+        world.getEgo().setLane(Lane.CENTER);
+        assertTrue(seesStopSign(camera, world), "after moving into CENTER the sign of that lane applies");
+
+        world.getEgo().setLane(Lane.LEFT);
+        assertFalse(seesStopSign(camera, world), "and stops applying once the vehicle has left CENTER");
+    }
+
+    private static boolean seesStopSign(CameraSensor camera, WorldState world) {
+        return camera.observe(world, 0L).stream().anyMatch(e -> e instanceof StopSignEvent);
     }
 }

@@ -16,7 +16,9 @@
 %
 % Factos da perceção, carregados em cada ciclo por driving_state.pl:
 %   time_ms(Ms)  ego_speed(Kmh)  ego_lane(Lane)  target_lane(Lane)  lane_change_state(State)
+%   ego_position(M)   a posição do ego na estrada, em metros percorridos
 %   speed_limit(Kmh)  signed_speed_limit(Kmh) | no_speed_sign  cruise_speed(Kmh)
+%   pending_speed_limit(Kmh, SignPositionM)   sinal lido à frente, ainda não alcançado
 %   traffic_light(Id, red|yellow|green, DistanceM)  light_commitment(Id, stop|proceed)
 %   pedestrian(Id, DistanceM)  crossing_state(Id, waiting|crossing|crossed)  pedestrian_in_path(Id)
 %   ttc_sample(Target, TtcS, AgeMs)
@@ -36,7 +38,6 @@
 %   overtaking(Active, OriginLane, TargetPassed, StartMs, Target)   estado do ciclo anterior
 %   obstacle(Id, DistanceM, Severity, Lane)  obstacle_sample(Id, DistanceM, Severity, Lane, AgeMs)
 %   pothole(Id, DistanceM, Severity, Lane)  barrier(Id, DistanceM, Open, Lane)
-%   speed_radar(Id, DistanceM, LimitKmh)   detetado e ainda não ultrapassado
 %   weather(clear|rain|..., Visibility, Grip)
 %   low_visibility_sample(Visibility, AgeMs)  low_grip_sample(Grip, AgeMs)
 
@@ -995,27 +996,30 @@ rule('Proceed after stop sign condition satisfied',
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Velocidade
 
-% Speed radar within 250 m: the limit configured on the radar applies to every lane. Above
-% it, slow down; within it, stay at the lower of the two limits.
-rule('Decelerate approaching speed radar to comply with legal limit',
-     320,
-     [ speed_radar(_, D, RadarLimit),
-       test((D > 0, D =< 250.0)),
+% A lower limit ahead is not in force yet, but the vehicle has to be down to it at the sign.
+% Far from the sign the approach speed is above any speed and the rule stays out; from
+% there the target follows the approach speed down to the new limit.
+rule('Slow down in time for the speed limit ahead (slow)',
+     310,
+     [ pending_speed_limit(Next, SignPosition),
+       speed_limit(Limit),
        ego_speed(V),
-       test(V > RadarLimit + 0.1),
-       test(radar_reason(RadarLimit, Reason)) ],
-     [ assert(proposal(reduce_speed, RadarLimit, moderate, speed_compliance, Reason)) ]).
+       ego_position(Position),
+       test(limit_ahead_target(Next, SignPosition, Position, V, Limit, Target)),
+       test(V > Target + 0.1),
+       test(limit_ahead_reason(Next, Reason)) ],
+     [ assert(proposal(reduce_speed, Target, moderate, speed_compliance, Reason)) ]).
 
-rule('Maintain speed at or below the configured radar limit while approaching',
-     215,
-     [ speed_radar(_, D, RadarLimit),
-       test((D >= 0, D =< 250.0)),
-       speed_limit(LegalLimit),
+rule('Slow down in time for the speed limit ahead (hold)',
+     310,
+     [ pending_speed_limit(Next, SignPosition),
+       speed_limit(Limit),
        ego_speed(V),
-       test(V =< RadarLimit + 0.1),
-       test(Target is min(RadarLimit, LegalLimit)) ],
-     [ assert(proposal(maintain_speed, Target, low, speed_compliance,
-                       'Radar speed-control zone ahead; maintaining speed at or below the effective limit')) ]).
+       ego_position(Position),
+       test(limit_ahead_target(Next, SignPosition, Position, V, Limit, Target)),
+       test(V =< Target + 0.1),
+       test(limit_ahead_reason(Next, Reason)) ],
+     [ assert(proposal(maintain_speed, Target, low, speed_compliance, Reason)) ]).
 
 % 0.1 km/h deadband, the same as the actuator's: "exceeds" and "complies" are exact
 % complements.
@@ -1291,9 +1295,26 @@ obstacle_curve(Margin, Target) :-
     deceleration(comfort, A),
     Target is sqrt(2.0 * A * Margin) * 3.6.
 
-radar_reason(Limit, Reason) :-
-    Rounded is round(Limit),
-    format(atom(Reason), 'Radar detects speed-control zone ahead; configured limit ~w km/h', [Rounded]).
+% StoppingPolicy.approachSpeedKmh: the fastest the vehicle may still be going D metres
+% before a sign posting Limit, so that slowing gently brings it to the limit a buffer before
+% the sign.
+approach_speed(Limit, D, Speed) :-
+    deceleration(anticipation, A),
+    param(speedLimitApproachBufferMeters, Buffer),
+    LimitMps is max(0.0, Limit) / 3.6,
+    Room is max(0.0, D - Buffer),
+    Speed is sqrt(LimitMps * LimitMps + 2.0 * A * Room) * 3.6.
+
+% The rule applies once the approach speed is within 1 km/h of the current speed; the target
+% is that approach speed, never above the limit in force.
+limit_ahead_target(Next, SignPosition, Position, V, Limit, Target) :-
+    D is SignPosition - Position,
+    approach_speed(Next, D, Approach),
+    Approach =< V + 1.0,
+    Target is min(Limit, Approach).
+
+limit_ahead_reason(Next, Reason) :-
+    format(atom(Reason), 'Speed limit ~w km/h ahead; slowing to reach it at the sign', [Next]).
 
 % STOP: braking curves that end 2 m before the sign.
 above_stop_curve(V, D) :-

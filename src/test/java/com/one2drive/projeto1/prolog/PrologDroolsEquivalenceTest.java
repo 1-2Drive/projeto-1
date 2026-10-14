@@ -208,8 +208,15 @@ class PrologDroolsEquivalenceTest {
         }
     }
 
-    /** One cycle of a multi-cycle comparison: time, speed and the events seen then. */
-    private record Step(long timestampMillis, double speedKmh, Object... events) {
+    /** One cycle of a multi-cycle comparison: time, speed, position on the road and the events seen then. */
+    private record Step(long timestampMillis, double speedKmh, double positionMeters, Object[] events) {
+        Step(long timestampMillis, double speedKmh, Object... events) {
+            this(timestampMillis, speedKmh, 0.0, events);
+        }
+
+        static Step at(double positionMeters, long timestampMillis, double speedKmh, Object... events) {
+            return new Step(timestampMillis, speedKmh, positionMeters, events);
+        }
     }
 
     static Stream<Arguments> sequences() {
@@ -294,6 +301,15 @@ class PrologDroolsEquivalenceTest {
                 new Step(1_100, 0.0, new PedestrianDetectedEvent(1_100, "camera", 0.0, "none", false)),
                 new Step(1_200, 0.0),
                 new Step(1_300, 5.0)}),
+            Arguments.of("speed limit ahead: pending, slowing in time, in force at the sign", new Step[]{
+                Step.at(0.0, 1_000, 90.0, new SpeedLimitDetectedEvent(1_000, "camera", 50, 110, "sign-50")),
+                Step.at(40.0, 1_100, 90.0, new SpeedLimitDetectedEvent(1_100, "camera", 50, 70, "sign-50")),
+                Step.at(80.0, 1_200, 75.0, new SpeedLimitDetectedEvent(1_200, "camera", 50, 30, "sign-50")),
+                Step.at(104.0, 1_300, 55.0, new SpeedLimitDetectedEvent(1_300, "camera", 50, 6, "sign-50")),
+                Step.at(111.0, 1_400, 52.0)}),
+            Arguments.of("speed limit ahead: dropped when the camera stops seeing it", new Step[]{
+                Step.at(0.0, 1_000, 90.0, new SpeedLimitDetectedEvent(1_000, "camera", 50, 40, "sign-50")),
+                Step.at(10.0, 2_100, 90.0)}),
             Arguments.of("move off under a 20 km/h limit", new Step[]{
                 new Step(1_000, 0.0, new SpeedLimitDetectedEvent(1_000, "camera", 20, 10, "sign-20")),
                 new Step(1_100, 8.0)}),
@@ -366,6 +382,8 @@ class PrologDroolsEquivalenceTest {
         try (DroolsTestHarness drools = new DroolsTestHarness(steps[0].speedKmh());
              PrologTestHarness prolog = new PrologTestHarness()) {
             for (Step step : steps) {
+                drools.moveTo(step.positionMeters());
+                prolog.moveTo(step.positionMeters());
                 DrivingDecision expected = drools.cycle(step.timestampMillis(), step.speedKmh(), step.events());
                 DrivingDecision actual = prolog.cycle(step.timestampMillis(), step.speedKmh(), step.events());
                 String at = " at t=" + step.timestampMillis() + "; Drools rule: " + expected.getSourceRule()

@@ -256,16 +256,25 @@ public class WorldState {
         return result;
     }
 
+    /** A speed limit holds for the whole road, so the next sign ahead counts whatever lane it stands in. */
     public Optional<SpeedLimitSign> nearestSpeedLimitSign(double maxDistance) {
-        return nearestByType(SpeedLimitSign.class, maxDistance);
+        return activeRoadElementsInFront(maxDistance).stream()
+            .filter(SpeedLimitSign.class::isInstance)
+            .map(SpeedLimitSign.class::cast)
+            .min(java.util.Comparator.comparingDouble(sign -> signedDistance(sign.getPositionMeters())));
     }
 
+    /** A traffic light governs the whole road, so the next one ahead counts whatever lane it stands in. */
     public Optional<TrafficLight> nearestTrafficLight(double maxDistance) {
-        return nearestByType(TrafficLight.class, maxDistance);
+        return activeRoadElementsInFront(maxDistance).stream()
+            .filter(TrafficLight.class::isInstance)
+            .map(TrafficLight.class::cast)
+            .min(java.util.Comparator.comparingDouble(light -> signedDistance(light.getPositionMeters())));
     }
 
+    /** A stop sign only binds the lane it stands in: one in another lane is not the vehicle's to obey. */
     public Optional<StopSign> nearestStopSign(double maxDistance) {
-        return nearestByType(StopSign.class, maxDistance);
+        return nearestByType(StopSign.class, maxDistance).filter(sign -> sign.getLane() == ego.getLane());
     }
 
     public Optional<Pothole> nearestPothole(double maxDistance) {
@@ -336,21 +345,6 @@ public class WorldState {
             }
         }
         return Optional.ofNullable(nearestOwnLane != null ? nearestOwnLane : nearestAnyLane);
-    }
-
-    public Optional<com.one2drive.projeto1.domain.SpeedRadar> findNearestSpeedRadarAhead(double maxDistance) {
-        com.one2drive.projeto1.domain.SpeedRadar nearest = null;
-        double nearestDistance = Double.POSITIVE_INFINITY;
-        for (RoadElement element : getRoadElements()) {
-            if (element instanceof com.one2drive.projeto1.domain.SpeedRadar radar && radar.isActive()) {
-                double distance = signedDistance(radar.getPositionMeters());
-                if (distance > 0 && distance <= maxDistance && distance < nearestDistance) {
-                    nearest = radar;
-                    nearestDistance = distance;
-                }
-            }
-        }
-        return Optional.ofNullable(nearest);
     }
 
     public Optional<Pothole> nearestPotholeAhead(double maxDistance) {

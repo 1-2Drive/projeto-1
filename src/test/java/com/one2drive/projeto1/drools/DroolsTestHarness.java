@@ -26,6 +26,11 @@ public class DroolsTestHarness implements AutoCloseable {
         return knowledgeSession;
     }
 
+    /** Places the vehicle along the road for the next cycle, for rules that depend on reaching a point. */
+    public void moveTo(double positionMeters) {
+        vehicleStateFact.setPositionMeters(positionMeters);
+    }
+
     public DrivingDecision cycle(long timestampMillis, double speedKmh, Object... events) {
         SessionPseudoClock clock = (SessionPseudoClock) knowledgeSession.getKieSession().getSessionClock();
         long now = clock.getCurrentTime();

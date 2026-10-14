@@ -82,7 +82,7 @@ class RoadLawAndOvertakingE2ETest {
     @DisplayName("Overtaking: slow vehicle ahead triggers left lane change, pass, and return right (Art. 35/38 CE)")
     void overtakingSlowVehiclePassesAndReturnsToRightLane(ExpertBackendType backend) {
         ScenarioLibrary library = ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json");
-        ScenarioDefinition scenario = library.findById("S16_SLOW_VEHICLE_OVERTAKE").orElseThrow();
+        ScenarioDefinition scenario = library.findById("S14_SLOW_VEHICLE_OVERTAKE").orElseThrow();
 
         try (SimulationEngine engine = BackendTestSupport.engine(scenario, backend)) {
             engine.start();
@@ -139,7 +139,7 @@ class RoadLawAndOvertakingE2ETest {
     @DisplayName("Continuous line: continuous road marking prohibits lane change; vehicle brakes before obstacle")
     void continuousLineBlocksLaneChangeAndBrakesBeforeObstacle(ExpertBackendType backend) {
         ScenarioLibrary library = ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json");
-        ScenarioDefinition scenario = library.findById("S17_CONTINUOUS_LINE_BLOCKED").orElseThrow();
+        ScenarioDefinition scenario = library.findById("S15_CONTINUOUS_LINE_BLOCKED").orElseThrow();
 
         try (SimulationEngine engine = BackendTestSupport.engine(scenario, backend)) {
             engine.start();
@@ -178,7 +178,7 @@ class RoadLawAndOvertakingE2ETest {
     @DisplayName("Pedestrian crossing: vehicle brakes/stops while pedestrian crosses roadway, then resumes")
     void pedestrianCrossingBrakesThenResumesAfterCrossingClears(ExpertBackendType backend) {
         ScenarioLibrary library = ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json");
-        ScenarioDefinition scenario = library.findById("S8").orElseThrow();
+        ScenarioDefinition scenario = library.findById("S7").orElseThrow();
 
         try (SimulationEngine engine = BackendTestSupport.engine(scenario, backend)) {
             engine.start();
@@ -230,117 +230,6 @@ class RoadLawAndOvertakingE2ETest {
             assertEquals(engine.getWorldState().getEgo().getSpeedMps(), vector[2], 0.01);
             assertEquals(80.0, vector[4], 1.0); // Actor x
             assertEquals(30.0 / 3.6, vector[6], 0.1); // Actor vx
-        }
-    }
-
-    @ParameterizedTest(name = "{0}")
-    @EnumSource(ExpertBackendType.class)
-    @Timeout(10)
-    @DisplayName("Radar Regression: Speed radar has fixed world position; distance derives from world coordinates and decreases naturally")
-    void radarHasFixedWorldPositionAndCalculatesDecreasingDistance(ExpertBackendType backend) {
-        ScenarioLibrary library = ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json");
-        ScenarioDefinition scenario = library.findById("S18_SPEED_RADAR_APPROACH").orElseThrow();
-
-        try (SimulationEngine engine = BackendTestSupport.engine(scenario, backend)) {
-            engine.start();
-
-            // Run ticks to trigger and flush timed elements
-            engine.tick();
-            engine.tick();
-
-            var radarOpt = engine.getWorldState().findNearestSpeedRadarAhead(200.0);
-            assertTrue(radarOpt.isPresent(), "Speed radar must be present ahead on the road");
-            var radar = radarOpt.get();
-            double fixedRadarPos = radar.getPositionMeters();
-            assertEquals(330.0, fixedRadarPos, 0.01, "Radar position must be 330m");
-
-            double previousDistance = Double.POSITIVE_INFINITY;
-            double previousEgoPos = engine.getWorldState().getEgo().getPositionMeters();
-
-            for (int i = 0; i < 40; i++) {
-                SimulationSnapshot snapshot = engine.tick();
-                double egoPos = snapshot.egoPositionMeters();
-                assertEquals(330.0, radar.getPositionMeters(), 0.001, "Radar world position must NOT move");
-
-                if (egoPos < fixedRadarPos) {
-                    double expectedDistance = fixedRadarPos - egoPos;
-                    double actualDistance = engine.getWorldState().distanceAhead(fixedRadarPos);
-                    assertEquals(expectedDistance, actualDistance, 0.01,
-                        "distanceToRadar must equal radarPosition - egoPosition");
-                    assertTrue(actualDistance <= previousDistance, "Radar distance must decrease as ego approaches");
-                    previousDistance = actualDistance;
-                }
-                assertTrue(egoPos >= previousEgoPos, "Ego position must increase");
-                previousEgoPos = egoPos;
-            }
-        }
-    }
-
-    @ParameterizedTest(name = "{0}")
-    @EnumSource(ExpertBackendType.class)
-    @Timeout(10)
-    @DisplayName("Radar Regression: Speeding vehicle progressively decelerates approaching radar; no lane changes or obstacle avoidance")
-    void speedingVehicleApproachingRadarProgressivelyDeceleratesWithoutLaneChange(ExpertBackendType backend) {
-        ScenarioLibrary library = ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json");
-        ScenarioDefinition scenario = library.findById("S18_SPEED_RADAR_APPROACH").orElseThrow();
-
-        try (SimulationEngine engine = BackendTestSupport.engine(scenario, backend)) {
-            engine.start();
-
-            boolean sawSpeedReduction = false;
-            boolean passedRadar = false;
-            boolean recordedPassage = false;
-
-            for (int i = 0; i < 120; i++) {
-                SimulationSnapshot snapshot = engine.tick();
-                String action = snapshot.currentDecision();
-                double egoPos = snapshot.egoPositionMeters();
-                double egoSpeed = snapshot.egoSpeedKmh();
-
-                if (snapshot.timeline().stream().anyMatch(msg -> msg.contains("Speed radar passed"))) {
-                    recordedPassage = true;
-                }
-
-                // Crucial requirement: radar must never trigger lane change or obstacle avoidance
-                assertFalse(action.equals(DrivingAction.CHANGE_LANE_LEFT.name()),
-                    "Radar must NEVER trigger CHANGE_LANE_LEFT");
-                assertFalse(action.equals(DrivingAction.CHANGE_LANE_RIGHT.name()),
-                    "Radar must NEVER trigger CHANGE_LANE_RIGHT");
-                assertEquals(Lane.RIGHT, engine.getWorldState().getEgo().getLane(),
-                    "Vehicle must stay in its lane; radar is not an obstacle to avoid");
-                assertNotEquals("STOPPED_FOR_HAZARD", engine.getWorldState().getEgo().getDrivingState().name(),
-                    "Radar must never cause STOPPED_FOR_HAZARD");
-
-                if (action.equals(DrivingAction.REDUCE_SPEED.name())) {
-                    sawSpeedReduction = true;
-                }
-
-                if (egoPos >= 330.0) {
-                    passedRadar = true;
-                    // When passing radar, vehicle speed must be legal (<= 50 + small margin)
-                    assertTrue(egoSpeed <= 55.0,
-                        "Vehicle must decelerate to near legal speed before passing radar, got " + egoSpeed);
-                    // Vehicle continues driving forward (must not stop at radar)
-                    assertTrue(egoSpeed > 20.0, "Vehicle must continue driving through radar, not stop");
-                    break;
-                }
-            }
-
-            assertTrue(sawSpeedReduction, "Speeding vehicle must decelerate when approaching speed radar");
-            assertTrue(passedRadar, "Vehicle must pass the radar");
-
-            // Verify vehicle continues past the radar
-            double postRadarPos = engine.getWorldState().getEgo().getPositionMeters();
-            for (int i = 0; i < 20; i++) {
-                SimulationSnapshot snapshot = engine.tick();
-                if (snapshot.timeline().stream().anyMatch(msg -> msg.contains("Speed radar passed"))) {
-                    recordedPassage = true;
-                }
-                assertTrue(snapshot.egoPositionMeters() > postRadarPos, "Vehicle must continue driving after passing radar");
-                postRadarPos = snapshot.egoPositionMeters();
-            }
-
-            assertTrue(recordedPassage, "Engine must record 'Speed radar passed' timeline event");
         }
     }
 
@@ -573,43 +462,6 @@ class RoadLawAndOvertakingE2ETest {
 
             assertTrue(p1 > p0, "Ego position must continuously increase while moving: p1=" + p1 + " > p0=" + p0);
             assertTrue(d1 < d0, "Static object distance must decrease as vehicle approaches: d1=" + d1 + " < d0=" + d0);
-        }
-    }
-
-    @ParameterizedTest(name = "{0}")
-    @EnumSource(ExpertBackendType.class)
-    @Timeout(10)
-    @DisplayName("Radar Regression: Legal-speed vehicle does not brake unnecessarily approaching radar")
-    void legalSpeedVehicleDoesNotBrakeApproachingRadar(ExpertBackendType backend) {
-        ScenarioDefinition scenario = new ScenarioDefinition();
-        scenario.setId("LEGAL_RADAR_TEST");
-        scenario.setName("Legal speed approaching radar");
-        scenario.setInitialSpeedKmh(45.0);
-        scenario.setInitialWeather(WeatherCondition.CLEAR);
-
-        var radarDef = new com.one2drive.projeto1.scenario.ScenarioRoadElementDefinition();
-        radarDef.setType(com.one2drive.projeto1.scenario.ScenarioRoadElementType.SPEED_RADAR);
-        radarDef.setPositionMeters(100.0);
-        radarDef.setLane(Lane.RIGHT);
-        radarDef.setSpeedLimitKmh(50);
-
-        var action = new com.one2drive.projeto1.scenario.ScenarioTimedAction();
-        action.setType(com.one2drive.projeto1.scenario.ScenarioTimedActionType.ADD_ROAD_ELEMENT);
-        action.setTriggerTimeMillis(0);
-        action.setRoadElement(radarDef);
-        scenario.getTimedActions().add(action);
-
-        try (SimulationEngine engine = BackendTestSupport.engine(scenario, backend)) {
-            engine.start();
-
-            for (int i = 0; i < 40; i++) {
-                SimulationSnapshot snapshot = engine.tick();
-                String decision = snapshot.currentDecision();
-                assertFalse(decision.equals(DrivingAction.BRAKE.name()) || decision.equals(DrivingAction.EMERGENCY_BRAKE.name()),
-                    "Legal-speed vehicle must not brake for radar");
-                assertFalse(decision.equals(DrivingAction.REDUCE_SPEED.name()),
-                    "Legal-speed vehicle must not reduce speed when already compliant with radar limit");
-            }
         }
     }
 

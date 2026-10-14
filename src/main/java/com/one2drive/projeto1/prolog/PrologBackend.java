@@ -4,22 +4,18 @@ import com.one2drive.projeto1.config.SimulationConfig;
 import com.one2drive.projeto1.decision.DecisionContext;
 import com.one2drive.projeto1.decision.DrivingDecision;
 import com.one2drive.projeto1.domain.Lane;
-import com.one2drive.projeto1.domain.SpeedRadar;
 import com.one2drive.projeto1.drools.FactDescription;
 import com.one2drive.projeto1.drools.WorkingMemoryFactView;
 import com.one2drive.projeto1.drools.events.BaseEvent;
-import com.one2drive.projeto1.drools.facts.SpeedRadarFact;
 import com.one2drive.projeto1.explanation.ExplanationTrace;
 import com.one2drive.projeto1.explanation.TimelineEntryType;
 import com.one2drive.projeto1.inference.DecisionInput;
 import com.one2drive.projeto1.inference.ExpertBackendType;
 import com.one2drive.projeto1.inference.ExpertSystemBackend;
-import com.one2drive.projeto1.simulation.WorldState;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 
@@ -40,13 +36,7 @@ public class PrologBackend implements ExpertSystemBackend {
     private PrologKnowledgeSession.VehicleInput vehicle =
         PrologKnowledgeSession.VehicleInput.keepingLane(0L, 0.0, Lane.CENTER);
     private PrologCycleResult lastResult =
-        new PrologCycleResult(List.of(), List.of(), 120.0, PrologCycleResult.RadarState.NONE);
-    /** Nearest radar ahead this cycle, read from the world before the rules run. */
-    private PrologKnowledgeSession.RadarInput radarInput = PrologKnowledgeSession.RadarInput.NONE;
-    /** Radar the ego passed after the last actuation; Prolog marks it passed next cycle. */
-    private String passedRadarId;
-    /** Between updateVehicleState and decide: the radar the rules are about to see. */
-    private boolean radarUpdatedThisCycle;
+        new PrologCycleResult(List.of(), List.of(), 120.0);
     private boolean closed;
 
     public PrologBackend(SimulationConfig config, Consumer<DrivingDecision> decisionConsumer, double cruiseTargetKmh) {
@@ -115,6 +105,7 @@ public class PrologBackend implements ExpertSystemBackend {
         vehicle = new PrologKnowledgeSession.VehicleInput(
             input.timestampMillis(),
             ego.getSpeedKmh(),
+            ego.getPositionMeters(),
             ego.getLane(),
             ego.getLaneChangeState(),
             ego.getTargetLane(),
@@ -123,16 +114,7 @@ public class PrologBackend implements ExpertSystemBackend {
             world.isLaneSafe(ego.getLane().left(), config.getBlindSpotRangeMeters(), 60.0),
             world.isLaneSafe(ego.getLane().right(), config.getBlindSpotRangeMeters(), 60.0),
             world.hasHazardAheadInLane(Lane.RIGHT, 150.0),
-            "S14_PRESENTATION_DEMO".equals(input.scenarioId()));
-        // DroolsBackend.updateActiveRadarFact: the nearest radar within 250 m becomes the
-        // detected radar, unless the current one has been passed.
-        var radar = world.findNearestSpeedRadarAhead(250.0);
-        radarInput = new PrologKnowledgeSession.RadarInput(
-            radar.map(r -> r.getId()).orElse(null),
-            radar.map(r -> world.signedDistance(r.getPositionMeters())).orElse(0.0),
-            radar.map(r -> r.getSpeedLimitKmh()).orElse(0.0),
-            passedRadarId);
-        radarUpdatedThisCycle = true;
+            "S12_PRESENTATION_DEMO".equals(input.scenarioId()));
     }
 
     @Override
@@ -143,9 +125,7 @@ public class PrologBackend implements ExpertSystemBackend {
             pendingCommands.clear();
         }
         // decision still holds the previous cycle's outcome until applyTo below.
-        lastResult = session.cycle(context, vehicle, radarInput, events, decision);
-        passedRadarId = null;
-        radarUpdatedThisCycle = false;
+        lastResult = session.cycle(context, vehicle, events, decision);
         context.applyTo(decision);
         traceFiredRules();
         decisionConsumer.accept(decision);
@@ -164,51 +144,9 @@ public class PrologBackend implements ExpertSystemBackend {
         }
     }
 
-    /** DroolsBackend.recordRadarPassage: once the ego is past the detected radar, it is passed. */
-    @Override
-    public void afterActuation(WorldState world, long timestampMillis) {
-        PrologCycleResult.RadarState radar = lastResult.radar();
-        if (!radar.active() || radar.radarId().equals(passedRadarId)) {
-            return;
-        }
-        var device = world.getRoadElements().stream()
-            .filter(SpeedRadar.class::isInstance)
-            .map(SpeedRadar.class::cast)
-            .filter(candidate -> candidate.getId().equals(radar.radarId()))
-            .findFirst();
-        if (device.isPresent() && world.signedDistance(device.get().getPositionMeters()) <= 0.0) {
-            passedRadarId = radar.radarId();
-            trace.add(timestampMillis, TimelineEntryType.INFO,
-                "Speed radar passed at " + Math.round(world.getEgo().getSpeedKmh())
-                    + " km/h — legal limit " + Math.round(radar.speedLimitKmh()) + " km/h");
-        }
-    }
-
     @Override
     public double currentSpeedLimitKmh() {
         return lastResult.speedLimitKmh();
-    }
-
-    /**
-     * The radar as Drools would hold it at this point of the tick: after updateVehicleState
-     * it is the one just read from the world (what DroolsBackend writes before the rules
-     * run), otherwise the state Prolog returned; a radar passed after the actuator is gone.
-     */
-    @Override
-    public Optional<SpeedRadarFact> activeSpeedRadar() {
-        PrologCycleResult.RadarState radar = lastResult.radar();
-        if (radar.passed() || radar.radarId().equals(passedRadarId)) {
-            return Optional.empty();
-        }
-        if (radarUpdatedThisCycle && radarInput.aheadId() != null) {
-            return Optional.of(new SpeedRadarFact(radarInput.aheadId(), radarInput.aheadDistanceMeters(),
-                radarInput.aheadSpeedLimitKmh(), vehicle.timestampMillis(), false, true));
-        }
-        if (!radar.active()) {
-            return Optional.empty();
-        }
-        return Optional.of(new SpeedRadarFact(radar.radarId(), radar.distanceMeters(), radar.speedLimitKmh(),
-            vehicle.timestampMillis(), false, true));
     }
 
     @Override

@@ -74,6 +74,7 @@ public class PrologKnowledgeSession implements AutoCloseable {
      */
     public record VehicleInput(long timestampMillis,
                                double speedKmh,
+                               double positionMeters,
                                Lane lane,
                                LaneChangeState laneChangeState,
                                Lane targetLane,
@@ -86,21 +87,19 @@ public class PrologKnowledgeSession implements AutoCloseable {
 
         /**
          * A vehicle keeping its lane between dashed markings, neither adjacent lane verified
-         * safe: the same defaults a new VehicleStateFact has.
+         * safe, at the start of the road: the same defaults a new VehicleStateFact has.
          */
         public static VehicleInput keepingLane(long timestampMillis, double speedKmh, Lane lane) {
-            return new VehicleInput(timestampMillis, speedKmh, lane, LaneChangeState.IDLE, lane,
+            return new VehicleInput(timestampMillis, speedKmh, 0.0, lane, LaneChangeState.IDLE, lane,
                 RoadMarkingType.DASHED, RoadMarkingType.DASHED, false, false, false, false);
         }
-    }
 
-    /**
-     * The world facts about speed radars that Java writes into the SpeedRadarFact for Drools
-     * (DroolsBackend): the nearest radar ahead within 250 m, if any, and the id of a radar the
-     * ego passed after the previous cycle's actuation, if any.
-     */
-    public record RadarInput(String aheadId, double aheadDistanceMeters, double aheadSpeedLimitKmh, String passedId) {
-        public static final RadarInput NONE = new RadarInput(null, 0.0, 0.0, null);
+        /** The same input with the vehicle at {@code positionMeters} along the road. */
+        public VehicleInput at(double positionMeters) {
+            return new VehicleInput(timestampMillis, speedKmh, positionMeters, lane, laneChangeState, targetLane,
+                leftMarking, rightMarking, leftAdjacentLaneSafe, rightAdjacentLaneSafe, rightLaneBlockedAhead,
+                presentationDemo);
+        }
     }
 
     /**
@@ -111,14 +110,11 @@ public class PrologKnowledgeSession implements AutoCloseable {
      *                 see as the DrivingDecision fact; null before the first cycle
      */
     public PrologCycleResult cycle(VehicleInput vehicle, List<?> events, DrivingDecision previous) {
-        return cycle(vehicle, RadarInput.NONE, events, previous);
-    }
-
-    public PrologCycleResult cycle(VehicleInput vehicle, RadarInput radar, List<?> events, DrivingDecision previous) {
         Map<String, Object> request = new LinkedHashMap<>();
         request.put("cmd", "tick");
         request.put("timestamp", vehicle.timestampMillis());
         request.put("speedKmh", vehicle.speedKmh());
+        request.put("positionMeters", vehicle.positionMeters());
         request.put("lane", vehicle.lane().name());
         request.put("laneChangeState", vehicle.laneChangeState().name());
         request.put("targetLane", vehicle.targetLane().name());
@@ -128,15 +124,6 @@ public class PrologKnowledgeSession implements AutoCloseable {
         request.put("rightAdjacentLaneSafe", vehicle.rightAdjacentLaneSafe());
         request.put("rightLaneBlockedAhead", vehicle.rightLaneBlockedAhead());
         request.put("presentationDemo", vehicle.presentationDemo());
-        if (radar.aheadId() != null) {
-            request.put("radarAhead", Map.of(
-                "id", radar.aheadId(),
-                "distanceMeters", radar.aheadDistanceMeters(),
-                "speedLimitKmh", radar.aheadSpeedLimitKmh()));
-        }
-        if (radar.passedId() != null) {
-            request.put("radarPassed", radar.passedId());
-        }
         request.put("events", events.stream().map(PrologKnowledgeSession::toJson).toList());
         if (previous != null) {
             request.put("previousDecision", Map.of(
@@ -165,16 +152,8 @@ public class PrologKnowledgeSession implements AutoCloseable {
             facts.add(new PrologCycleResult.WorkingMemoryFact(
                 node.path("n").asInt(), node.path("fact").asText(), rule.isNull() ? null : rule.asText()));
         }
-        JsonNode radarNode = reply.path("radar");
-        JsonNode radarDistance = radarNode.path("distanceMeters");
-        PrologCycleResult.RadarState radarState = new PrologCycleResult.RadarState(
-            radarNode.path("id").asText("none"),
-            radarDistance.isNull() ? Double.POSITIVE_INFINITY : radarDistance.asDouble(),
-            radarNode.path("speedLimitKmh").asDouble(50.0),
-            radarNode.path("detected").asBoolean(false),
-            radarNode.path("passed").asBoolean(false));
         return new PrologCycleResult(List.copyOf(proposals), List.copyOf(facts),
-            reply.path("speedLimitKmh").asDouble(), radarState);
+            reply.path("speedLimitKmh").asDouble());
     }
 
     public PrologCycleResult cycle(long timestampMillis, double speedKmh, Lane lane, List<?> events,
@@ -185,12 +164,7 @@ public class PrologKnowledgeSession implements AutoCloseable {
     /** Runs a cycle and hands every proposal to {@code context}, which arbitrates them. */
     public PrologCycleResult cycle(DecisionContext context, VehicleInput vehicle, List<?> events,
                                    DrivingDecision previous) {
-        return cycle(context, vehicle, RadarInput.NONE, events, previous);
-    }
-
-    public PrologCycleResult cycle(DecisionContext context, VehicleInput vehicle, RadarInput radar, List<?> events,
-                                   DrivingDecision previous) {
-        PrologCycleResult result = cycle(vehicle, radar, events, previous);
+        PrologCycleResult result = cycle(vehicle, events, previous);
         result.proposals().forEach(proposal -> proposal.proposeTo(context));
         return result;
     }
@@ -202,7 +176,7 @@ public class PrologKnowledgeSession implements AutoCloseable {
 
     public PrologCycleResult cycle(DecisionContext context, long timestampMillis, double speedKmh, Lane lane,
                                    LaneChangeState laneChangeState, List<?> events, DrivingDecision previous) {
-        return cycle(context, new VehicleInput(timestampMillis, speedKmh, lane, laneChangeState, lane,
+        return cycle(context, new VehicleInput(timestampMillis, speedKmh, 0.0, lane, laneChangeState, lane,
             RoadMarkingType.DASHED, RoadMarkingType.DASHED, false, false, false, false), events, previous);
     }
 
@@ -232,6 +206,8 @@ public class PrologKnowledgeSession implements AutoCloseable {
         params.put("reactionTimeSeconds", StoppingPolicy.REACTION_TIME_SECONDS);
         params.put("redLightStopLineOffsetMeters", StoppingPolicy.RED_LIGHT_STOP_LINE_OFFSET_METERS);
         params.put("stopLineToleranceMeters", StoppingPolicy.STOP_LINE_TOLERANCE_METERS);
+        params.put("stopSignOffsetMeters", StoppingPolicy.STOP_SIGN_OFFSET_METERS);
+        params.put("speedLimitApproachBufferMeters", StoppingPolicy.SPEED_LIMIT_APPROACH_BUFFER_METERS);
         return params;
     }
 

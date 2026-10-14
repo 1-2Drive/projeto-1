@@ -5,7 +5,6 @@ import com.one2drive.projeto1.decision.DrivingDecision;
 import com.one2drive.projeto1.domain.EgoVehicleState;
 import com.one2drive.projeto1.drools.facts.CruiseTargetFact;
 import com.one2drive.projeto1.drools.facts.CurrentSpeedLimit;
-import com.one2drive.projeto1.drools.facts.SpeedRadarFact;
 import com.one2drive.projeto1.drools.facts.VehicleStateFact;
 import com.one2drive.projeto1.explanation.ExplanationTrace;
 import com.one2drive.projeto1.explanation.TimelineEntryType;
@@ -18,7 +17,6 @@ import org.kie.api.runtime.rule.FactHandle;
 import org.kie.api.time.SessionPseudoClock;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -103,7 +101,6 @@ public class DroolsBackend implements ExpertSystemBackend {
     @Override
     public void updateVehicleState(DecisionInput input) {
         updateVehicleStateFact(input);
-        updateActiveRadarFact(input.world(), input.timestampMillis());
     }
 
     @Override
@@ -125,27 +122,11 @@ public class DroolsBackend implements ExpertSystemBackend {
     }
 
     @Override
-    public void afterActuation(WorldState world, long timestampMillis) {
-        recordRadarPassage(world, timestampMillis);
-    }
-
-    @Override
     public double currentSpeedLimitKmh() {
         for (Object obj : knowledgeSession.getKieSession().getObjects(new ClassObjectFilter(CurrentSpeedLimit.class))) {
             return ((CurrentSpeedLimit) obj).getLimitKmh();
         }
         return 120;
-    }
-
-    @Override
-    public Optional<SpeedRadarFact> activeSpeedRadar() {
-        for (Object fact : knowledgeSession.getKieSession().getObjects(new ClassObjectFilter(SpeedRadarFact.class))) {
-            SpeedRadarFact radar = (SpeedRadarFact) fact;
-            if (radar.isDetected() && !radar.isPassed() && !"none".equals(radar.getRadarId())) {
-                return Optional.of(radar);
-            }
-        }
-        return Optional.empty();
     }
 
     @Override
@@ -180,61 +161,8 @@ public class DroolsBackend implements ExpertSystemBackend {
         vehicleStateFact.setRightLaneBlockedAhead(worldState.hasHazardAheadInLane(com.one2drive.projeto1.domain.Lane.RIGHT, 150.0));
         vehicleStateFact.setLeftAdjacentLaneSafe(worldState.isLaneSafe(ego.getLane().left(), config.getBlindSpotRangeMeters(), 60.0));
         vehicleStateFact.setRightAdjacentLaneSafe(worldState.isLaneSafe(ego.getLane().right(), config.getBlindSpotRangeMeters(), 60.0));
-        vehicleStateFact.setPresentationDemo("S14_PRESENTATION_DEMO".equals(input.scenarioId()));
+        vehicleStateFact.setPresentationDemo("S12_PRESENTATION_DEMO".equals(input.scenarioId()));
         knowledgeSession.getKieSession().update(vehicleStateHandle, vehicleStateFact);
-    }
-
-    /** Makes the nearest lane-independent enforcement device authoritative for the decision cycle. */
-    private void updateActiveRadarFact(WorldState worldState, long simTimeMillis) {
-        SpeedRadarFact state = null;
-        FactHandle handle = null;
-        for (FactHandle candidate : knowledgeSession.getKieSession().getFactHandles(new ClassObjectFilter(SpeedRadarFact.class))) {
-            state = (SpeedRadarFact) knowledgeSession.getKieSession().getObject(candidate);
-            handle = candidate;
-            break;
-        }
-        if (state == null || handle == null || state.isPassed()) return;
-        var radar = worldState.findNearestSpeedRadarAhead(250.0);
-        if (radar.isEmpty()) return;
-
-        var device = radar.get();
-        double distance = worldState.signedDistance(device.getPositionMeters());
-        if (!device.getId().equals(state.getRadarId()) || Math.abs(distance - state.getDistanceMeters()) > 0.01
-            || Math.abs(state.getSpeedLimitKmh() - device.getSpeedLimitKmh()) > 0.01 || !state.isDetected()) {
-            state.setRadarId(device.getId());
-            state.setDistanceMeters(distance);
-            state.setSpeedLimitKmh(device.getSpeedLimitKmh());
-            state.setTimestamp(simTimeMillis);
-            state.setDetected(true);
-            knowledgeSession.getKieSession().update(handle, state);
-        }
-    }
-
-    private void recordRadarPassage(WorldState worldState, long simTimeMillis) {
-        SpeedRadarFact radarFact = null;
-        FactHandle radarHandle = null;
-        for (Object fact : knowledgeSession.getKieSession().getObjects(new ClassObjectFilter(SpeedRadarFact.class))) {
-            radarFact = (SpeedRadarFact) fact;
-            break;
-        }
-        if (radarFact != null) radarHandle = findFactHandle(radarFact);
-        if (radarFact != null && radarHandle != null && radarFact.isDetected() && !radarFact.isPassed()) {
-            String activeRadarId = radarFact.getRadarId();
-            var radar = worldState.getRoadElements().stream()
-                .filter(com.one2drive.projeto1.domain.SpeedRadar.class::isInstance)
-                .map(com.one2drive.projeto1.domain.SpeedRadar.class::cast)
-                .filter(candidate -> candidate.getId().equals(activeRadarId))
-                .findFirst();
-            if (radar.isPresent() && worldState.signedDistance(radar.get().getPositionMeters()) <= 0.0) {
-                radarFact.setPassed(true);
-                radarFact.setDistanceMeters(0.0);
-                radarFact.setTimestamp(simTimeMillis);
-                knowledgeSession.getKieSession().update(radarHandle, radarFact);
-                knowledgeSession.getTrace().add(simTimeMillis, TimelineEntryType.INFO,
-                    "Speed radar passed at " + Math.round(worldState.getEgo().getSpeedKmh())
-                        + " km/h — legal limit " + Math.round(radarFact.getSpeedLimitKmh()) + " km/h");
-            }
-        }
     }
 
     private FactHandle findFactHandle(Object object) {

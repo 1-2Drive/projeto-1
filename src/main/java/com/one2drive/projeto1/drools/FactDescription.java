@@ -4,7 +4,6 @@ import com.one2drive.projeto1.decision.DecisionContext;
 import com.one2drive.projeto1.decision.DrivingDecision;
 import com.one2drive.projeto1.drools.facts.BarrierStateFact;
 import com.one2drive.projeto1.drools.facts.CurrentSpeedLimit;
-import com.one2drive.projeto1.drools.facts.SpeedRadarFact;
 import com.one2drive.projeto1.drools.facts.CruiseTargetFact;
 import com.one2drive.projeto1.drools.facts.FrontVehicleState;
 import com.one2drive.projeto1.drools.facts.LaneOccupancyState;
@@ -60,13 +59,16 @@ public final class FactDescription {
         if (fact instanceof CurrentSpeedLimit value) {
             return "Speed limit: %d km/h in force (source %s)".formatted(value.getLimitKmh(), value.getSourceId());
         }
+        if (fact instanceof com.one2drive.projeto1.drools.facts.PendingSpeedLimit value) {
+            return com.one2drive.projeto1.drools.facts.PendingSpeedLimit.NONE.equals(value.getSignId())
+                ? "Next speed limit: none ahead"
+                : "Next speed limit: %d km/h pending until sign %s".formatted(value.getLimitKmh(), id(value.getSignId()));
+        }
+        if (fact instanceof StopSignState value) {
+            return "Stop sign %s: stop line %s m".formatted(id(value.getSignId()), decimal(value.getDistanceMeters(), 1));
+        }
         if (fact instanceof CruiseTargetFact value) {
             return "Cruise target: %s km/h from the scenario".formatted(decimal(value.getTargetKmh(), 1));
-        }
-        if (fact instanceof SpeedRadarFact value && !"none".equals(value.getRadarId())) {
-            return "Speed-control radar %s: limit %s km/h, %s m ahead%s".formatted(
-                id(value.getRadarId()), decimal(value.getSpeedLimitKmh(), 0),
-                decimal(value.getDistanceMeters(), 1), value.isPassed() ? " (passed)" : "");
         }
         if (fact instanceof WeatherStateFact value) {
             return "Weather: %s, visibility %s, grip %s".formatted(
@@ -92,9 +94,6 @@ public final class FactDescription {
         if (fact instanceof BarrierStateFact value) {
             return "Barrier %s: %s, %s m".formatted(
                 id(value.getBarrierId()), value.isOpen() ? "open" : "closed", decimal(value.getDistanceMeters(), 1));
-        }
-        if (fact instanceof StopSignState value) {
-            return "Stop sign %s: %s m".formatted(id(value.getSignId()), decimal(value.getDistanceMeters(), 1));
         }
         if (fact instanceof LaneOccupancyState value) {
             return "Lane %s: %s, nearest %s".formatted(

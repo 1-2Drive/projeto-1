@@ -40,6 +40,9 @@ import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DrivingExpertSystemRulesTest {
+    /** Distance from a stop sign back to its stop line: the rules measure to the line. */
+    private static final double STOP_LINE = com.one2drive.projeto1.decision.StoppingPolicy.STOP_SIGN_OFFSET_METERS;
+
 
     /**
      * The knowledge base is compiled once, on first use, and that takes several seconds.
@@ -69,8 +72,33 @@ class DrivingExpertSystemRulesTest {
                 90.0,
                 new SpeedLimitDetectedEvent(1_000, "camera", 50, 20, "sign-50")
             );
+            // 20 m before the sign the limit is still pending: the vehicle slows towards it,
+            // and it only becomes the limit in force at the sign.
             assertEquals(DrivingAction.REDUCE_SPEED, decision.getAction());
-            assertEquals(50.0, decision.getRecommendedSpeedKmh(), 0.01);
+            assertEquals("Slow down in time for the speed limit ahead", decision.getSourceRule());
+            assertTrue(decision.getRecommendedSpeedKmh() > 50.0 && decision.getRecommendedSpeedKmh() < 60.0,
+                "recommended " + decision.getRecommendedSpeedKmh());
+
+            harness.moveTo(20.0);
+            DrivingDecision atSign = harness.cycle(1_200, 60.0);
+            assertEquals(DrivingAction.REDUCE_SPEED, atSign.getAction());
+            assertEquals(50.0, atSign.getRecommendedSpeedKmh(), 0.01);
+            assertEquals("Reduce speed when exceeding detected limit", atSign.getSourceRule());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void lowerLimitFarAheadDoesNotSlowTheVehicleYet() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(60.0)) {
+            DrivingDecision decision = harness.cycle(
+                1_000,
+                60.0,
+                new SpeedLimitDetectedEvent(1_000, "camera", 30, 110, "sign-30")
+            );
+            assertEquals(DrivingAction.MAINTAIN_SPEED, decision.getAction());
+            assertEquals(60.0, decision.getRecommendedSpeedKmh(), 0.01);
+            assertEquals("Default maintain speed baseline", decision.getSourceRule());
         }
     }
 
@@ -95,6 +123,11 @@ class DrivingExpertSystemRulesTest {
                 60.0,
                 new SpeedLimitDetectedEvent(1_000, "camera", 90, 80, "sign-90")
             );
+            assertEquals(60.0, decision.getRecommendedSpeedKmh(), 0.01,
+                "a higher limit ahead is not a target before its sign");
+
+            harness.moveTo(80.0);
+            decision = harness.cycle(1_200, 60.0);
             assertEquals(DrivingAction.MAINTAIN_SPEED, decision.getAction());
             assertEquals(90.0, decision.getRecommendedSpeedKmh(), 0.01,
                 "approaching a limit from below means building up to it, not holding the old speed");
@@ -124,21 +157,21 @@ class DrivingExpertSystemRulesTest {
             DrivingDecision approach = harness.cycle(
                 1_000,
                 50.0,
-                // 35 m is the closest point at which comfortable braking (2.8 m/s2) can
+                // 35 m from the stop line is the closest point at which comfortable braking (2.8 m/s2) can
                 // still stop from 50 km/h, so the approach must be a plain reduction.
-                new StopSignEvent(1_000, "camera", 35, "stop-1")
+                new StopSignEvent(1_000, "camera", STOP_LINE + 35, "stop-1")
             );
             assertEquals(DrivingAction.REDUCE_SPEED, approach.getAction());
 
             DrivingDecision near = harness.cycle(
                 2_000,
                 4.0,
-                new StopSignEvent(2_000, "camera", 3.0, "stop-1")
+                new StopSignEvent(2_000, "camera", STOP_LINE + 3.0, "stop-1")
             );
             assertEquals(DrivingAction.STOP, near.getAction());
 
-            harness.cycle(2_200, 0.0, new StopSignEvent(2_200, "camera", 2.5, "stop-1"));
-            DrivingDecision proceed = harness.cycle(3_600, 0.0, new StopSignEvent(3_600, "camera", 1.0, "stop-1"));
+            harness.cycle(2_200, 0.0, new StopSignEvent(2_200, "camera", STOP_LINE + 2.5, "stop-1"));
+            DrivingDecision proceed = harness.cycle(3_600, 0.0, new StopSignEvent(3_600, "camera", STOP_LINE + 1.0, "stop-1"));
             assertEquals(DrivingAction.CONTINUE, proceed.getAction());
         }
     }
@@ -150,7 +183,7 @@ class DrivingExpertSystemRulesTest {
             DrivingDecision approach = harness.cycle(
                 1_000,
                 50.0,
-                new StopSignEvent(1_000, "camera", 25, "stop-1")
+                new StopSignEvent(1_000, "camera", STOP_LINE + 25, "stop-1")
             );
             assertEquals(DrivingAction.EMERGENCY_BRAKE, approach.getAction());
         }

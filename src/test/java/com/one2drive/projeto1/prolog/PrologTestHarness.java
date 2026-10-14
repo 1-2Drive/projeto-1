@@ -15,6 +15,7 @@ public class PrologTestHarness implements AutoCloseable {
     private final DecisionContext context = new DecisionContext();
     private final DrivingDecision decision = new DrivingDecision();
     private PrologCycleResult lastResult;
+    private double positionMeters;
 
     public PrologTestHarness() {
         this(0.0);
@@ -33,9 +34,16 @@ public class PrologTestHarness implements AutoCloseable {
         return lastResult;
     }
 
+    /** Places the vehicle along the road for the next cycle, as DroolsTestHarness.moveTo does. */
+    public void moveTo(double positionMeters) {
+        this.positionMeters = positionMeters;
+    }
+
     public DrivingDecision cycle(long timestampMillis, double speedKmh, Object... events) {
         context.beginCycle(timestampMillis, speedKmh);
-        lastResult = session.cycle(context, timestampMillis, speedKmh, Lane.CENTER, List.of(events), decision);
+        lastResult = session.cycle(context,
+            PrologKnowledgeSession.VehicleInput.keepingLane(timestampMillis, speedKmh, Lane.CENTER).at(positionMeters),
+            List.of(events), decision);
         context.applyTo(decision);
         return decision;
     }

@@ -32,6 +32,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * and actuator as with Drools. The red-light cases mirror RedTrafficLightStopE2ETest.
  */
 class PrologSimulationE2ETest {
+    /** Distance from the stop sign to its stop line, where the vehicle has to come to rest. */
+    private static final double STOP_SIGN_LINE_METERS = com.one2drive.projeto1.decision.StoppingPolicy.STOP_SIGN_OFFSET_METERS;
+
     private static final double LIGHT_POSITION_METERS = 118.0;
     private static final double STOP_LINE_METERS =
         LIGHT_POSITION_METERS - StoppingPolicy.RED_LIGHT_STOP_LINE_OFFSET_METERS;
@@ -150,7 +153,7 @@ class PrologSimulationE2ETest {
                 double distance = engine.getWorldState().signedDistance(signPosition);
                 closestDistance = Math.min(closestDistance, distance);
                 emergency |= snapshot.currentDecision().equals(DrivingAction.EMERGENCY_BRAKE.name());
-                if (snapshot.egoSpeedKmh() < 0.6 && distance <= 4.0) {
+                if (snapshot.egoSpeedKmh() < 0.6 && distance <= STOP_SIGN_LINE_METERS + 4.0) {
                     stoppedTicks++;
                     stoppedAtLine = stoppedTicks >= 10;
                 } else {
@@ -158,7 +161,7 @@ class PrologSimulationE2ETest {
                 }
             }
             assertTrue(stoppedAtLine, "full stop at the sign, closest distance " + closestDistance);
-            assertTrue(closestDistance >= -1.0 && closestDistance <= 4.0,
+            assertTrue(closestDistance >= STOP_SIGN_LINE_METERS - 1.0 && closestDistance <= STOP_SIGN_LINE_METERS + 4.0,
                 "stops at the line instead of crossing it, closest distance " + closestDistance);
             assertFalse(emergency, "a sign seen from afar needs no emergency brake");
 
@@ -182,7 +185,7 @@ class PrologSimulationE2ETest {
         try (SimulationEngine engine = startedPrologEngine(scenario)) {
             ScenarioRoadElementDefinition sign = new ScenarioRoadElementDefinition();
             sign.setType(ScenarioRoadElementType.STOP_SIGN);
-            sign.setLane(Lane.CENTER);
+            sign.setLane(Lane.RIGHT);
             sign.setPositionMeters(60.0);
             engine.addRoadElementAhead(sign);
             engine.tick();
@@ -213,7 +216,7 @@ class PrologSimulationE2ETest {
                 }
                 approaching |= snapshot.sourceRule() != null && snapshot.sourceRule().startsWith("Stop sign");
                 previousWasEmergency = emergency;
-                if (snapshot.egoSpeedKmh() < 0.6 && distance <= 4.0) {
+                if (snapshot.egoSpeedKmh() < 0.6 && distance <= STOP_SIGN_LINE_METERS + 4.0) {
                     stoppedTicks++;
                     stopped = stoppedTicks >= 10;
                 } else {
@@ -222,9 +225,9 @@ class PrologSimulationE2ETest {
             }
             assertTrue(stopped, "full stop at the sign, closest distance " + closestDistance);
             // The same bounds SimulationEngineE2ETest holds Drools to.
-            assertTrue(closestDistance >= -1.0 && closestDistance <= 4.0,
+            assertTrue(closestDistance >= STOP_SIGN_LINE_METERS - 1.0 && closestDistance <= STOP_SIGN_LINE_METERS + 4.0,
                 "stops at the line, neither short of it nor past it, closest distance " + closestDistance);
-            assertTrue(firstRestDistance >= -1.0 && firstRestDistance <= 4.0,
+            assertTrue(firstRestDistance >= STOP_SIGN_LINE_METERS - 1.0 && firstRestDistance <= STOP_SIGN_LINE_METERS + 4.0,
                 "the first rest is at the line, not a stall short of it: " + firstRestDistance);
             assertTrue(emergencyBursts <= 2, "hard braking is one short burst, not a pulse train: " + emergencyBursts);
             assertTrue(baselineTicks < 10, "the stop sign owns the approach; baseline ticks " + baselineTicks);

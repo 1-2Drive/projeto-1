@@ -6,6 +6,5 @@ public enum ScenarioRoadElementType {
     TRAFFIC_LIGHT,
     POTHOLE,
     STATIC_OBSTACLE,
-    BARRIER,
-    SPEED_RADAR
+    BARRIER
 }

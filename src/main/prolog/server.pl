@@ -6,11 +6,10 @@
 %
 % Pedidos:
 %   {"cmd":"reset", "cruiseTargetKmh":..., "params":{...}, "priorities":{...}}
-%   {"cmd":"tick", "timestamp":ms, "speedKmh":..., "lane":"RIGHT", "events":[{"type":...}, ...],
+%   {"cmd":"tick", "timestamp":ms, "speedKmh":..., "positionMeters":..., "lane":"RIGHT", "events":[{"type":...}, ...],
 %    "laneChangeState":"IDLE", "targetLane":"CENTER", "leftMarking":"DASHED", "rightMarking":"CONTINUOUS",
 %    "leftAdjacentLaneSafe":true, "rightAdjacentLaneSafe":false,
 %    "rightLaneBlockedAhead":false, "presentationDemo":false,
-%    "radarAhead":{"id":..., "distanceMeters":..., "speedLimitKmh":...}, "radarPassed":"<id>",
 %    "previousDecision":{"action":"STOP", "rule":"...", "priority":60}}
 %   (os campos a partir da segunda linha são opcionais)
 %   {"cmd":"whynot", "rule":"<rule id>"}
@@ -56,7 +55,7 @@ handle_line(Line) :-
 reply(reset, R, _{ok: true}) :-
     reset_state(R.cruiseTargetKmh, R.params, R.priorities).
 
-reply(tick, R, _{ok: true, proposals: Proposals, facts: Facts, speedLimitKmh: Limit, radar: Radar}) :-
+reply(tick, R, _{ok: true, proposals: Proposals, facts: Facts, speedLimitKmh: Limit}) :-
     downcase_atom(R.lane, Lane),
     optional(R, laneChangeState, 'IDLE', LaneChange),
     optional(R, leftMarking, 'DASHED', LeftMarking),
@@ -66,22 +65,17 @@ reply(tick, R, _{ok: true, proposals: Proposals, facts: Facts, speedLimitKmh: Li
     optional(R, rightAdjacentLaneSafe, false, SafeRight),
     optional(R, rightLaneBlockedAhead, false, RightBlocked),
     optional(R, presentationDemo, false, Demo),
-    optional(R, radarPassed, none, RadarPassed),
-    (   get_dict(radarAhead, R, A)
-    ->  RadarAhead = radar_ahead(A.id, A.distanceMeters, A.speedLimitKmh)
-    ;   RadarAhead = none
-    ),
+    optional(R, positionMeters, 0.0, Position),
     previous_decision_input(R, Previous),
-    update_state(vehicle_input(R.timestamp, R.speedKmh, Lane, LaneChange, LeftMarking-RightMarking,
+    update_state(vehicle_input(R.timestamp, R.speedKmh, Position, Lane, LaneChange, LeftMarking-RightMarking,
                                TargetLane, SafeLeft-SafeRight, RightBlocked-Demo),
-                 RadarPassed-RadarAhead, R.events, Previous),
+                 R.events, Previous),
     load_cycle_facts,
     run_rules,
     store_conclusions,
     findall(J, ( wm_fact(Id, proposal(_, _, _, _, _)), proposal_json(Id, J) ), Proposals),
     findall(J, ( wm_fact(Id, Fact), fact_json(Id, Fact, J) ), Facts),
-    limit_state(Limit, _, _),
-    radar_json(Radar).
+    limit_state(Limit, _, _).
 
 reply(whynot, R, _{ok: true, rule: R.rule, failedConditions: Texts}) :-
     why_not(R.rule, Blocking),
@@ -124,11 +118,6 @@ evidence_text(Id, Text) :-
 fact_json(Id, Fact, _{n: Id, fact: Text, rule: Rule}) :-
     format(atom(Text), '~w', [Fact]),
     (   wm_support(Id, Rule0, _) -> Rule = Rule0 ; Rule = null ).
-
-% The radar state, for Java to show and to detect the passage after the actuator.
-radar_json(_{id: Id, distanceMeters: DJ, speedLimitKmh: L, detected: Detected, passed: Passed}) :-
-    radar(Id, D, L, _, Detected, Passed),
-    (   D == inf -> DJ = null ; DJ = D ).
 
 text(Term, Text) :-
     format(atom(Text), '~w', [Term]).

@@ -30,6 +30,16 @@ public final class StoppingPolicy {
     /** How far short of the stop line a stopped vehicle is still considered to be at it. */
     public static final double STOP_LINE_TOLERANCE_METERS = 3.0;
 
+    /**
+     * Where the stop line of a stop sign lies, measured back from the sign. The vehicle is
+     * drawn around its reference point, so stopping at the sign itself leaves the sign under
+     * the car; this keeps the nose of the car just short of it.
+     */
+    public static final double STOP_SIGN_OFFSET_METERS = 15.0;
+
+    /** Stretch before a speed limit sign over which the vehicle already holds the new limit. */
+    public static final double SPEED_LIMIT_APPROACH_BUFFER_METERS = 8.0;
+
     private StoppingPolicy() {
     }
 
@@ -43,6 +53,18 @@ public final class StoppingPolicy {
         return speedMps * REACTION_TIME_SECONDS
             + speedMps * speedMps / (2.0 * decelerationMps2)
             + stopBufferMeters;
+    }
+
+    /**
+     * Fastest the vehicle may still be going {@code distanceMeters} before a sign that posts
+     * {@code limitKmh}, so that slowing gently from there brings it to the limit
+     * {@link #SPEED_LIMIT_APPROACH_BUFFER_METERS} before the sign. Far from the sign this is
+     * well above any speed, so nothing slows down early.
+     */
+    public static double approachSpeedKmh(double limitKmh, double distanceMeters) {
+        double limitMps = Math.max(0.0, limitKmh) / 3.6;
+        double room = Math.max(0.0, distanceMeters - SPEED_LIMIT_APPROACH_BUFFER_METERS);
+        return Math.sqrt(limitMps * limitMps + 2.0 * ANTICIPATION_DECELERATION_MPS2 * room) * 3.6;
     }
 
     /** Braking distance alone, with no reaction time and no buffer. */

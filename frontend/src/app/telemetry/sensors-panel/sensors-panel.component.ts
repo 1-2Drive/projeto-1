@@ -36,7 +36,7 @@ export class SensorsPanelComponent {
       return [];
     }
     const tracking = radar.status !== 'CLEAR';
-    const lines: SensorLine[] = [
+    return [
       { label: 'Range', value: `${this.round(radar.rangeMeters)} m` },
       { label: 'Target', value: tracking ? this.shortId(radar.targetId) : 'none' },
       {
@@ -54,13 +54,6 @@ export class SensorsPanelComponent {
         tone: this.toneFor(radar.status)
       }
     ];
-    if (radar.speedRadarDistanceMeters != null && Number.isFinite(radar.speedRadarDistanceMeters) && radar.speedRadarDistanceMeters > 0) {
-      lines.push({
-        label: 'Speed radar',
-        value: `${this.round(radar.speedRadarDistanceMeters)} m (${Math.round(radar.speedRadarLimitKmh ?? 50)} km/h limit)`
-      });
-    }
-    return lines;
   });
 
   protected readonly cameraLines = computed<SensorLine[]>(() => {

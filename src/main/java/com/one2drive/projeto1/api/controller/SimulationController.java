@@ -5,6 +5,7 @@ import com.one2drive.projeto1.api.model.ApiSimulationSnapshot;
 import com.one2drive.projeto1.api.model.ApiSystemStatus;
 import com.one2drive.projeto1.api.service.SimulationRuntimeService;
 import com.one2drive.projeto1.domain.LaneChangeDirection;
+import com.one2drive.projeto1.inference.ExpertBackendType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -61,6 +62,14 @@ public class SimulationController {
     @GetMapping("/state")
     public ResponseEntity<ApiSimulationSnapshot> state() {
         return ResponseEntity.ok(runtime.snapshot());
+    }
+
+    /** Switches the deciding rule engine (drools or prolog) and reloads the current scenario. */
+    @PostMapping("/backend/{type}")
+    public ResponseEntity<ApiCommandResponse> switchBackend(@PathVariable("type") String type) {
+        ExpertBackendType parsed = ExpertBackendType.parse(type);
+        runtime.switchBackend(parsed);
+        return ResponseEntity.ok(new ApiCommandResponse(true, parsed.label() + " is now deciding"));
     }
 
     @GetMapping("/status")

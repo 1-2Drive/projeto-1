@@ -7,14 +7,16 @@ import com.one2drive.projeto1.domain.Lane;
 import com.one2drive.projeto1.domain.Pedestrian;
 import com.one2drive.projeto1.domain.TrafficLight;
 import com.one2drive.projeto1.domain.TrafficLightState;
+import com.one2drive.projeto1.inference.ExpertBackendType;
 import com.one2drive.projeto1.scenario.ScenarioActorDefinition;
 import com.one2drive.projeto1.scenario.ScenarioActorType;
 import com.one2drive.projeto1.scenario.ScenarioDefinition;
 import com.one2drive.projeto1.scenario.ScenarioRoadElementDefinition;
 import com.one2drive.projeto1.scenario.ScenarioRoadElementType;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.ParameterizedTest;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -29,7 +31,7 @@ class RedLightHoldTimerE2ETest {
     private static final long HOLD_TICKS = SimulationConfig.RED_HOLD_AFTER_STOP_MS / TICK_MILLIS;
 
     /** A light that starts yellow runs its cycle: red after the yellow time, then green. */
-    private static SimulationEngine approachingAYellowLight(double speedKmh, double lightPositionMeters) {
+    private static SimulationEngine approachingAYellowLight(ExpertBackendType backend, double speedKmh, double lightPositionMeters) {
         ScenarioDefinition scenario = new ScenarioDefinition();
         scenario.setId("RED_HOLD_TIMER");
         scenario.setInitialSpeedKmh(speedKmh);
@@ -40,7 +42,7 @@ class RedLightHoldTimerE2ETest {
         light.setPositionMeters(lightPositionMeters);
         light.setTrafficLightState(TrafficLightState.YELLOW);
         scenario.getRoadElements().add(light);
-        SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> { });
+        SimulationEngine engine = BackendTestSupport.engine(scenario, backend);
         engine.start();
         return engine;
     }
@@ -86,11 +88,12 @@ class RedLightHoldTimerE2ETest {
         return new Run(firstRed, stopTick, greenTick, restPosition, timerRanWhileMoving, movedBeforeGreen);
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(30)
     @DisplayName("red with the ego still moving: the red time does not run; it starts when the ego is at rest before the line")
-    void redTimeStartsWhenTheEgoIsAtRestBeforeTheLine() {
-        try (SimulationEngine engine = approachingAYellowLight(60.0, 80.0)) {
+    void redTimeStartsWhenTheEgoIsAtRestBeforeTheLine(ExpertBackendType backend) {
+        try (SimulationEngine engine = approachingAYellowLight(backend, 60.0, 80.0)) {
             EgoVehicleState ego = engine.getWorldState().getEgo();
             TrafficLight light = onlyLight(engine);
             double stopLine = light.getPositionMeters() - StoppingPolicy.RED_LIGHT_STOP_LINE_OFFSET_METERS;
@@ -135,13 +138,14 @@ class RedLightHoldTimerE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(60)
     @DisplayName("however long the ego takes to stop, the light turns green 5 s after it has stopped, not 5 s after turning red")
-    void redTimeCountsFromTheStopHoweverLongTheApproachTakes() {
+    void redTimeCountsFromTheStopHoweverLongTheApproachTakes(ExpertBackendType backend) {
         double[][] approaches = {{60.0, 80.0}, {40.0, 115.0}, {30.0, 115.0}};
         for (double[] approach : approaches) {
-            try (SimulationEngine engine = approachingAYellowLight(approach[0], approach[1])) {
+            try (SimulationEngine engine = approachingAYellowLight(backend, approach[0], approach[1])) {
                 TrafficLight light = onlyLight(engine);
                 Run run = runUntilGreen(engine, light);
                 String label = approach[0] + " km/h, light at " + approach[1] + " m: ";
@@ -158,7 +162,7 @@ class RedLightHoldTimerE2ETest {
             }
         }
         // The slowest approach takes longer than the red time itself to reach the line.
-        try (SimulationEngine engine = approachingAYellowLight(30.0, 115.0)) {
+        try (SimulationEngine engine = approachingAYellowLight(backend, 30.0, 115.0)) {
             Run run = runUntilGreen(engine, onlyLight(engine));
             assertTrue(run.stopTick() - run.firstRedTick() > HOLD_TICKS,
                 "this approach must take longer than 5 s from red to standstill, it took "
@@ -166,11 +170,12 @@ class RedLightHoldTimerE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(60)
     @DisplayName("green after the 5 s does not override a pedestrian: the ego stays stopped while the crossing is occupied")
-    void greenDoesNotMoveTheEgoWhileAPedestrianIsCrossing() {
-        try (SimulationEngine engine = approachingAYellowLight(60.0, 80.0)) {
+    void greenDoesNotMoveTheEgoWhileAPedestrianIsCrossing(ExpertBackendType backend) {
+        try (SimulationEngine engine = approachingAYellowLight(backend, 60.0, 80.0)) {
             EgoVehicleState ego = engine.getWorldState().getEgo();
             TrafficLight light = onlyLight(engine);
             for (int i = 0; i < 300 && !(light.getState() == TrafficLightState.RED && ego.getSpeedKmh() < 0.1); i++) {

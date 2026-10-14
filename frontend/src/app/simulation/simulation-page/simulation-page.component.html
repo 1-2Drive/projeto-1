@@ -4,7 +4,7 @@
   <header class="top">
     <div class="top__identity">
       <h1>Sistema Inteligente de Apoio à Decisão de Condução</h1>
-      <p>Realtime Expert System · Java · Drools · CEP</p>
+      <p>Realtime Expert System · {{ engine().tagline }}</p>
     </div>
 
     <div class="top__status">
@@ -14,9 +14,11 @@
         data-testid="backend-status"
       />
       <app-status-badge
-        label="Drools"
-        [connected]="vm().connection.droolsActive"
+        [label]="engine().label"
+        [connected]="vm().connection.droolsActive && !expertBackendError()"
         connectedText="ACTIVE"
+        [disconnectedText]="expertBackendError() ? 'ERROR' : 'DISCONNECTED'"
+        data-testid="engine-status"
       />
       <app-status-badge
         label="Stream"
@@ -53,7 +55,7 @@
         <span class="btn__glyph" aria-hidden="true">■</span>STOP
       </button>
       <button data-testid="reset-btn" type="button" class="btn"
-              [disabled]="!canReset()" (click)="reset()" title="Reset world, sensors and Drools working memory">
+              [disabled]="!canReset()" (click)="reset()" title="Reset world, sensors and the rule engine's working memory">
         <span class="btn__glyph" aria-hidden="true">↺</span>RESET
       </button>
     </div>
@@ -62,14 +64,31 @@
       <span class="controls__demo-label">Driver</span>
       <button data-testid="lane-left-btn" type="button" class="btn"
               [disabled]="!canChangeLaneLeft()" (click)="requestLaneChange('LEFT')"
-              title="Ask Drools to change to the left lane; it only executes if the lane is clear">
+              title="Ask the rule engine to change to the left lane; it only executes if the lane is clear">
         <span class="btn__glyph" aria-hidden="true">◀</span>LANE LEFT
       </button>
       <button data-testid="lane-right-btn" type="button" class="btn"
               [disabled]="!canChangeLaneRight()" (click)="requestLaneChange('RIGHT')"
-              title="Ask Drools to change to the right lane; it only executes if the lane is clear">
+              title="Ask the rule engine to change to the right lane; it only executes if the lane is clear">
         LANE RIGHT<span class="btn__glyph" aria-hidden="true">▶</span>
       </button>
+    </div>
+
+    <div class="controls__engine" role="group" aria-label="Rule engine">
+      <span class="controls__demo-label">Rule engine</span>
+      @for (option of engines; track option.id) {
+        <button type="button" class="btn"
+                [class.btn--selected]="option.id === expertBackend()"
+                [attr.aria-pressed]="option.id === expertBackend()"
+                [attr.data-testid]="'engine-' + option.id.toLowerCase() + '-btn'"
+                [disabled]="vm().loading"
+                (click)="switchBackend(option.id)"
+                [title]="option.id === expertBackend()
+                  ? option.label + ' is deciding'
+                  : 'Decide with ' + option.label + ': reloads the current scenario with an empty working memory'">
+          {{ option.label }}
+        </button>
+      }
     </div>
 
     <div class="controls__demo">
@@ -89,6 +108,12 @@
   </nav>
 
   <app-flow-stage [activeStage]="snapshot()?.activeStage ?? 'WORLD'" />
+
+  @if (expertBackendError()) {
+    <aside class="error" data-testid="engine-error" role="alert">
+      <span>{{ expertBackendError() }}. Reset, or switch engine, to continue.</span>
+    </aside>
+  }
 
   @if (vm().error) {
     <aside class="error" data-testid="ui-error" role="alert">

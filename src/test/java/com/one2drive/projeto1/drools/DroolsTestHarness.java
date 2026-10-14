@@ -37,8 +37,10 @@ public class DroolsTestHarness implements AutoCloseable {
         vehicleStateFact.setTimestamp(timestampMillis);
         knowledgeSession.getKieSession().update(vehicleHandle, vehicleStateFact);
 
+        // As SimulationEngine does: reset the context and tell Drools it changed, so rules
+        // whose own facts did not change this cycle still fire again.
+        knowledgeSession.beginDecisionCycle(timestampMillis, speedKmh);
         DecisionContext context = knowledgeSession.getDecisionContext();
-        context.beginCycle(timestampMillis, speedKmh);
 
         for (Object event : events) {
             knowledgeSession.getRouter().insertEvent(event);

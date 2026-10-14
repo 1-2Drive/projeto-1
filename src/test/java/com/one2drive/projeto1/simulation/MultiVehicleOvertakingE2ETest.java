@@ -1,20 +1,19 @@
 package com.one2drive.projeto1.simulation;
 
-import com.one2drive.projeto1.config.SimulationConfig;
 import com.one2drive.projeto1.domain.DrivingAction;
 import com.one2drive.projeto1.domain.DynamicActor;
 import com.one2drive.projeto1.domain.EgoVehicleState;
 import com.one2drive.projeto1.domain.Lane;
 import com.one2drive.projeto1.domain.LaneChangeState;
 import com.one2drive.projeto1.domain.WeatherCondition;
-import com.one2drive.projeto1.drools.facts.OvertakingStateFact;
+import com.one2drive.projeto1.inference.ExpertBackendType;
 import com.one2drive.projeto1.scenario.ScenarioActorDefinition;
 import com.one2drive.projeto1.scenario.ScenarioActorType;
 import com.one2drive.projeto1.scenario.ScenarioDefinition;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.kie.api.runtime.ClassObjectFilter;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,14 +31,14 @@ class MultiVehicleOvertakingE2ETest {
     private static final double EGO_SPEED_KMH = 60.0;
     private static final double SLOW_SPEED_KMH = 30.0;
 
-    private static SimulationEngine runningEngine() {
+    private static SimulationEngine runningEngine(ExpertBackendType backend) {
         ScenarioDefinition scenario = new ScenarioDefinition();
         scenario.setId("MULTI_VEHICLE_OVERTAKE");
         scenario.setName("Overtaking with several vehicles ahead");
         scenario.setInitialSpeedKmh(EGO_SPEED_KMH);
         scenario.setInitialLane(Lane.RIGHT);
         scenario.setInitialWeather(WeatherCondition.CLEAR);
-        SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {});
+        SimulationEngine engine = BackendTestSupport.engine(scenario, backend);
         engine.start();
         for (int i = 0; i < 10; i++) {
             engine.tick();
@@ -56,9 +55,8 @@ class MultiVehicleOvertakingE2ETest {
         return engine.addActorAheadAndGetId(vehicle);
     }
 
-    private static OvertakingStateFact overtaking(SimulationEngine engine) {
-        return (OvertakingStateFact) engine.getKnowledgeSession().getKieSession()
-            .getObjects(new ClassObjectFilter(OvertakingStateFact.class)).iterator().next();
+    private static OvertakingProbe.OvertakingView overtaking(SimulationEngine engine) {
+        return OvertakingProbe.of(engine);
     }
 
     /** An overtaken vehicle leaves the world once it is out of the rendered window behind the car. */
@@ -81,11 +79,12 @@ class MultiVehicleOvertakingE2ETest {
         return closest;
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(30)
     @DisplayName("slow vehicles in RIGHT and CENTER, LEFT clear: the ego passes both through LEFT and returns to RIGHT once")
-    void passesVehiclesInRightAndCenterThroughLeftAndReturnsRight() {
-        try (SimulationEngine engine = runningEngine()) {
+    void passesVehiclesInRightAndCenterThroughLeftAndReturnsRight(ExpertBackendType backend) {
+        try (SimulationEngine engine = runningEngine(backend)) {
             EgoVehicleState ego = engine.getWorldState().getEgo();
             String right = addVehicle(engine, Lane.RIGHT, 60.0, SLOW_SPEED_KMH);
             String center = addVehicle(engine, Lane.CENTER, 110.0, SLOW_SPEED_KMH);
@@ -119,15 +118,16 @@ class MultiVehicleOvertakingE2ETest {
             assertFalse(rightVehicleBackInFront, "a vehicle already passed must not get back in front of the ego");
             assertFalse(sawEmergencyBrake, "overtaking must not need emergency braking");
             assertTrue(closest > 5.0, "ego must keep clear of vehicles in its own lane, closest was " + closest + " m");
-            assertFalse(overtaking(engine).isActive(), "overtaking state must be cleared once back in RIGHT");
+            assertFalse(overtaking(engine).active(), "overtaking state must be cleared once back in RIGHT");
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(30)
     @DisplayName("RIGHT -> CENTER, then a slower vehicle in CENTER with LEFT clear: the ego continues CENTER -> LEFT")
-    void continuesFromCenterToLeftWhenCenterVehicleIsSlower() {
-        try (SimulationEngine engine = runningEngine()) {
+    void continuesFromCenterToLeftWhenCenterVehicleIsSlower(ExpertBackendType backend) {
+        try (SimulationEngine engine = runningEngine(backend)) {
             EgoVehicleState ego = engine.getWorldState().getEgo();
             String right = addVehicle(engine, Lane.RIGHT, 50.0, SLOW_SPEED_KMH);
             String center = addVehicle(engine, Lane.CENTER, 100.0, SLOW_SPEED_KMH);
@@ -141,12 +141,12 @@ class MultiVehicleOvertakingE2ETest {
                 engine.tick();
                 if (!reachedCenter && ego.getLane() == Lane.CENTER && ego.getLaneChangeState() == LaneChangeState.IDLE) {
                     reachedCenter = true;
-                    targetWhenSettledInCenter = overtaking(engine).getTargetId();
-                    passedFlagWhenSettledInCenter = overtaking(engine).isPassedTarget();
+                    targetWhenSettledInCenter = overtaking(engine).targetId();
+                    passedFlagWhenSettledInCenter = overtaking(engine).passedTarget();
                 }
                 if (reachedCenter && targetWhenLeavingCenter == null && ego.getLane() == Lane.CENTER
                     && ego.getLaneChangeState() != LaneChangeState.IDLE && ego.getTargetLane() == Lane.LEFT) {
-                    targetWhenLeavingCenter = overtaking(engine).getTargetId();
+                    targetWhenLeavingCenter = overtaking(engine).targetId();
                 }
                 reachedLeft = ego.getLane() == Lane.LEFT;
             }
@@ -162,11 +162,12 @@ class MultiVehicleOvertakingE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(30)
     @DisplayName("same case with LEFT occupied: the ego stays in CENTER and adapts its speed")
-    void staysInCenterAndAdaptsSpeedWhenLeftIsOccupied() {
-        try (SimulationEngine engine = runningEngine()) {
+    void staysInCenterAndAdaptsSpeedWhenLeftIsOccupied(ExpertBackendType backend) {
+        try (SimulationEngine engine = runningEngine(backend)) {
             EgoVehicleState ego = engine.getWorldState().getEgo();
             // Three slow vehicles nearly abreast: once in CENTER the ego has the RIGHT vehicle
             // alongside and a LEFT vehicle just behind the CENTER one, so neither side helps.
@@ -197,11 +198,12 @@ class MultiVehicleOvertakingE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(30)
     @DisplayName("an overtaken vehicle that is behind the ego is not tracked again by the front radar")
-    void overtakenVehicleBehindIsNotTrackedAsFrontVehicle() {
-        try (SimulationEngine engine = runningEngine()) {
+    void overtakenVehicleBehindIsNotTrackedAsFrontVehicle(ExpertBackendType backend) {
+        try (SimulationEngine engine = runningEngine(backend)) {
             EgoVehicleState ego = engine.getWorldState().getEgo();
             String right = addVehicle(engine, Lane.RIGHT, 50.0, SLOW_SPEED_KMH);
 

@@ -7,12 +7,14 @@ import com.one2drive.projeto1.domain.EgoVehicleState;
 import com.one2drive.projeto1.domain.Lane;
 import com.one2drive.projeto1.domain.TrafficLight;
 import com.one2drive.projeto1.domain.TrafficLightState;
+import com.one2drive.projeto1.inference.ExpertBackendType;
 import com.one2drive.projeto1.scenario.ScenarioDefinition;
 import com.one2drive.projeto1.scenario.ScenarioRoadElementDefinition;
 import com.one2drive.projeto1.scenario.ScenarioRoadElementType;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.ParameterizedTest;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -47,7 +49,7 @@ class TrafficLightCycleE2ETest {
         return light;
     }
 
-    private static SimulationEngine startedEngine(SimulationConfig config, double speedKmh,
+    private static SimulationEngine startedEngine(ExpertBackendType backend, SimulationConfig config, double speedKmh,
                                                  ScenarioRoadElementDefinition... elements) {
         ScenarioDefinition scenario = new ScenarioDefinition();
         scenario.setId("TRAFFIC_LIGHT_CYCLE");
@@ -56,7 +58,7 @@ class TrafficLightCycleE2ETest {
         for (ScenarioRoadElementDefinition element : elements) {
             scenario.getRoadElements().add(element);
         }
-        SimulationEngine engine = new SimulationEngine(config, scenario, true, d -> { });
+        SimulationEngine engine = BackendTestSupport.engine(config, scenario, backend);
         engine.start();
         return engine;
     }
@@ -66,11 +68,12 @@ class TrafficLightCycleE2ETest {
             .filter(TrafficLight.class::isInstance).map(TrafficLight.class::cast).findFirst().orElseThrow();
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(30)
     @DisplayName("yellow far ahead at 60 km/h: the ego can stop, and is at rest before the stop line")
-    void yellowFarAheadStopsBeforeTheLine() {
-        try (SimulationEngine engine = startedEngine(SimulationConfig.defaultConfig(), 60.0,
+    void yellowFarAheadStopsBeforeTheLine(ExpertBackendType backend) {
+        try (SimulationEngine engine = startedEngine(backend, SimulationConfig.defaultConfig(), 60.0,
             light(TrafficLightState.YELLOW, 80.0))) {
             EgoVehicleState ego = engine.getWorldState().getEgo();
             TrafficLight light = onlyLight(engine);
@@ -96,13 +99,14 @@ class TrafficLightCycleE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(30)
     @DisplayName("stopped at yellow: stays stopped when it turns red, and moves off only when it turns green once the ego has waited the red time")
-    void staysStoppedThroughRedAndDrivesOnAtGreen() {
+    void staysStoppedThroughRedAndDrivesOnAtGreen(ExpertBackendType backend) {
         double yellowSeconds = 10.0;
         double redSeconds = 5.0;
-        try (SimulationEngine engine = startedEngine(configWithLightTimes(yellowSeconds, redSeconds), 50.0,
+        try (SimulationEngine engine = startedEngine(backend, configWithLightTimes(yellowSeconds, redSeconds), 50.0,
             light(TrafficLightState.YELLOW, 80.0))) {
             EgoVehicleState ego = engine.getWorldState().getEgo();
             TrafficLight light = onlyLight(engine);
@@ -142,11 +146,12 @@ class TrafficLightCycleE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(30)
     @DisplayName("yellow too close to stop safely: the ego drives on, does not brake across the light and is not held after it")
-    void yellowTooCloseIsDrivenThroughWithoutBraking() {
-        try (SimulationEngine engine = startedEngine(SimulationConfig.defaultConfig(), 60.0)) {
+    void yellowTooCloseIsDrivenThroughWithoutBraking(ExpertBackendType backend) {
+        try (SimulationEngine engine = startedEngine(backend, SimulationConfig.defaultConfig(), 60.0)) {
             EgoVehicleState ego = engine.getWorldState().getEgo();
             for (int i = 0; i < 10; i++) {
                 engine.tick();
@@ -175,11 +180,12 @@ class TrafficLightCycleE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(30)
     @DisplayName("committed to drive on at yellow, the light turns red before the ego has passed: it still drives on")
-    void keepsDrivingOnWhenTheYellowTurnsRedBeforeItHasPassed() {
-        try (SimulationEngine engine = startedEngine(SimulationConfig.defaultConfig(), 20.0)) {
+    void keepsDrivingOnWhenTheYellowTurnsRedBeforeItHasPassed(ExpertBackendType backend) {
+        try (SimulationEngine engine = startedEngine(backend, SimulationConfig.defaultConfig(), 20.0)) {
             EgoVehicleState ego = engine.getWorldState().getEgo();
             for (int i = 0; i < 10; i++) {
                 engine.tick();
@@ -206,15 +212,15 @@ class TrafficLightCycleE2ETest {
     }
 
     private static String lightFact(SimulationEngine engine) {
-        return engine.getWorkingMemoryFactViews().stream()
-            .filter(f -> f.type().equals("TrafficLightStateFact")).map(f -> f.value()).findFirst().orElse("");
+        return TrafficLightProbe.lightFact(engine);
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(40)
     @DisplayName("yellow detected far away: committed to stop from the first detection, progressive approach, never changes to drive on")
-    void yellowDetectedFarAwayCommitsToStopFromTheFirstDetectionAndNeverChanges() {
-        try (SimulationEngine engine = startedEngine(SimulationConfig.defaultConfig(), 30.0,
+    void yellowDetectedFarAwayCommitsToStopFromTheFirstDetectionAndNeverChanges(ExpertBackendType backend) {
+        try (SimulationEngine engine = startedEngine(backend, SimulationConfig.defaultConfig(), 30.0,
             light(TrafficLightState.YELLOW, 115.0))) {
             EgoVehicleState ego = engine.getWorldState().getEgo();
             TrafficLight light = onlyLight(engine);
@@ -261,11 +267,12 @@ class TrafficLightCycleE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(30)
     @DisplayName("committed to drive on: once the ego has cleared the light, the light's state and the commitment are cleared")
-    void commitmentIsClearedOnceTheLightIsBehind() {
-        try (SimulationEngine engine = startedEngine(SimulationConfig.defaultConfig(), 60.0)) {
+    void commitmentIsClearedOnceTheLightIsBehind(ExpertBackendType backend) {
+        try (SimulationEngine engine = startedEngine(backend, SimulationConfig.defaultConfig(), 60.0)) {
             EgoVehicleState ego = engine.getWorldState().getEgo();
             for (int i = 0; i < 10; i++) {
                 engine.tick();
@@ -292,11 +299,12 @@ class TrafficLightCycleE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(30)
     @DisplayName("red light first seen 15 m ahead at 60 km/h, already past the stop line: never keeps its speed, brakes as hard as it can while the light is ahead")
-    void redLightFirstSeenPastTheStopLineIsBrakedForHard() {
-        try (SimulationEngine engine = startedEngine(SimulationConfig.defaultConfig(), 60.0)) {
+    void redLightFirstSeenPastTheStopLineIsBrakedForHard(ExpertBackendType backend) {
+        try (SimulationEngine engine = startedEngine(backend, SimulationConfig.defaultConfig(), 60.0)) {
             EgoVehicleState ego = engine.getWorldState().getEgo();
             for (int i = 0; i < 10; i++) {
                 engine.tick();
@@ -339,11 +347,12 @@ class TrafficLightCycleE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(30)
     @DisplayName("red light first seen past the stop line at low speed: comfortable stop, at rest before the light, held, green after the red time")
-    void redLightFirstSeenPastTheStopLineAtLowSpeedStopsComfortablyBeforeTheLightAndHolds() {
-        try (SimulationEngine engine = startedEngine(SimulationConfig.defaultConfig(), 25.0)) {
+    void redLightFirstSeenPastTheStopLineAtLowSpeedStopsComfortablyBeforeTheLightAndHolds(ExpertBackendType backend) {
+        try (SimulationEngine engine = startedEngine(backend, SimulationConfig.defaultConfig(), 25.0)) {
             EgoVehicleState ego = engine.getWorldState().getEgo();
             for (int i = 0; i < 10; i++) {
                 engine.tick();
@@ -387,11 +396,12 @@ class TrafficLightCycleE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(30)
     @DisplayName("red light at a normal distance: the approach stays progressive, with no emergency brake")
-    void redLightAtANormalDistanceIsStillApproachedProgressively() {
-        try (SimulationEngine engine = startedEngine(SimulationConfig.defaultConfig(), 60.0,
+    void redLightAtANormalDistanceIsStillApproachedProgressively(ExpertBackendType backend) {
+        try (SimulationEngine engine = startedEngine(backend, SimulationConfig.defaultConfig(), 60.0,
             light(TrafficLightState.RED, 115.0))) {
             EgoVehicleState ego = engine.getWorldState().getEgo();
             TrafficLight light = onlyLight(engine);
@@ -412,11 +422,12 @@ class TrafficLightCycleE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(30)
     @DisplayName("red light already behind the ego: it is no longer considered and does not brake the ego")
-    void redLightBehindTheEgoDoesNotBrakeIt() {
-        try (SimulationEngine engine = startedEngine(SimulationConfig.defaultConfig(), 60.0)) {
+    void redLightBehindTheEgoDoesNotBrakeIt(ExpertBackendType backend) {
+        try (SimulationEngine engine = startedEngine(backend, SimulationConfig.defaultConfig(), 60.0)) {
             EgoVehicleState ego = engine.getWorldState().getEgo();
             for (int i = 0; i < 10; i++) {
                 engine.tick();

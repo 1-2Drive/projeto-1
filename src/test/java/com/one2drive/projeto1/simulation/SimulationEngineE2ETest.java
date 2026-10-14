@@ -9,6 +9,7 @@ import com.one2drive.projeto1.domain.Lane;
 import com.one2drive.projeto1.domain.StopSign;
 import com.one2drive.projeto1.domain.TrafficLight;
 import com.one2drive.projeto1.domain.WeatherCondition;
+import com.one2drive.projeto1.inference.ExpertBackendType;
 import com.one2drive.projeto1.scenario.ScenarioActorDefinition;
 import com.one2drive.projeto1.scenario.ScenarioActorType;
 import com.one2drive.projeto1.scenario.ScenarioDefinition;
@@ -17,6 +18,8 @@ import com.one2drive.projeto1.scenario.ScenarioRoadElementDefinition;
 import com.one2drive.projeto1.scenario.ScenarioRoadElementType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.ParameterizedTest;
 
 import java.util.HashSet;
 import java.util.List;
@@ -375,14 +378,14 @@ class SimulationEngineE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(12)
-    void dynamicWorldMutationPotholeDuringRunTriggersReaction() {
+    void dynamicWorldMutationPotholeDuringRunTriggersReaction(ExpertBackendType backend) {
         ScenarioLibrary library = ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json");
         ScenarioDefinition scenario = library.findById("S1").orElseThrow();
 
-        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {
-        })) {
+        try (SimulationEngine engine = BackendTestSupport.engine(scenario, backend)) {
             engine.start();
             for (int i = 0; i < 8; i++) {
                 engine.tick();
@@ -454,14 +457,14 @@ class SimulationEngineE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(12)
-    void weatherMutationDuringRunChangesRecommendationsAndVehicleBehavior() {
+    void weatherMutationDuringRunChangesRecommendationsAndVehicleBehavior(ExpertBackendType backend) {
         ScenarioLibrary library = ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json");
         ScenarioDefinition scenario = library.findById("S1").orElseThrow();
 
-        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {
-        })) {
+        try (SimulationEngine engine = BackendTestSupport.engine(scenario, backend)) {
             engine.getWorldState().getEgo().setSpeedKmh(110.0);
             engine.start();
             for (int i = 0; i < 6; i++) {
@@ -623,9 +626,10 @@ class SimulationEngineE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(45)
-    void speedRadarEnforcesSameLimitInEveryEgoLane() {
+    void speedRadarEnforcesSameLimitInEveryEgoLane(ExpertBackendType backend) {
         for (Lane lane : Lane.values()) {
             ScenarioDefinition scenario = new ScenarioDefinition();
             scenario.setId("RADAR_" + lane);
@@ -639,7 +643,7 @@ class SimulationEngineE2ETest {
             radar.setSpeedLimitKmh(70);
             scenario.getRoadElements().add(radar);
 
-            try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> { })) {
+            try (SimulationEngine engine = BackendTestSupport.engine(scenario, backend)) {
                 assertEquals(1, engine.getWorldState().getRoadElements().stream()
                     .filter(com.one2drive.projeto1.domain.SpeedRadar.class::isInstance).count(),
                     "The all-lane radar must exist once in world state");
@@ -662,8 +666,8 @@ class SimulationEngineE2ETest {
                     SimulationSnapshot snapshot = engine.tick();
                     assertTrue(snapshot.egoPositionMeters() < 250.0 || snapshot.egoSpeedKmh() <= 70.1,
                         "Ego must stay at/below radar speed through the enforcement point");
-                    passed = engine.getWorkingMemoryFactViews().stream()
-                        .anyMatch(f -> f.type().equals("SpeedRadarFact") && f.value().contains("passed=true"));
+                    // Both backends record the passage on the timeline the moment it happens.
+                    passed = snapshot.timeline().stream().anyMatch(line -> line.contains("Speed radar passed at"));
                     if (passed) break;
                 }
                 assertTrue(passed, "The all-lane radar must be recorded as passed for " + lane);
@@ -671,9 +675,10 @@ class SimulationEngineE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(15)
-    void radarDoesNotAccelerateCompliantEgoAboveItsLimitAndReleasesAfterPassage() {
+    void radarDoesNotAccelerateCompliantEgoAboveItsLimitAndReleasesAfterPassage(ExpertBackendType backend) {
         ScenarioDefinition scenario = new ScenarioDefinition();
         scenario.setId("RADAR_COMPLIANT");
         scenario.setInitialSpeedKmh(90);
@@ -684,7 +689,7 @@ class SimulationEngineE2ETest {
         radar.setPositionMeters(100);
         radar.setSpeedLimitKmh(70);
         scenario.getRoadElements().add(radar);
-        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> { })) {
+        try (SimulationEngine engine = BackendTestSupport.engine(scenario, backend)) {
             engine.start();
             boolean compliedBeforeRadar = false;
             for (int i = 0; i < 250; i++) {

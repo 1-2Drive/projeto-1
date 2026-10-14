@@ -4,6 +4,7 @@ import com.one2drive.projeto1.api.model.ApiSimulationSnapshot;
 import com.one2drive.projeto1.api.model.ApiSystemStatus;
 import com.one2drive.projeto1.config.SimulationConfig;
 import com.one2drive.projeto1.domain.LaneChangeDirection;
+import com.one2drive.projeto1.inference.ExpertBackendType;
 import com.one2drive.projeto1.scenario.ScenarioDefinition;
 import com.one2drive.projeto1.scenario.ScenarioLibrary;
 import com.one2drive.projeto1.simulation.SimulationEngine;
@@ -52,10 +53,13 @@ public class SimulationRuntimeService {
             // A scheduled task that throws is never run again, which would freeze the
             // simulation silently: log the failure and keep ticking.
             try {
+                ApiSimulationSnapshot snapshot;
                 synchronized (this) {
                     simulationEngine.tick();
-                    publisher.publish(snapshot());
+                    snapshot = snapshot();
                 }
+                // Outside the lock: sending to the clients must never hold up API calls.
+                publisher.publish(snapshot);
             } catch (RuntimeException e) {
                 LOGGER.error("Simulation tick failed", e);
             }
@@ -76,8 +80,9 @@ public class SimulationRuntimeService {
     public synchronized ApiSystemStatus systemStatus() {
         return new ApiSystemStatus(
             "CONNECTED",
-            "ACTIVE",
-            simulationEngine.getStatus().name()
+            simulationEngine.getBackendError() == null ? "ACTIVE" : "ERROR",
+            simulationEngine.getStatus().name(),
+            simulationEngine.getBackendType().name()
         );
     }
 
@@ -121,6 +126,17 @@ public class SimulationRuntimeService {
         ScenarioDefinition scenario = scenarioLibrary.findById(scenarioId)
             .orElseThrow(() -> new NoSuchElementException("Scenario not found: " + scenarioId));
         simulationEngine.reset(scenario);
+        publisher.publish(snapshot());
+    }
+
+    /**
+     * Makes {@code type} the deciding engine. The current scenario is reloaded, as a reset
+     * would, so the new engine starts from an empty working memory.
+     */
+    public synchronized void switchBackend(ExpertBackendType type) {
+        ScenarioDefinition scenario = scenarioLibrary.findById(simulationEngine.getScenarioId())
+            .orElseGet(() -> scenarioLibrary.getScenarios().stream().findFirst().orElseThrow());
+        simulationEngine.switchBackend(type, scenario);
         publisher.publish(snapshot());
     }
 

@@ -18,6 +18,10 @@ export class DecisionPanelComponent {
 
   protected readonly decision = computed(() => this.snapshot()?.currentDecision ?? null);
 
+  /** Which rule engine reached the decision. */
+  protected readonly source = computed(() =>
+    this.snapshot()?.expertBackend === 'PROLOG' ? 'SWI-Prolog · swipl' : 'Drools · KieSession');
+
   /**
    * True before the first decision cycle ever ran (fresh load, or after RESET). The
    * backend still ships its untouched default decision there, so the panel shows its

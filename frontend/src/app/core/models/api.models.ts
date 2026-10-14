@@ -114,7 +114,13 @@ export interface ApiSimulationSnapshot {
     rightMarking: 'DASHED' | 'CONTINUOUS' | string;
   };
   laneSafety?: Array<{ lane: LaneName; safe: boolean }>;
+  /** Rule engine deciding this simulation. */
+  expertBackend?: ExpertBackend;
+  /** Why that engine stopped deciding (the simulation is then paused); null while it works. */
+  expertBackendError?: string | null;
 }
+
+export type ExpertBackend = 'DROOLS' | 'PROLOG';
 
 /**
  * The road as a matrix: cells[row][lane], rows going forward along a looping road and
@@ -232,8 +238,10 @@ export interface ApiImportantEventView {
 
 export interface ApiSystemStatus {
   backend: string;
+  /** ACTIVE while the deciding rule engine, whichever it is, works. */
   drools: string;
   simulation: string;
+  expertBackend?: ExpertBackend;
 }
 
 export interface SnapshotStreamMessage {

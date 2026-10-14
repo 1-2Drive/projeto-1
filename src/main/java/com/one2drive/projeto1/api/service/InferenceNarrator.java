@@ -2,7 +2,6 @@ package com.one2drive.projeto1.api.service;
 
 import com.one2drive.projeto1.api.model.ApiSimulationSnapshot;
 import com.one2drive.projeto1.drools.FactDescription;
-import com.one2drive.projeto1.drools.KnowledgeSession;
 import com.one2drive.projeto1.domain.DrivingAction;
 import com.one2drive.projeto1.drools.facts.SpeedRadarFact;
 import com.one2drive.projeto1.explanation.ExplanationTrace;
@@ -18,8 +17,8 @@ import java.util.List;
 /**
  * Builds the "what just happened" narrative shown in the UI.
  *
- * <p>Every line restates something the engine, the sensors or Drools already
- * produced. Nothing here infers a driving conclusion; if Drools has not decided
+ * <p>Every line restates something the engine, the sensors or the rule engine already
+ * produced. Nothing here infers a driving conclusion; if the rules have not decided
  * something, this class does not claim it.
  */
 final class InferenceNarrator {
@@ -36,8 +35,7 @@ final class InferenceNarrator {
     }
 
     static ApiSimulationSnapshot.InferenceSummaryView summarise(SimulationEngine engine, SimulationSnapshot snapshot) {
-        KnowledgeSession knowledge = engine.getKnowledgeSession();
-        List<TimelineEntry> entries = knowledge.getTrace().snapshot();
+        List<TimelineEntry> entries = engine.getTrace().snapshot();
         TimelineEntry lastImportant = lastImportantEntry(entries);
 
         return new ApiSimulationSnapshot.InferenceSummaryView(
@@ -100,7 +98,7 @@ final class InferenceNarrator {
 
         String rule = engine.getCurrentDecision().getSourceRule();
         if (rule != null && !rule.isBlank()) {
-            steps.add("Drools fired \"" + rule + "\"");
+            steps.add(engine.getBackendType().label() + " fired \"" + rule + "\"");
         }
 
         steps.add("Decision: " + snapshot.currentDecision()

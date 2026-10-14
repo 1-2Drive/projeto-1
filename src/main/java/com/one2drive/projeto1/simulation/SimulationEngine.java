@@ -16,6 +16,7 @@ import com.one2drive.projeto1.drools.events.AccelerationRequestEvent;
 import com.one2drive.projeto1.drools.events.BarrierDetectedEvent;
 import com.one2drive.projeto1.drools.events.FrontDistanceEvent;
 import com.one2drive.projeto1.drools.events.LaneOccupancyEvent;
+import com.one2drive.projeto1.drools.DroolsBackend;
 import com.one2drive.projeto1.drools.KnowledgeSession;
 import com.one2drive.projeto1.drools.WorkingMemoryFactView;
 import com.one2drive.projeto1.drools.events.LaneChangeRequestEvent;
@@ -27,13 +28,15 @@ import com.one2drive.projeto1.drools.events.SpeedLimitDetectedEvent;
 import com.one2drive.projeto1.drools.events.StopSignEvent;
 import com.one2drive.projeto1.drools.events.TTCEvent;
 import com.one2drive.projeto1.drools.events.TrafficLightEvent;
-import com.one2drive.projeto1.drools.facts.CruiseTargetFact;
-import com.one2drive.projeto1.drools.facts.CurrentSpeedLimit;
 import com.one2drive.projeto1.drools.facts.SpeedRadarFact;
-import com.one2drive.projeto1.drools.facts.VehicleStateFact;
 import com.one2drive.projeto1.explanation.ExplanationTrace;
 import com.one2drive.projeto1.explanation.TimelineEntry;
 import com.one2drive.projeto1.explanation.TimelineEntryType;
+import com.one2drive.projeto1.inference.DecisionInput;
+import com.one2drive.projeto1.inference.ExpertBackendType;
+import com.one2drive.projeto1.inference.ExpertSystemBackend;
+import com.one2drive.projeto1.inference.ExpertSystemException;
+import com.one2drive.projeto1.prolog.PrologBackend;
 import com.one2drive.projeto1.scenario.ScenarioActorDefinition;
 import com.one2drive.projeto1.scenario.ScenarioDefinition;
 import com.one2drive.projeto1.scenario.ScenarioFactory;
@@ -45,10 +48,6 @@ import com.one2drive.projeto1.sensors.EnvironmentSensor;
 import com.one2drive.projeto1.sensors.FrontRadarSensor;
 import com.one2drive.projeto1.sensors.SensorManager;
 import com.one2drive.projeto1.sensors.SpeedSensor;
-import org.kie.api.runtime.rule.FactHandle;
-import org.kie.api.runtime.rule.QueryResultsRow;
-import org.kie.api.runtime.ClassObjectFilter;
-import org.kie.api.time.SessionPseudoClock;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -59,20 +58,20 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 public class SimulationEngine implements AutoCloseable {
     /** Objects closer than this behind the car are drawn behind it; anything further back is drawn as coming up. */
     private static final double RENDER_BEHIND_METERS = 50.0;
-    /** Upper bound on rule firings in one tick; a normal tick fires well under a hundred. */
-    private static final int MAX_RULE_FIRINGS_PER_TICK = 5000;
     /** Roughly one car length: a passed vehicle catching up from behind vanishes just before the bumpers meet. */
     private static final double CATCH_UP_GAP_METERS = 6.0;
 
     private final SimulationConfig config;
     private final SimulationClock simulationClock;
-    private KnowledgeSession knowledgeSession;
+    private ExpertSystemBackend backend;
+    private ExpertBackendType backendType;
+    /** Why the active backend stopped deciding, until the next reset; null while it works. */
+    private String backendError;
     private final WorldPhysicsEngine physicsEngine;
     private final DecisionActuator actuator;
     private final SensorManager sensorManager;
@@ -104,8 +103,6 @@ public class SimulationEngine implements AutoCloseable {
     private long scenarioActionCursor;
     private SimulationStatus status;
     private DrivingDecision currentDecision;
-    private FactHandle vehicleStateHandle;
-    private VehicleStateFact vehicleStateFact;
     private String scenarioId;
     private double scenarioInitialSpeedKmh;
 
@@ -113,7 +110,16 @@ public class SimulationEngine implements AutoCloseable {
                             ScenarioDefinition scenarioDefinition,
                             boolean pseudoClock,
                             Consumer<DrivingDecision> decisionConsumer) {
+        this(config, scenarioDefinition, pseudoClock, decisionConsumer, ExpertBackendType.DROOLS);
+    }
+
+    public SimulationEngine(SimulationConfig config,
+                            ScenarioDefinition scenarioDefinition,
+                            boolean pseudoClock,
+                            Consumer<DrivingDecision> decisionConsumer,
+                            ExpertBackendType backendType) {
         this.config = config;
+        this.backendType = backendType;
         this.pseudoClock = pseudoClock;
         this.decisionConsumer = decisionConsumer;
         this.simulationClock = pseudoClock ? new PseudoSimulationClock(0) : new RealtimeSimulationClock();
@@ -133,14 +139,11 @@ public class SimulationEngine implements AutoCloseable {
         this.passedActorIds = new HashSet<>();
         this.demoEvidence = new HashSet<>();
 
-        this.knowledgeSession = createKnowledgeSession();
-
         this.worldState = ScenarioFactory.buildWorld(scenarioDefinition, config);
         this.scenarioId = scenarioDefinition.getId();
         this.worldState.setSimTimeMillis(0);
         this.simTimeMillis = 0;
         this.status = SimulationStatus.STOPPED;
-        this.currentDecision = knowledgeSession.getDrivingDecision();
 
         this.timedActions = new ArrayList<>(scenarioDefinition.getTimedActions());
         this.timedActions.sort(Comparator.comparingLong(ScenarioTimedAction::getTriggerTimeMillis));
@@ -158,34 +161,20 @@ public class SimulationEngine implements AutoCloseable {
             new EnvironmentSensor(config)
         ));
 
-        insertInitialVehicleFact();
-        insertCruiseTargetFact();
-    }
-
-    private KnowledgeSession createKnowledgeSession() {
-        ExplanationTrace trace = new ExplanationTrace(500);
-        return pseudoClock
-            ? KnowledgeSession.createPseudoClock(trace, decisionConsumer)
-            : KnowledgeSession.createRealtime(trace, decisionConsumer);
-    }
-
-    private void insertInitialVehicleFact() {
-        this.vehicleStateFact = new VehicleStateFact(
-            worldState.getEgo().getSpeedKmh(),
-            worldState.getEgo().getPositionMeters(),
-            worldState.getEgo().getLane(),
-            simTimeMillis
-        );
-        this.vehicleStateHandle = knowledgeSession.getKieSession().insert(vehicleStateFact);
+        this.backend = createBackend();
+        this.currentDecision = backend.getDrivingDecision();
     }
 
     /**
-     * Publishes the scenario's initial speed as the cruise speed of this road: it is the
-     * only target that can accelerate the vehicle again after a rule slowed it down
-     * (brake, overtake, stop) and no speed-limit sign governs the road.
+     * Opens a session of the selected backend on the world as it is now: the vehicle at rest
+     * and the scenario's initial speed as the cruise speed of this road.
      */
-    private void insertCruiseTargetFact() {
-        knowledgeSession.getKieSession().insert(new CruiseTargetFact(scenarioInitialSpeedKmh));
+    private ExpertSystemBackend createBackend() {
+        return switch (backendType) {
+            case DROOLS -> new DroolsBackend(config, pseudoClock, decisionConsumer, worldState, simTimeMillis,
+                scenarioInitialSpeedKmh);
+            case PROLOG -> new PrologBackend(config, decisionConsumer, scenarioInitialSpeedKmh);
+        };
     }
 
     /**
@@ -229,8 +218,8 @@ public class SimulationEngine implements AutoCloseable {
 
     public synchronized void reset(ScenarioDefinition scenarioDefinition) {
         pendingWorldMutations.clear();
-        knowledgeSession.close();
-        knowledgeSession = createKnowledgeSession();
+        backend.close();
+        backendError = null;
         simulationClock.reset();
         worldState = ScenarioFactory.buildWorld(scenarioDefinition, config);
         scenarioId = scenarioDefinition.getId();
@@ -241,8 +230,6 @@ public class SimulationEngine implements AutoCloseable {
         timedActions.addAll(scenarioDefinition.getTimedActions());
         timedActions.sort(Comparator.comparingLong(ScenarioTimedAction::getTriggerTimeMillis));
         status = SimulationStatus.STOPPED;
-        currentDecision = knowledgeSession.getDrivingDecision();
-        currentDecision.reset(0);
         sensorManager.reset();
         lastSensorValues.clear();
         sensorSignificance.reset();
@@ -263,8 +250,26 @@ public class SimulationEngine implements AutoCloseable {
         demoEvidence.clear();
         scenarioInitialSpeedKmh = scenarioDefinition.getInitialSpeedKmh();
         holdVehicleAtRest();
-        insertInitialVehicleFact();
-        insertCruiseTargetFact();
+        backend = createBackend();
+        currentDecision = backend.getDrivingDecision();
+        currentDecision.reset(0);
+    }
+
+    /**
+     * Makes {@code type} the backend that decides, reloading {@code scenarioDefinition} as a
+     * reset does: the new engine starts from an empty working memory, never from the other's.
+     * If the new backend cannot start, the previous one is restored and the error rethrown.
+     */
+    public synchronized void switchBackend(ExpertBackendType type, ScenarioDefinition scenarioDefinition) {
+        ExpertBackendType previous = backendType;
+        backendType = type;
+        try {
+            reset(scenarioDefinition);
+        } catch (RuntimeException e) {
+            backendType = previous;
+            reset(scenarioDefinition);
+            throw e;
+        }
     }
 
     public synchronized SimulationSnapshot tick() {
@@ -284,111 +289,54 @@ public class SimulationEngine implements AutoCloseable {
         worldState.setSimTimeMillis(simTimeMillis);
 
         if (simulationClock.isPseudo()) {
-            SessionPseudoClock pseudoClock = (SessionPseudoClock) knowledgeSession.getKieSession().getSessionClock();
-            pseudoClock.advanceTime(config.getTickMillis(), TimeUnit.MILLISECONDS);
+            backend.advanceClock(config.getTickMillis());
         }
 
         flushPendingMutations();
         runTimedActions();
 
         List<Object> events = sensorManager.observe(worldState, simTimeMillis);
-        knowledgeSession.beginDecisionCycle(simTimeMillis, worldState.getEgo().getSpeedKmh());
+        backend.beginDecisionCycle(simTimeMillis, worldState.getEgo().getSpeedKmh());
         for (Object event : events) {
-            // Raw samples still go to Drools and Working Memory; only meaningful
-            // transitions reach the inference timeline.
+            // Raw samples still go to the rule engine and its working memory; only
+            // meaningful transitions reach the inference timeline.
             String significant = sensorSignificance.classify(event);
             if (significant != null) {
-                knowledgeSession.getTrace().add(simTimeMillis, TimelineEntryType.PERCEPTION_CHANGE, significant);
+                backend.getTrace().add(simTimeMillis, TimelineEntryType.PERCEPTION_CHANGE, significant);
             }
-            knowledgeSession.getRouter().insertEvent(event);
+            backend.insertEvent(event);
             updateSensorPanel(event);
             recordDetectedObject(event);
         }
-        updateVehicleStateFact();
-        updateActiveRadarFact();
+        backend.updateVehicleState(new DecisionInput(worldState, simTimeMillis, scenarioId));
         refreshSensorTelemetry(events);
 
-        // Circuit breaker: rules that re-trigger each other must never freeze the tick.
-        int fired = knowledgeSession.getKieSession().fireAllRules(MAX_RULE_FIRINGS_PER_TICK);
-        if (fired >= MAX_RULE_FIRINGS_PER_TICK) {
-            knowledgeSession.getTrace().add(simTimeMillis, TimelineEntryType.INFO,
-                "Rule firing limit reached (" + MAX_RULE_FIRINGS_PER_TICK + "): possible rule loop");
-        }
-        knowledgeSession.getDecisionContext().applyTo(currentDecision);
-
-        FactHandle decisionHandle = findFactHandle(currentDecision);
-        if (decisionHandle != null) {
-            knowledgeSession.getKieSession().update(decisionHandle, currentDecision);
+        try {
+            backend.decide();
+        } catch (ExpertSystemException e) {
+            // No decision was inferred, so none is acted on: the simulation pauses with the
+            // error in view instead of driving on a default nobody decided.
+            backendError = backendType.label() + " failed: " + e.getMessage();
+            backend.getTrace().add(simTimeMillis, TimelineEntryType.INFO, backendError + " (simulation paused)");
+            status = SimulationStatus.PAUSED;
+            return snapshot();
         }
 
         boolean decisionChanged = trackDecisionTransition();
         if (decisionChanged) {
-            knowledgeSession.getTrace().addDecision(currentDecision);
+            backend.getTrace().addDecision(currentDecision);
         }
         LaneChangeState stateBefore = worldState.getEgo().getLaneChangeState();
         actuator.applyDecision(worldState, currentDecision);
         recordManeuverStart(stateBefore);
         recordActuatorChange();
         settleManeuver();
-        recordRadarPassage();
+        backend.afterActuation(worldState, simTimeMillis);
         consumePassedRoadElements();
         markDemoEvidence(events);
         purgeExpiredDetections();
 
         return snapshot();
-    }
-
-    private void recordRadarPassage() {
-        SpeedRadarFact radarFact = null;
-        FactHandle radarHandle = null;
-        for (Object fact : knowledgeSession.getKieSession().getObjects(new ClassObjectFilter(SpeedRadarFact.class))) {
-            radarFact = (SpeedRadarFact) fact;
-            break;
-        }
-        if (radarFact != null) radarHandle = findFactHandle(radarFact);
-        if (radarFact != null && radarHandle != null && radarFact.isDetected() && !radarFact.isPassed()) {
-            String activeRadarId = radarFact.getRadarId();
-            var radar = worldState.getRoadElements().stream()
-                .filter(com.one2drive.projeto1.domain.SpeedRadar.class::isInstance)
-                .map(com.one2drive.projeto1.domain.SpeedRadar.class::cast)
-                .filter(candidate -> candidate.getId().equals(activeRadarId))
-                .findFirst();
-            if (radar.isPresent() && worldState.signedDistance(radar.get().getPositionMeters()) <= 0.0) {
-                radarFact.setPassed(true);
-                radarFact.setDistanceMeters(0.0);
-                radarFact.setTimestamp(simTimeMillis);
-                knowledgeSession.getKieSession().update(radarHandle, radarFact);
-                knowledgeSession.getTrace().add(simTimeMillis, TimelineEntryType.INFO,
-                    "Speed radar passed at " + Math.round(worldState.getEgo().getSpeedKmh())
-                        + " km/h — legal limit " + Math.round(radarFact.getSpeedLimitKmh()) + " km/h");
-            }
-        }
-    }
-
-    /** Makes the nearest lane-independent enforcement device authoritative for the decision cycle. */
-    private void updateActiveRadarFact() {
-        SpeedRadarFact state = null;
-        FactHandle handle = null;
-        for (FactHandle candidate : knowledgeSession.getKieSession().getFactHandles(new ClassObjectFilter(SpeedRadarFact.class))) {
-            state = (SpeedRadarFact) knowledgeSession.getKieSession().getObject(candidate);
-            handle = candidate;
-            break;
-        }
-        if (state == null || handle == null || state.isPassed()) return;
-        var radar = worldState.findNearestSpeedRadarAhead(250.0);
-        if (radar.isEmpty()) return;
-
-        var device = radar.get();
-        double distance = worldState.signedDistance(device.getPositionMeters());
-        if (!device.getId().equals(state.getRadarId()) || Math.abs(distance - state.getDistanceMeters()) > 0.01
-            || Math.abs(state.getSpeedLimitKmh() - device.getSpeedLimitKmh()) > 0.01 || !state.isDetected()) {
-            state.setRadarId(device.getId());
-            state.setDistanceMeters(distance);
-            state.setSpeedLimitKmh(device.getSpeedLimitKmh());
-            state.setTimestamp(simTimeMillis);
-            state.setDetected(true);
-            knowledgeSession.getKieSession().update(handle, state);
-        }
     }
 
     /** Retires single-use static objects after passing while retaining their visual as it moves behind the car. */
@@ -457,7 +405,7 @@ public class SimulationEngine implements AutoCloseable {
         if (ego.getLaneChangeState() != LaneChangeState.REQUESTED || stateBefore == LaneChangeState.REQUESTED) {
             return;
         }
-        knowledgeSession.getTrace().add(
+        backend.getTrace().add(
             simTimeMillis,
             TimelineEntryType.MANEUVER,
             "MANEUVER STARTED " + ego.getLane().name() + " -> " + ego.getTargetLane().name()
@@ -693,31 +641,11 @@ public class SimulationEngine implements AutoCloseable {
         }
         tracedActuatorAction = currentDecision.getAction();
         tracedActuatorAcceleration = acceleration;
-        knowledgeSession.getTrace().add(
+        backend.getTrace().add(
             simTimeMillis,
             TimelineEntryType.ACTUATOR,
             "ACTUATOR " + currentDecision.getAction() + " acceleration=" + acceleration
         );
-    }
-
-    private void updateVehicleStateFact() {
-        EgoVehicleState ego = worldState.getEgo();
-        vehicleStateFact.setSpeedKmh(ego.getSpeedKmh());
-        vehicleStateFact.setPositionMeters(ego.getPositionMeters());
-        vehicleStateFact.setLane(ego.getLane());
-        vehicleStateFact.setLaneChangeState(ego.getLaneChangeState());
-        vehicleStateFact.setTargetLane(ego.getTargetLane());
-        vehicleStateFact.setTimestamp(simTimeMillis);
-        vehicleStateFact.setDrivingState(ego.getDrivingState());
-        vehicleStateFact.setIndicatorState(ego.getIndicatorState());
-        vehicleStateFact.setLateralPositionMeters(ego.getLateralPositionMeters());
-        vehicleStateFact.setLeftMarking(worldState.getLeftMarking());
-        vehicleStateFact.setRightMarking(worldState.getRightMarking());
-        vehicleStateFact.setRightLaneBlockedAhead(worldState.hasHazardAheadInLane(com.one2drive.projeto1.domain.Lane.RIGHT, 150.0));
-        vehicleStateFact.setLeftAdjacentLaneSafe(worldState.isLaneSafe(ego.getLane().left(), config.getBlindSpotRangeMeters(), 60.0));
-        vehicleStateFact.setRightAdjacentLaneSafe(worldState.isLaneSafe(ego.getLane().right(), config.getBlindSpotRangeMeters(), 60.0));
-        vehicleStateFact.setPresentationDemo("S14_PRESENTATION_DEMO".equals(scenarioId));
-        knowledgeSession.getKieSession().update(vehicleStateHandle, vehicleStateFact);
     }
 
     public synchronized boolean isLaneSafe(Lane lane) {
@@ -725,13 +653,7 @@ public class SimulationEngine implements AutoCloseable {
     }
 
     public synchronized Optional<SpeedRadarFact> activeSpeedRadarFact() {
-        for (Object fact : knowledgeSession.getKieSession().getObjects(new ClassObjectFilter(SpeedRadarFact.class))) {
-            SpeedRadarFact radar = (SpeedRadarFact) fact;
-            if (radar.isDetected() && !radar.isPassed() && !"none".equals(radar.getRadarId())) {
-                return Optional.of(radar);
-            }
-        }
-        return Optional.empty();
+        return backend.activeSpeedRadar();
     }
 
     /**
@@ -744,22 +666,12 @@ public class SimulationEngine implements AutoCloseable {
             return;
         }
         ego.setLane(ego.getTargetLane());
-        knowledgeSession.getTrace().add(
+        backend.getTrace().add(
             simTimeMillis,
             TimelineEntryType.MANEUVER,
             "MANEUVER COMPLETED " + ego.getLane().name() + " lane at "
                 + String.format("%.2f", ego.getLateralPositionMeters()) + "m lateral"
         );
-    }
-
-    private FactHandle findFactHandle(Object object) {
-        for (FactHandle handle : knowledgeSession.getKieSession().getFactHandles()) {
-            Object candidate = knowledgeSession.getKieSession().getObject(handle);
-            if (candidate == object) {
-                return handle;
-            }
-        }
-        return null;
     }
 
     private void flushPendingMutations() {
@@ -1014,11 +926,11 @@ public class SimulationEngine implements AutoCloseable {
     }
 
     public synchronized void requestLaneChange(LaneChangeDirection direction) {
-        knowledgeSession.getRouter().insertEvent(new LaneChangeRequestEvent(simTimeMillis, "ui", direction));
+        backend.submitCommand(new LaneChangeRequestEvent(simTimeMillis, "ui", direction));
     }
 
     public synchronized void requestAcceleration(double targetSpeedKmh) {
-        knowledgeSession.getRouter().insertEvent(new AccelerationRequestEvent(simTimeMillis, "ui", targetSpeedKmh));
+        backend.submitCommand(new AccelerationRequestEvent(simTimeMillis, "ui", targetSpeedKmh));
     }
 
     public synchronized SensorTelemetry getSensorTelemetry() {
@@ -1034,15 +946,10 @@ public class SimulationEngine implements AutoCloseable {
     }
 
     public synchronized SimulationSnapshot snapshot() {
-        double legalLimit = 120;
-        for (Object obj : knowledgeSession.getKieSession().getObjects(new ClassObjectFilter(CurrentSpeedLimit.class))) {
-            CurrentSpeedLimit limit = (CurrentSpeedLimit) obj;
-            legalLimit = limit.getLimitKmh();
-            break;
-        }
+        double legalLimit = backend.currentSpeedLimitKmh();
 
         List<String> timeline = new ArrayList<>();
-        for (TimelineEntry entry : knowledgeSession.getTrace().snapshot()) {
+        for (TimelineEntry entry : backend.getTrace().snapshot()) {
             timeline.add(entry.toString());
         }
 
@@ -1063,7 +970,7 @@ public class SimulationEngine implements AutoCloseable {
             currentDecision.getReason(),
             currentDecision.getSourceRule(),
             Map.copyOf(lastSensorValues),
-            knowledgeSession.getInspector().snapshotFacts(),
+            backend.factSnapshot(),
             timeline,
             detectedObjectTimestamps.keySet().stream().sorted().toList(),
             cameraDetectedObjectTimestamps.keySet().stream().sorted().toList(),
@@ -1085,11 +992,11 @@ public class SimulationEngine implements AutoCloseable {
     }
 
     public synchronized List<WorkingMemoryFactView> getWorkingMemoryFactViews() {
-        return knowledgeSession.getInspector().snapshotFactViews();
+        return backend.factViews();
     }
 
     public synchronized List<TimelineEntry> getTimelineEntries() {
-        return knowledgeSession.getTrace().snapshot();
+        return backend.getTrace().snapshot();
     }
 
     public synchronized List<RoadRenderItem> getAllRoadItemsRelativeToEgo() {
@@ -1113,8 +1020,21 @@ public class SimulationEngine implements AutoCloseable {
         return worldState;
     }
 
+    /** The Drools session, for Drools-specific inspection; fails while another backend decides. */
     public synchronized KnowledgeSession getKnowledgeSession() {
-        return knowledgeSession;
+        if (backend instanceof DroolsBackend drools) {
+            return drools.session();
+        }
+        throw new IllegalStateException("Drools is not the active backend: " + backendType.label() + " is");
+    }
+
+    public synchronized ExpertBackendType getBackendType() {
+        return backendType;
+    }
+
+    /** Why the active backend stopped deciding, or null while it works. */
+    public synchronized String getBackendError() {
+        return backendError;
     }
 
     public synchronized DrivingDecision getCurrentDecision() {
@@ -1122,7 +1042,7 @@ public class SimulationEngine implements AutoCloseable {
     }
 
     public synchronized ExplanationTrace getTrace() {
-        return knowledgeSession.getTrace();
+        return backend.getTrace();
     }
 
     public synchronized String getScenarioId() {
@@ -1134,12 +1054,7 @@ public class SimulationEngine implements AutoCloseable {
     }
 
     public synchronized List<String> queryCurrentDecision() {
-        var query = knowledgeSession.getKieSession().getQueryResults("Current Driving Decision");
-        List<String> lines = new ArrayList<>();
-        for (QueryResultsRow row : query) {
-            lines.add(String.valueOf(row.get("$decision")));
-        }
-        return lines;
+        return backend.queryCurrentDecision();
     }
 
     public synchronized List<RoadRenderItem> visibleRoadItems(double forwardMeters, double backwardMeters) {
@@ -1200,6 +1115,6 @@ public class SimulationEngine implements AutoCloseable {
     public synchronized void close() {
         status = SimulationStatus.STOPPED;
         pendingWorldMutations.clear();
-        knowledgeSession.close();
+        backend.close();
     }
 }

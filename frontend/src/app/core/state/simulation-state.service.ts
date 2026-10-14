@@ -6,6 +6,7 @@ import {
   CreateActorRequest,
   CreateRoadElementRequest,
   EnvironmentUpdateRequest,
+  ExpertBackend,
   MapCellRequest,
   ScenarioSummary,
   UiModel,
@@ -42,6 +43,8 @@ export class SimulationStateService {
   readonly connection = computed(() => this.state().connection);
   readonly error = computed(() => this.state().error);
   readonly loading = computed(() => this.state().loading);
+  readonly expertBackend = computed<ExpertBackend>(() => this.state().snapshot?.expertBackend ?? 'DROOLS');
+  readonly expertBackendError = computed(() => this.state().snapshot?.expertBackendError ?? null);
 
   initialize(): void {
     this.destroyed = false;
@@ -93,7 +96,30 @@ export class SimulationStateService {
     this.runCommand(this.api.resetSimulation(), 'Unable to reset simulation.', 'STOPPED');
   }
 
-  /** Driver request only; Drools decides whether the target lane is safe. */
+  /**
+   * Hands the decisions to another rule engine. The backend reloads the current scenario,
+   * so the simulation comes back STOPPED with an empty working memory.
+   */
+  switchBackend(backend: ExpertBackend): void {
+    if (backend === this.expertBackend() || this.state().loading) {
+      return;
+    }
+    this.patch({ loading: true, error: null });
+    this.api.switchBackend(backend)
+      .pipe(finalize(() => this.patch({ loading: false })))
+      .subscribe({
+        next: (response) => {
+          if (!response.success) {
+            this.patch({ error: response.message || `Unable to switch to ${backend}.` });
+            return;
+          }
+          this.patch({ connection: { ...this.state().connection, simulationStatus: 'STOPPED' } });
+        },
+        error: (err) => this.patch({ error: this.errorMessage(err, `Unable to switch to ${backend}.`) })
+      });
+  }
+
+  /** Driver request only; the rule engine decides whether the target lane is safe. */
   requestLaneChange(direction: 'LEFT' | 'RIGHT'): void {
     this.runCommand(this.api.requestLaneChange(direction), `Unable to request lane change ${direction.toLowerCase()}.`);
   }

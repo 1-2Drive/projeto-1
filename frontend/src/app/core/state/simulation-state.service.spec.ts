@@ -86,6 +86,10 @@ class BackendApiServiceMock {
   updateEnvironment() {
     return of({ success: true, message: 'ok' });
   }
+
+  switchBackend(_backend: string) {
+    return of({ success: true, message: 'ok' });
+  }
 }
 
 class RealtimeStreamServiceMock {
@@ -152,5 +156,35 @@ describe('SimulationStateService', () => {
     expect(service.connection().backendConnected).toBeTrue();
     expect(service.connection().streamStatus).toBe('LIVE');
     expect(service.scenarios().length).toBe(1);
+  });
+
+  it('reports Drools as the rule engine when the snapshot does not name one', () => {
+    service.initialize();
+
+    expect(service.expertBackend()).toBe('DROOLS');
+    expect(service.expertBackendError()).toBeNull();
+  });
+
+  it('asks the backend to switch rule engine, but not to the one already deciding', () => {
+    const api = TestBed.inject(BackendApiService) as unknown as BackendApiServiceMock;
+    const switchSpy = spyOn(api, 'switchBackend').and.callThrough();
+    service.initialize();
+
+    service.switchBackend('DROOLS');
+    expect(switchSpy).not.toHaveBeenCalled();
+
+    service.switchBackend('PROLOG');
+    expect(switchSpy).toHaveBeenCalledOnceWith('PROLOG');
+    expect(service.connection().simulationStatus).toBe('STOPPED');
+    expect(service.loading()).toBeFalse();
+  });
+
+  it('shows why a switch failed', () => {
+    const api = TestBed.inject(BackendApiService) as unknown as BackendApiServiceMock;
+    spyOn(api, 'switchBackend').and.returnValue(of({ success: false, message: 'swipl not found' }));
+    service.initialize();
+
+    service.switchBackend('PROLOG');
+    expect(service.error()).toBe('swipl not found');
   });
 });

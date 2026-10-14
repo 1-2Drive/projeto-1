@@ -7,14 +7,16 @@ import com.one2drive.projeto1.domain.Lane;
 import com.one2drive.projeto1.domain.Pedestrian;
 import com.one2drive.projeto1.domain.TrafficLightState;
 import com.one2drive.projeto1.domain.WeatherCondition;
+import com.one2drive.projeto1.inference.ExpertBackendType;
 import com.one2drive.projeto1.scenario.ScenarioActorDefinition;
 import com.one2drive.projeto1.scenario.ScenarioActorType;
 import com.one2drive.projeto1.scenario.ScenarioDefinition;
 import com.one2drive.projeto1.scenario.ScenarioRoadElementDefinition;
 import com.one2drive.projeto1.scenario.ScenarioRoadElementType;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.ParameterizedTest;
 
 import java.util.Optional;
 
@@ -32,14 +34,14 @@ class PedestrianConflictE2ETest {
     private static final double WALKING_SPEED_KMH = 6.0;
     private static final double SLOW_WALKING_SPEED_KMH = 2.5;
 
-    private static SimulationEngine runningEngine() {
+    private static SimulationEngine runningEngine(ExpertBackendType backend) {
         ScenarioDefinition scenario = new ScenarioDefinition();
         scenario.setId("PEDESTRIAN_CONFLICT");
         scenario.setName("Pedestrian crossing from another lane");
         scenario.setInitialSpeedKmh(EGO_SPEED_KMH);
         scenario.setInitialLane(Lane.RIGHT);
         scenario.setInitialWeather(WeatherCondition.CLEAR);
-        SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {});
+        SimulationEngine engine = BackendTestSupport.engine(scenario, backend);
         engine.start();
         for (int i = 0; i < 10; i++) {
             engine.tick();
@@ -67,11 +69,12 @@ class PedestrianConflictE2ETest {
             || decision.equals(DrivingAction.EMERGENCY_BRAKE.name());
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(30)
     @DisplayName("ego in RIGHT, pedestrian crossing from LEFT towards its lane: braking starts early and the ego stops short of the crossing")
-    void anticipatesPedestrianCrossingFromLeftTowardsTheEgoLane() {
-        try (SimulationEngine engine = runningEngine()) {
+    void anticipatesPedestrianCrossingFromLeftTowardsTheEgoLane(ExpertBackendType backend) {
+        try (SimulationEngine engine = runningEngine(backend)) {
             EgoVehicleState ego = engine.getWorldState().getEgo();
             double crossingPosition = ego.getPositionMeters() + 90.0;
             String id = addPedestrian(engine, Lane.LEFT, 90.0, WALKING_SPEED_KMH);
@@ -110,11 +113,12 @@ class PedestrianConflictE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(30)
     @DisplayName("pedestrian standing in the ego lane: the ego stops near the pedestrian, neither far behind nor too close")
-    void stopsNearAPedestrianStandingInItsLane() {
-        try (SimulationEngine engine = runningEngine()) {
+    void stopsNearAPedestrianStandingInItsLane(ExpertBackendType backend) {
+        try (SimulationEngine engine = runningEngine(backend)) {
             EgoVehicleState ego = engine.getWorldState().getEgo();
             double pedestrianPosition = ego.getPositionMeters() + 100.0;
             addPedestrian(engine, Lane.RIGHT, 100.0, 0.0);
@@ -132,11 +136,12 @@ class PedestrianConflictE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(30)
     @DisplayName("ego in RIGHT, pedestrian standing in LEFT: no conflict, the ego does not brake")
-    void doesNotBrakeForPedestrianInLeftLaneThatWillNotCross() {
-        try (SimulationEngine engine = runningEngine()) {
+    void doesNotBrakeForPedestrianInLeftLaneThatWillNotCross(ExpertBackendType backend) {
+        try (SimulationEngine engine = runningEngine(backend)) {
             EgoVehicleState ego = engine.getWorldState().getEgo();
             addPedestrian(engine, Lane.LEFT, 90.0, 0.0);
 
@@ -156,11 +161,12 @@ class PedestrianConflictE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(30)
     @DisplayName("ego in RIGHT, pedestrian crossing LEFT -> CENTER -> RIGHT: the ego never speeds up while the crossing is occupied, and resumes only after it")
-    void neverSpeedsUpWhileThePedestrianIsStillOnTheCrossing() {
-        try (SimulationEngine engine = runningEngine()) {
+    void neverSpeedsUpWhileThePedestrianIsStillOnTheCrossing(ExpertBackendType backend) {
+        try (SimulationEngine engine = runningEngine(backend)) {
             EgoVehicleState ego = engine.getWorldState().getEgo();
             String id = addPedestrian(engine, Lane.LEFT, 90.0, SLOW_WALKING_SPEED_KMH);
 
@@ -199,11 +205,12 @@ class PedestrianConflictE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(30)
     @DisplayName("pedestrian has left the ego lane but is still on the crossing: the ego stays stopped until it is across")
-    void staysStoppedAfterThePedestrianLeavesItsLaneButIsStillCrossing() {
-        try (SimulationEngine engine = runningEngine()) {
+    void staysStoppedAfterThePedestrianLeavesItsLaneButIsStillCrossing(ExpertBackendType backend) {
+        try (SimulationEngine engine = runningEngine(backend)) {
             EgoVehicleState ego = engine.getWorldState().getEgo();
             // Starts in the ego's lane and walks away from it, across CENTER and LEFT.
             String id = addPedestrian(engine, Lane.RIGHT, 90.0, SLOW_WALKING_SPEED_KMH);
@@ -234,11 +241,12 @@ class PedestrianConflictE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(30)
     @DisplayName("red light beyond a crossing pedestrian: the ego waits for the pedestrian, then still stops at the red light")
-    void afterThePedestrianHasCrossedTheRedLightIsStillRespected() {
-        try (SimulationEngine engine = runningEngine()) {
+    void afterThePedestrianHasCrossedTheRedLightIsStillRespected(ExpertBackendType backend) {
+        try (SimulationEngine engine = runningEngine(backend)) {
             EgoVehicleState ego = engine.getWorldState().getEgo();
             double lightPosition = ego.getPositionMeters() + 130.0;
             ScenarioRoadElementDefinition red = new ScenarioRoadElementDefinition();

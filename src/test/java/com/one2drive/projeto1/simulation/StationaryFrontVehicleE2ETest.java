@@ -1,17 +1,18 @@
 package com.one2drive.projeto1.simulation;
 
-import com.one2drive.projeto1.config.SimulationConfig;
 import com.one2drive.projeto1.domain.DrivingAction;
 import com.one2drive.projeto1.domain.EgoVehicleState;
 import com.one2drive.projeto1.domain.Lane;
 import com.one2drive.projeto1.domain.LaneChangeState;
 import com.one2drive.projeto1.domain.WeatherCondition;
+import com.one2drive.projeto1.inference.ExpertBackendType;
 import com.one2drive.projeto1.scenario.ScenarioActorDefinition;
 import com.one2drive.projeto1.scenario.ScenarioActorType;
 import com.one2drive.projeto1.scenario.ScenarioDefinition;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -24,14 +25,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class StationaryFrontVehicleE2ETest {
 
-    private static SimulationEngine runningEngine(double speedKmh) {
+    private static SimulationEngine runningEngine(ExpertBackendType backend, double speedKmh) {
         ScenarioDefinition scenario = new ScenarioDefinition();
         scenario.setId("STATIONARY_FRONT_VEHICLE");
         scenario.setName("Stationary vehicle in the ego lane");
         scenario.setInitialSpeedKmh(speedKmh);
         scenario.setInitialLane(Lane.RIGHT);
         scenario.setInitialWeather(WeatherCondition.CLEAR);
-        SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {});
+        SimulationEngine engine = BackendTestSupport.engine(scenario, backend);
         engine.start();
         for (int i = 0; i < 10; i++) {
             engine.tick();
@@ -48,11 +49,12 @@ class StationaryFrontVehicleE2ETest {
         return vehicle;
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(30)
     @DisplayName("left lane clear: the ego goes around the stationary vehicle and returns to the right lane")
-    void goesAroundStationaryVehicleWhenLeftLaneIsClear() {
-        try (SimulationEngine engine = runningEngine(60.0)) {
+    void goesAroundStationaryVehicleWhenLeftLaneIsClear(ExpertBackendType backend) {
+        try (SimulationEngine engine = runningEngine(backend, 60.0)) {
             EgoVehicleState ego = engine.getWorldState().getEgo();
             double vehiclePosition = ego.getPositionMeters() + 60.0;
             engine.addActorAhead(stationaryVehicle(Lane.RIGHT, 60.0));
@@ -87,11 +89,12 @@ class StationaryFrontVehicleE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(30)
     @DisplayName("left lane blocked: the ego stops behind the stationary vehicle, holds, then goes around once the lane clears")
-    void stopsBehindStationaryVehicleAndGoesAroundOnceLeftLaneClears() {
-        try (SimulationEngine engine = runningEngine(60.0)) {
+    void stopsBehindStationaryVehicleAndGoesAroundOnceLeftLaneClears(ExpertBackendType backend) {
+        try (SimulationEngine engine = runningEngine(backend, 60.0)) {
             EgoVehicleState ego = engine.getWorldState().getEgo();
             double vehiclePosition = ego.getPositionMeters() + 80.0;
             engine.addActorAhead(stationaryVehicle(Lane.RIGHT, 80.0));
@@ -134,11 +137,12 @@ class StationaryFrontVehicleE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(30)
     @DisplayName("stationary vehicle seen from far away: the ego passes it on the move without emergency braking")
-    void passesFarStationaryVehicleOnTheMove() {
-        try (SimulationEngine engine = runningEngine(60.0)) {
+    void passesFarStationaryVehicleOnTheMove(ExpertBackendType backend) {
+        try (SimulationEngine engine = runningEngine(backend, 60.0)) {
             EgoVehicleState ego = engine.getWorldState().getEgo();
             double vehiclePosition = ego.getPositionMeters() + 125.0;
             engine.addActorAhead(stationaryVehicle(Lane.RIGHT, 125.0));

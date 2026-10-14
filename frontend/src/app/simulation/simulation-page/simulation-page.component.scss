@@ -147,6 +147,7 @@
 
 .controls__primary,
 .controls__driver,
+.controls__engine,
 .controls__demo {
   display: flex;
   align-items: center;
@@ -155,6 +156,7 @@
 }
 
 .controls__driver,
+.controls__engine,
 .controls__demo {
   padding-left: var(--ds-space-3);
   border-left: 1px dashed var(--ds-border);
@@ -212,6 +214,14 @@
 
   &--icon {
     padding: 0.4rem 0.55rem;
+  }
+
+  /* The engine currently deciding, in the rule engine switch. */
+  &--selected {
+    border-color: #3f95cf;
+    background: rgba(47, 127, 184, 0.22);
+    color: #f2fbff;
+    font-weight: 600;
   }
 }
 

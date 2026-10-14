@@ -18,6 +18,29 @@ The loop runs continuously while the simulation is running. Changing the world
 while the vehicle is moving produces new sensor observations, new inference, and
 new vehicle behavior.
 
+## Rule engines: Drools and SWI-Prolog
+
+Decisions come from one of two interchangeable rule engines behind
+`inference.ExpertSystemBackend`:
+
+- **Drools** (default): the full DRL knowledge base, CEP, live query.
+- **SWI-Prolog**: our own forward-chaining production-rule engine (`src/main/prolog/`):
+  each rule with a precedence equal to its Drools salience, an agenda that fires the
+  highest precedence first, and re-matching driven by a dependency
+  index built from the rules. It replicates every Drools decision rule, under the same
+  rule names; `PrologDroolsEquivalenceTest` checks both engines decide alike, and most
+  simulation tests run on both. It runs as one persistent `swipl` process, with JSON over
+  stdin/stdout, and needs SWI-Prolog 9.x: `swipl` on `PATH`, installed in the default
+  folder on Windows (`C:\Program Files\swipl`) or macOS (Homebrew, MacPorts or
+  `/Applications/SWI-Prolog.app`), or given with `-Dprolog.executable=...`.
+
+Both feed the same `DecisionContext` arbitration, actuator, timeline and working-memory
+views. Choose the engine at startup with `expert.backend=drools|prolog`, or switch at
+runtime with the **Rule engine** toggle in the control bar or
+`POST /api/simulation/backend/{drools|prolog}`. A switch reloads the current scenario. If
+the active engine fails, the simulation pauses and shows the error; it never drives on a
+decision nobody inferred.
+
 ## Project Goal
 
 - Prove a realtime loop: world change -> sensor perception -> Drools inference -> decision -> vehicle reaction -> new world state.
@@ -698,7 +721,7 @@ Integration tests validate dynamic behavior end-to-end without injecting final d
 - weather mutation impact,
 - reset isolation and KieSession rebuild.
 
-The direct integration suite covers 81 backend tests: 23 rule/CEP tests, 7 fact description tests, 13 SimulationEngine flows, 7 lane change flows, 21 road-law and overtaking flows, 5 road map integration tests, and 5 road map unit tests. In total `mvn test` runs 110 backend tests (JUnit 5), and Angular has 38 Karma unit tests (`npm test`). Browser E2E has 16 Playwright tests covering startup, runtime speed-limit, pedestrian, pothole progressive lane change, blocked lane change fallback, sensor groups, and presentation-demo paths with the real stack.
+The direct integration suite covers 81 backend tests: 23 rule/CEP tests, 7 fact description tests, 13 SimulationEngine flows, 7 lane change flows, 21 road-law and overtaking flows, 5 road map integration tests, and 5 road map unit tests. In total `mvn test` runs 389 backend tests (JUnit 5), and Angular has 38 Karma unit tests (`npm test`). Browser E2E has 16 Playwright tests covering startup, runtime speed-limit, pedestrian, pothole progressive lane change, blocked lane change fallback, sensor groups, and presentation-demo paths with the real stack.
 
 ## Manual Test
 

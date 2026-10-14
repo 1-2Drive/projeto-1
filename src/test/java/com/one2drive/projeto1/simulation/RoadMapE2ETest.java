@@ -4,11 +4,14 @@ import com.one2drive.projeto1.config.SimulationConfig;
 import com.one2drive.projeto1.domain.DrivingAction;
 import com.one2drive.projeto1.domain.Lane;
 import com.one2drive.projeto1.domain.WeatherCondition;
+import com.one2drive.projeto1.inference.ExpertBackendType;
 import com.one2drive.projeto1.scenario.ScenarioDefinition;
 import com.one2drive.projeto1.scenario.ScenarioLibrary;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.ParameterizedTest;
 
 import java.util.EnumSet;
 import java.util.Set;
@@ -24,6 +27,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class RoadMapE2ETest {
 
     private static SimulationEngine engine(double speedKmh, int[][] cells) {
+        return engine(ExpertBackendType.DROOLS, speedKmh, cells);
+    }
+
+    private static SimulationEngine engine(ExpertBackendType backend, double speedKmh, int[][] cells) {
         ScenarioDefinition scenario = new ScenarioDefinition();
         scenario.setId("MAP_TEST");
         scenario.setName("Road map test");
@@ -32,8 +39,7 @@ class RoadMapE2ETest {
         scenario.setInitialWeather(WeatherCondition.CLEAR);
         scenario.setInitialLane(Lane.CENTER);
         scenario.setMap(cells);
-        SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {
-        });
+        SimulationEngine engine = BackendTestSupport.engine(scenario, backend);
         engine.start();
         return engine;
     }
@@ -63,19 +69,22 @@ class RoadMapE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(30)
     @DisplayName("an obstacle across every lane stops the car; opening one cell lets it steer through")
-    void wallOfObstaclesStopsTheCarUntilALaneOpens() {
+    void wallOfObstaclesStopsTheCarUntilALaneOpens(ExpertBackendType backend) {
         int[][] cells = new int[100][3];
         cells[30] = new int[] {1, 1, 1};
 
-        try (SimulationEngine engine = engine(70, cells)) {
+        try (SimulationEngine engine = engine(backend, 70, cells)) {
             boolean stopRuleSeen = false;
             boolean swerved = false;
             for (int i = 0; i < 300; i++) {
                 engine.tick();
-                stopRuleSeen |= "Stop before obstacle when no lane is free".equals(engine.getCurrentDecision().getSourceRule());
+                // Prolog rule ids append the outcome variant, e.g. "... (brake)".
+                String rule = engine.getCurrentDecision().getSourceRule();
+                stopRuleSeen |= rule != null && rule.startsWith("Stop before obstacle when no lane is free");
                 DrivingAction action = engine.getCurrentDecision().getAction();
                 double distToWall = engine.getWorldState().distanceAhead(150.0);
                 if (distToWall <= 60.0) {
@@ -84,7 +93,7 @@ class RoadMapE2ETest {
             }
 
             double gap = engine.getWorldState().distanceAhead(150.0);
-            assertTrue(stopRuleSeen, "Drools should explain the stop with the no-free-lane rule");
+            assertTrue(stopRuleSeen, "the rule engine should explain the stop with the no-free-lane rule");
             assertFalse(swerved, "No lane is free, so the car must not try to change lane");
             assertEquals(0.0, engine.getWorldState().getEgo().getSpeedKmh(), 0.5);
             assertTrue(gap > 8.0 && gap <= 20.0,
@@ -104,15 +113,15 @@ class RoadMapE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(60)
     @DisplayName("the matrix obstacle course is driven lap after lap without touching an obstacle")
-    void obstacleCourseIsDrivenWithoutCollisions() {
+    void obstacleCourseIsDrivenWithoutCollisions(ExpertBackendType backend) {
         ScenarioDefinition course = ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json")
             .findById("S15_MATRIX_COURSE").orElseThrow();
 
-        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), course, true, d -> {
-        })) {
+        try (SimulationEngine engine = BackendTestSupport.engine(course, backend)) {
             engine.start();
             RoadMap map = engine.getWorldState().getRoadMap();
             Set<Lane> lanesUsed = EnumSet.noneOf(Lane.class);

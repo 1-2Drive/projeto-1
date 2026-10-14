@@ -1,6 +1,7 @@
 package com.one2drive.projeto1.api.controller;
 
 import com.one2drive.projeto1.api.model.ApiCommandResponse;
+import com.one2drive.projeto1.inference.ExpertSystemException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -20,6 +21,13 @@ public class ApiExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiCommandResponse> badRequest(IllegalArgumentException ex) {
         return ResponseEntity.badRequest()
+            .body(new ApiCommandResponse(false, ex.getMessage()));
+    }
+
+    /** The requested rule engine could not start, e.g. SWI-Prolog is not installed. */
+    @ExceptionHandler(ExpertSystemException.class)
+    public ResponseEntity<ApiCommandResponse> engineUnavailable(ExpertSystemException ex) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
             .body(new ApiCommandResponse(false, ex.getMessage()));
     }
 

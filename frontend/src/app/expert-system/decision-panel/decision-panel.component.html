@@ -1,7 +1,7 @@
 @if (idle() || !decision()) {
   <section class="decision decision--idle" data-testid="decision-panel">
     <header class="decision__head">
-      <span class="decision__source">Drools · KieSession</span>
+      <span class="decision__source">{{ source() }}</span>
       <span class="risk risk--low" data-testid="decision-risk">IDLE</span>
     </header>
 
@@ -16,7 +16,7 @@
   @if (decision(); as d) {
     <section class="decision" [class]="'decision decision--' + tone()" data-testid="decision-panel">
       <header class="decision__head">
-        <span class="decision__source">Drools · KieSession</span>
+        <span class="decision__source">{{ source() }}</span>
         <span class="risk" [class]="'risk ' + riskClass()" data-testid="decision-risk">{{ d.riskLevel }}</span>
       </header>
 
@@ -51,7 +51,7 @@
       <p class="decision__reason">{{ d.reason }}</p>
 
       <footer class="decision__foot">
-        <span class="decision__rule" title="Fired Drools rule">{{ d.sourceRule }}</span>
+        <span class="decision__rule" title="Rule that reached the decision">{{ d.sourceRule }}</span>
         <span class="decision__age">active {{ decisionAge() }}</span>
       </footer>
     </section>

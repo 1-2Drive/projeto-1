@@ -31,7 +31,8 @@ Decisions come from one of two interchangeable rule engines behind
   rule names; `PrologDroolsEquivalenceTest` checks both engines decide alike, and most
   simulation tests run on both. It runs as one persistent `swipl` process, with JSON over
   stdin/stdout, and needs SWI-Prolog 9.x: `swipl` on `PATH`, installed in the default
-  folder on Windows (`C:\Program Files\swipl`), or given with `-Dprolog.executable=...`.
+  folder on Windows (`C:\Program Files\swipl`) or macOS (Homebrew, MacPorts or
+  `/Applications/SWI-Prolog.app`), or given with `-Dprolog.executable=...`.
 
 Both feed the same `DecisionContext` arbitration, actuator, timeline and working-memory
 views. Choose the engine at startup with `expert.backend=drools|prolog`, or switch at

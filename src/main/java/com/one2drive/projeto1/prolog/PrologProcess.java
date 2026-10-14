@@ -107,7 +107,9 @@ final class PrologProcess implements AutoCloseable {
     /**
      * The {@code swipl} to run: the {@value #EXECUTABLE_PROPERTY} property if set, else
      * {@code swipl} when it is on PATH. The Windows installer leaves PATH alone unless asked
-     * to, so on Windows the usual install folders are tried next. Failing all of that it is
+     * to, the macOS app bundle never touches it, and a JVM started from the macOS Dock (an
+     * IDE) does not see the shell's PATH with Homebrew in it, so on those systems the usual
+     * install folders are tried next. Failing all of that it is
      * plain {@code swipl}, and starting it reports the missing executable.
      */
     static String executable() {
@@ -118,11 +120,13 @@ final class PrologProcess implements AutoCloseable {
         if (onPath()) {
             return DEFAULT_EXECUTABLE;
         }
-        if (System.getProperty("os.name", "").toLowerCase(Locale.ROOT).startsWith("windows")) {
-            for (Path candidate : windowsInstallCandidates()) {
-                if (Files.isRegularFile(candidate)) {
-                    return candidate.toString();
-                }
+        String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+        List<Path> candidates = os.startsWith("windows") ? windowsInstallCandidates()
+            : os.startsWith("mac") ? macInstallCandidates()
+            : List.of();
+        for (Path candidate : candidates) {
+            if (Files.isRegularFile(candidate)) {
+                return candidate.toString();
             }
         }
         return DEFAULT_EXECUTABLE;
@@ -160,6 +164,17 @@ final class PrologProcess implements AutoCloseable {
         addCandidate(candidates, System.getenv("LOCALAPPDATA"), "Programs", "swipl", "bin", "swipl.exe");
         addCandidate(candidates, System.getenv("USERPROFILE"), "scoop", "apps", "swipl", "current", "bin", "swipl.exe");
         addCandidate(candidates, "C:\\Program Files", "swipl", "bin", "swipl.exe");
+        return candidates;
+    }
+
+    /** Homebrew (Apple Silicon, then Intel), MacPorts and the app bundle from swi-prolog.org. */
+    private static List<Path> macInstallCandidates() {
+        List<Path> candidates = new ArrayList<>();
+        addCandidate(candidates, "/opt/homebrew/bin", "swipl");
+        addCandidate(candidates, "/usr/local/bin", "swipl");
+        addCandidate(candidates, "/opt/local/bin", "swipl");
+        addCandidate(candidates, "/Applications/SWI-Prolog.app/Contents/MacOS", "swipl");
+        addCandidate(candidates, System.getProperty("user.home"), "Applications", "SWI-Prolog.app", "Contents", "MacOS", "swipl");
         return candidates;
     }
 

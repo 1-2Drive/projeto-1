@@ -28,7 +28,11 @@ public record ApiSimulationSnapshot(
     InferenceSummaryView inference,
     RoadMapView roadMap,
     RoadMarksView roadMarks,
-    List<LaneSafetyView> laneSafety
+    List<LaneSafetyView> laneSafety,
+    /** The rule engine deciding: DROOLS or PROLOG. */
+    String expertBackend,
+    /** Why that engine stopped deciding (the simulation is then paused), or null. */
+    String expertBackendError
 ) {
     /**
      * The road as a matrix: {@code cells[row][lane]}, rows going forward along the

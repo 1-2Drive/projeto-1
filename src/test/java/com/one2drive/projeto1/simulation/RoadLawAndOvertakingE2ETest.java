@@ -8,6 +8,7 @@ import com.one2drive.projeto1.domain.Lane;
 import com.one2drive.projeto1.domain.LaneChangeState;
 import com.one2drive.projeto1.domain.SteeringState;
 import com.one2drive.projeto1.domain.WeatherCondition;
+import com.one2drive.projeto1.inference.ExpertBackendType;
 import com.one2drive.projeto1.scenario.ScenarioActorDefinition;
 import com.one2drive.projeto1.scenario.ScenarioActorType;
 import com.one2drive.projeto1.scenario.ScenarioDefinition;
@@ -17,8 +18,9 @@ import com.one2drive.projeto1.scenario.ScenarioRoadElementType;
 import com.one2drive.projeto1.scenario.ScenarioTimedAction;
 import com.one2drive.projeto1.scenario.ScenarioTimedActionType;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.ParameterizedTest;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -30,17 +32,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RoadLawAndOvertakingE2ETest {
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(15)
     @DisplayName("Moving off: vehicle starts from 0 km/h, accelerates continuously, and advances world position")
-    void movingOffAndContinuousEgoMovementIncreasesWorldPosition() {
+    void movingOffAndContinuousEgoMovementIncreasesWorldPosition(ExpertBackendType backend) {
         ScenarioDefinition scenario = new ScenarioDefinition();
         scenario.setId("MOVE_OFF_TEST");
         scenario.setName("Move off from rest");
         scenario.setInitialSpeedKmh(0.0);
         scenario.setInitialWeather(WeatherCondition.CLEAR);
 
-        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {})) {
+        try (SimulationEngine engine = BackendTestSupport.engine(scenario, backend)) {
             engine.start();
 
             double initialPos = engine.getWorldState().getEgo().getPositionMeters();
@@ -73,14 +76,15 @@ class RoadLawAndOvertakingE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(30)
     @DisplayName("Overtaking: slow vehicle ahead triggers left lane change, pass, and return right (Art. 35/38 CE)")
-    void overtakingSlowVehiclePassesAndReturnsToRightLane() {
+    void overtakingSlowVehiclePassesAndReturnsToRightLane(ExpertBackendType backend) {
         ScenarioLibrary library = ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json");
         ScenarioDefinition scenario = library.findById("S14_SLOW_VEHICLE_OVERTAKE").orElseThrow();
 
-        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {})) {
+        try (SimulationEngine engine = BackendTestSupport.engine(scenario, backend)) {
             engine.start();
 
             assertEquals(Lane.RIGHT, engine.getWorldState().getEgo().getLane(), "Ego starts in rightmost lane");
@@ -129,14 +133,15 @@ class RoadLawAndOvertakingE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(15)
     @DisplayName("Continuous line: continuous road marking prohibits lane change; vehicle brakes before obstacle")
-    void continuousLineBlocksLaneChangeAndBrakesBeforeObstacle() {
+    void continuousLineBlocksLaneChangeAndBrakesBeforeObstacle(ExpertBackendType backend) {
         ScenarioLibrary library = ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json");
         ScenarioDefinition scenario = library.findById("S15_CONTINUOUS_LINE_BLOCKED").orElseThrow();
 
-        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {})) {
+        try (SimulationEngine engine = BackendTestSupport.engine(scenario, backend)) {
             engine.start();
 
             boolean sawContinuousLineRule = false;
@@ -167,14 +172,15 @@ class RoadLawAndOvertakingE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(15)
     @DisplayName("Pedestrian crossing: vehicle brakes/stops while pedestrian crosses roadway, then resumes")
-    void pedestrianCrossingBrakesThenResumesAfterCrossingClears() {
+    void pedestrianCrossingBrakesThenResumesAfterCrossingClears(ExpertBackendType backend) {
         ScenarioLibrary library = ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json");
         ScenarioDefinition scenario = library.findById("S7").orElseThrow();
 
-        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {})) {
+        try (SimulationEngine engine = BackendTestSupport.engine(scenario, backend)) {
             engine.start();
 
             boolean sawBrakeOrStop = false;
@@ -193,10 +199,11 @@ class RoadLawAndOvertakingE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(10)
     @DisplayName("Matrix state vector extracts kinematic vector [x, y, vx, vy] accurately")
-    void stateVectorRepresentationReflectsKinematics() {
+    void stateVectorRepresentationReflectsKinematics(ExpertBackendType backend) {
         ScenarioDefinition scenario = new ScenarioDefinition();
         scenario.setId("VECTOR_TEST");
         scenario.setName("State vector test");
@@ -210,7 +217,7 @@ class RoadLawAndOvertakingE2ETest {
         frontCar.setSpeedKmh(30.0);
         scenario.getActors().add(frontCar);
 
-        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {})) {
+        try (SimulationEngine engine = BackendTestSupport.engine(scenario, backend)) {
             engine.start();
             engine.tick();
 
@@ -226,10 +233,11 @@ class RoadLawAndOvertakingE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(15)
     @DisplayName("Regression Exact Screenshot: ego in CENTER with clear RIGHT lane must fire RETURN_RIGHT and return to RIGHT")
-    void regressionTestExactScreenshotStateCenterReturnsToRight() {
+    void regressionTestExactScreenshotStateCenterReturnsToRight(ExpertBackendType backend) {
         ScenarioDefinition scenario = new ScenarioDefinition();
         scenario.setId("SCREENSHOT_REGRESSION");
         scenario.setName("Center lane return right regression");
@@ -237,7 +245,7 @@ class RoadLawAndOvertakingE2ETest {
         scenario.setInitialLane(Lane.CENTER);
         scenario.setInitialWeather(WeatherCondition.CLEAR);
 
-        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {})) {
+        try (SimulationEngine engine = BackendTestSupport.engine(scenario, backend)) {
             engine.start();
 
             var ego = engine.getWorldState().getEgo();
@@ -273,10 +281,11 @@ class RoadLawAndOvertakingE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(25)
     @DisplayName("Avoidance follow-through: vehicle avoids obstacle in RIGHT, passes it, and returns to RIGHT lane")
-    void regressionTestReturnRightAfterObstacleAvoidance() {
+    void regressionTestReturnRightAfterObstacleAvoidance(ExpertBackendType backend) {
         ScenarioDefinition scenario = new ScenarioDefinition();
         scenario.setId("AVOID_AND_RETURN");
         scenario.setName("Avoid obstacle and return right");
@@ -291,7 +300,7 @@ class RoadLawAndOvertakingE2ETest {
         obstacleDef.setSeverity(com.one2drive.projeto1.domain.HazardSeverity.HIGH);
         scenario.getRoadElements().add(obstacleDef);
 
-        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {})) {
+        try (SimulationEngine engine = BackendTestSupport.engine(scenario, backend)) {
             engine.start();
 
             boolean avoidedToCenter = false;
@@ -324,10 +333,11 @@ class RoadLawAndOvertakingE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(20)
     @DisplayName("Multi-lane return: vehicle starting in LEFT returns sequentially: LEFT -> CENTER -> RIGHT")
-    void regressionTestMultiLaneReturnLeftToCenterToRight() {
+    void regressionTestMultiLaneReturnLeftToCenterToRight(ExpertBackendType backend) {
         ScenarioDefinition scenario = new ScenarioDefinition();
         scenario.setId("MULTI_LANE_RETURN");
         scenario.setName("Left to center to right return");
@@ -335,7 +345,7 @@ class RoadLawAndOvertakingE2ETest {
         scenario.setInitialLane(Lane.LEFT);
         scenario.setInitialWeather(WeatherCondition.CLEAR);
 
-        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {})) {
+        try (SimulationEngine engine = BackendTestSupport.engine(scenario, backend)) {
             engine.start();
 
             boolean reachedCenter = false;
@@ -367,10 +377,11 @@ class RoadLawAndOvertakingE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(20)
     @DisplayName("Blocked return: vehicle in CENTER with vehicle 3m behind in RIGHT waits, then returns when safe")
-    void regressionTestBlockedReturnRightWaitsForSafety() {
+    void regressionTestBlockedReturnRightWaitsForSafety(ExpertBackendType backend) {
         ScenarioDefinition scenario = new ScenarioDefinition();
         scenario.setId("BLOCKED_RETURN_TEST");
         scenario.setName("Blocked return test");
@@ -378,7 +389,7 @@ class RoadLawAndOvertakingE2ETest {
         scenario.setInitialLane(Lane.CENTER);
         scenario.setInitialWeather(WeatherCondition.CLEAR);
 
-        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {})) {
+        try (SimulationEngine engine = BackendTestSupport.engine(scenario, backend)) {
             engine.start();
 
             // Add a blocker in RIGHT lane alongside / 3m behind ego
@@ -417,10 +428,11 @@ class RoadLawAndOvertakingE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(10)
     @DisplayName("Forward motion: ego.worldPosition continuously increases and static object distance decreases")
-    void regressionTestForwardMotionAndApproachingObjectDistance() {
+    void regressionTestForwardMotionAndApproachingObjectDistance(ExpertBackendType backend) {
         ScenarioDefinition scenario = new ScenarioDefinition();
         scenario.setId("FORWARD_MOTION_TEST");
         scenario.setName("Forward motion test");
@@ -435,7 +447,7 @@ class RoadLawAndOvertakingE2ETest {
         signDef.setSpeedLimitKmh(50);
         scenario.getRoadElements().add(signDef);
 
-        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {})) {
+        try (SimulationEngine engine = BackendTestSupport.engine(scenario, backend)) {
             engine.start();
 
             double p0 = engine.getWorldState().getEgo().getPositionMeters();
@@ -456,10 +468,11 @@ class RoadLawAndOvertakingE2ETest {
     // ======================================================================
     // BUG 1 REGRESSION: Speed Limit 50 -> stable ego speed <= 50 km/h
     // ======================================================================
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(15)
     @DisplayName("BUG 1 Regression: speedLimit = 50 -> stable ego speed <= 50 km/h (never 51 km/h)")
-    void bug1RegressionSpeedLimit50NeverExceedsOrStabilizesAt51() {
+    void bug1RegressionSpeedLimit50NeverExceedsOrStabilizesAt51(ExpertBackendType backend) {
         ScenarioDefinition scenario = new ScenarioDefinition();
         scenario.setId("BUG1_SPEED50");
         scenario.setName("Speed limit 50 compliance test");
@@ -479,7 +492,7 @@ class RoadLawAndOvertakingE2ETest {
         action.setRoadElement(speedSign);
         scenario.getTimedActions().add(action);
 
-        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {})) {
+        try (SimulationEngine engine = BackendTestSupport.engine(scenario, backend)) {
             engine.start();
 
             // Run until the vehicle decelerates to the speed limit and stabilizes
@@ -502,10 +515,11 @@ class RoadLawAndOvertakingE2ETest {
     // ======================================================================
     // BUG 2 REGRESSION TESTS: Pothole avoidance chooses RIGHT over LEFT
     // ======================================================================
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(15)
     @DisplayName("BUG 2 Regression 1: CENTER + pothole + RIGHT free + LEFT free -> RIGHT")
-    void bug2RegressionCenterPotholeBothLanesFreeChoosesRight() {
+    void bug2RegressionCenterPotholeBothLanesFreeChoosesRight(ExpertBackendType backend) {
         ScenarioDefinition scenario = new ScenarioDefinition();
         scenario.setId("BUG2_POTHOLE_RIGHT");
         scenario.setName("Pothole avoidance prefers right");
@@ -525,7 +539,7 @@ class RoadLawAndOvertakingE2ETest {
         action.setRoadElement(potholeDef);
         scenario.getTimedActions().add(action);
 
-        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {})) {
+        try (SimulationEngine engine = BackendTestSupport.engine(scenario, backend)) {
             engine.start();
 
             boolean sawAvoidRight = false;
@@ -547,10 +561,11 @@ class RoadLawAndOvertakingE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(15)
     @DisplayName("BUG 2 Regression 2: CENTER + pothole + RIGHT blocked + LEFT free -> LEFT")
-    void bug2RegressionCenterPotholeRightBlockedChoosesLeft() {
+    void bug2RegressionCenterPotholeRightBlockedChoosesLeft(ExpertBackendType backend) {
         ScenarioDefinition scenario = new ScenarioDefinition();
         scenario.setId("BUG2_POTHOLE_LEFT");
         scenario.setName("Pothole avoidance chooses left when right blocked");
@@ -582,7 +597,7 @@ class RoadLawAndOvertakingE2ETest {
         a2.setActor(blockerDef);
         scenario.getTimedActions().add(a2);
 
-        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {})) {
+        try (SimulationEngine engine = BackendTestSupport.engine(scenario, backend)) {
             engine.start();
 
             boolean sawAvoidLeft = false;
@@ -604,10 +619,11 @@ class RoadLawAndOvertakingE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(15)
     @DisplayName("BUG 2 Regression 3: CENTER + pothole + both blocked -> no unsafe lane change")
-    void bug2RegressionCenterPotholeBothBlockedNoLaneChange() {
+    void bug2RegressionCenterPotholeBothBlockedNoLaneChange(ExpertBackendType backend) {
         ScenarioDefinition scenario = new ScenarioDefinition();
         scenario.setId("BUG2_POTHOLE_BOTH_BLOCKED");
         scenario.setName("Pothole both lanes blocked no lane change");
@@ -651,7 +667,7 @@ class RoadLawAndOvertakingE2ETest {
         a3.setActor(blockerRight);
         scenario.getTimedActions().add(a3);
 
-        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {})) {
+        try (SimulationEngine engine = BackendTestSupport.engine(scenario, backend)) {
             engine.start();
 
             boolean attemptedLaneChange = false;
@@ -677,10 +693,11 @@ class RoadLawAndOvertakingE2ETest {
     // ======================================================================
     // BUG 3 REGRESSION TESTS: Overtaking strictly on LEFT, progressive return RIGHT
     // ======================================================================
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(15)
     @DisplayName("BUG 3 Regression 1: RIGHT + slower vehicle ahead + CENTER safe -> CHANGE_LANE_LEFT / RIGHT->CENTER")
-    void bug3RegressionRightSlowerVehicleOvertakesLeftIntoCenter() {
+    void bug3RegressionRightSlowerVehicleOvertakesLeftIntoCenter(ExpertBackendType backend) {
         ScenarioDefinition scenario = new ScenarioDefinition();
         scenario.setId("BUG3_OVERTAKE_RIGHT_TO_CENTER");
         scenario.setName("Overtake slower vehicle from RIGHT to CENTER");
@@ -695,7 +712,7 @@ class RoadLawAndOvertakingE2ETest {
         slowVehicle.setSpeedKmh(18.0);
         scenario.getActors().add(slowVehicle);
 
-        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {})) {
+        try (SimulationEngine engine = BackendTestSupport.engine(scenario, backend)) {
             engine.start();
 
             boolean sawChangeLeft = false;
@@ -716,10 +733,11 @@ class RoadLawAndOvertakingE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(15)
     @DisplayName("BUG 3 Regression 2: CENTER + slower vehicle ahead + LEFT safe -> CHANGE_LANE_LEFT / CENTER->LEFT")
-    void bug3RegressionCenterSlowerVehicleOvertakesLeftIntoLeft() {
+    void bug3RegressionCenterSlowerVehicleOvertakesLeftIntoLeft(ExpertBackendType backend) {
         ScenarioDefinition scenario = new ScenarioDefinition();
         scenario.setId("BUG3_OVERTAKE_CENTER_TO_LEFT");
         scenario.setName("Overtake slower vehicle from CENTER to LEFT");
@@ -734,7 +752,7 @@ class RoadLawAndOvertakingE2ETest {
         slowVehicle.setSpeedKmh(18.0);
         scenario.getActors().add(slowVehicle);
 
-        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {})) {
+        try (SimulationEngine engine = BackendTestSupport.engine(scenario, backend)) {
             engine.start();
 
             boolean sawChangeLeft = false;
@@ -756,10 +774,11 @@ class RoadLawAndOvertakingE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(15)
     @DisplayName("BUG 3 Regression 3: never overtake slower vehicle by initiating CHANGE_LANE_RIGHT")
-    void bug3RegressionNeverOvertakeSlowerVehicleByInitiatingRight() {
+    void bug3RegressionNeverOvertakeSlowerVehicleByInitiatingRight(ExpertBackendType backend) {
         ScenarioDefinition scenario = new ScenarioDefinition();
         scenario.setId("BUG3_NO_OVERTAKE_RIGHT");
         scenario.setName("Never overtake slower vehicle on the right");
@@ -784,7 +803,7 @@ class RoadLawAndOvertakingE2ETest {
         scenario.getActors().add(slowVehicle);
         scenario.getActors().add(leftBlocker);
 
-        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {})) {
+        try (SimulationEngine engine = BackendTestSupport.engine(scenario, backend)) {
             engine.start();
 
             boolean initiatedRightLaneChange = false;
@@ -805,10 +824,11 @@ class RoadLawAndOvertakingE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(25)
     @DisplayName("BUG 3 Regression 4: after overtaking + RIGHT safe -> progressively return RIGHT (LEFT->CENTER->RIGHT)")
-    void bug3RegressionAfterOvertakingProgressivelyReturnsRight() {
+    void bug3RegressionAfterOvertakingProgressivelyReturnsRight(ExpertBackendType backend) {
         ScenarioDefinition scenario = new ScenarioDefinition();
         scenario.setId("BUG3_PROGRESSIVE_RETURN");
         scenario.setName("Progressive return right after overtaking from LEFT");
@@ -816,7 +836,7 @@ class RoadLawAndOvertakingE2ETest {
         scenario.setInitialLane(Lane.LEFT);
         scenario.setInitialWeather(WeatherCondition.CLEAR);
 
-        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {})) {
+        try (SimulationEngine engine = BackendTestSupport.engine(scenario, backend)) {
             engine.start();
 
             boolean reachedCenter = false;

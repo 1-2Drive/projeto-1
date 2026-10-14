@@ -128,7 +128,9 @@ public class ApiModelMapper {
             ),
             Arrays.stream(new Lane[] {Lane.LEFT, Lane.CENTER, Lane.RIGHT})
                 .map(lane -> new ApiSimulationSnapshot.LaneSafetyView(lane.name(), engine.isLaneSafe(lane)))
-                .toList()
+                .toList(),
+            engine.getBackendType().name(),
+            engine.getBackendError()
         );
     }
 

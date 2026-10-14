@@ -9,6 +9,7 @@ import com.one2drive.projeto1.domain.DrivingAction;
 import com.one2drive.projeto1.domain.Lane;
 import com.one2drive.projeto1.domain.LaneChangeState;
 import com.one2drive.projeto1.domain.Pothole;
+import com.one2drive.projeto1.inference.ExpertBackendType;
 import com.one2drive.projeto1.scenario.ScenarioActorDefinition;
 import com.one2drive.projeto1.scenario.ScenarioActorType;
 import com.one2drive.projeto1.scenario.ScenarioDefinition;
@@ -16,8 +17,9 @@ import com.one2drive.projeto1.scenario.ScenarioLibrary;
 import com.one2drive.projeto1.scenario.ScenarioRoadElementDefinition;
 import com.one2drive.projeto1.scenario.ScenarioRoadElementType;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.ParameterizedTest;
 
 import java.util.List;
 
@@ -31,11 +33,10 @@ import java.util.List;
  */
 class LaneChangeManeuverE2ETest {
 
-    private static SimulationEngine runningEngine() {
+    private static SimulationEngine runningEngine(ExpertBackendType backend) {
         ScenarioLibrary library = ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json");
         ScenarioDefinition scenario = library.findById("S1").orElseThrow();
-        SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {
-        });
+        SimulationEngine engine = BackendTestSupport.engine(scenario, backend);
         engine.getWorldState().getEgo().setLane(Lane.CENTER);
         engine.getWorldState().getEgo().setLateralPositionMeters(Lane.CENTER.centreMeters());
         engine.getWorldState().getEgo().setSpeedKmh(70.0);
@@ -65,11 +66,12 @@ class LaneChangeManeuverE2ETest {
         engine.addActorAhead(vehicle);
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(30)
     @DisplayName("pothole in own lane with right lane blocked makes Drools choose CHANGE_LANE_LEFT and the car moves left")
-    void potholeAvoidanceMovesVehicleLeft() {
-        try (SimulationEngine engine = runningEngine()) {
+    void potholeAvoidanceMovesVehicleLeft(ExpertBackendType backend) {
+        try (SimulationEngine engine = runningEngine(backend)) {
             addPothole(engine, 90.0, Lane.CENTER);
             addVehicleInLane(engine, 22.0, Lane.RIGHT);
 
@@ -126,11 +128,12 @@ class LaneChangeManeuverE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(30)
     @DisplayName("pothole with both adjacent lanes occupied must not change lane")
-    void blockedLanesPreventLaneChange() {
-        try (SimulationEngine engine = runningEngine()) {
+    void blockedLanesPreventLaneChange(ExpertBackendType backend) {
+        try (SimulationEngine engine = runningEngine(backend)) {
             addPothole(engine, 90.0, Lane.CENTER);
             addVehicleInLane(engine, 18.0, Lane.LEFT);
             addVehicleInLane(engine, 22.0, Lane.RIGHT);
@@ -159,11 +162,12 @@ class LaneChangeManeuverE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(30)
     @DisplayName("pothole in centre lane steers right when only the right lane is clear")
-    void potholeAvoidancePrefersRightWhenLeftOccupied() {
-        try (SimulationEngine engine = runningEngine()) {
+    void potholeAvoidancePrefersRightWhenLeftOccupied(ExpertBackendType backend) {
+        try (SimulationEngine engine = runningEngine(backend)) {
             addPothole(engine, 90.0, Lane.CENTER);
             addVehicleInLane(engine, 20.0, Lane.LEFT);
 
@@ -181,11 +185,12 @@ class LaneChangeManeuverE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(30)
     @DisplayName("vehicle does not oscillate between lanes once the hazard is behind it")
-    void doesNotOscillateAfterAvoidance() {
-        try (SimulationEngine engine = runningEngine()) {
+    void doesNotOscillateAfterAvoidance(ExpertBackendType backend) {
+        try (SimulationEngine engine = runningEngine(backend)) {
             addPothole(engine, 70.0, Lane.CENTER);
 
             List<String> committedLanes = new java.util.ArrayList<>();
@@ -203,11 +208,12 @@ class LaneChangeManeuverE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(30)
     @DisplayName("driver request to change lane left is executed when the left lane is clear")
-    void driverRequestedLaneChangeLeftIsExecuted() {
-        try (SimulationEngine engine = runningEngine()) {
+    void driverRequestedLaneChangeLeftIsExecuted(ExpertBackendType backend) {
+        try (SimulationEngine engine = runningEngine(backend)) {
             engine.requestLaneChange(com.one2drive.projeto1.domain.LaneChangeDirection.LEFT);
 
             boolean decisionSeen = false;
@@ -229,11 +235,12 @@ class LaneChangeManeuverE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(30)
     @DisplayName("driver request to change lane is executed while the car is moving off from a standstill")
-    void driverRequestedLaneChangeWhileMovingOff() {
-        try (SimulationEngine engine = runningEngine()) {
+    void driverRequestedLaneChangeWhileMovingOff(ExpertBackendType backend) {
+        try (SimulationEngine engine = runningEngine(backend)) {
             engine.getWorldState().getEgo().setSpeedKmh(0.0);
             for (int i = 0; i < 10; i++) {
                 engine.tick();
@@ -256,11 +263,12 @@ class LaneChangeManeuverE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(30)
     @DisplayName("driver request to change lane right is refused while the right lane is occupied")
-    void driverRequestedLaneChangeIntoOccupiedLaneIsRefused() {
-        try (SimulationEngine engine = runningEngine()) {
+    void driverRequestedLaneChangeIntoOccupiedLaneIsRefused(ExpertBackendType backend) {
+        try (SimulationEngine engine = runningEngine(backend)) {
             addVehicleInLane(engine, 20.0, Lane.RIGHT);
             for (int i = 0; i < 5; i++) {
                 engine.tick();

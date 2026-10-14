@@ -7,12 +7,14 @@ import com.one2drive.projeto1.domain.EgoVehicleState;
 import com.one2drive.projeto1.domain.Lane;
 import com.one2drive.projeto1.domain.TrafficLight;
 import com.one2drive.projeto1.domain.TrafficLightState;
+import com.one2drive.projeto1.inference.ExpertBackendType;
 import com.one2drive.projeto1.scenario.ScenarioDefinition;
 import com.one2drive.projeto1.scenario.ScenarioRoadElementDefinition;
 import com.one2drive.projeto1.scenario.ScenarioRoadElementType;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.ParameterizedTest;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -42,9 +44,8 @@ class RedTrafficLightStopE2ETest {
         return scenario;
     }
 
-    private static SimulationEngine startedEngine(double speedKmh) {
-        SimulationEngine engine = new SimulationEngine(
-            SimulationConfig.defaultConfig(), redLightScenario(speedKmh), true, d -> { });
+    private static SimulationEngine startedEngine(ExpertBackendType backend, double speedKmh) {
+        SimulationEngine engine = BackendTestSupport.engine(redLightScenario(speedKmh), backend);
         engine.start();
         return engine;
     }
@@ -78,11 +79,12 @@ class RedTrafficLightStopE2ETest {
         return new Approach(ego.getPositionMeters(), furthest, firstBraking, emergency, stopped);
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(30)
     @DisplayName("red light at 70 km/h: the ego brakes early, without an emergency brake, and is at rest before the stop line")
-    void at70KmhBrakesEarlyAndRestsBeforeTheStopLine() {
-        try (SimulationEngine engine = startedEngine(70.0)) {
+    void at70KmhBrakesEarlyAndRestsBeforeTheStopLine(ExpertBackendType backend) {
+        try (SimulationEngine engine = startedEngine(backend, 70.0)) {
             Approach approach = driveUntilStopped(engine);
 
             assertTrue(approach.stopped(), "the ego must come to rest");
@@ -99,7 +101,8 @@ class RedTrafficLightStopE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(60)
     @DisplayName("one red light governs the whole road: the ego stops at its stop line whichever lane it drives in")
     void oneLightStopsTheEgoInEveryLane() {
@@ -135,12 +138,14 @@ class RedTrafficLightStopE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+
+    @EnumSource(ExpertBackendType.class)
     @Timeout(60)
     @DisplayName("red light at 30, 50, 70 and 90 km/h: the ego never passes the stop line and does not stop needlessly far from it")
-    void neverPassesTheStopLineAtAnySpeed() {
+    void neverPassesTheStopLineAtAnySpeed(ExpertBackendType backend) {
         for (double speedKmh : new double[]{30.0, 50.0, 70.0, 90.0}) {
-            try (SimulationEngine engine = startedEngine(speedKmh)) {
+            try (SimulationEngine engine = startedEngine(backend, speedKmh)) {
                 Approach approach = driveUntilStopped(engine);
 
                 assertTrue(approach.stopped(), speedKmh + " km/h: the ego must come to rest");
@@ -156,11 +161,12 @@ class RedTrafficLightStopE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(30)
     @DisplayName("red light: the ego stays at rest, in the same place, for as long as the light is red: the whole red time")
-    void staysAtRestWhileTheLightIsRed() {
-        try (SimulationEngine engine = startedEngine(50.0)) {
+    void staysAtRestWhileTheLightIsRed(ExpertBackendType backend) {
+        try (SimulationEngine engine = startedEngine(backend, 50.0)) {
             Approach approach = driveUntilStopped(engine);
             assertTrue(approach.stopped(), "the ego must come to rest");
             EgoVehicleState ego = engine.getWorldState().getEgo();
@@ -184,11 +190,12 @@ class RedTrafficLightStopE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(30)
     @DisplayName("red then green: the ego moves off only when the light turns green and builds its speed back up")
-    void drivesOnWhenTheLightTurnsGreen() {
-        try (SimulationEngine engine = startedEngine(50.0)) {
+    void drivesOnWhenTheLightTurnsGreen(ExpertBackendType backend) {
+        try (SimulationEngine engine = startedEngine(backend, 50.0)) {
             Approach approach = driveUntilStopped(engine);
             assertTrue(approach.stopped(), "the ego must come to rest");
             EgoVehicleState ego = engine.getWorldState().getEgo();

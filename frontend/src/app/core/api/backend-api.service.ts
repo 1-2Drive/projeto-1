@@ -10,6 +10,7 @@ import {
   CreateActorRequest,
   CreateRoadElementRequest,
   EnvironmentUpdateRequest,
+  ExpertBackend,
   MapCellRequest,
   ScenarioSummary,
   WorldMutationResponse
@@ -53,6 +54,11 @@ export class BackendApiService {
 
   stopSimulation(): Observable<CommandResponse> {
     return this.http.post<CommandResponse>(`${this.baseUrl}/simulation/stop`, {});
+  }
+
+  /** Switches the deciding rule engine; the backend reloads the current scenario. */
+  switchBackend(backend: ExpertBackend): Observable<CommandResponse> {
+    return this.http.post<CommandResponse>(`${this.baseUrl}/simulation/backend/${backend.toLowerCase()}`, {});
   }
 
   resetSimulation(): Observable<CommandResponse> {

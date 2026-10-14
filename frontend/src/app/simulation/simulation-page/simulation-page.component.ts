@@ -13,7 +13,13 @@ import { DecisionPanelComponent } from '../../expert-system/decision-panel/decis
 import { RuleTimelineComponent } from '../../expert-system/rule-timeline/rule-timeline.component';
 import { WorkingMemoryComponent } from '../../expert-system/working-memory/working-memory.component';
 import { ExplanationPanelComponent } from '../../expert-system/explanation-panel/explanation-panel.component';
-import { CreateActorRequest, CreateRoadElementRequest, EnvironmentUpdateRequest, MapCellRequest } from '../../core/models/api.models';
+import {
+  CreateActorRequest,
+  CreateRoadElementRequest,
+  EnvironmentUpdateRequest,
+  ExpertBackend,
+  MapCellRequest
+} from '../../core/models/api.models';
 import { WorldStateComponent } from '../world-state/world-state.component';
 import { SituationPanelComponent } from '../../telemetry/situation-panel/situation-panel.component';
 
@@ -47,6 +53,15 @@ export class SimulationPageComponent implements OnInit, OnDestroy {
   protected readonly vm = this.state.vm;
   protected readonly snapshot = this.state.snapshot;
   protected readonly scenarios = this.state.scenarios;
+
+  protected readonly engines: ReadonlyArray<{ id: ExpertBackend; label: string; tagline: string }> = [
+    { id: 'DROOLS', label: 'Drools', tagline: 'Java · Drools · CEP' },
+    { id: 'PROLOG', label: 'Prolog', tagline: 'Java · SWI-Prolog' }
+  ];
+  protected readonly expertBackend = this.state.expertBackend;
+  protected readonly expertBackendError = this.state.expertBackendError;
+  protected readonly engine = computed(() =>
+    this.engines.find((engine) => engine.id === this.expertBackend()) ?? this.engines[0]);
 
   protected readonly activeTab = signal<'timeline' | 'memory' | 'explanation' | 'world'>('timeline');
   protected readonly simulationClock = computed(() => {
@@ -118,6 +133,10 @@ export class SimulationPageComponent implements OnInit, OnDestroy {
 
   protected reset(): void {
     this.state.reset();
+  }
+
+  protected switchBackend(backend: ExpertBackend): void {
+    this.state.switchBackend(backend);
   }
 
   protected requestLaneChange(direction: 'LEFT' | 'RIGHT'): void {

@@ -10,6 +10,7 @@ import com.one2drive.projeto1.domain.Lane;
 import com.one2drive.projeto1.domain.StopSign;
 import com.one2drive.projeto1.domain.TrafficLight;
 import com.one2drive.projeto1.domain.WeatherCondition;
+import com.one2drive.projeto1.inference.ExpertBackendType;
 import com.one2drive.projeto1.scenario.ScenarioActorDefinition;
 import com.one2drive.projeto1.scenario.ScenarioActorType;
 import com.one2drive.projeto1.scenario.ScenarioDefinition;
@@ -18,6 +19,8 @@ import com.one2drive.projeto1.scenario.ScenarioRoadElementDefinition;
 import com.one2drive.projeto1.scenario.ScenarioRoadElementType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.ParameterizedTest;
 
 import java.util.HashSet;
 import java.util.List;
@@ -549,14 +552,14 @@ class SimulationEngineE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(12)
-    void dynamicWorldMutationPotholeDuringRunTriggersReaction() {
+    void dynamicWorldMutationPotholeDuringRunTriggersReaction(ExpertBackendType backend) {
         ScenarioLibrary library = ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json");
         ScenarioDefinition scenario = library.findById("S1").orElseThrow();
 
-        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {
-        })) {
+        try (SimulationEngine engine = BackendTestSupport.engine(scenario, backend)) {
             engine.start();
             for (int i = 0; i < 8; i++) {
                 engine.tick();
@@ -628,14 +631,14 @@ class SimulationEngineE2ETest {
         }
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
     @Timeout(12)
-    void weatherMutationDuringRunChangesRecommendationsAndVehicleBehavior() {
+    void weatherMutationDuringRunChangesRecommendationsAndVehicleBehavior(ExpertBackendType backend) {
         ScenarioLibrary library = ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json");
         ScenarioDefinition scenario = library.findById("S1").orElseThrow();
 
-        try (SimulationEngine engine = new SimulationEngine(SimulationConfig.defaultConfig(), scenario, true, d -> {
-        })) {
+        try (SimulationEngine engine = BackendTestSupport.engine(scenario, backend)) {
             engine.getWorldState().getEgo().setSpeedKmh(110.0);
             engine.start();
             for (int i = 0; i < 6; i++) {

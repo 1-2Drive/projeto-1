@@ -3,9 +3,12 @@ package com.one2drive.projeto1.drools;
 import com.one2drive.projeto1.decision.DecisionContext;
 import com.one2drive.projeto1.decision.DrivingDecision;
 import com.one2drive.projeto1.drools.facts.BarrierStateFact;
+import com.one2drive.projeto1.drools.facts.BoxedInFact;
 import com.one2drive.projeto1.drools.facts.CurrentSpeedLimit;
 import com.one2drive.projeto1.drools.facts.CruiseTargetFact;
 import com.one2drive.projeto1.drools.facts.FrontVehicleState;
+import com.one2drive.projeto1.drools.facts.FuzzyConclusion;
+import com.one2drive.projeto1.drools.facts.FuzzyMembership;
 import com.one2drive.projeto1.drools.facts.LaneOccupancyState;
 import com.one2drive.projeto1.drools.facts.PedestrianStateFact;
 import com.one2drive.projeto1.drools.facts.PotholeStateFact;
@@ -73,6 +76,16 @@ public final class FactDescription {
         if (fact instanceof WeatherStateFact value) {
             return "Weather: %s, visibility %s, grip %s".formatted(
                 value.getCondition(), decimal(value.getVisibilityFactor(), 2), decimal(value.getGripFactor(), 2));
+        }
+        if (fact instanceof BoxedInFact value) {
+            return "Boxed in behind slow traffic in lane %s since %d ms".formatted(value.getLane(), value.getSince());
+        }
+        if (fact instanceof FuzzyMembership value) {
+            return "Fuzzy: %s is %s, degree %s".formatted(
+                value.getVariable(), value.getTerm(), decimal(value.getDegree(), 2));
+        }
+        if (fact instanceof FuzzyConclusion value) {
+            return "Fuzzy: speed is %s, degree %s".formatted(value.getTerm(), decimal(value.getDegree(), 2));
         }
         if (fact instanceof FrontVehicleState value) {
             return "Front vehicle %s: %s m, relative speed %s m/s, %s".formatted(

@@ -651,16 +651,14 @@ class PrologRulesTest {
     @Timeout(10)
     void rainAdjustsSafeSpeed() {
         try (PrologTestHarness harness = new PrologTestHarness()) {
-            // Updated expectation: the weather rules are all speed ceilings at ROAD_HAZARD and the
-            // lowest wins. The visibility and grip rules now read the persistent weather state
-            // (below 0.85), so with visibility 0.7 and grip 0.65 the grip ceiling (52 km/h) would
-            // win; visibility 0.74 keeps the rain rule's 55 km/h branch the lowest ceiling.
+            // Fuzzy weather controller: visibility 0.74 is fair (0.73) and good (0.27), grip 0.9
+            // is good, so rain concludes prudent 0.27 and the visibility moderate 0.73.
             DrivingDecision decision = harness.cycle(1_000, 90.0,
                 new WeatherEvent(1_000, "env", WeatherCondition.RAIN, 0.74, 0.9));
             assertEquals(DrivingAction.REDUCE_SPEED, decision.getAction());
-            assertEquals(55.0, decision.getRecommendedSpeedKmh(), 0.01,
-                "visibility below 0.75 lowers the rain speed to 55 km/h");
-            assertEquals("Rain lowers recommended safe speed", decision.getSourceRule());
+            assertEquals(58.05, decision.getRecommendedSpeedKmh(), 0.01,
+                "centroid of moderate 0.73 and prudent 0.27");
+            assertEquals("Defuzzify weather speed ceiling", decision.getSourceRule());
         }
     }
 
@@ -674,13 +672,13 @@ class PrologRulesTest {
             DrivingDecision decision = harness.cycle(1_000, 88.0,
                 new WeatherEvent(1_000, "env", WeatherCondition.CLEAR, 0.55, 0.55));
             assertEquals(DrivingAction.REDUCE_SPEED, decision.getAction());
-            assertEquals(41.25, decision.getRecommendedSpeedKmh(), 0.01, "max(30, 75 x 0.55) beats max(25, 80 x 0.55)");
-            assertEquals("Low visibility requires stronger speed reduction", decision.getSourceRule());
+            assertEquals(44.64, decision.getRecommendedSpeedKmh(), 0.01, "centroid of slow 0.75 and moderate 0.25");
+            assertEquals("Defuzzify weather speed ceiling", decision.getSourceRule());
 
             DrivingDecision later = harness.cycle(1_600, 88.0);
             assertEquals(DrivingAction.REDUCE_SPEED, later.getAction(),
                 "the weather is a persistent condition: the ceiling must not lapse between sensor readings");
-            assertEquals(41.25, later.getRecommendedSpeedKmh(), 0.01);
+            assertEquals(44.64, later.getRecommendedSpeedKmh(), 0.01);
         }
     }
 

@@ -69,6 +69,28 @@ class LaneChangeManeuverE2ETest {
     @ParameterizedTest(name = "{0}")
     @EnumSource(ExpertBackendType.class)
     @Timeout(30)
+    @DisplayName("in rain the fuzzy weather ceiling slows the car but does not stop it avoiding a pothole")
+    void rainDoesNotBlockPotholeAvoidance(ExpertBackendType backend) {
+        try (SimulationEngine engine = runningEngine(backend)) {
+            engine.setRain(true);
+            addPothole(engine, 100.0, Lane.CENTER);
+
+            boolean weatherCeilingSeen = false;
+            for (int i = 0; i < 160 && engine.getWorldState().getEgo().getLane() == Lane.CENTER; i++) {
+                engine.tick();
+                weatherCeilingSeen |= engine.getCurrentDecision().getProposals().stream()
+                    .anyMatch(p -> "Defuzzify weather speed ceiling".equals(p.getSourceRule()));
+            }
+
+            assertTrue(weatherCeilingSeen, "rain must produce the fuzzy weather ceiling");
+            assertTrue(engine.getWorldState().getEgo().getLane() != Lane.CENTER,
+                "the lane channel is arbitrated apart from the speed ceiling, so the car still leaves the pothole lane");
+        }
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
+    @Timeout(30)
     @DisplayName("pothole in own lane with right lane blocked makes Drools choose CHANGE_LANE_LEFT and the car moves left")
     void potholeAvoidanceMovesVehicleLeft(ExpertBackendType backend) {
         try (SimulationEngine engine = runningEngine(backend)) {

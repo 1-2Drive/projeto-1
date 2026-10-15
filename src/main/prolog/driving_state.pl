@@ -74,6 +74,9 @@ reset_state(Cruise, Params, Priorities) :-
     assertz(occupancy(right, true, inf, false)),
     % overtaking_state(Active, OriginLane, TargetPassed, StartMs, Target)
     assertz(overtaking_state(false, right, false, 0, none)),
+    % boxed_in_state(Active, Lane, SinceMs): Drools' BoxedInFact, absent at the start.
+    retractall(boxed_in_state(_, _, _)),
+    assertz(boxed_in_state(false, none, 0)),
     assertz(limit_state(120, default, 0)),
     % pending_limit(SignId, LimitKmh, SignPositionM, Ms): Drools' PendingSpeedLimit.
     assertz(pending_limit(none, 0, inf, -1)),
@@ -386,7 +389,8 @@ store_conclusions :-
     replace(overtaking_state(_, _, _, _, _), overtaking_state(Active, Origin, Passed, Start, Target)),
     % Shown in the working memory the user sees: the state the cycle ended with. The rules
     % have already stopped, so none reads it.
-    add_fact(overtaking_result(Active, Origin, Passed, Start, Target)).
+    add_fact(overtaking_result(Active, Origin, Passed, Start, Target)),
+    store_boxed_in.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Estado -> memória de trabalho (os factos iniciais do ciclo)
@@ -409,7 +413,8 @@ load_cycle_facts :-
     load_lights_and_signs,
     load_vehicles(Now),
     load_previous_decision,
-    load_ttc(Now).
+    load_ttc(Now),
+    load_boxed_in.
 
 load_vehicle :-
     lane_change(State),
@@ -504,3 +509,23 @@ load_previous_decision :-
 load_ttc(Now) :-
     forall(ttc_reading(Ms, Ttc, Target),
            ( Age is Now - Ms, add_fact(ttc_sample(Target, Ttc, Age)) )).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Preso atrás de trânsito lento (BoxedInFact no Drools)
+
+:- dynamic boxed_in_state/3.
+
+% Started or cleared by the rules of this cycle; otherwise as it was.
+store_boxed_in :-
+    (   known(boxed_in_started(Lane, Since))
+    ->  replace(boxed_in_state(_, _, _), boxed_in_state(true, Lane, Since))
+    ;   known(boxed_in_cleared)
+    ->  replace(boxed_in_state(_, _, _), boxed_in_state(false, none, 0))
+    ;   true
+    ).
+
+load_boxed_in :-
+    (   boxed_in_state(true, Lane, Since)
+    ->  add_fact(boxed_in(Lane, Since))
+    ;   true
+    ).

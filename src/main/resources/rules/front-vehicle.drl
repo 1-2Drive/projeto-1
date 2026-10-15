@@ -9,8 +9,14 @@ import com.one2drive.projeto1.domain.LaneChangeState
 import com.one2drive.projeto1.domain.RiskLevel
 import com.one2drive.projeto1.domain.RoadMarkingType
 import com.one2drive.projeto1.domain.TrafficLightState
+import com.one2drive.projeto1.domain.WeatherCondition
 import com.one2drive.projeto1.drools.DroolsSupport
+import com.one2drive.projeto1.drools.facts.BarrierStateFact
+import com.one2drive.projeto1.drools.facts.BoxedInFact
 import com.one2drive.projeto1.drools.facts.CruiseTargetFact
+import com.one2drive.projeto1.drools.facts.ObstacleStateFact
+import com.one2drive.projeto1.drools.facts.PotholeStateFact
+import com.one2drive.projeto1.drools.facts.WeatherStateFact
 import com.one2drive.projeto1.drools.facts.CurrentSpeedLimit
 import com.one2drive.projeto1.drools.facts.FrontVehicleState
 import com.one2drive.projeto1.drools.facts.LaneChangeRequestState
@@ -161,6 +167,75 @@ then
         "Front distance trend decreasing quickly",
         drools.getRule().getName(),
         "samples=" + $count + ", max=" + $max + "m, min=" + $min + "m"
+    );
+end
+
+// Following a moving vehicle at its speed, just outside the 12 m gap. There the vehicle
+// is no longer too close (the gap rules above say nothing) but not yet far enough for the
+// curve to act unless it is closing in: with no rule holding, the cruise speed would win
+// and drive it at the vehicle ahead, then the brake (below 14 m) would take over again,
+// in a loop. The ceiling holds the front vehicle's speed and, closer than 16 m, 1 km/h
+// less, so the gap settles a couple of metres clear of the brake's 14 m, beyond radar
+// noise. The window reaches 20 m, and on low grip it grows with the stopping distance
+// (divided by the grip, at most twice), so in rain the vehicle keeps further back (Art.
+// 18/24 CE). When closing in fast the rules above give lower ceilings, and the lowest wins.
+rule "Follow the front vehicle speed outside the following gap"
+salience 508
+when
+    $ctx : DecisionContext()
+    VehicleStateFact($speed : speedKmh)
+    WeatherStateFact($grip : gripFactor)
+    FrontVehicleState(targetId != "none", $distance : distanceMeters > 12.0, $relative : relativeSpeedMps)
+    eval(Math.max(0.0, $speed / 3.6 - $relative) >= 0.5
+        && $distance <= 20.0 / Math.max(0.5, Math.min(1.0, $grip)))
+then
+    double frontSpeedKmh = Math.max(0.0, $speed / 3.6 - $relative) * 3.6;
+    double target = $distance < 16.0 ? Math.max(0.0, frontSpeedKmh - 1.0) : frontSpeedKmh;
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.REDUCE_SPEED,
+        target,
+        RiskLevel.MODERATE,
+        DecisionPriority.COLLISION_AVOIDANCE,
+        "Following the front vehicle at its speed (Art. 18 CE)",
+        drools.getRule().getName(),
+        "distance=" + $distance + "m, relativeSpeed=" + $relative + "m/s, front speed="
+            + Math.round(frontSpeedKmh) + " km/h, grip=" + $grip
+    );
+end
+
+// The approaching-trend rule above asks for 35 km/h. Below that speed the request would
+// make the actuator accelerate towards the vehicle it is approaching. While the vehicle is
+// really closing in, this holds the current speed instead: a lower ceiling, so it wins.
+rule "Hold speed on an approaching trend below its target"
+salience 504
+when
+    $ctx : DecisionContext()
+    FrontVehicleState($target : targetId != "none", distanceMeters > 0, distanceMeters < 50.0, relativeSpeedMps > 0)
+    VehicleStateFact(laneChangeState == LaneChangeState.IDLE, $speed : speedKmh < 35.0)
+    $count : Number( intValue >= 3 ) from accumulate(
+        FrontDistanceEvent( targetId == $target, $d : distanceMeters > 0 ) over window:time(2s) from entry-point "PERCEPTION_STREAM",
+        count(1)
+    )
+    $min : Number() from accumulate(
+        FrontDistanceEvent( targetId == $target, $dMin : distanceMeters > 0 ) over window:time(2s) from entry-point "PERCEPTION_STREAM",
+        min($dMin)
+    )
+    $max : Number() from accumulate(
+        FrontDistanceEvent( targetId == $target, $dMax : distanceMeters > 0 ) over window:time(2s) from entry-point "PERCEPTION_STREAM",
+        max($dMax)
+    )
+    eval($min.doubleValue() < ($max.doubleValue() - 4.0))
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.REDUCE_SPEED,
+        $speed,
+        RiskLevel.MODERATE,
+        DecisionPriority.COLLISION_AVOIDANCE,
+        "Front distance trend decreasing; not accelerating towards it",
+        drools.getRule().getName(),
+        "samples=" + $count + ", max=" + $max + "m, min=" + $min + "m, speed=" + $speed + " km/h"
     );
 end
 
@@ -459,4 +534,143 @@ when
     VehicleStateFact(lane == Lane.RIGHT, laneChangeState == LaneChangeState.IDLE)
 then
     modify($state) { setActive(false), setPassedTarget(false), setTargetId(OvertakingStateFact.NO_TARGET) }
+end
+
+// Slow traffic in every lane the ego could use to overtake. The overtake rules move left
+// only while the next lane is clear and clearly freer than the ego's own (+20 m), and the
+// return after an overtake waits for the overtaken vehicle to be passed. With slow
+// vehicles side by side neither ever happens: the ego would stay in CENTER or LEFT behind
+// them for ever. A BoxedInFact records that the ego is behind a slow vehicle (at least
+// 10 km/h below the speed it is aiming for, as for the overtake) and cannot move left:
+// the road edge, a continuous line, an occupied lane, or one no clearer than its own.
+// After 3 s it falls back and returns right (Art. 13 CE), and does not start the same
+// impossible overtake again until the way ahead or to the left opens.
+rule "Note the vehicle is boxed in behind slow traffic"
+salience 536
+when
+    VehicleStateFact(lane != Lane.RIGHT, $lane : lane, laneChangeState == LaneChangeState.IDLE, $leftMarking : leftMarking, $speed : speedKmh, $now : timestamp)
+    FrontVehicleState(targetId != "none", $distance : distanceMeters > 0, distanceMeters <= 30.0, $relative : relativeSpeedMps >= -0.5)
+    LaneOccupancyState(lane == Lane.LEFT, $leftOccupied : occupied, $leftFront : frontDistanceMeters)
+    CruiseTargetFact($cruise : targetKmh)
+    CurrentSpeedLimit($limit : limitKmh, $source : sourceId)
+    not BoxedInFact()
+    eval(Math.max(0.0, $speed / 3.6 - $relative) >= 0.5
+        && Math.max(0.0, $speed / 3.6 - $relative) * 3.6
+            <= (CurrentSpeedLimit.DEFAULT_SOURCE.equals($source) && $cruise > 0 ? Math.min($cruise, $limit) : $limit) - 10.0
+        && ($lane == Lane.LEFT || $leftMarking == RoadMarkingType.CONTINUOUS
+            || $leftOccupied || $leftFront <= $distance + 20.0))
+then
+    insert(new BoxedInFact($lane, $now));
+end
+
+// The way opens: no vehicle within 80 m ahead, or a left lane the ego may enter that is
+// clearly freer than its own (the same +20 m the overtake asks for).
+rule "Forget boxed in once nothing is ahead"
+salience 535
+when
+    $boxed : BoxedInFact()
+    VehicleStateFact(laneChangeState == LaneChangeState.IDLE)
+    not FrontVehicleState(targetId != "none", distanceMeters > 0, distanceMeters <= 80.0)
+then
+    delete($boxed);
+end
+
+rule "Forget boxed in once the left lane opens"
+salience 535
+when
+    $boxed : BoxedInFact()
+    VehicleStateFact(lane != Lane.LEFT, laneChangeState == LaneChangeState.IDLE, leftMarking != RoadMarkingType.CONTINUOUS)
+    FrontVehicleState(targetId != "none", $distance : distanceMeters > 0, distanceMeters <= 80.0)
+    LaneOccupancyState(lane == Lane.LEFT, occupied == false, $leftFront : frontDistanceMeters)
+    eval($leftFront > $distance + 20.0)
+then
+    delete($boxed);
+end
+
+// While the right lane is still occupied (by the slow vehicle alongside it, as a rule),
+// drive 3 km/h below the vehicle ahead, as when reopening the following gap: the traffic
+// pulls ahead and the right lane clears behind it.
+rule "Fall back behind slow traffic to return right"
+salience 507
+when
+    $ctx : DecisionContext()
+    BoxedInFact($since : since)
+    VehicleStateFact(lane != Lane.RIGHT, laneChangeState == LaneChangeState.IDLE, $speed : speedKmh, $now : timestamp)
+    LaneOccupancyState(lane == Lane.RIGHT, occupied == true)
+    FrontVehicleState(targetId != "none", $distance : distanceMeters > 0, distanceMeters <= 30.0, $relative : relativeSpeedMps)
+    eval($now - $since >= 3000 && Math.max(0.0, $speed / 3.6 - $relative) >= 0.5)
+then
+    double frontSpeedKmh = Math.max(0.0, $speed / 3.6 - $relative) * 3.6;
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.REDUCE_SPEED,
+        Math.max(0.0, frontSpeedKmh - 3.0),
+        RiskLevel.MODERATE,
+        DecisionPriority.COLLISION_AVOIDANCE,
+        "Overtaking impossible: falling back to return to the right lane (Art. 13 CE)",
+        drools.getRule().getName(),
+        "front vehicle at " + $distance + "m doing " + Math.round(frontSpeedKmh) + " km/h, right lane occupied"
+    );
+end
+
+// Back right once the right lane is clear alongside (the blind-spot sensor: nothing within
+// its range, nothing closing in from behind) and ahead by at least the 2-second rule, 3 s
+// in rain or on low grip, and never less than 30 m, so the ego never cuts in close in
+// front of or behind anyone. The actuator's lane safety guard checks the lane again.
+// Only behind traffic in the right lane too (a vehicle there within 80 m, the look-ahead
+// of the return rules): with the right lane empty, moving there would pass the slow
+// vehicle on its right (Art. 36 CE), so the ego stays behind it instead.
+rule "Return right when boxed in and the right lane is clear"
+salience 470
+no-loop true
+when
+    $ctx : DecisionContext()
+    BoxedInFact($since : since)
+    VehicleStateFact(lane != Lane.RIGHT, laneChangeState == LaneChangeState.IDLE, rightMarking != RoadMarkingType.CONTINUOUS, $speed : speedKmh, $now : timestamp)
+    LaneOccupancyState(lane == Lane.RIGHT, occupied == false, $rightFront : frontDistanceMeters)
+    WeatherStateFact($condition : condition, $grip : gripFactor)
+    not LaneChangeRequestState(active == true)
+    eval($now - $since >= 3000
+        && $rightFront <= 80.0
+        && $rightFront >= Math.max(30.0, $speed / 3.6
+            * ($condition == WeatherCondition.RAIN || $grip < 0.85 ? 3.0 : 2.0)))
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.RETURN_RIGHT,
+        Double.NaN,
+        RiskLevel.LOW,
+        DecisionPriority.MANEUVER_SAFETY,
+        "Portuguese Highway Code Art. 13: overtaking impossible, returning to the right lane",
+        drools.getRule().getName(),
+        "slow traffic ahead in every lane, right lane clear " + Math.round($rightFront) + " m ahead"
+    );
+end
+
+// Back in the right lane, the next lane is still no clearer: starting the overtake again
+// would only box the ego in once more. Hold the lane above the overtake rungs, but below
+// hazard avoidance (it does not hold with an obstacle, pothole, closed barrier or
+// pedestrian to attend to) and never against a lane change the driver asks for.
+rule "Keep the right lane while the lanes ahead stay blocked"
+salience 527
+when
+    $ctx : DecisionContext()
+    BoxedInFact()
+    VehicleStateFact(lane == Lane.RIGHT, laneChangeState == LaneChangeState.IDLE)
+    not LaneChangeRequestState(active == true)
+    not ObstacleStateFact(obstacleId != "none", distanceMeters > 0)
+    not PotholeStateFact(potholeId != "none", distanceMeters > 0)
+    not BarrierStateFact(barrierId != "none", open == false, distanceMeters > 0)
+    not PedestrianStateFact(pedestrianId != "none", inPath == true || crossingState == PedestrianCrossingState.CROSSING, distanceMeters > 0)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.KEEP_LANE,
+        Double.NaN,
+        RiskLevel.LOW,
+        DecisionPriority.COLLISION_AVOIDANCE,
+        "Slow traffic in every lane ahead: no overtake (Art. 13/35 CE)",
+        drools.getRule().getName(),
+        "the next lane is no clearer than the right lane"
+    );
 end

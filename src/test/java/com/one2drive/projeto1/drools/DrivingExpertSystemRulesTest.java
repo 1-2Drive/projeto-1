@@ -5,6 +5,7 @@ import com.one2drive.projeto1.domain.DrivingAction;
 import com.one2drive.projeto1.domain.HazardSeverity;
 import com.one2drive.projeto1.domain.Lane;
 import com.one2drive.projeto1.domain.PedestrianCrossingState;
+import com.one2drive.projeto1.domain.RiskLevel;
 import com.one2drive.projeto1.domain.LaneChangeDirection;
 import com.one2drive.projeto1.domain.TrafficLightState;
 import com.one2drive.projeto1.domain.WeatherCondition;
@@ -23,6 +24,8 @@ import com.one2drive.projeto1.drools.events.TTCEvent;
 import com.one2drive.projeto1.drools.events.TrafficLightEvent;
 import com.one2drive.projeto1.drools.events.WeatherEvent;
 import com.one2drive.projeto1.drools.facts.CruiseTargetFact;
+import com.one2drive.projeto1.drools.facts.FuzzyConclusion;
+import com.one2drive.projeto1.drools.facts.FuzzyMembership;
 import com.one2drive.projeto1.explanation.TimelineEntryType;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -30,6 +33,7 @@ import org.junit.jupiter.api.Timeout;
 import org.kie.api.KieServices;
 
 import java.time.Duration;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -326,14 +330,68 @@ class DrivingExpertSystemRulesTest {
             );
             assertEquals(DrivingAction.REDUCE_SPEED, decision.getAction());
             assertTrue(decision.getRecommendedSpeedKmh() <= 50.0);
-            // Both hold and both are ceilings: the lowest of them (visibility, 41.25 km/h) wins.
-            assertEquals("Low visibility requires stronger speed reduction", decision.getSourceRule());
-            assertEquals(75.0 * 0.55, decision.getRecommendedSpeedKmh(), 0.01);
+            // 0.55 is reduced (0.75) and fair (0.25) for both inputs: slow 0.75, moderate 0.25,
+            // whose centroid is the ceiling.
+            assertEquals("Defuzzify weather speed ceiling", decision.getSourceRule());
+            assertEquals(44.64, decision.getRecommendedSpeedKmh(), 0.01);
+            assertEquals(RiskLevel.HIGH, decision.getRiskLevel());
 
             DrivingDecision later = harness.cycle(1_600, 88.0);
             assertEquals(DrivingAction.REDUCE_SPEED, later.getAction(),
                 "the weather is a persistent condition: the ceiling must not lapse between sensor readings");
+            assertEquals(44.64, later.getRecommendedSpeedKmh(), 0.01);
         }
+    }
+
+    @Test
+    @Timeout(10)
+    void rainAloneIsAModerateFuzzyCeilingOf65() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(90.0)) {
+            DrivingDecision decision = harness.cycle(1_000, 90.0,
+                new WeatherEvent(1_000, "env", WeatherCondition.RAIN, 1.0, 1.0));
+            assertEquals(DrivingAction.REDUCE_SPEED, decision.getAction());
+            assertEquals("Defuzzify weather speed ceiling", decision.getSourceRule());
+            assertEquals(65.0, decision.getRecommendedSpeedKmh(), 0.01);
+            assertEquals(RiskLevel.MODERATE, decision.getRiskLevel());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void goodClearWeatherProposesNoFuzzyCeiling() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(90.0)) {
+            DrivingDecision decision = harness.cycle(1_000, 90.0,
+                new WeatherEvent(1_000, "env", WeatherCondition.CLEAR, 0.85, 0.9));
+            assertTrue(decision.getProposals().stream()
+                    .noneMatch(p -> "Defuzzify weather speed ceiling".equals(p.getSourceRule())),
+                "at 0.85 and above only the non-restrictive term holds: no ceiling");
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void fuzzyFactsAreRetractedWhenTheWeatherClears() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(88.0)) {
+            harness.cycle(1_000, 88.0, new WeatherEvent(1_000, "env", WeatherCondition.CLEAR, 0.55, 0.55));
+            assertTrue(fuzzyConclusions(harness).contains("slow"));
+
+            // Truth maintenance: the conclusions were inserted logically, so the new reading
+            // takes away their justification and the engine retracts them.
+            DrivingDecision decision = harness.cycle(1_400, 88.0,
+                new WeatherEvent(1_400, "env", WeatherCondition.CLEAR, 1.0, 1.0));
+            assertEquals(List.of("light"), fuzzyConclusions(harness));
+            assertTrue(decision.getProposals().stream()
+                .noneMatch(p -> "Defuzzify weather speed ceiling".equals(p.getSourceRule())));
+            assertEquals(8, harness.session().getKieSession().getObjects(o -> o instanceof FuzzyMembership).size(),
+                "four terms for each of the two inputs, the old degrees gone");
+        }
+    }
+
+    private static List<String> fuzzyConclusions(DroolsTestHarness harness) {
+        return harness.session().getKieSession().getObjects(o -> o instanceof FuzzyConclusion).stream()
+            .map(o -> ((FuzzyConclusion) o).getTerm())
+            .sorted()
+            .toList();
     }
 
     @Test

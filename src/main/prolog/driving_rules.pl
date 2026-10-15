@@ -367,6 +367,40 @@ rule('Approaching trend from sliding distance window',
      [ assert(proposal(reduce_speed, 35.0, moderate, collision_avoidance,
                        'Front distance trend decreasing quickly')) ]).
 
+% Following a moving vehicle at its speed, just outside the 12 m gap, where no rule above
+% holds unless the ego is closing in: the cruise speed would otherwise drive it at the
+% vehicle ahead and the brake (below 14 m) would take over again, in a loop. Closer than
+% 16 m, 1 km/h less, so the gap settles clear of the brake's 14 m, beyond radar noise. The
+% window reaches 20 m, divided by the grip on low grip (at most twice).
+rule('Follow the front vehicle speed outside the following gap',
+     508,
+     [ front_vehicle(_, D, Rel),
+       ego_speed(V),
+       weather(_, _, Grip),
+       test(D > 12.0),
+       test(front_vehicle_speed(V, Rel, Front)),
+       test(Front >= 0.5),
+       test(D =< 20.0 / max(0.5, min(1.0, Grip))),
+       test(( FrontKmh is Front * 3.6,
+              ( D < 16.0 -> Target is max(0.0, FrontKmh - 1.0) ; Target = FrontKmh ) )) ],
+     [ assert(proposal(reduce_speed, Target, moderate, collision_avoidance,
+                       'Following the front vehicle at its speed (Art. 18 CE)')) ]).
+
+% Below the 35 km/h the trend rule asks for, that request would make the actuator
+% accelerate towards the vehicle being approached: while really closing in, hold the speed.
+rule('Hold speed on an approaching trend below its target',
+     504,
+     [ front_vehicle(Target, D, Rel),
+       test((D > 0, D < 50.0, Rel > 0)),
+       lane_change_state(idle),
+       ego_speed(V),
+       test(V < 35.0),
+       test(front_distance_window(Target, Count, Minimum, Maximum)),
+       test(Count >= 3),
+       test(Minimum < Maximum - 4.0) ],
+     [ assert(proposal(reduce_speed, V, moderate, collision_avoidance,
+                       'Front distance trend decreasing; not accelerating towards it')) ]).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Ultrapassagem
 %
@@ -528,6 +562,107 @@ rule('Return to right lane after overtaking slow vehicle',
        not(lane_change_request(_)) ],
      [ assert(proposal(return_right, no_target, low, maneuver_safety,
                        'Portuguese Highway Code Art. 38: return to rightmost lane after overtaking')) ]).
+
+% Slow traffic in every lane the ego could use to overtake (front-vehicle.drl, the same
+% rules). boxed_in(Lane, Since) comes from the previous cycle (driving_state.pl); the rules
+% conclude boxed_in_started/2 or boxed_in_cleared and current_boxed_in/1 reads the result.
+% Boxed in: behind a vehicle at least 10 km/h below the speed the ego is aiming for, and
+% unable to move left (road edge, continuous line, occupied, or no clearer than its own
+% lane by 20 m). After 3 s the ego falls back, returns right with the right lane clear
+% alongside and ahead (2-second rule, 3 s in rain or on low grip, at least 30 m) but with
+% traffic there within 80 m (into an empty right lane it would pass the slow vehicle on its
+% right, Art. 36 CE), and does not start the same overtake again until the way ahead or to
+% the left opens.
+rule('Note the vehicle is boxed in behind slow traffic',
+     536,
+     [ ego_lane(Lane),
+       test(Lane \== right),
+       lane_change_state(idle),
+       left_marking(LeftMarking),
+       ego_speed(V),
+       time_ms(Now),
+       front_vehicle(_, D, Rel),
+       test((D > 0, D =< 30.0, Rel >= -0.5)),
+       lane_occupancy(left, LeftOccupied, LeftFront),
+       not(boxed_in(_, _)),
+       test(front_vehicle_speed(V, Rel, Front)),
+       test(Front >= 0.5),
+       test(desired_speed(Desired)),
+       test(Front * 3.6 =< Desired - 10.0),
+       test(( Lane == left ; LeftMarking == continuous ; LeftOccupied == true ; LeftFront =< D + 20.0 )) ],
+     [ assert(boxed_in_started(Lane, Now)) ]).
+
+rule('Forget boxed in once nothing is ahead',
+     535,
+     [ boxed_in(_, _),
+       lane_change_state(idle),
+       not(test(front_vehicle_within(80.0))) ],
+     [ assert(boxed_in_cleared) ]).
+
+rule('Forget boxed in once the left lane opens',
+     535,
+     [ boxed_in(_, _),
+       ego_lane(Lane),
+       test(Lane \== left),
+       lane_change_state(idle),
+       left_marking(LeftMarking),
+       test(LeftMarking \== continuous),
+       front_vehicle(_, D, _),
+       test((D > 0, D =< 80.0)),
+       lane_occupancy(left, false, LeftFront),
+       test(LeftFront > D + 20.0) ],
+     [ assert(boxed_in_cleared) ]).
+
+rule('Fall back behind slow traffic to return right',
+     507,
+     [ test(current_boxed_in(Since)),
+       ego_lane(Lane),
+       test(Lane \== right),
+       lane_change_state(idle),
+       ego_speed(V),
+       time_ms(Now),
+       test(Now - Since >= 3000),
+       lane_occupancy(right, true, _),
+       front_vehicle(_, D, Rel),
+       test((D > 0, D =< 30.0)),
+       test(front_vehicle_speed(V, Rel, Front)),
+       test(Front >= 0.5),
+       test(Target is max(0.0, Front * 3.6 - 3.0)) ],
+     [ assert(proposal(reduce_speed, Target, moderate, collision_avoidance,
+                       'Overtaking impossible: falling back to return to the right lane (Art. 13 CE)')) ]).
+
+rule('Return right when boxed in and the right lane is clear',
+     470,
+     [ test(current_boxed_in(Since)),
+       ego_lane(Lane),
+       test(Lane \== right),
+       lane_change_state(idle),
+       right_marking(RightMarking),
+       test(RightMarking \== continuous),
+       ego_speed(V),
+       time_ms(Now),
+       test(Now - Since >= 3000),
+       lane_occupancy(right, false, RightFront),
+       weather(Condition, _, Grip),
+       not(lane_change_request(_)),
+       test(( ( Condition == rain ; Grip < 0.85 ) -> Seconds = 3.0 ; Seconds = 2.0 )),
+       test(RightFront =< 80.0),
+       test(RightFront >= max(30.0, V / 3.6 * Seconds)) ],
+     [ assert(proposal(return_right, no_target, low, maneuver_safety,
+                       'Portuguese Highway Code Art. 13: overtaking impossible, returning to the right lane')) ]).
+
+rule('Keep the right lane while the lanes ahead stay blocked',
+     527,
+     [ test(current_boxed_in(_)),
+       ego_lane(right),
+       lane_change_state(idle),
+       not(lane_change_request(_)),
+       not(obstacle(_, _, _, _)),
+       not(pothole(_, _, _, _)),
+       not(barrier(_, _, false, _)),
+       not(pedestrian_conflict(_)) ],
+     [ assert(proposal(keep_lane, no_target, low, collision_avoidance,
+                       'Slow traffic in every lane ahead: no overtake (Art. 13/35 CE)')) ]).
 
 % Art. 13 CE (keep right): drive in the rightmost available safe lane. CENTER and LEFT are
 % manoeuvre lanes: once an overtake or an avoidance is over, with the right lane clear
@@ -934,37 +1069,84 @@ rule('Open barrier allows continue if no higher priority',
                        'Barrier open and crossing allowed')) ]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Condições meteorológicas (weather.drl, temporal.drl)
+% Condições meteorológicas: lógica difusa (fuzzy-weather.drl) e temporal.drl
 
-% The weather is a persistent condition of the road, so the three rules read the weather
-% state (kept up to date by the environment events) instead of short event windows that
-% would let the ceiling lapse between two readings. All three propose at road_hazard: they
-% are speed ceilings, and the lowest of the ceilings that hold wins the cycle. The 0.85
-% thresholds are the ones the environment sensor uses to flag reduced visibility and grip.
+% Fuzzy weather controller (Mamdani), the same as fuzzy-weather.drl. Visibility and grip are
+% vague, so each reading belongs, to some degree, to the terms poor / reduced / fair / good:
+%   1. fuzzification   (360): weather/3 -> fuzzy_membership(Variable, Term, Degree)
+%   2. inference       (355): one rule per fuzzy rule, AND = min, OR = max
+%                             -> fuzzy_conclusion(Term, Degree)
+%   3. composition and 4. defuzzification (350): the conclusions are joined (max) and their
+%                             centroid is the recommended speed.
+% The result is one speed ceiling at road_hazard, proposed only when a restrictive term
+% holds. The sets and the centroid sampling are those of FuzzySupport.java, so both engines
+% compute the same speed.
 
-% Rain: prudent speed of 65 km/h, or 55 km/h with low visibility or grip.
-rule('Rain lowers recommended safe speed',
-     340,
-     [ weather(rain, Visibility, Grip),
-       test(( ( Visibility < 0.75 ; Grip < 0.7 ) -> Target = 55.0 ; Target = 65.0 )) ],
-     [ assert(proposal(reduce_speed, Target, moderate, road_hazard,
-                       'Rain and reduced grip require conservative speed')) ]).
-
-rule('Low visibility requires stronger speed reduction',
-     350,
+rule('Fuzzify visibility',
+     360,
      [ weather(_, Visibility, _),
-       test(Visibility < 0.85),
-       test(Target is max(30.0, 75.0 * Visibility)) ],
-     [ assert(proposal(reduce_speed, Target, high, road_hazard,
-                       'Reduced visibility requires conservative speed')) ]).
+       test(fuzzy_input_degrees(Visibility, Poor, Reduced, Fair, Good)) ],
+     [ assert(fuzzy_membership(visibility, poor, Poor)),
+       assert(fuzzy_membership(visibility, reduced, Reduced)),
+       assert(fuzzy_membership(visibility, fair, Fair)),
+       assert(fuzzy_membership(visibility, good, Good)) ]).
 
-rule('Low road grip requires stronger speed reduction',
-     350,
+rule('Fuzzify grip',
+     360,
      [ weather(_, _, Grip),
-       test(Grip < 0.85),
-       test(Target is max(25.0, 80.0 * Grip)) ],
-     [ assert(proposal(reduce_speed, Target, high, road_hazard,
-                       'Reduced grip requires cautious speed')) ]).
+       test(fuzzy_input_degrees(Grip, Poor, Reduced, Fair, Good)) ],
+     [ assert(fuzzy_membership(grip, poor, Poor)),
+       assert(fuzzy_membership(grip, reduced, Reduced)),
+       assert(fuzzy_membership(grip, fair, Fair)),
+       assert(fuzzy_membership(grip, good, Good)) ]).
+
+rule('Fuzzy: poor visibility or poor grip -> very slow',
+     355,
+     [ fuzzy_membership(visibility, poor, V),
+       fuzzy_membership(grip, poor, G),
+       test(( D is max(V, G), D > 0.0 )) ],
+     [ assert(fuzzy_conclusion(very_slow, D)) ]).
+
+rule('Fuzzy: reduced visibility or reduced grip -> slow',
+     355,
+     [ fuzzy_membership(visibility, reduced, V),
+       fuzzy_membership(grip, reduced, G),
+       test(( D is max(V, G), D > 0.0 )) ],
+     [ assert(fuzzy_conclusion(slow, D)) ]).
+
+rule('Fuzzy: fair visibility or fair grip -> moderate',
+     355,
+     [ fuzzy_membership(visibility, fair, V),
+       fuzzy_membership(grip, fair, G),
+       test(( D is max(V, G), D > 0.0 )) ],
+     [ assert(fuzzy_conclusion(moderate, D)) ]).
+
+% Rain is crisp (rain or clear): it enters the rule with degree 1 or 0.
+rule('Fuzzy: rain with good visibility and good grip -> prudent',
+     355,
+     [ weather(rain, _, _),
+       fuzzy_membership(visibility, good, V),
+       fuzzy_membership(grip, good, G),
+       test(( D is min(V, G), D > 0.0 )) ],
+     [ assert(fuzzy_conclusion(prudent, D)) ]).
+
+% light only refines a ceiling another term already set: alone it proposes nothing.
+rule('Fuzzy: no rain with good visibility and good grip -> light',
+     355,
+     [ weather(Condition, _, _),
+       test(Condition \== rain),
+       fuzzy_membership(visibility, good, V),
+       fuzzy_membership(grip, good, G),
+       test(( D is min(V, G), D > 0.0 )) ],
+     [ assert(fuzzy_conclusion(light, D)) ]).
+
+% Rain alone (prudent) is a moderate risk; reduced visibility or grip is a high one.
+rule('Defuzzify weather speed ceiling',
+     350,
+     [ weather(_, _, _),
+       test(fuzzy_speed_ceiling(Target, Risk)) ],
+     [ assert(proposal(reduce_speed, Target, Risk, road_hazard,
+                       'Weather conditions (fuzzy) require a reduced speed')) ]).
 
 % In rain, two TTC readings below 3 s within 2 s are enough to brake.
 rule('Persistent low TTC in rain increases conservatism',
@@ -1472,3 +1654,82 @@ moving_off :-
 speed_proposal :-
     known(proposal(Action, _, _, _, _)),
     \+ memberchk(Action, [keep_lane, change_lane_left, change_lane_right, return_right]), !.
+
+% Lógica difusa: the membership functions and the centroid of FuzzySupport.java.
+
+% The degrees of a visibility or grip reading (clamped to 0..1) in the four input terms.
+fuzzy_input_degrees(Value, Poor, Reduced, Fair, Good) :-
+    X is max(0.0, min(1.0, float(Value))),
+    fuzzy_trapezoid(X, 0.0, 0.0, 0.35, 0.5, Poor),
+    fuzzy_triangle(X, 0.35, 0.5, 0.7, Reduced),
+    fuzzy_triangle(X, 0.5, 0.7, 0.85, Fair),
+    fuzzy_trapezoid(X, 0.7, 0.85, 1.0, 1.0, Good).
+
+fuzzy_output_set(very_slow, 15.0, 25.0, 35.0).
+fuzzy_output_set(slow, 30.0, 40.0, 50.0).
+fuzzy_output_set(moderate, 45.0, 55.0, 65.0).
+fuzzy_output_set(prudent, 55.0, 65.0, 75.0).
+fuzzy_output_set(light, 65.0, 75.0, 85.0).
+
+% Output terms, most restrictive first (ties in the strongest term go to the first).
+fuzzy_output_terms([very_slow, slow, moderate, prudent, light]).
+
+fuzzy_triangle(X, A, B, C, D) :-
+    (   ( X =< A ; X >= C ) -> D = 0.0
+    ;   X =< B -> D is (X - A) / (B - A)
+    ;   D is (C - X) / (C - B)
+    ).
+
+fuzzy_trapezoid(X, A, B, C, Dd, D) :-
+    (   ( X < A ; X > Dd ) -> D = 0.0
+    ;   ( X >= B, X =< C ) -> D = 1.0
+    ;   X < B -> D is (X - A) / (B - A)
+    ;   D is (Dd - X) / (Dd - C)
+    ).
+
+% The ceiling, when a restrictive term (any but light) holds: the centroid of the
+% aggregated output, sampled every 0.5 km/h from 0 to 130 km/h.
+fuzzy_speed_ceiling(Target, Risk) :-
+    findall(T-D, known(fuzzy_conclusion(T, D)), Conclusions),
+    once(( member(T0-D0, Conclusions), T0 \== light, D0 > 0.0 )),
+    fuzzy_centroid(Conclusions, Target),
+    fuzzy_strongest_term(Conclusions, Strongest),
+    (   Strongest == prudent -> Risk = moderate ; Risk = high ).
+
+fuzzy_centroid(Conclusions, Centroid) :-
+    fuzzy_centroid_sums(0, Conclusions, 0.0, 0.0, Weighted, Area),
+    Area > 0.0,
+    Centroid is Weighted / Area.
+
+fuzzy_centroid_sums(I, _, W, A, W, A) :-
+    I > 260, !.
+fuzzy_centroid_sums(I, Conclusions, W0, A0, W, A) :-
+    X is I * 0.5,
+    fuzzy_aggregate(Conclusions, X, 0.0, Mu),
+    W1 is W0 + X * Mu,
+    A1 is A0 + Mu,
+    I1 is I + 1,
+    fuzzy_centroid_sums(I1, Conclusions, W1, A1, W, A).
+
+fuzzy_aggregate([], _, Mu, Mu).
+fuzzy_aggregate([T-D | Rest], X, Mu0, Mu) :-
+    fuzzy_output_set(T, A, B, C),
+    fuzzy_triangle(X, A, B, C, M),
+    Mu1 is max(Mu0, min(D, M)),
+    fuzzy_aggregate(Rest, X, Mu1, Mu).
+
+fuzzy_strongest_term(Conclusions, Strongest) :-
+    fuzzy_output_terms(Terms),
+    foldl(fuzzy_stronger(Conclusions), Terms, none-(-1.0), Strongest-_).
+
+fuzzy_stronger(Conclusions, Term, Best0-Degree0, Best-Degree) :-
+    (   member(Term-D, Conclusions), D > Degree0
+    ->  Best = Term, Degree = D
+    ;   Best = Best0, Degree = Degree0
+    ).
+
+% Boxed in behind slow traffic, as the cycle leaves it: started in an earlier cycle and not
+% cleared in this one.
+current_boxed_in(Since) :-
+    \+ known(boxed_in_cleared),
+    known(boxed_in(_, Since)).

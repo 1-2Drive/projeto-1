@@ -891,19 +891,21 @@
   filter: drop-shadow(0 0 5px rgba(255, 59, 48, 0.8));
 }
 
-.car__indicator rect {
-  fill: #2f3a46;
-  opacity: 0.5;
-  transition: opacity 120ms ease, fill 120ms ease;
+/* Blinkers are only drawn while active: off, the lamps are hidden. */
+.car__indicator .indicator-light {
+  fill: #ffb000;
+  stroke: #fff3c4;
+  stroke-width: 0.6;
+  filter: drop-shadow(0 0 3px rgba(255, 176, 0, 0.95)) drop-shadow(0 0 7px rgba(255, 140, 0, 0.7));
+  opacity: 0;
 }
 
-.ego--indicator-left .car__indicator--left rect,
-.ego--indicator-right .car__indicator--right rect,
-.ego--indicator-hazard .car__indicator--left rect,
-.ego--indicator-hazard .car__indicator--right rect {
-  fill: #ffc233;
-  opacity: 1;
-  animation: indicator-blink 550ms steps(2, jump-none) infinite;
+/* Lit and dark halves of each period, as a real flasher (about 85 flashes a minute). */
+.ego--indicator-left .car__indicator--left .indicator-light,
+.ego--indicator-right .car__indicator--right .indicator-light,
+.ego--indicator-hazard .car__indicator--left .indicator-light,
+.ego--indicator-hazard .car__indicator--right .indicator-light {
+  animation: indicator-blink 700ms steps(1, end) infinite;
 }
 
 .car__wheels rect,
@@ -983,8 +985,12 @@
 }
 
 @keyframes indicator-blink {
+  0% {
+    opacity: 1;
+  }
+
   50% {
-    opacity: 0.25;
+    opacity: 0;
   }
 }
 
@@ -1004,9 +1010,13 @@
   white-space: nowrap;
 }
 
+/* Without motion the active side stays lit instead of flashing. */
 @media (prefers-reduced-motion: reduce) {
-  .ego--indicator-left .car__indicator--left rect,
-  .ego--indicator-right .car__indicator--right rect {
+  .ego--indicator-left .car__indicator--left .indicator-light,
+  .ego--indicator-right .car__indicator--right .indicator-light,
+  .ego--indicator-hazard .car__indicator--left .indicator-light,
+  .ego--indicator-hazard .car__indicator--right .indicator-light {
     animation: none;
+    opacity: 1;
   }
 }

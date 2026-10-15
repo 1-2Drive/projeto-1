@@ -6,18 +6,23 @@ import com.one2drive.projeto1.domain.DrivingAction
 import com.one2drive.projeto1.domain.Lane
 import com.one2drive.projeto1.domain.LaneChangeState
 import com.one2drive.projeto1.domain.RiskLevel
+import com.one2drive.projeto1.domain.RoadMarkingType
 import com.one2drive.projeto1.drools.DroolsSupport
 import com.one2drive.projeto1.drools.facts.BarrierStateFact
 import com.one2drive.projeto1.drools.facts.VehicleStateFact
 
 global DroolsSupport droolsSupport
 
+// A closed barrier blocks the lane, so going around it is collision avoidance. Each
+// rule also checks the line it would cross (the line between RIGHT and CENTER is the
+// rightMarking, the one between CENTER and LEFT the leftMarking): a continuous line
+// is never crossed, and the vehicle stops instead.
 rule "Avoid closed barrier by changing left when safe"
 salience 650
 when
     $ctx : DecisionContext()
     VehicleStateFact(lane == Lane.RIGHT, laneChangeState == LaneChangeState.IDLE,
-                     leftAdjacentLaneSafe == true)
+                     leftAdjacentLaneSafe == true, rightMarking != RoadMarkingType.CONTINUOUS)
     BarrierStateFact(barrierId != "none", open == false, lane == Lane.RIGHT,
                      $distance : distanceMeters > 0, distanceMeters <= 55.0)
 then
@@ -26,7 +31,7 @@ then
         DrivingAction.CHANGE_LANE_LEFT,
         Double.NaN,
         RiskLevel.HIGH,
-        DecisionPriority.MANEUVER_SAFETY,
+        DecisionPriority.COLLISION_AVOIDANCE,
         "Closed barrier ahead; changing left to a verified clear lane",
         drools.getRule().getName(),
         "barrier " + $distance + "m ahead in RIGHT, CENTER clear"
@@ -38,7 +43,7 @@ salience 650
 when
     $ctx : DecisionContext()
     VehicleStateFact(lane == Lane.CENTER, laneChangeState == LaneChangeState.IDLE,
-                     leftAdjacentLaneSafe == true)
+                     leftAdjacentLaneSafe == true, leftMarking != RoadMarkingType.CONTINUOUS)
     BarrierStateFact(barrierId != "none", open == false, lane == Lane.CENTER,
                      $distance : distanceMeters > 0, distanceMeters <= 55.0)
 then
@@ -47,7 +52,7 @@ then
         DrivingAction.CHANGE_LANE_LEFT,
         Double.NaN,
         RiskLevel.HIGH,
-        DecisionPriority.MANEUVER_SAFETY,
+        DecisionPriority.COLLISION_AVOIDANCE,
         "Closed barrier ahead; changing left to a verified clear lane",
         drools.getRule().getName(),
         "barrier " + $distance + "m ahead in CENTER, LEFT clear"
@@ -59,7 +64,8 @@ salience 650
 when
     $ctx : DecisionContext()
     VehicleStateFact(lane == Lane.CENTER, laneChangeState == LaneChangeState.IDLE,
-                     leftAdjacentLaneSafe == false, rightAdjacentLaneSafe == true)
+                     leftAdjacentLaneSafe == false, rightAdjacentLaneSafe == true,
+                     rightMarking != RoadMarkingType.CONTINUOUS)
     BarrierStateFact(barrierId != "none", open == false, lane == Lane.CENTER,
                      $distance : distanceMeters > 0, distanceMeters <= 55.0)
 then
@@ -68,7 +74,7 @@ then
         DrivingAction.CHANGE_LANE_RIGHT,
         Double.NaN,
         RiskLevel.HIGH,
-        DecisionPriority.MANEUVER_SAFETY,
+        DecisionPriority.COLLISION_AVOIDANCE,
         "Closed barrier ahead; changing right to a verified clear lane",
         drools.getRule().getName(),
         "barrier " + $distance + "m ahead in CENTER, RIGHT clear"
@@ -80,7 +86,7 @@ salience 650
 when
     $ctx : DecisionContext()
     VehicleStateFact(lane == Lane.LEFT, laneChangeState == LaneChangeState.IDLE,
-                     rightAdjacentLaneSafe == true)
+                     rightAdjacentLaneSafe == true, leftMarking != RoadMarkingType.CONTINUOUS)
     BarrierStateFact(barrierId != "none", open == false, lane == Lane.LEFT,
                      $distance : distanceMeters > 0, distanceMeters <= 55.0)
 then
@@ -89,7 +95,7 @@ then
         DrivingAction.CHANGE_LANE_RIGHT,
         Double.NaN,
         RiskLevel.HIGH,
-        DecisionPriority.MANEUVER_SAFETY,
+        DecisionPriority.COLLISION_AVOIDANCE,
         "Closed barrier ahead; changing right to a verified clear lane",
         drools.getRule().getName(),
         "barrier " + $distance + "m ahead in LEFT, CENTER clear"
@@ -116,10 +122,12 @@ then
     );
 end
 
+// Comfort proposal: it loses to any speed ceiling, hold or maneuver speed in the cycle,
+// so it needs no guard on what else was proposed.
 rule "Open barrier allows continue if no higher priority"
 salience 170
 when
-    $ctx : DecisionContext(priority < DecisionPriority.COLLISION_AVOIDANCE)
+    $ctx : DecisionContext()
     BarrierStateFact(barrierId != "none", open == true, distanceMeters >= 0, distanceMeters <= 35.0)
 then
     droolsSupport.proposeDecision(

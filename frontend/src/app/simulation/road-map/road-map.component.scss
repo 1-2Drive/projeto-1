@@ -221,3 +221,8 @@
 .swatch--limit {
   background: #5ba6d9;
 }
+
+.cell--crosswalk,
+.swatch--crosswalk {
+  background: repeating-linear-gradient(90deg, #f3f7fa 0 3px, #121c26 3px 6px);
+}

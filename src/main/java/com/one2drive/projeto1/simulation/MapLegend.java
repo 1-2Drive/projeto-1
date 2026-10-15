@@ -31,7 +31,7 @@ public final class MapLegend {
                 case TRAFFIC_LIGHT -> template.getTrafficLightState().name();
                 case POTHOLE, STATIC_OBSTACLE -> template.getSeverity().name();
                 case BARRIER -> Boolean.TRUE.equals(template.getBarrierOpen()) ? "OPEN" : "CLOSED";
-                case STOP_SIGN -> "";
+                case STOP_SIGN, CROSSWALK -> "";
             };
         }
     }
@@ -44,6 +44,7 @@ public final class MapLegend {
         legend.put(2, hazard(ScenarioRoadElementType.POTHOLE, HazardSeverity.HIGH));
         legend.put(3, barrier(false));
         legend.put(4, element(ScenarioRoadElementType.STOP_SIGN));
+        legend.put(5, element(ScenarioRoadElementType.CROSSWALK));
         legend.put(6, trafficLight(TrafficLightState.RED));
         legend.put(7, trafficLight(TrafficLightState.GREEN));
         int code = 8;
@@ -115,7 +116,7 @@ public final class MapLegend {
             case POTHOLE -> template.setSeverity(source.getSeverity() == null ? HazardSeverity.MEDIUM : source.getSeverity());
             case STATIC_OBSTACLE -> template.setSeverity(source.getSeverity() == null ? HazardSeverity.HIGH : source.getSeverity());
             case BARRIER -> template.setBarrierOpen(source.getBarrierOpen() == null || source.getBarrierOpen());
-            case STOP_SIGN -> {
+            case STOP_SIGN, CROSSWALK -> {
             }
         }
         return template;
@@ -135,6 +136,7 @@ public final class MapLegend {
             case POTHOLE -> "Pothole" + severitySuffix(template.getSeverity());
             case BARRIER -> Boolean.TRUE.equals(template.getBarrierOpen()) ? "Open barrier" : "Closed barrier";
             case STOP_SIGN -> "Stop sign";
+            case CROSSWALK -> "Crosswalk";
             case TRAFFIC_LIGHT -> switch (template.getTrafficLightState()) {
                 case RED -> "Red light";
                 case YELLOW -> "Yellow light";

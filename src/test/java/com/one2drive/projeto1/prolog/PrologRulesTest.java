@@ -11,8 +11,6 @@ import com.one2drive.projeto1.domain.LaneChangeState;
 import com.one2drive.projeto1.domain.RoadMarkingType;
 import com.one2drive.projeto1.domain.WeatherCondition;
 import com.one2drive.projeto1.drools.events.BarrierDetectedEvent;
-import com.one2drive.projeto1.drools.events.ReducedGripEvent;
-import com.one2drive.projeto1.drools.events.ReducedVisibilityEvent;
 import com.one2drive.projeto1.drools.events.WeatherEvent;
 import com.one2drive.projeto1.drools.events.FrontDistanceEvent;
 import com.one2drive.projeto1.drools.events.ObstacleDetectedEvent;
@@ -454,8 +452,18 @@ class PrologRulesTest {
                 new FrontDistanceEvent(1_000, "front-radar", 40.0, "front-1"),
                 new RelativeSpeedEvent(1_000, "front-radar", 5.0, "front-1"),
                 new LaneOccupancyEvent(1_000, "blind-spot", Lane.LEFT, false, Double.POSITIVE_INFINITY));
+            // Updated expectation: the lane change is arbitrated in its own (lateral) channel,
+            // so the decision's recommended speed is the speed channel's (the following rules no
+            // longer step aside for the overtake); the overtake's own proposal carries no speed.
             assertEquals(DrivingAction.CHANGE_LANE_LEFT, decision.getAction());
-            assertTrue(Double.isNaN(decision.getRecommendedSpeedKmh()), "a lane change carries no target speed");
+            assertEquals(DrivingAction.CHANGE_LANE_LEFT, decision.getLaneAction());
+            assertEquals("Overtake slow front vehicle via left lane", decision.getLaneSourceRule());
+            assertTrue(decision.getProposals().stream()
+                    .filter(p -> p.getSourceRule().equals("Overtake slow front vehicle via left lane"))
+                    .allMatch(p -> Double.isNaN(p.getRecommendedSpeedKmh())),
+                "a lane change carries no target speed");
+            assertEquals(DrivingAction.REDUCE_SPEED, decision.getSpeedAction(),
+                "the speed channel keeps slowing for the vehicle ahead in the same cycle");
             assertTrue(factPresent(harness, "overtaking_result(true,center,false,1000,front-1)"),
                 "the working memory shows the overtake the cycle ended with");
         }
@@ -463,17 +471,41 @@ class PrologRulesTest {
 
     @Test
     @Timeout(10)
-    void followingRulesStepAsideOnlyInTheCycleTheOvertakeStarts() {
+    void vehicleFollowedAtItsSpeedIsOvertakenWhenTheLeftLaneIsClear() {
+        // No scenario cruise speed: the desired speed is the limit in force (120 km/h). Following
+        // a 40 km/h vehicle 20 m ahead at its speed, in CENTER, with the left lane clear far beyond
+        // it: the closing-in overtake cannot start (not closing), so this is the exit from following.
         try (PrologTestHarness harness = new PrologTestHarness()) {
-            harness.cycle(1_000, 60.0,
+            DrivingDecision decision = harness.cycle(1_000, 40.0,
+                new FrontDistanceEvent(1_000, "front-radar", 20.0, "front-1"),
+                new RelativeSpeedEvent(1_000, "front-radar", 0.0, "front-1"),
+                new LaneOccupancyEvent(1_000, "blind-spot", Lane.LEFT, false, Double.POSITIVE_INFINITY));
+            assertEquals(DrivingAction.CHANGE_LANE_LEFT, decision.getAction());
+            assertEquals(DrivingAction.CHANGE_LANE_LEFT, decision.getLaneAction());
+            assertEquals("Overtake the vehicle being followed", decision.getLaneSourceRule());
+            assertTrue(factPresent(harness, "overtaking_result(true,center,false,1000,front-1)"),
+                "the working memory shows the overtake the cycle ended with");
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void followingRulesKeepSlowingWhileTheOvertakeStarts() {
+        try (PrologTestHarness harness = new PrologTestHarness()) {
+            // Updated expectation: the following rules no longer step aside in the cycle the
+            // overtake starts; the speed channel slows down in that cycle and in the next one.
+            DrivingDecision first = harness.cycle(1_000, 60.0,
                 new FrontDistanceEvent(1_000, "front-radar", 40.0, "front-1"),
                 new RelativeSpeedEvent(1_000, "front-radar", 5.0, "front-1"),
                 new LaneOccupancyEvent(1_000, "blind-spot", Lane.LEFT, false, Double.POSITIVE_INFINITY));
+            assertEquals(DrivingAction.CHANGE_LANE_LEFT, first.getLaneAction());
+            assertEquals(DrivingAction.REDUCE_SPEED, first.getSpeedAction(),
+                "the vehicle slows for the vehicle ahead in the very cycle the overtake starts");
             DrivingDecision next = harness.cycle(1_100, 60.0,
                 new FrontDistanceEvent(1_100, "front-radar", 39.5, "front-1"),
                 new RelativeSpeedEvent(1_100, "front-radar", 5.0, "front-1"),
                 new LaneOccupancyEvent(1_100, "blind-spot", Lane.LEFT, false, Double.POSITIVE_INFINITY));
-            assertEquals(DrivingAction.REDUCE_SPEED, next.getAction(),
+            assertEquals(DrivingAction.REDUCE_SPEED, next.getSpeedAction(),
                 "while the vehicle has not left its lane it keeps slowing for the vehicle ahead");
         }
     }
@@ -569,15 +601,20 @@ class PrologRulesTest {
 
     @Test
     @Timeout(10)
-    void continuousLineOnTheLeftStopsBeforeTheObstacle() {
+    void continuousLineBesideTheEgoLaneStopsBeforeTheObstacle() {
         try (PrologTestHarness harness = new PrologTestHarness()) {
+            // Updated expectation: the line the ego in RIGHT would cross towards CENTER is the
+            // right marking (WorldState.getMarkingBetween), so it is the continuous one here; the
+            // blind-spot occupancy reports the free left side as not safe to enter across it.
             var vehicle = new PrologKnowledgeSession.VehicleInput(1_000, 30.0, 0.0, Lane.RIGHT, LaneChangeState.IDLE,
-                Lane.RIGHT, RoadMarkingType.CONTINUOUS, RoadMarkingType.DASHED, false, false, false, false);
+                Lane.RIGHT, RoadMarkingType.DASHED, RoadMarkingType.CONTINUOUS, false, false, false, false);
             DrivingDecision decision = decide(harness, vehicle,
                 new ObstacleDetectedEvent(1_000, "camera", 40.0, "obstacle-1", HazardSeverity.MEDIUM, Lane.RIGHT),
-                new LaneOccupancyEvent(1_000, "blind-spot", Lane.LEFT, false, Double.POSITIVE_INFINITY));
+                new LaneOccupancyEvent(1_000, "blind-spot", Lane.LEFT, false, Double.POSITIVE_INFINITY, false,
+                    Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY));
             assertEquals(DrivingAction.BRAKE, decision.getAction(),
                 "the left lane is free but the continuous line forbids it");
+            assertEquals(DrivingAction.KEEP_LANE, decision.getLaneAction());
             assertEquals("Stop before obstacle when lane change prohibited by continuous line (brake)",
                 decision.getSourceRule());
         }
@@ -614,11 +651,15 @@ class PrologRulesTest {
     @Timeout(10)
     void rainAdjustsSafeSpeed() {
         try (PrologTestHarness harness = new PrologTestHarness()) {
+            // Updated expectation: the weather rules are all speed ceilings at ROAD_HAZARD and the
+            // lowest wins. The visibility and grip rules now read the persistent weather state
+            // (below 0.85), so with visibility 0.7 and grip 0.65 the grip ceiling (52 km/h) would
+            // win; visibility 0.74 keeps the rain rule's 55 km/h branch the lowest ceiling.
             DrivingDecision decision = harness.cycle(1_000, 90.0,
-                new WeatherEvent(1_000, "env", WeatherCondition.RAIN, 0.7, 0.65));
+                new WeatherEvent(1_000, "env", WeatherCondition.RAIN, 0.74, 0.9));
             assertEquals(DrivingAction.REDUCE_SPEED, decision.getAction());
             assertEquals(55.0, decision.getRecommendedSpeedKmh(), 0.01,
-                "visibility below 0.75 and grip below 0.7 lower the rain speed to 55 km/h");
+                "visibility below 0.75 lowers the rain speed to 55 km/h");
             assertEquals("Rain lowers recommended safe speed", decision.getSourceRule());
         }
     }
@@ -627,12 +668,19 @@ class PrologRulesTest {
     @Timeout(10)
     void reducedVisibilityAndGripTriggerConservativeReduction() {
         try (PrologTestHarness harness = new PrologTestHarness()) {
+            // Updated expectation: the visibility and grip rules read the persistent weather
+            // state (updated by the weather event), no longer the 500 ms reduced-visibility and
+            // reduced-grip event windows, which both engines now ignore.
             DrivingDecision decision = harness.cycle(1_000, 88.0,
-                new ReducedVisibilityEvent(1_000, "environment", 0.55),
-                new ReducedGripEvent(1_000, "environment", 0.55));
+                new WeatherEvent(1_000, "env", WeatherCondition.CLEAR, 0.55, 0.55));
             assertEquals(DrivingAction.REDUCE_SPEED, decision.getAction());
             assertEquals(41.25, decision.getRecommendedSpeedKmh(), 0.01, "max(30, 75 x 0.55) beats max(25, 80 x 0.55)");
             assertEquals("Low visibility requires stronger speed reduction", decision.getSourceRule());
+
+            DrivingDecision later = harness.cycle(1_600, 88.0);
+            assertEquals(DrivingAction.REDUCE_SPEED, later.getAction(),
+                "the weather is a persistent condition: the ceiling must not lapse between sensor readings");
+            assertEquals(41.25, later.getRecommendedSpeedKmh(), 0.01);
         }
     }
 

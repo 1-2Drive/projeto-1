@@ -204,7 +204,7 @@
   </div>
 
   <!-- ============ world objects ============ -->
-  @for (item of items(); track item.id) {
+  @for (item of objects(); track item.id) {
     <div
       class="obj"
       [class]="'obj obj--' + item.kind"
@@ -333,10 +333,12 @@
         </div>
       }
     }
-    @if (item.kind === 'pedestrian') {
-      <div class="crosswalk" aria-hidden="true" [style.left.%]="item.xPercent" data-testid="crosswalk">
-      </div>
-    }
+  }
+
+  @for (crosswalk of crosswalks(); track crosswalk.id) {
+    <div class="crosswalk" [style.left.%]="crosswalk.xPercent" data-testid="crosswalk"
+         [attr.data-object-id]="crosswalk.id" [attr.aria-label]="crosswalk.ariaLabel" role="img">
+    </div>
   }
 
   <!-- ============ first-run invitation ============ -->

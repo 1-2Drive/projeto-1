@@ -94,6 +94,7 @@ public final class ScenarioFactory {
                 lane,
                 definition.getBarrierOpen() == null || definition.getBarrierOpen()
             );
+            case CROSSWALK -> new com.one2drive.projeto1.domain.Crosswalk(definition.getPositionMeters(), lane);
         };
     }
 

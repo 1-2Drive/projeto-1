@@ -11,7 +11,8 @@ export type RoadObjectKind =
   | 'pothole'
   | 'obstacle'
   | 'vehicle'
-  | 'pedestrian';
+  | 'pedestrian'
+  | 'crosswalk';
 
 export interface RoadRenderItem {
   id: string;
@@ -255,6 +256,10 @@ export class RoadCanvasComponent {
       .filter((item) => item.visible);
   });
 
+  /** Objects drawn as cards above the road; crosswalks are painted on the asphalt instead. */
+  protected readonly objects = computed(() => this.items().filter((item) => item.kind !== 'crosswalk'));
+  protected readonly crosswalks = computed(() => this.items().filter((item) => item.kind === 'crosswalk'));
+
   /**
    * Vertical position comes straight from the backend lateral coordinate, so during a
    * lane change the car visibly slides across the road.
@@ -469,6 +474,8 @@ export class RoadCanvasComponent {
         return 'Vehicle';
       case 'pedestrian':
         return 'Pedestrian';
+      case 'crosswalk':
+        return 'Crosswalk';
     }
   }
 
@@ -493,6 +500,7 @@ export class RoadCanvasComponent {
     if (type.includes('Barrier')) return 'barrier';
     if (type.includes('Pothole')) return 'pothole';
     if (type.includes('Obstacle')) return 'obstacle';
+    if (type.includes('Crosswalk')) return 'crosswalk';
     if (type.includes('Pedestrian')) return 'pedestrian';
     if (type.includes('Vehicle')) return 'vehicle';
     return 'obstacle';

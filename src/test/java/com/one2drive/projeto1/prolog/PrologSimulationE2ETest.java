@@ -165,10 +165,14 @@ class PrologSimulationE2ETest {
                 "stops at the line instead of crossing it, closest distance " + closestDistance);
             assertFalse(emergency, "a sign seen from afar needs no emergency brake");
 
+            // Updated expectation: the proceed proposal (MANEUVER_SAFETY) no longer wins the
+            // speed channel once the cruise-speed ceiling holds, so, as SimulationEngineE2ETest
+            // does for Drools, the release is read from the rules fired, not the winning rule.
             boolean proceeded = false;
             for (int i = 0; i < 250; i++) {
                 SimulationSnapshot snapshot = engine.tick();
-                proceeded |= "Proceed after stop sign condition satisfied".equals(snapshot.sourceRule());
+                proceeded |= snapshot.timeline().stream()
+                    .anyMatch(line -> line.contains("Proceed after stop sign condition satisfied"));
             }
             assertTrue(proceeded, "the stop condition must be released");
             assertTrue(engine.snapshot().egoSpeedKmh() >= 25.0,

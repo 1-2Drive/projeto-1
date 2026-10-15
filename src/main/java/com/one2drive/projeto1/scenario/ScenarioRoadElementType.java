@@ -6,5 +6,6 @@ public enum ScenarioRoadElementType {
     TRAFFIC_LIGHT,
     POTHOLE,
     STATIC_OBSTACLE,
-    BARRIER
+    BARRIER,
+    CROSSWALK
 }

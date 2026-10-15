@@ -114,6 +114,28 @@ public class WorldState {
 
     public void addActor(DynamicActor actor) {
         actors.add(actor);
+        if (actor instanceof com.one2drive.projeto1.domain.Pedestrian) {
+            ensureCrosswalkAt(actor.getPositionMeters());
+        }
+    }
+
+    /**
+     * Pedestrians cross at crosswalks: adding one paints a crossing on the block it
+     * crosses at, unless that block already holds a crosswalk or any other element (a
+     * crossing takes the whole row, and it must not overwrite a sign placed there).
+     */
+    private void ensureCrosswalkAt(double positionMeters) {
+        int row = roadMap.rowAt(positionMeters);
+        for (Lane lane : new Lane[] {Lane.LEFT, Lane.CENTER, Lane.RIGHT}) {
+            if (roadMap.get(row, lane) != MapLegend.FREE) {
+                return;
+            }
+        }
+        com.one2drive.projeto1.scenario.ScenarioRoadElementDefinition crosswalk =
+            new com.one2drive.projeto1.scenario.ScenarioRoadElementDefinition();
+        crosswalk.setType(com.one2drive.projeto1.scenario.ScenarioRoadElementType.CROSSWALK);
+        crosswalk.setLane(Lane.CENTER);
+        roadMap.place(crosswalk, positionMeters);
     }
 
     public boolean isLoopWorldObjects() {
@@ -287,6 +309,14 @@ public class WorldState {
 
     public Optional<StaticObstacle> nearestObstacle(double maxDistance) {
         return nearestByType(StaticObstacle.class, maxDistance);
+    }
+
+    /** A crosswalk spans the whole road, so the next one ahead counts whatever cell it was painted in. */
+    public Optional<com.one2drive.projeto1.domain.Crosswalk> nearestCrosswalk(double maxDistance) {
+        return activeRoadElementsInFront(maxDistance).stream()
+            .filter(com.one2drive.projeto1.domain.Crosswalk.class::isInstance)
+            .map(com.one2drive.projeto1.domain.Crosswalk.class::cast)
+            .min(java.util.Comparator.comparingDouble(c -> signedDistance(c.getPositionMeters())));
     }
 
     @SuppressWarnings("unchecked")

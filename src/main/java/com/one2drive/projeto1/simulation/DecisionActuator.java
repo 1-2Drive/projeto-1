@@ -12,7 +12,7 @@ import com.one2drive.projeto1.domain.RoadMarkingType;
 import com.one2drive.projeto1.domain.SteeringState;
 
 /**
- * Executes the maneuver Drools selected.
+ * Executes the decision the rules selected: the speed decision and the lane decision.
  *
  * <p>This class never decides whether a maneuver is safe or desirable: that is
  * entirely the knowledge base's job. It only turns the chosen
@@ -33,31 +33,10 @@ public class DecisionActuator {
     public void applyDecision(WorldState worldState, DrivingDecision decision) {
         EgoVehicleState ego = worldState.getEgo();
 
-        if (decision.getAction() == DrivingAction.CHANGE_LANE_LEFT
-            || decision.getAction() == DrivingAction.CHANGE_LANE_RIGHT
-            || decision.getAction() == DrivingAction.RETURN_RIGHT) {
-            Lane target = switch (decision.getAction()) {
-                case CHANGE_LANE_LEFT -> ego.getLane().left();
-                case CHANGE_LANE_RIGHT -> ego.getLane().right();
-                case RETURN_RIGHT -> ego.getLane() == Lane.LEFT ? Lane.CENTER : Lane.RIGHT;
-                default -> ego.getLane();
-            };
-            if (!worldState.isLaneSafe(target, config.getBlindSpotRangeMeters(), 60.0)) {
-                decision.apply(DrivingAction.REDUCE_SPEED, Math.max(0.0, ego.getSpeedKmh() - 10.0),
-                    com.one2drive.projeto1.domain.RiskLevel.HIGH,
-                    com.one2drive.projeto1.decision.DecisionPriority.COLLISION_AVOIDANCE,
-                    "Lane-change command rejected: target lane is occupied or unsafe",
-                    "Actuator safety guard",
-                    decision.getTimestamp(),
-                    java.util.List.of("target lane=" + target + " is not safe to enter"));
-                ego.setAccelerationMps2(-config.getComfortableDecelerationMps2());
-                ego.setIndicatorState(IndicatorState.OFF);
-                ego.setSteeringState(SteeringState.STRAIGHT);
-                return;
-            }
-        }
+        applyLaneDecision(worldState, decision);
 
-        switch (decision.getAction()) {
+        DrivingAction action = decision.getSpeedAction();
+        switch (action) {
             case EMERGENCY_BRAKE -> {
                 ego.setAccelerationMps2(-config.getEmergencyDecelerationMps2());
                 ego.setIndicatorState(IndicatorState.HAZARD);
@@ -69,34 +48,12 @@ public class DecisionActuator {
                 ? -config.getComfortableDecelerationMps2()
                 : 0.0);
             case ACCELERATE, RESUME -> ego.setAccelerationMps2(config.getMaxAccelerationMps2());
-            case CHANGE_LANE_LEFT -> {
-                if (worldState.getMarkingBetween(ego.getLane(), ego.getLane().left()) != RoadMarkingType.CONTINUOUS) {
-                    requestLaneChange(ego, ego.getLane().left());
-                    ego.setIndicatorState(IndicatorState.LEFT);
-                    ego.setSteeringState(SteeringState.LEFT);
-                    holdSpeedIfNoneRecommended(ego, decision);
-                } else {
-                    ego.setAccelerationMps2(-config.getComfortableDecelerationMps2());
-                }
-            }
-            case CHANGE_LANE_RIGHT, RETURN_RIGHT -> {
-                if (worldState.getMarkingBetween(ego.getLane(), ego.getLane().right()) != RoadMarkingType.CONTINUOUS) {
-                    requestLaneChange(ego, ego.getLane().right());
-                    ego.setIndicatorState(IndicatorState.RIGHT);
-                    ego.setSteeringState(SteeringState.RIGHT);
-                    holdSpeedIfNoneRecommended(ego, decision);
-                } else {
-                    ego.setAccelerationMps2(-config.getComfortableDecelerationMps2());
-                }
-            }
-            case KEEP_LANE -> ego.setAccelerationMps2(0);
-            case MAINTAIN_SPEED, CONTINUE -> ego.setAccelerationMps2(0);
+            default -> ego.setAccelerationMps2(0);
         }
 
         double recommendedSpeed = decision.getRecommendedSpeedKmh();
         boolean mandatoryStop = decision.getPriority() >= com.one2drive.projeto1.decision.DecisionPriority.LEGAL_MANDATORY_STOP;
         if (mandatoryStop) {
-            DrivingAction action = decision.getAction();
             if (action == DrivingAction.STOP || action == DrivingAction.WAIT || action == DrivingAction.REDUCE_SPEED) {
                 ego.setAccelerationMps2(ego.getSpeedKmh() < 0.6 ? 0.0 : -config.getComfortableDecelerationMps2());
             } else if (action == DrivingAction.EMERGENCY_BRAKE) {
@@ -109,7 +66,7 @@ public class DecisionActuator {
             preserveIndicatorsAndState(ego, decision);
             return;
         }
-        if (decision.getAction() != DrivingAction.EMERGENCY_BRAKE && !Double.isNaN(recommendedSpeed)) {
+        if (action != DrivingAction.EMERGENCY_BRAKE && !Double.isNaN(recommendedSpeed)) {
             double current = ego.getSpeedKmh();
             if (current > recommendedSpeed + SPEED_DEAD_BAND_KMH) {
                 if (current > recommendedSpeed + 2.0) {
@@ -118,24 +75,26 @@ public class DecisionActuator {
                     ego.setAccelerationMps2(-Math.max(1.0, (current - recommendedSpeed) * 1.5));
                 }
             } else if (current < recommendedSpeed - SPEED_DEAD_BAND_KMH) {
-                double accel = (decision.getAction() == DrivingAction.RESUME || decision.getAction() == DrivingAction.ACCELERATE || current < 5.0)
-                    ? config.getMaxAccelerationMps2()
-                    : config.getMaxAccelerationMps2() * 0.5;
-                double dt = config.getTickMillis() / 1000.0;
-                double maxAccel = ((recommendedSpeed / 3.6) - ego.getSpeedMps()) / Math.max(dt, 0.01);
-                ego.setAccelerationMps2(Math.max(0.0, Math.min(accel, maxAccel)));
+                if (action.isBraking()) {
+                    // A braking decision may hold the speed but never raise it, whatever its target.
+                    ego.setAccelerationMps2(0);
+                } else {
+                    double accel = (action == DrivingAction.RESUME || action == DrivingAction.ACCELERATE || current < 5.0)
+                        ? config.getMaxAccelerationMps2()
+                        : config.getMaxAccelerationMps2() * 0.5;
+                    double dt = config.getTickMillis() / 1000.0;
+                    double maxAccel = ((recommendedSpeed / 3.6) - ego.getSpeedMps()) / Math.max(dt, 0.01);
+                    ego.setAccelerationMps2(Math.max(0.0, Math.min(accel, maxAccel)));
+                }
             } else {
                 // Inside the dead band: hold the recommended speed instead of hunting around it.
                 // A braking decision may hold but never raise the speed.
-                boolean braking = decision.getAction() == DrivingAction.BRAKE
-                    || decision.getAction() == DrivingAction.STOP
-                    || decision.getAction() == DrivingAction.WAIT;
-                ego.setSpeedKmh(braking ? Math.min(current, recommendedSpeed) : recommendedSpeed);
+                ego.setSpeedKmh(action.isBraking() ? Math.min(current, recommendedSpeed) : recommendedSpeed);
                 ego.setAccelerationMps2(0);
             }
         }
 
-        if (decision.getAction() == DrivingAction.STOP || decision.getAction() == DrivingAction.WAIT) {
+        if (action == DrivingAction.STOP || action == DrivingAction.WAIT) {
             if (ego.getSpeedMps() < 2.0) {
                 ego.setSpeedMps(0);
                 ego.setAccelerationMps2(0);
@@ -146,13 +105,58 @@ public class DecisionActuator {
     }
 
     /**
-     * A lane change decision that names no speed keeps the current one. Without this the
-     * acceleration of whatever decision came before stayed in force for the whole maneuver,
-     * so one braking cycle before a lane change slowed the vehicle all the way through it.
+     * Executes the lane decision. A maneuver already under way is left to run; a new one
+     * starts only if the target lane can be entered and no continuous line is crossed,
+     * otherwise the decision records the refusal and the vehicle keeps its lane. The
+     * speed decision applies either way: a lane change runs at whatever speed the speed
+     * channel decided.
      */
-    private static void holdSpeedIfNoneRecommended(EgoVehicleState ego, DrivingDecision decision) {
-        if (Double.isNaN(decision.getRecommendedSpeedKmh())) {
-            ego.setAccelerationMps2(0);
+    private void applyLaneDecision(WorldState worldState, DrivingDecision decision) {
+        EgoVehicleState ego = worldState.getEgo();
+        DrivingAction lane = decision.getLaneAction();
+        if (!lane.isLaneManeuver() || ego.getLaneChangeState() != LaneChangeState.IDLE) {
+            return;
+        }
+        Lane target = switch (lane) {
+            case CHANGE_LANE_LEFT -> ego.getLane().left();
+            case CHANGE_LANE_RIGHT -> ego.getLane().right();
+            case RETURN_RIGHT -> ego.getLane() == Lane.LEFT ? Lane.CENTER : Lane.RIGHT;
+            default -> ego.getLane();
+        };
+        if (target == ego.getLane()) {
+            rejectLane(ego, decision, "already in the " + target + " lane");
+            return;
+        }
+        if (!worldState.isLaneSafe(target, config.getBlindSpotRangeMeters(), 60.0)) {
+            rejectLane(ego, decision, "target lane " + target + " is not safe to enter");
+            return;
+        }
+        if (worldState.getMarkingBetween(ego.getLane(), target) == RoadMarkingType.CONTINUOUS) {
+            rejectLane(ego, decision, "a continuous line forbids crossing into " + target);
+            return;
+        }
+        requestLaneChange(ego, target);
+        boolean left = target.centreMeters() < ego.getLane().centreMeters();
+        ego.setIndicatorState(left ? IndicatorState.LEFT : IndicatorState.RIGHT);
+        ego.setSteeringState(left ? SteeringState.LEFT : SteeringState.RIGHT);
+    }
+
+    /**
+     * A maneuver the world does not allow is refused, and unless the speed channel is
+     * already slowing the vehicle down it eases off as the safe reaction to a plan that
+     * could not be executed. The rules decide again next cycle with the same facts.
+     */
+    private static void rejectLane(EgoVehicleState ego, DrivingDecision decision, String detail) {
+        decision.rejectLane(detail);
+        DrivingAction speed = decision.getSpeedAction();
+        if (!speed.isBraking() && speed != DrivingAction.REDUCE_SPEED) {
+            decision.apply(DrivingAction.REDUCE_SPEED, Math.max(0.0, ego.getSpeedKmh() - 10.0),
+                com.one2drive.projeto1.domain.RiskLevel.HIGH,
+                com.one2drive.projeto1.decision.DecisionPriority.COLLISION_AVOIDANCE,
+                "Lane-change command rejected: " + detail,
+                "Actuator safety guard",
+                decision.getTimestamp(),
+                java.util.List.of(detail));
         }
     }
 
@@ -168,13 +172,13 @@ public class DecisionActuator {
                 ego.setSteeringState(SteeringState.RIGHT);
             }
         } else if (ego.getLaneChangeState() == LaneChangeState.COMPLETED || ego.getLaneChangeState() == LaneChangeState.IDLE) {
-            if (decision.getAction() != DrivingAction.EMERGENCY_BRAKE) {
+            if (decision.getSpeedAction() != DrivingAction.EMERGENCY_BRAKE) {
                 ego.setIndicatorState(IndicatorState.OFF);
             }
             ego.setSteeringState(SteeringState.STRAIGHT);
         }
 
-        ego.updateDrivingState(decision.getAction(), recommendedSpeed);
+        ego.updateDrivingState(decision.getSpeedAction(), recommendedSpeed);
     }
 
     /**

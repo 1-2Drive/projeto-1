@@ -9,6 +9,7 @@ export type ToolboxAction =
   | 'POTHOLE'
   | 'STATIC_OBSTACLE'
   | 'BARRIER'
+  | 'CROSSWALK'
   | 'FRONT_VEHICLE'
   | 'PEDESTRIAN';
 
@@ -53,6 +54,11 @@ const ACTIONS: Record<ToolboxAction, ActionDefinition> = {
     title: 'Add barrier', hint: 'A closed barrier produces a mandatory stop decision.',
     needsLane: true, needsSeverity: false, needsSpeedLimit: false,
     needsLightState: false, needsBarrierState: true, needsActorSpeed: false
+  },
+  CROSSWALK: {
+    title: 'Add crosswalk', hint: 'Painted across the road at this distance; a pedestrian added on the road gets one automatically.',
+    needsLane: false, needsSeverity: false, needsSpeedLimit: false,
+    needsLightState: false, needsBarrierState: false, needsActorSpeed: false
   },
   FRONT_VEHICLE: {
     title: 'Add vehicle', hint: 'Radar measures distance, relative speed and time-to-collision.',
@@ -172,6 +178,9 @@ export class ElementPropertiesComponent {
           distanceAheadMeters: this.distanceAheadMeters(),
           speedLimitKmh: this.speedLimitKmh()
         });
+        break;
+      case 'CROSSWALK':
+        this.createRoadElement.emit({ type: 'CROSSWALK', lane: 'CENTER', distanceAheadMeters: this.distanceAheadMeters() });
         break;
       case 'STOP_SIGN':
         this.createRoadElement.emit(this.simpleElement('STOP_SIGN'));

@@ -84,18 +84,24 @@ then
     );
 end
 
+// The obstacle fills the ego lane and no side can be entered (the blind-spot occupancy
+// already counts a continuous line, like the road edge, as a closed side), and a
+// continuous line is what closes at least one of them: the explanation names the law,
+// not just the traffic. The line a change crosses follows WorldState.getMarkingBetween:
+// leftMarking lies between LEFT and CENTER, rightMarking between CENTER and RIGHT.
 rule "Stop before obstacle when lane change prohibited by continuous line"
 salience 466
 when
     $ctx : DecisionContext()
-    VehicleStateFact($lane : lane, $speed : speedKmh, leftMarking == RoadMarkingType.CONTINUOUS)
+    VehicleStateFact($lane : lane, $speed : speedKmh, $left : leftMarking, $right : rightMarking)
     ObstacleStateFact(obstacleId != "none", lane == $lane,
                       $distance : distanceMeters > 0, distanceMeters <= 60.0)
-    (
-        LaneOccupancyState(lane == Lane.RIGHT, occupied == true)
-        or
-        VehicleStateFact(lane == Lane.RIGHT)
-    )
+    LaneOccupancyState(lane == Lane.LEFT, $leftSafe : safeToEnter)
+    LaneOccupancyState(lane == Lane.RIGHT, $rightSafe : safeToEnter)
+    eval(!$leftSafe && !$rightSafe
+        && (($lane == Lane.CENTER && ($left == RoadMarkingType.CONTINUOUS || $right == RoadMarkingType.CONTINUOUS))
+            || ($lane == Lane.RIGHT && $right == RoadMarkingType.CONTINUOUS)
+            || ($lane == Lane.LEFT && $left == RoadMarkingType.CONTINUOUS)))
 then
     double room = Math.max(0.0, $distance - 10.0);
     DrivingAction action = DrivingAction.BRAKE;
@@ -110,8 +116,8 @@ then
         target,
         RiskLevel.HIGH,
         DecisionPriority.COLLISION_AVOIDANCE,
-        "Continuous line prohibits lane change left; stopping before obstacle",
+        "Continuous line prohibits lane change; stopping before obstacle",
         drools.getRule().getName(),
-        "continuous line left, obstacle " + $distance + "m ahead"
+        "continuous line closes the free side, obstacle " + $distance + "m ahead"
     );
 end

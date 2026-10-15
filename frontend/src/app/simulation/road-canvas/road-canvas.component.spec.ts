@@ -492,4 +492,58 @@ describe('RoadCanvasComponent', () => {
     expect(host.querySelector('[data-testid="rain-chip"]')).toBeNull();
     expect(host.querySelector('.road--rain')).toBeNull();
   });
+
+  describe('crosswalk', () => {
+    function pedestrianSnapshot(timeMillis: number, egoPositionMeters: number, worldObjects: unknown[]) {
+      return {
+        simulationTimeMillis: timeMillis,
+        status: 'RUNNING',
+        egoVehicle: { speedKmh: 30, positionMeters: egoPositionMeters, lane: 'RIGHT', accelerationMps2: 0 },
+        environment: { weatherCondition: 'CLEAR', visibilityFactor: 1, gripFactor: 1 },
+        speedAdvisor: { currentKmh: 30, legalLimitKmh: 50, recommendedKmh: 30, action: 'MAINTAIN_SPEED' },
+        currentDecision: { action: 'MAINTAIN_SPEED', recommendedSpeedKmh: 30, riskLevel: 'LOW', reason: '', sourceRule: '', timestamp: timeMillis, evidence: [] },
+        sensorReadings: {},
+        sensors: {},
+        worldObjects,
+        detectedObjectIds: [], cameraDetectedObjectIds: [], radarDetectedObjectIds: [],
+        sensorRanges: { cameraRangeMeters: 120, radarRangeMeters: 130, blindSpotRangeMeters: 30, cameraRateMillis: 200, radarRateMillis: 100 }
+      } as never;
+    }
+
+    function crosswalk(egoPositionMeters: number) {
+      return {
+        id: 'r20-ALL', type: 'Crosswalk', positionMeters: 100 - egoPositionMeters, lane: 'ALL',
+        details: "Crosswalk{id='r20-ALL', positionMeters=100.0, lane=null, active=true}", worldPositionMeters: 100
+      };
+    }
+
+    function pedestrian(egoPositionMeters: number) {
+      return {
+        id: 'p1', type: 'Pedestrian', positionMeters: 100 - egoPositionMeters, lane: 'LEFT',
+        details: "Pedestrian{id='p1', crossingState=CROSSING}", worldPositionMeters: 100
+      };
+    }
+
+    function crosswalkLeft(): number | null {
+      const el = fixture.nativeElement.querySelector('[data-testid="crosswalk"]') as HTMLElement | null;
+      return el ? parseFloat(el.style.left) : null;
+    }
+
+    it('is painted across the road from the Crosswalk world object, not from the pedestrian', () => {
+      fixture.componentRef.setInput('snapshot', pedestrianSnapshot(1000, 90, [crosswalk(90), pedestrian(90)]));
+      fixture.detectChanges();
+      const host = fixture.nativeElement as HTMLElement;
+      expect(host.querySelectorAll('[data-testid="crosswalk"]').length).toBe(1);
+      expect(host.querySelector('[data-testid="road-pedestrian"]')).not.toBeNull();
+      expect(host.querySelector('.obj--crosswalk')).toBeNull();
+      const atCrossing = crosswalkLeft();
+
+      // The pedestrian has crossed and left the world; the crosswalk slides behind the car.
+      fixture.componentRef.setInput('snapshot', pedestrianSnapshot(2000, 105, [crosswalk(105)]));
+      fixture.detectChanges();
+      expect(host.querySelector('[data-testid="road-pedestrian"]')).toBeNull();
+      expect(crosswalkLeft()).not.toBeNull();
+      expect(crosswalkLeft()!).toBeLessThan(atCrossing!);
+    });
+  });
 });

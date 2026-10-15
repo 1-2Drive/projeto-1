@@ -125,7 +125,20 @@ DrivingDecision -> DecisionActuator -> Updated WorldState -> next cycle
 
 - Stateful `KieSession` in stream mode (`kmodule.xml`).
 - Forward chaining on real sensor events.
-- Conflict handling with `DecisionContext` priority strategy.
+- Conflict handling in `DecisionContext`, per control channel. Every rule proposal
+  of a cycle is kept and arbitrated separately for the speed (longitudinal) and the
+  lane (lateral) channel, so a lane change and a speed reduction never compete:
+  - Speed: `LEGAL_MANDATORY_STOP` (60) and `EMERGENCY_SAFETY` (70) proposals override
+    everything, highest priority first. Below them `COLLISION_AVOIDANCE` (50),
+    `ROAD_HAZARD` (40) and `SPEED_COMPLIANCE` (20) proposals are speed ceilings and the
+    lowest of all that hold wins; `MANEUVER_SAFETY` (30, moving off / resuming) and
+    `COMFORT_PROGRESS` (10) only set the base speed the ceilings cap.
+  - Lane: highest priority wins, then `RETURN_RIGHT` > `CHANGE_LANE` > `KEEP_LANE`.
+    A lane maneuver is vetoed when the speed decision is an emergency or a mandatory
+    stop from a higher priority; the actuator can still refuse it (lane unsafe,
+    continuous line).
+  - Each proposal records its outcome (`WON`, `LOST_TO rule`, `VETOED_BY rule`,
+    `REJECTED_BY actuator`); the decision panel lists them as the why / why not.
 
 ### CEP / Temporal Reasoning
 
@@ -170,6 +183,10 @@ placed at rest (0 km/h, `STOPPED`) and the scenario's entry speed is applied by
 Every tick starts a fresh decision cycle: the `DecisionContext` is reset and updated in
 the KieSession, so all rules re-evaluate against the current state facts on every tick.
 Rules that read raw stream events use sliding windows, so only recent samples count.
+The cycle ends with a `DrivingDecision` that carries a speed decision and a lane
+decision; `getAction()` is the headline (the lane maneuver while one executes, the
+speed action otherwise) and the actuator applies both channels. A `BRAKE`, `STOP` or
+`WAIT` decision never raises the speed, whatever its target.
 
 ### Road map
 
@@ -187,6 +204,7 @@ without `map` gets an empty 100x3 road (`SimulationConfig`: block length and row
 | 2 | Pothole (high severity) |
 | 3 | Closed barrier |
 | 4 | Stop sign |
+| 5 | Crosswalk (painted across the road; a pedestrian added on the road gets one on its block) |
 | 6 / 7 | Red / green traffic light |
 | 8 - 13 | Speed limit 30 / 50 / 70 / 90 / 100 / 120 km/h |
 
@@ -760,8 +778,15 @@ The direct integration suite covers 81 backend tests: 23 rule/CEP tests, 7 fact 
    in `src/main/resources/META-INF/kmodule.xml`.
 4. Write the rule and call `droolsSupport.proposeDecision($ctx, action,
    recommendedSpeed, riskLevel, DecisionPriority.X, reason, ruleName, evidence)`.
-   Pick the priority so conflict resolution matches the intended safety order.
+   The priority names what kind of rule it is (emergency, mandatory stop, collision
+   avoidance, road hazard, maneuver, speed compliance, comfort), never a value chosen
+   to beat a specific other rule: speed rules below 60 are ceilings combined by
+   minimum, and lane rules only compete with lane rules. Do not read
+   `DecisionContext(priority ...)` in a rule and do not make a rule step aside for
+   another; the arbitration does that.
 5. Add a rule-level test in `DrivingExpertSystemRulesTest`.
+6. Mirror the rule in `src/main/prolog/driving_rules.pl` (same name, conditions and
+   targets): `PrologDroolsEquivalenceTest` checks that both engines decide alike.
 
 Do not decide vehicle behaviour outside Drools: the actuator only reacts to the
 `DrivingDecision` produced by rules.

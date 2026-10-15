@@ -11,7 +11,8 @@ export type MapCellTone =
   | 'light-red'
   | 'light-yellow'
   | 'light-green'
-  | 'limit';
+  | 'limit'
+  | 'crosswalk';
 
 export interface MapCellView {
   row: number;
@@ -141,6 +142,8 @@ export class RoadMapComponent {
         return entry.detail === 'GREEN' ? 'light-green' : entry.detail === 'YELLOW' ? 'light-yellow' : 'light-red';
       case 'SPEED_LIMIT':
         return 'limit';
+      case 'CROSSWALK':
+        return 'crosswalk';
       default:
         return 'free';
     }

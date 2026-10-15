@@ -69,6 +69,14 @@ public class CameraSensor extends AbstractSensor<Object> {
             seen.crossingState()
         )));
 
+        worldState.nearestCrosswalk(range).ifPresent(c -> events.add(
+            new com.one2drive.projeto1.drools.events.CrosswalkDetectedEvent(
+                timestampMillis,
+                id(),
+                worldState.signedDistance(c.getPositionMeters()),
+                c.getId()
+            )));
+
         Optional<Pothole> pothole = worldState.nearestPotholeAhead(range);
         pothole.ifPresent(p -> events.add(new PotholeDetectedEvent(
             timestampMillis,

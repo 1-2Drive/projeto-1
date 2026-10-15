@@ -9,6 +9,7 @@ import com.one2drive.projeto1.drools.events.LeftLaneVehicleEvent
 import com.one2drive.projeto1.drools.events.ObstacleDetectedEvent
 import com.one2drive.projeto1.drools.events.PedestrianDetectedEvent
 import com.one2drive.projeto1.drools.events.PotholeDetectedEvent
+import com.one2drive.projeto1.drools.events.CrosswalkDetectedEvent
 import com.one2drive.projeto1.drools.events.RelativeSpeedEvent
 import com.one2drive.projeto1.drools.events.RoadGripEvent
 import com.one2drive.projeto1.drools.events.ReducedGripEvent
@@ -82,6 +83,12 @@ declare PotholeDetectedEvent
 end
 
 declare BarrierDetectedEvent
+    @role( event )
+    @timestamp( timestamp )
+    @expires( 20s )
+end
+
+declare CrosswalkDetectedEvent
     @role( event )
     @timestamp( timestamp )
     @expires( 20s )

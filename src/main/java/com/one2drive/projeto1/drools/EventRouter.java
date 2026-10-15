@@ -37,7 +37,8 @@ public class EventRouter {
             kieSession.getEntryPoint(DroolsEntryPoints.PERCEPTION_STREAM).insert(event);
         } else if (event instanceof SpeedLimitDetectedEvent || event instanceof StopSignEvent
             || event instanceof ObstacleDetectedEvent || event instanceof PotholeDetectedEvent
-            || event instanceof BarrierDetectedEvent) {
+            || event instanceof BarrierDetectedEvent
+            || event instanceof com.one2drive.projeto1.drools.events.CrosswalkDetectedEvent) {
             kieSession.getEntryPoint(DroolsEntryPoints.ROAD_STREAM).insert(event);
         } else if (event instanceof TrafficLightEvent) {
             kieSession.getEntryPoint(DroolsEntryPoints.TRAFFIC_STREAM).insert(event);

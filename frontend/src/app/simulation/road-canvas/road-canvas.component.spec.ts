@@ -209,6 +209,44 @@ describe('RoadCanvasComponent', () => {
     expect(egoElement.contains(wheelGroup)).toBeTrue();
   });
 
+  for (const indicator of ['LEFT', 'RIGHT', 'HAZARD', 'OFF']) {
+    it(`should flash the ego blinker lamps for indicator ${indicator}, and show none while off`, () => {
+      fixture.componentRef.setInput('snapshot', {
+        simulationTimeMillis: 1000,
+        status: 'RUNNING',
+        egoVehicle: {
+          speedKmh: 50,
+          positionMeters: 30,
+          lane: 'CENTER',
+          lateralPositionMeters: 0,
+          laneChangeState: 'IDLE',
+          indicatorState: indicator
+        },
+        sensors: {},
+        worldObjects: []
+      });
+      fixture.detectChanges();
+
+      const ego = fixture.nativeElement.querySelector('[data-testid="road-ego"]') as HTMLElement;
+      const left = indicator === 'LEFT' || indicator === 'HAZARD';
+      const right = indicator === 'RIGHT' || indicator === 'HAZARD';
+      expect(ego.classList.contains('ego--indicator-left') || ego.classList.contains('ego--indicator-hazard')).toBe(left);
+      expect(ego.classList.contains('ego--indicator-right') || ego.classList.contains('ego--indicator-hazard')).toBe(right);
+
+      for (const side of ['left', 'right']) {
+        const group = ego.querySelector(`[data-testid="ego-indicator-${side}"]`) as SVGGElement;
+        expect(group).toBeTruthy(`the ${side} blinker must be drawn on the ego car`);
+        expect(group.querySelectorAll('.indicator-light').length).toBe(3, `front, rear and side lamps on the ${side}`);
+        const lamp = group.querySelector('.indicator-light') as SVGElement;
+        const flashing = side === 'left' ? left : right;
+        expect(getComputedStyle(lamp).animationName).toBe(flashing ? 'indicator-blink' : 'none');
+        if (!flashing) {
+          expect(getComputedStyle(lamp).opacity).toBe('0', `the ${side} blinker is not shown while off`);
+        }
+      }
+    });
+  }
+
   it('should render clean EGO badge without concatenating state text like EGOCRUISING', () => {
     fixture.componentRef.setInput('snapshot', {
       simulationTimeMillis: 500,

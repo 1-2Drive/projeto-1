@@ -33,13 +33,13 @@
 %   front_distance_sample(Target, DistanceM, AgeMs)  front_read_now(Target)
 %   left_lane_vehicle(Target, DistanceM, RelSpeedMps)  left_read_now(Target)
 %   lane_occupancy(left|right, Occupied, FrontDistanceM)   o lado do ego, não uma faixa
+%   lane_safe_to_enter(left|right, true|false)   o safeToEnter do sensor de ângulo morto
 %   left_marking(dashed|continuous)  right_marking(dashed|continuous)
 %   adjacent_lane_safe(left|right, true|false)   calculado pelo Java (WorldState.isLaneSafe)
 %   overtaking(Active, OriginLane, TargetPassed, StartMs, Target)   estado do ciclo anterior
 %   obstacle(Id, DistanceM, Severity, Lane)  obstacle_sample(Id, DistanceM, Severity, Lane, AgeMs)
 %   pothole(Id, DistanceM, Severity, Lane)  barrier(Id, DistanceM, Open, Lane)
-%   weather(clear|rain|..., Visibility, Grip)
-%   low_visibility_sample(Visibility, AgeMs)  low_grip_sample(Grip, AgeMs)
+%   weather(clear|rain|..., Visibility, Grip)   o estado persistente (último WeatherEvent)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Emergência
@@ -290,28 +290,31 @@ rule('Green traffic light releases red-light hold',
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Veículo da frente
 %
-% As regras que abrandam atrás do veículo da frente afastam-se no ciclo em que começa uma
-% ultrapassagem: a ultrapassagem propõe com a prioridade de manobra e perderia sempre para
-% elas, pelo que a mudança de faixa nunca começaria. A sua precedência é inferior à das
-% regras de ultrapassagem, por isso a ultrapassagem já é conhecida quando são avaliadas. A
-% partir do ciclo seguinte voltam a aplicar-se, também enquanto o veículo ainda está a sair
-% da faixa. A travagem a curta distância nunca se afasta.
+% As regras que abrandam atrás do veículo da frente nunca se afastam por uma ultrapassagem:
+% a mudança de faixa é arbitrada no seu próprio canal (lateral) e não compete com as
+% propostas de velocidade, por isso a ultrapassagem pode começar no mesmo ciclo em que o
+% veículo continua a abrandar atrás do da frente, e isso mantém-se até ter saído da faixa.
 
+% Too close and still closing: brake to 3 km/h below the front vehicle's speed, so the gap
+% reopens instead of merely holding the closing speed.
 rule('Brake when front vehicle distance low',
      520,
      [ front_vehicle(_, D, Rel),
-       test((D > 0, D < 14.0, Rel > 0)) ],
-     [ assert(proposal(brake, 20.0, high, collision_avoidance,
+       ego_speed(V),
+       test((D > 0, D < 14.0, Rel > 0)),
+       test(Target is max(0.0, (V / 3.6 - Rel) * 3.6 - 3.0)) ],
+     [ assert(proposal(brake, Target, high, collision_avoidance,
                        'Front vehicle too close')) ]).
 
 % Art. 18 and 24 CE: the speed from which 2.0 m/s2 still matches the front vehicle's speed
 % 12 m behind it. Only proposes above that speed, because a recommendation above the current
 % speed would make the actuator accelerate. Behind a stopped vehicle, keeps the stop until
-% 2 m past the stopping point, so radar noise does not release it.
+% 2 m past the stopping point, so radar noise does not release it. Inside the 12 m gap behind
+% a moving vehicle, and not opening the gap fast, the curve says nothing (no room left): the
+% vehicle then drives 3 km/h slower than the vehicle ahead until the gap has reopened.
 rule('Keep safe following distance behind front vehicle (stop)',
      510,
-     [ not(overtake_started(_, _, _)),
-       front_vehicle(_, D, Rel),
+     [ front_vehicle(_, D, Rel),
        ego_speed(V),
        test(D > 0),
        test(unsafe_following(V, D, Rel)),
@@ -320,22 +323,32 @@ rule('Keep safe following distance behind front vehicle (stop)',
      [ assert(proposal(stop, 0.0, high, collision_avoidance,
                        'Stopped behind a stationary front vehicle (Art. 18 CE)')) ]).
 
+rule('Keep safe following distance behind front vehicle (reopen gap)',
+     510,
+     [ front_vehicle(_, D, Rel),
+       ego_speed(V),
+       test(D > 0),
+       test(reopening_gap(V, D, Rel)),
+       test(front_vehicle_speed(V, Rel, Front)),
+       test(Target is max(0.0, Front * 3.6 - 3.0)) ],
+     [ assert(proposal(reduce_speed, Target, moderate, collision_avoidance,
+                       'Reopening the following gap behind the front vehicle (Art. 18 CE)')) ]).
+
 rule('Keep safe following distance behind front vehicle (reduce)',
      510,
-     [ not(overtake_started(_, _, _)),
-       front_vehicle(_, D, Rel),
+     [ front_vehicle(_, D, Rel),
        ego_speed(V),
        test(D > 0),
        test(unsafe_following(V, D, Rel)),
        not(test(( front_vehicle_stopped(V, Rel), D - 12.0 =< 2.0 ))),
+       not(test(reopening_gap(V, D, Rel))),
        test(following_speed(V, D, Rel, Target)) ],
      [ assert(proposal(reduce_speed, Target, moderate, collision_avoidance,
                        'Keeping a safe distance to the front vehicle (Art. 18/24 CE)')) ]).
 
 rule('Reduce speed when closing front vehicle',
      500,
-     [ not(overtake_started(_, _, _)),
-       front_vehicle(_, D, Rel),
+     [ front_vehicle(_, D, Rel),
        test((D >= 14.0, D < 35.0, Rel > 0.8)),
        test(Target is max(20.0, D * 1.2)) ],
      [ assert(proposal(reduce_speed, Target, moderate, collision_avoidance,
@@ -345,8 +358,7 @@ rule('Reduce speed when closing front vehicle',
 % radar switches to another vehicle, the jump in distance between the two is no approach.
 rule('Approaching trend from sliding distance window',
      505,
-     [ not(overtake_started(_, _, _)),
-       front_vehicle(Target, D, _),
+     [ front_vehicle(Target, D, _),
        test((D > 0, D < 50.0)),
        lane_change_state(idle),
        test(front_distance_window(Target, Count, Minimum, Maximum)),
@@ -421,6 +433,35 @@ rule('Overtake slow front vehicle via left lane',
      [ assert(overtake_started(Target, Lane, Now)),
        assert(proposal(change_lane_left, no_target, low, maneuver_safety,
                        'Overtaking slower vehicle via clear left lane (Art. 35/36 CE)')) ]).
+
+% The overtake above needs the ego to be closing in, which never holds once the following
+% rule has matched it to the front vehicle's speed. This is the exit from following: at the
+% front vehicle's speed (within 0.5 m/s either way), in the following window (6-30 m) and
+% with that vehicle at least 10 km/h below the speed the ego aims for (the posted limit, or
+% the scenario cruise speed), it moves left when the left lane is clear. Same lane, line,
+% lane-ahead and legal (Art. 41 CE) conditions as the overtake.
+rule('Overtake the vehicle being followed',
+     524,
+     [ ego_lane(Lane),
+       test(memberchk(Lane, [right, center])),
+       lane_change_state(idle),
+       left_marking(LeftMarking),
+       test(LeftMarking \== continuous),
+       ego_speed(V),
+       time_ms(Now),
+       front_vehicle(Target, D, Rel),
+       front_read_now(Target),
+       test((D > 6.0, D =< 30.0, Rel >= -0.5, Rel =< 0.5)),
+       lane_occupancy(left, false, LeftFront),
+       not(pedestrian_conflict(_)),
+       not(test(light_forbids_overtaking)),
+       test(may_start_overtaking(Target, Lane)),
+       test((Lane \== center ; LeftFront > D + 20.0)),
+       test(desired_speed(Desired)),
+       test((V / 3.6 - Rel) * 3.6 =< Desired - 10.0) ],
+     [ assert(overtake_started(Target, Lane, Now)),
+       assert(proposal(change_lane_left, no_target, low, maneuver_safety,
+                       'Overtaking the slower vehicle being followed via clear left lane (Art. 35/36 CE)')) ]).
 
 % Art. 36 CE: a slower vehicle in the left lane is not passed on its right. From the right
 % lane, the ego first moves in behind it (RIGHT -> CENTER) and that vehicle becomes the
@@ -524,8 +565,7 @@ rule('Enforce keep right road law when right lane is safe',
 % beyond the blind-spot range, so the lane reads clear and the ego can move in).
 rule('Do not pass a slower left lane vehicle on its right (closing in)',
      508,
-     [ not(overtake_started(_, _, _)),
-       ego_speed(V),
+     [ ego_speed(V),
        left_lane_vehicle(_, D, Rel),
        test((D > 0, Rel > -2.5)),
        test(must_not_pass_on_right(V, D, Rel)),
@@ -536,8 +576,7 @@ rule('Do not pass a slower left lane vehicle on its right (closing in)',
 
 rule('Do not pass a slower left lane vehicle on its right (fall back)',
      508,
-     [ not(overtake_started(_, _, _)),
-       ego_speed(V),
+     [ ego_speed(V),
        left_lane_vehicle(_, D, Rel),
        test((D > 0, Rel > -2.5)),
        test(must_not_pass_on_right(V, D, Rel)),
@@ -550,8 +589,7 @@ rule('Do not pass a slower left lane vehicle on its right (fall back)',
 
 rule('Do not pass a slower left lane vehicle on its right (hold)',
      508,
-     [ not(overtake_started(_, _, _)),
-       ego_speed(V),
+     [ ego_speed(V),
        left_lane_vehicle(_, D, Rel),
        test((D > 0, Rel > -2.5)),
        test(must_not_pass_on_right(V, D, Rel)),
@@ -618,10 +656,14 @@ rule('Avoid pothole in centre lane by changing left when right is occupied',
      [ assert(proposal(change_lane_left, no_target, low, road_hazard,
                        'Avoiding pothole by moving into the clear left lane')) ]).
 
+% Every lane change checks the line it crosses: between RIGHT and CENTER the right marking,
+% between CENTER and LEFT the left marking; a continuous line is never crossed.
 rule('Avoid pothole in left lane by changing right',
      470,
      [ ego_lane(left),
        lane_change_state(idle),
+       left_marking(LeftMarking),
+       test(LeftMarking \== continuous),
        pothole(_, D, _, left),
        test((D > 0, D =< 50.0)),
        lane_occupancy(right, false, _) ],
@@ -632,52 +674,63 @@ rule('Avoid pothole in right lane by changing left',
      470,
      [ ego_lane(right),
        lane_change_state(idle),
+       right_marking(RightMarking),
+       test(RightMarking \== continuous),
        pothole(_, D, _, right),
        test((D > 0, D =< 50.0)),
        lane_occupancy(left, false, _) ],
      [ assert(proposal(change_lane_left, no_target, low, road_hazard,
                        'Avoiding pothole by moving into the clear left lane')) ]).
 
-% Obstacle: from the centre, prefer the left; right only with the left occupied.
+% Obstacle: from the centre, prefer the left; right only with the left occupied. An obstacle
+% blocks the lane, so going around it is collision avoidance.
 rule('Avoid obstacle in centre lane by changing left',
      470,
      [ ego_lane(center),
        lane_change_state(idle),
+       left_marking(LeftMarking),
+       test(LeftMarking \== continuous),
        obstacle(_, D, _, center),
        test((D > 0, D =< 50.0)),
        lane_occupancy(left, false, _) ],
-     [ assert(proposal(change_lane_left, no_target, low, road_hazard,
+     [ assert(proposal(change_lane_left, no_target, low, collision_avoidance,
                        'Avoiding obstacle by moving into the clear left lane')) ]).
 
 rule('Avoid obstacle in centre lane by changing right when left is occupied',
      470,
      [ ego_lane(center),
        lane_change_state(idle),
+       right_marking(RightMarking),
+       test(RightMarking \== continuous),
        obstacle(_, D, _, center),
        test((D > 0, D =< 50.0)),
        lane_occupancy(left, true, _),
        lane_occupancy(right, false, _) ],
-     [ assert(proposal(change_lane_right, no_target, low, road_hazard,
+     [ assert(proposal(change_lane_right, no_target, low, collision_avoidance,
                        'Avoiding obstacle by moving into the clear right lane')) ]).
 
 rule('Avoid obstacle in left lane by changing right',
      470,
      [ ego_lane(left),
        lane_change_state(idle),
+       left_marking(LeftMarking),
+       test(LeftMarking \== continuous),
        obstacle(_, D, _, left),
        test((D > 0, D =< 50.0)),
        lane_occupancy(right, false, _) ],
-     [ assert(proposal(change_lane_right, no_target, low, road_hazard,
+     [ assert(proposal(change_lane_right, no_target, low, collision_avoidance,
                        'Avoiding obstacle by moving into the clear right lane')) ]).
 
 rule('Avoid obstacle in right lane by changing left',
      470,
      [ ego_lane(right),
        lane_change_state(idle),
+       right_marking(RightMarking),
+       test(RightMarking \== continuous),
        obstacle(_, D, _, right),
        test((D > 0, D =< 50.0)),
        lane_occupancy(left, false, _) ],
-     [ assert(proposal(change_lane_left, no_target, low, road_hazard,
+     [ assert(proposal(change_lane_left, no_target, low, collision_avoidance,
                        'Avoiding obstacle by moving into the clear left lane')) ]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -774,45 +827,54 @@ rule('Stop before obstacle when no lane is free (brake)',
      [ assert(proposal(brake, Target, high, collision_avoidance,
                        'Obstacle ahead and no free lane to avoid it')) ]).
 
-% Continuous line on the left and the right lane occupied (or the ego already in the right
-% lane): there is nowhere to go legally.
+% Neither side is safe to enter (the blind-spot occupancy already reports a side as not safe
+% when the line towards it is continuous, WorldState.sideLaneOccupancy) and the ego's lane
+% is closed by a continuous line (the left marking lies between LEFT and CENTER, the right
+% marking between CENTER and RIGHT): there is nowhere to go legally.
 rule('Stop before obstacle when lane change prohibited by continuous line (stop)',
      466,
-     [ left_marking(continuous),
-       ego_lane(Lane),
+     [ ego_lane(Lane),
        obstacle(_, D, _, Lane),
        test((D > 0, D =< 60.0)),
-       test(right_unavailable(Lane)),
+       lane_safe_to_enter(left, false),
+       lane_safe_to_enter(right, false),
+       test(continuous_line_closes_lane(Lane)),
        test(obstacle_margin(D, Margin)),
        test(Margin =< 0.5) ],
      [ assert(proposal(stop, 0.0, high, collision_avoidance,
-                       'Continuous line prohibits lane change left; stopping before obstacle')) ]).
+                       'Continuous line prohibits lane change; stopping before obstacle')) ]).
 
 rule('Stop before obstacle when lane change prohibited by continuous line (brake)',
      466,
-     [ left_marking(continuous),
-       ego_lane(Lane),
+     [ ego_lane(Lane),
        obstacle(_, D, _, Lane),
        test((D > 0, D =< 60.0)),
-       test(right_unavailable(Lane)),
+       lane_safe_to_enter(left, false),
+       lane_safe_to_enter(right, false),
+       test(continuous_line_closes_lane(Lane)),
        test(obstacle_margin(D, Margin)),
        test(Margin > 0.5),
        test(obstacle_curve(Margin, Target)) ],
      [ assert(proposal(brake, Target, high, collision_avoidance,
-                       'Continuous line prohibits lane change left; stopping before obstacle')) ]).
+                       'Continuous line prohibits lane change; stopping before obstacle')) ]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Barreiras
 
-% Closed barrier in the ego's lane: move to a lane Java verified safe.
+% Closed barrier in the ego's lane: move to a lane Java verified safe. The barrier blocks
+% the lane, so going around it is collision avoidance. Each rule checks the line it crosses
+% (RIGHT-CENTER: the right marking; CENTER-LEFT: the left marking): a continuous line is
+% never crossed, and the vehicle stops instead.
 rule('Avoid closed barrier by changing left when safe',
      650,
      [ ego_lane(right),
        lane_change_state(idle),
        adjacent_lane_safe(left, true),
+       right_marking(RightMarking),
+       test(RightMarking \== continuous),
        barrier(_, D, false, right),
        test((D > 0, D =< 55.0)) ],
-     [ assert(proposal(change_lane_left, no_target, high, maneuver_safety,
+     [ assert(proposal(change_lane_left, no_target, high, collision_avoidance,
                        'Closed barrier ahead; changing left to a verified clear lane')) ]).
 
 rule('Avoid closed barrier by changing left from centre when safe',
@@ -820,9 +882,11 @@ rule('Avoid closed barrier by changing left from centre when safe',
      [ ego_lane(center),
        lane_change_state(idle),
        adjacent_lane_safe(left, true),
+       left_marking(LeftMarking),
+       test(LeftMarking \== continuous),
        barrier(_, D, false, center),
        test((D > 0, D =< 55.0)) ],
-     [ assert(proposal(change_lane_left, no_target, high, maneuver_safety,
+     [ assert(proposal(change_lane_left, no_target, high, collision_avoidance,
                        'Closed barrier ahead; changing left to a verified clear lane')) ]).
 
 rule('Avoid closed barrier by changing right from centre when safe',
@@ -831,9 +895,11 @@ rule('Avoid closed barrier by changing right from centre when safe',
        lane_change_state(idle),
        adjacent_lane_safe(left, false),
        adjacent_lane_safe(right, true),
+       right_marking(RightMarking),
+       test(RightMarking \== continuous),
        barrier(_, D, false, center),
        test((D > 0, D =< 55.0)) ],
-     [ assert(proposal(change_lane_right, no_target, high, maneuver_safety,
+     [ assert(proposal(change_lane_right, no_target, high, collision_avoidance,
                        'Closed barrier ahead; changing right to a verified clear lane')) ]).
 
 rule('Avoid closed barrier by changing right when safe',
@@ -841,9 +907,11 @@ rule('Avoid closed barrier by changing right when safe',
      [ ego_lane(left),
        lane_change_state(idle),
        adjacent_lane_safe(right, true),
+       left_marking(LeftMarking),
+       test(LeftMarking \== continuous),
        barrier(_, D, false, left),
        test((D > 0, D =< 55.0)) ],
-     [ assert(proposal(change_lane_right, no_target, high, maneuver_safety,
+     [ assert(proposal(change_lane_right, no_target, high, collision_avoidance,
                        'Closed barrier ahead; changing right to a verified clear lane')) ]).
 
 rule('Closed barrier requires stop',
@@ -856,39 +924,44 @@ rule('Closed barrier requires stop',
      [ assert(proposal(stop, 0.0, high, legal_mandatory_stop,
                        'Closed barrier ahead and no adjacent lane is safe')) ]).
 
-% Only when nothing at collision-avoidance priority or above has been proposed.
+% Comfort proposal: it loses to any speed ceiling, hold or manoeuvre speed in the cycle, so
+% it needs no guard on what else was proposed.
 rule('Open barrier allows continue if no higher priority',
      170,
      [ barrier(_, D, true, _),
-       test((D >= 0, D =< 35.0)),
-       not(test(proposal_at_least(collision_avoidance))) ],
+       test((D >= 0, D =< 35.0)) ],
      [ assert(proposal(continue, 35.0, low, comfort_progress,
                        'Barrier open and crossing allowed')) ]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Condições meteorológicas (weather.drl, temporal.drl)
 
+% The weather is a persistent condition of the road, so the three rules read the weather
+% state (kept up to date by the environment events) instead of short event windows that
+% would let the ceiling lapse between two readings. All three propose at road_hazard: they
+% are speed ceilings, and the lowest of the ceilings that hold wins the cycle. The 0.85
+% thresholds are the ones the environment sensor uses to flag reduced visibility and grip.
+
 % Rain: prudent speed of 65 km/h, or 55 km/h with low visibility or grip.
 rule('Rain lowers recommended safe speed',
      340,
      [ weather(rain, Visibility, Grip),
        test(( ( Visibility < 0.75 ; Grip < 0.7 ) -> Target = 55.0 ; Target = 65.0 )) ],
-     [ assert(proposal(reduce_speed, Target, moderate, speed_compliance,
+     [ assert(proposal(reduce_speed, Target, moderate, road_hazard,
                        'Rain and reduced grip require conservative speed')) ]).
 
-% One proposal per reading in the last 500 ms; the slowest wins the arbitration.
 rule('Low visibility requires stronger speed reduction',
      350,
-     [ low_visibility_sample(Visibility, Age),
-       test(Age < 500),
+     [ weather(_, Visibility, _),
+       test(Visibility < 0.85),
        test(Target is max(30.0, 75.0 * Visibility)) ],
      [ assert(proposal(reduce_speed, Target, high, road_hazard,
                        'Reduced visibility requires conservative speed')) ]).
 
 rule('Low road grip requires stronger speed reduction',
      350,
-     [ low_grip_sample(Grip, Age),
-       test(Age < 500),
+     [ weather(_, _, Grip),
+       test(Grip < 0.85),
        test(Target is max(25.0, 80.0 * Grip)) ],
      [ assert(proposal(reduce_speed, Target, high, road_hazard,
                        'Reduced grip requires cautious speed')) ]).
@@ -1049,18 +1122,17 @@ rule('Build back up to the scenario cruise speed when no sign governs the road',
        ego_speed(V),
        test(Cruise > 0),
        test(Target is min(Cruise, Limit)),
-       test(V < Target - 0.5),
-       not(test(proposal_above(comfort_progress))) ],
+       test(V < Target - 0.5) ],
      [ assert(proposal(maintain_speed, Target, low, speed_compliance,
                        'Road is clear; building back up to the scenario cruise speed')) ]).
 
-% Driver acceleration request: accepted for 1.5 s, only when nothing above comfort has been
-% proposed.
+% Driver acceleration request: accepted for 1.5 s. A comfort proposal only applies when no
+% ceiling, hold or manoeuvre speed holds in the cycle, which the arbitration settles, so the
+% rule needs no guard.
 rule('Allow acceleration request when safe context',
      205,
      [ acceleration_request(Target, Age),
-       test((Target > 0, Age < 1500)),
-       not(test(proposal_above(comfort_progress))) ],
+       test((Target > 0, Age < 1500)) ],
      [ assert(proposal(accelerate, Target, low, comfort_progress,
                        'Driver acceleration request accepted')) ]).
 
@@ -1094,24 +1166,24 @@ rule('Stop moving off once held or at speed',
      [ assert(move_off_ended) ]).
 
 % At manoeuvre priority: any rule that still requires the stop wins; the slower "proceed"
-% of a STOP wins the tie. It steps aside during a driver lane change request and while an
-% overtake has not yet left its lane, so its speed does not win the tie against the lane
-% change.
+% of a STOP wins the tie. It steps aside during a driver lane change request: the driver's
+% request is answered first. A vehicle going around a stationary vehicle needs no such
+% step: the lane change is arbitrated in its own channel and moves off at the same time.
 rule('Move off when stopped and nothing holds the vehicle',
      -90,
      [ test(moving_off),
-       ego_lane(Lane),
        speed_limit(Limit),
        not(lane_change_request(_)),
-       not(test(current_overtaking(true, Lane, false, _, _))),
        test(Target is min(30.0, Limit)) ],
      [ assert(proposal(continue, Target, low, maneuver_safety,
                        'Vehicle was stopped and no rule holds it any more')) ]).
 
+% Only when no speed (longitudinal) proposal was made: a lane proposal alone does not
+% count, as in Drools, where the context priority only follows speed proposals.
 rule('Default maintain speed baseline',
      -100,
      [ ego_speed(V),
-       not(proposal(_, _, _, _, _)) ],
+       not(test(speed_proposal)) ],
      [ assert(proposal(maintain_speed, V, low, comfort_progress,
                        'No restrictive condition detected')) ]).
 
@@ -1196,6 +1268,12 @@ unsafe_following(V, D, Rel) :-
         front_vehicle_stopped(V, Rel)
     ).
 
+% Inside the 12 m gap behind a moving front vehicle, not opening the gap fast.
+reopening_gap(V, D, Rel) :-
+    D =< 12.0,
+    Rel > -0.3,
+    \+ front_vehicle_stopped(V, Rel).
+
 front_distance_window(Target, Count, Minimum, Maximum) :-
     front_distance_window_ms(Window),
     findall(D, ( known(front_distance_sample(Target, D, Age)), D > 0, Age < Window ), Ds),
@@ -1210,8 +1288,13 @@ current_overtaking(Active, Origin, Passed, Start, Target) :-
     effective_overtaking(Active0, Origin0, Passed0, Start0, Target0),
     Active = Active0, Origin = Origin0, Passed = Passed0, Start = Start0, Target = Target0.
 
+% When two overtake rules start in the same cycle, the one that fired last prevails, as in
+% Drools, where the later modify of the state fact wins.
 effective_overtaking(true, Origin, false, Start, Target) :-
-    known(overtake_started(Target, Origin, Start)), !.
+    known(overtake_started(_, _, _)),
+    findall(Id-overtake_started(T, O, S), wm_fact(Id, overtake_started(T, O, S)), Started),
+    msort(Started, Sorted),
+    last(Sorted, _-overtake_started(Target, Origin, Start)), !.
 effective_overtaking(false, Origin, false, Start, none) :-
     (   known(overtake_cancelled) ; known(overtake_finished) ), !,
     known(overtaking(_, Origin, _, Start, _)).
@@ -1276,9 +1359,16 @@ no_free_adjacent_lane(left) :-
 no_free_adjacent_lane(right) :-
     known(lane_occupancy(left, true, _)).
 
-right_unavailable(right) :- !.
-right_unavailable(_) :-
-    known(lane_occupancy(right, true, _)).
+% A continuous line on a side of the ego's lane: the right marking lies between CENTER and
+% RIGHT, the left marking between LEFT and CENTER (WorldState.getMarkingBetween).
+continuous_line_closes_lane(center) :-
+    (   known(left_marking(continuous))
+    ;   known(right_marking(continuous))
+    ), !.
+continuous_line_closes_lane(right) :-
+    known(right_marking(continuous)).
+continuous_line_closes_lane(left) :-
+    known(left_marking(continuous)).
 
 % Metres to the stopping point, 10 m before the obstacle.
 obstacle_margin(D, Margin) :-
@@ -1378,14 +1468,7 @@ moving_off :-
     \+ known(move_off_ended),
     known(move_off_state(true, _)).
 
-proposal_at_least(Name) :-
-    priority_value(Name, Threshold),
-    known(proposal(_, _, _, P, _)),
-    priority_value(P, Value),
-    Value >= Threshold, !.
-
-proposal_above(Name) :-
-    priority_value(Name, Threshold),
-    known(proposal(_, _, _, P, _)),
-    priority_value(P, Value),
-    Value > Threshold, !.
+% A proposal in the longitudinal (speed) channel: anything but a lane action.
+speed_proposal :-
+    known(proposal(Action, _, _, _, _)),
+    \+ memberchk(Action, [keep_lane, change_lane_left, change_lane_right, return_right]), !.

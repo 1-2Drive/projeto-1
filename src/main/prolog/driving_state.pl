@@ -9,10 +9,10 @@
 
 :- dynamic ego_state/3, lane_change/1, markings/2, target_lane_state/1, safe_lanes/2,
            road_flags/2, lane_request/3, accel_request/2, ego_position/1,
-           weather_state/4, visibility_reading/2, grip_reading/2,
+           weather_state/4,
            obstacle_track/5, obstacle_reading/5, pothole_track/5, barrier_track/5,
            limit_state/3, pending_limit/4, light_track/5, pedestrian_track/5, ttc_reading/3, stop_track/5,
-           front_track/4, front_distance_reading/3, occupancy/3, left_vehicle_track/4,
+           front_track/4, front_distance_reading/3, occupancy/4, left_vehicle_track/4,
            overtaking_state/5, last_decision/2, last_priority/1, move_off/2, cruise/1,
            param/2, priority_value/2.
 
@@ -35,15 +35,13 @@ obstacle_window_ms(300).
 pending_limit_validity_ms(1000).
 % A driver request lasts 1.5 s.
 request_validity_ms(1500).
-% Window of the reduced visibility and grip readings (window:time(500ms) in Drools).
-weather_window_ms(500).
 
 state_predicates([ego_state/3, lane_change/1, markings/2, target_lane_state/1, safe_lanes/2,
                   road_flags/2, lane_request/3, accel_request/2, ego_position/1,
-                  weather_state/4, visibility_reading/2, grip_reading/2,
+                  weather_state/4,
                   obstacle_track/5, obstacle_reading/5, pothole_track/5, barrier_track/5,
                   limit_state/3, pending_limit/4, light_track/5, pedestrian_track/5, ttc_reading/3, stop_track/5,
-                  front_track/4, front_distance_reading/3, occupancy/3, left_vehicle_track/4,
+                  front_track/4, front_distance_reading/3, occupancy/4, left_vehicle_track/4,
                   overtaking_state/5, last_decision/2, last_priority/1, move_off/2, cruise/1,
                   param/2, priority_value/2]).
 
@@ -69,10 +67,11 @@ reset_state(Cruise, Params, Priorities) :-
     assertz(ego_position(0.0)),
     % weather_state(Condition, Visibility, Grip, Ms): clear-weather seed, as in Drools.
     assertz(weather_state(clear, 1.0, 1.0, 0)),
-    % The adjacent lanes start occupied: the vehicle never moves into a lane only because it
+    % occupancy(Side, Occupied, FrontDistanceM, SafeToEnter). The adjacent lanes start
+    % occupied and not safe to enter: the vehicle never moves into a lane only because it
     % has not sensed it yet (a pessimistic seed, as in Drools).
-    assertz(occupancy(left, true, inf)),
-    assertz(occupancy(right, true, inf)),
+    assertz(occupancy(left, true, inf, false)),
+    assertz(occupancy(right, true, inf, false)),
     % overtaking_state(Active, OriginLane, TargetPassed, StartMs, Target)
     assertz(overtaking_state(false, right, false, 0, none)),
     assertz(limit_state(120, default, 0)),
@@ -243,7 +242,9 @@ on_event('BarrierDetectedEvent', E) :-
     ;   true
     ).
 
-% "Update weather state": the environment sensor's latest reading; it does not expire.
+% "Update weather state": the environment sensor's latest reading; it does not expire. The
+% weather rules read this state alone: the ReducedVisibilityEvent and ReducedGripEvent the
+% sensor also emits below 0.85 are ignored, as in Drools, where no rule reads them any more.
 on_event('WeatherEvent', E) :-
     weather_state(_, _, _, Since),
     (   E.timestamp >= Since
@@ -252,13 +253,6 @@ on_event('WeatherEvent', E) :-
                 weather_state(Condition, E.visibilityFactor, E.gripFactor, E.timestamp))
     ;   true
     ).
-
-% The sensor only emits them below 0.85; the rules read those of the last 500 ms.
-on_event('ReducedVisibilityEvent', E) :-
-    assertz(visibility_reading(E.timestamp, E.visibilityFactor)).
-
-on_event('ReducedGripEvent', E) :-
-    assertz(grip_reading(E.timestamp, E.gripFactor)).
 
 % "Update lane change request": only a newer request (or another direction at the same
 % instant) activates the state; reactivating an expired request would fight the expiry.
@@ -299,7 +293,7 @@ on_event('FrontDistanceEvent', E) :-
 on_event('LaneOccupancyEvent', E) :-
     downcase_atom(E.lane, Side),
     distance(E.frontDistanceMeters, Front),
-    replace(occupancy(Side, _, _), occupancy(Side, E.occupied, Front)).
+    replace(occupancy(Side, _, _, _), occupancy(Side, E.occupied, Front, E.safeToEnter)).
 
 % "Update left lane vehicle state": the nearest vehicle ahead in the left lane.
 on_event('LeftLaneVehicleEvent', E) :-
@@ -340,9 +334,6 @@ expire_old_readings(Now) :-
     expire_track(left_vehicle_track(_, _, _, T6), T6, LeftValidity, Now),
     expire_lane_request(Now),
     expire_pending_limit(Now),
-    weather_window_ms(WeatherWindow),
-    expire_window(visibility_reading(T7, _), T7, WeatherWindow, Now),
-    expire_window(grip_reading(T8, _), T8, WeatherWindow, Now),
     hazard_validity_ms(HazardValidity),
     expire_track(obstacle_track(_, _, _, _, T9), T9, HazardValidity, Now),
     expire_track(pothole_track(_, _, _, _, T10), T10, HazardValidity, Now),
@@ -411,7 +402,7 @@ load_cycle_facts :-
     load_vehicle,
     load_hazards(Now),
     load_driver_requests(Now),
-    load_weather(Now),
+    load_weather,
     load_road,
     load_overtaking,
     load_speed_limit,
@@ -448,20 +439,17 @@ load_driver_requests(Now) :-
     Age is Now - Since,
     add_fact(acceleration_request(Target, Age)).
 
-load_weather(Now) :-
+load_weather :-
     weather_state(Condition, Visibility, Grip, _),
-    add_fact(weather(Condition, Visibility, Grip)),
-    forall(visibility_reading(Ms, Value),
-           ( Age is Now - Ms, add_fact(low_visibility_sample(Value, Age)) )),
-    forall(grip_reading(Ms, Value),
-           ( Age is Now - Ms, add_fact(low_grip_sample(Value, Age)) )).
+    add_fact(weather(Condition, Visibility, Grip)).
 
 load_road :-
     markings(Left, Right),
     add_fact(left_marking(Left)),
     add_fact(right_marking(Right)),
-    forall(occupancy(Side, Occupied, Front),
-           add_fact(lane_occupancy(Side, Occupied, Front))).
+    forall(occupancy(Side, Occupied, Front, Safe),
+           ( add_fact(lane_occupancy(Side, Occupied, Front)),
+             add_fact(lane_safe_to_enter(Side, Safe)) )).
 
 load_overtaking :-
     overtaking_state(Active, Origin, Passed, Start, Target),

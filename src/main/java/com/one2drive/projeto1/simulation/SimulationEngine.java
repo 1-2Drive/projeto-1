@@ -61,7 +61,7 @@ import java.util.function.Consumer;
 
 public class SimulationEngine implements AutoCloseable {
     /** Objects closer than this behind the car are drawn behind it; anything further back is drawn as coming up. */
-    private static final double RENDER_BEHIND_METERS = 50.0;
+    static final double RENDER_BEHIND_METERS = 50.0;
     /** Roughly one car length: a passed vehicle catching up from behind vanishes just before the bumpers meet. */
     private static final double CATCH_UP_GAP_METERS = 6.0;
 
@@ -495,6 +495,11 @@ public class SimulationEngine implements AutoCloseable {
                 detections.removeIf(d -> d.objectId().equals(e.getPedestrianId()));
                 detections.add(new SensorTelemetry.CameraDetection(
                     e.getPedestrianId(), "Pedestrian", e.getDistanceMeters(), "CENTER", "camera"));
+            } else if (event instanceof com.one2drive.projeto1.drools.events.CrosswalkDetectedEvent e) {
+                cameraUpdated = true;
+                detections.removeIf(d -> d.objectId().equals(e.getCrosswalkId()));
+                detections.add(new SensorTelemetry.CameraDetection(
+                    e.getCrosswalkId(), "Crosswalk", e.getDistanceMeters(), "ALL", "camera"));
             }
         }
         if (!cameraUpdated && detections.isEmpty() && previous.frontCamera().detections().isEmpty()) {
@@ -675,6 +680,7 @@ public class SimulationEngine implements AutoCloseable {
                 e.getCrossingState() == com.one2drive.projeto1.domain.PedestrianCrossingState.CROSSED;
         }
         else if (event instanceof PotholeDetectedEvent e) objectId = e.getPotholeId();
+        else if (event instanceof com.one2drive.projeto1.drools.events.CrosswalkDetectedEvent e) objectId = e.getCrosswalkId();
         else if (event instanceof BarrierDetectedEvent e) objectId = e.getBarrierId();
         else if (event instanceof ObstacleDetectedEvent e) objectId = e.getObstacleId();
         else if (event instanceof FrontDistanceEvent e) objectId = e.getTargetId();
@@ -707,7 +713,7 @@ public class SimulationEngine implements AutoCloseable {
             || event instanceof com.one2drive.projeto1.drools.events.ReducedGripEvent);
         boolean hasTtc = events.stream().anyMatch(TTCEvent.class::isInstance);
         boolean hasPedestrian = events.stream().anyMatch(PedestrianDetectedEvent.class::isInstance);
-        DrivingAction action = currentDecision.getAction();
+        DrivingAction action = currentDecision.getSpeedAction();
 
         if (hasSpeedLimit && action == DrivingAction.REDUCE_SPEED) {
             demoEvidence.add("speed-limit");
@@ -911,6 +917,7 @@ public class SimulationEngine implements AutoCloseable {
             legalLimit,
             currentDecision.getRecommendedSpeedKmh(),
             currentDecision.getAction().name(),
+            currentDecision.getLaneAction().name(),
             currentDecision.getRiskLevel().name(),
             currentDecision.getReason(),
             currentDecision.getSourceRule(),

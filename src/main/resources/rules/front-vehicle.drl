@@ -24,29 +24,32 @@ import com.one2drive.projeto1.drools.events.FrontDistanceEvent
 
 global DroolsSupport droolsSupport
 
-// The rules that slow the vehicle down behind a front vehicle step aside in the one
-// cycle in which an overtake starts (OvertakingStateFact stamped with the current
-// time): the overtake proposes at the maneuver priority and would otherwise always lose
-// to them, so the lane change would never begin. From the next cycle on they apply
-// again, also while the vehicle is still moving out of the lane, so it keeps slowing
-// down for the vehicle ahead until it has left the lane. The short-range brake below
-// and every emergency rule never step aside.
+// The rules that slow the vehicle down behind a front vehicle never step aside for an
+// overtake: a lane change is arbitrated in its own (lateral) channel and does not
+// compete with the speed proposals, so the overtake can begin in the same cycle in
+// which the vehicle keeps slowing down for the vehicle ahead, and that goes on until
+// it has left the lane.
 
+// Too close and still closing: brake to 3 km/h below the front vehicle's speed, so the
+// gap reopens instead of merely holding the closing speed.
 rule "Brake when front vehicle distance low"
 salience 520
 when
     $ctx : DecisionContext()
+    VehicleStateFact($speed : speedKmh)
     FrontVehicleState(targetId != "none", $distance : distanceMeters > 0, distanceMeters < 14.0, $relative : relativeSpeedMps > 0)
 then
+    double frontSpeedKmh = ($speed / 3.6 - $relative) * 3.6;
     droolsSupport.proposeDecision(
         $ctx,
         DrivingAction.BRAKE,
-        20.0,
+        Math.max(0.0, frontSpeedKmh - 3.0),
         RiskLevel.HIGH,
         DecisionPriority.COLLISION_AVOIDANCE,
         "Front vehicle too close",
         drools.getRule().getName(),
-        "distance=" + $distance + "m, relativeSpeed=" + $relative + "m/s"
+        "distance=" + $distance + "m, relativeSpeed=" + $relative + "m/s, front speed="
+            + Math.round(Math.max(0.0, frontSpeedKmh)) + " km/h"
     );
 end
 
@@ -62,17 +65,21 @@ end
 // vehicle still closing in, otherwise the stopped vehicle would move off again and
 // brake in a loop; it reaches 2 m beyond the stopping point so radar noise does not
 // release it.
+//
+// Inside the 12 m gap behind a moving vehicle, and not opening the gap fast, the
+// vehicle is too close for the curve to say anything (no room left): it then drives
+// 3 km/h slower than the vehicle ahead until the gap has reopened.
 rule "Keep safe following distance behind front vehicle"
 salience 510
 when
     $ctx : DecisionContext()
-    VehicleStateFact($speed : speedKmh, $now : timestamp)
+    VehicleStateFact($speed : speedKmh)
     FrontVehicleState(targetId != "none", $distance : distanceMeters > 0, $relative : relativeSpeedMps)
-    not OvertakingStateFact(active == true, passedTarget == false, timestamp == $now)
     eval(($relative > 0.3
             && $speed / 3.6 > Math.sqrt(Math.pow(Math.max(0.0, $speed / 3.6 - $relative), 2)
                 + 2.0 * 2.0 * Math.max(0.0, $distance - 12.0)))
-        || ($distance <= 14.0 && $relative > -0.3 && Math.max(0.0, $speed / 3.6 - $relative) < 0.5))
+        || ($distance <= 14.0 && $relative > -0.3 && Math.max(0.0, $speed / 3.6 - $relative) < 0.5)
+        || ($distance <= 12.0 && $relative > -0.3 && Math.max(0.0, $speed / 3.6 - $relative) >= 0.5))
 then
     double frontSpeedMps = Math.max(0.0, $speed / 3.6 - $relative);
     double room = Math.max(0.0, $distance - 12.0);
@@ -86,6 +93,9 @@ then
         target = 0.0;
         risk = RiskLevel.HIGH;
         reason = "Stopped behind a stationary front vehicle (Art. 18 CE)";
+    } else if (!frontStopped && $distance <= 12.0 && $relative > -0.3) {
+        target = Math.max(0.0, frontSpeedMps * 3.6 - 3.0);
+        reason = "Reopening the following gap behind the front vehicle (Art. 18 CE)";
     }
     droolsSupport.proposeDecision(
         $ctx,
@@ -104,9 +114,7 @@ rule "Reduce speed when closing front vehicle"
 salience 500
 when
     $ctx : DecisionContext()
-    VehicleStateFact($now : timestamp)
     FrontVehicleState(targetId != "none", $distance : distanceMeters >= 14.0, distanceMeters < 35.0, $relative : relativeSpeedMps > 0.8)
-    not OvertakingStateFact(active == true, passedTarget == false, timestamp == $now)
 then
     double target = Math.max(20.0, $distance * 1.2);
     droolsSupport.proposeDecision(
@@ -129,8 +137,7 @@ salience 505
 when
     $ctx : DecisionContext()
     FrontVehicleState($target : targetId != "none", distanceMeters > 0, distanceMeters < 50.0)
-    VehicleStateFact(laneChangeState == LaneChangeState.IDLE, $now : timestamp)
-    not OvertakingStateFact(active == true, passedTarget == false, timestamp == $now)
+    VehicleStateFact(laneChangeState == LaneChangeState.IDLE)
     $count : Number( intValue >= 3 ) from accumulate(
         FrontDistanceEvent( targetId == $target, $d : distanceMeters > 0 ) over window:time(2s) from entry-point "PERCEPTION_STREAM",
         count(1)
@@ -173,8 +180,8 @@ then
     modify($state) { setActive(false), setPassedTarget(false), setTargetId(OvertakingStateFact.NO_TARGET) }
 end
 
-// Fires before the rules that slow the vehicle down behind the front vehicle, so that
-// once the state is active they step aside in the same cycle.
+// The lane change is decided in the lateral channel, so the rules that slow the vehicle
+// down behind the front vehicle keep applying in the same cycle and never block it.
 //
 // The state records which vehicle is being passed. An overtake that is already active
 // does not block a new one for a different vehicle: having moved RIGHT -> CENTER to pass
@@ -224,6 +231,50 @@ then
         "Overtaking slower vehicle via clear left lane (Art. 35/36 CE)",
         drools.getRule().getName(),
         "slower vehicle at " + $distance + "m, left lane clear"
+    );
+end
+
+// The overtake above needs the ego to be closing in on the front vehicle, and that
+// never holds once the following-distance rule has matched the ego to its speed: the
+// ego would follow a slow vehicle for ever. This rule is the exit from following: at
+// the front vehicle's speed (within 0.5 m/s either way), in the following window and
+// with that vehicle at least 10 km/h below the speed the ego is aiming for (the limit a
+// sign posted, or the scenario cruise speed), it moves left when the left lane is
+// clear. Same lane, line, lane-ahead and legal (Art. 41 CE) conditions as the overtake.
+rule "Overtake the vehicle being followed"
+salience 524
+no-loop true
+when
+    $ctx : DecisionContext()
+    $state : OvertakingStateFact($active : active, $tracked : targetId, $origin : originalLane)
+    VehicleStateFact(lane == Lane.RIGHT || lane == Lane.CENTER, $currentLane : lane, laneChangeState == LaneChangeState.IDLE, leftMarking != RoadMarkingType.CONTINUOUS, $speed : speedKmh, $now : timestamp)
+    FrontVehicleState($target : targetId != "none", $distance : distanceMeters > 6.0, distanceMeters <= 30.0, $relative : relativeSpeedMps >= -0.5, relativeSpeedMps <= 0.5, timestamp == $now)
+    LaneOccupancyState(lane == Lane.LEFT, occupied == false, $leftFront : frontDistanceMeters)
+    CruiseTargetFact($cruise : targetKmh)
+    CurrentSpeedLimit($limit : limitKmh, $source : sourceId)
+    not PedestrianStateFact(pedestrianId != "none", inPath == true || crossingState == PedestrianCrossingState.CROSSING)
+    not TrafficLightStateFact(lightId != "none", state != TrafficLightState.GREEN, distanceMeters <= 125.0)
+    eval((!$active || !$target.equals($tracked) || $currentLane != $origin)
+        && ($currentLane != Lane.CENTER || $leftFront > $distance + 20.0)
+        && ($speed / 3.6 - $relative) * 3.6
+            <= (CurrentSpeedLimit.DEFAULT_SOURCE.equals($source) && $cruise > 0 ? Math.min($cruise, $limit) : $limit) - 10.0)
+then
+    // Guard against a match that outlived a state change made earlier in this cycle.
+    if ($state.isActive() && $target.equals($state.getTargetId()) && $state.getOriginalLane() == $currentLane) {
+        return;
+    }
+    double desiredKmh = CurrentSpeedLimit.DEFAULT_SOURCE.equals($source) && $cruise > 0 ? Math.min($cruise, $limit) : $limit;
+    modify($state) { setActive(true), setOriginalLane($currentLane), setPassedTarget(false), setTimestamp($now), setTargetId($target) }
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.CHANGE_LANE_LEFT,
+        Double.NaN,
+        RiskLevel.LOW,
+        DecisionPriority.MANEUVER_SAFETY,
+        "Overtaking the slower vehicle being followed via clear left lane (Art. 35/36 CE)",
+        drools.getRule().getName(),
+        "followed vehicle at " + $distance + "m doing " + Math.round(($speed / 3.6 - $relative) * 3.6)
+            + " km/h, desired speed " + Math.round(desiredKmh) + " km/h, left lane clear"
     );
 end
 
@@ -289,9 +340,8 @@ rule "Do not pass a slower left lane vehicle on its right"
 salience 508
 when
     $ctx : DecisionContext()
-    VehicleStateFact($speed : speedKmh, $now : timestamp)
+    VehicleStateFact($speed : speedKmh)
     LeftLaneVehicleState(targetId != "none", $distance : distanceMeters > 0, $relative : relativeSpeedMps > -2.5)
-    not OvertakingStateFact(active == true, passedTarget == false, timestamp == $now)
     eval($speed / 3.6 - $relative >= 1.4
         && ($distance <= 37.0
             || $speed / 3.6 > Math.sqrt(Math.pow($speed / 3.6 - $relative, 2) + 2.0 * 2.0 * Math.max(0.0, $distance - 35.0))))

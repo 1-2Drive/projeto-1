@@ -97,7 +97,23 @@ public class ApiModelMapper {
                 decision.getReason(),
                 decision.getSourceRule(),
                 decision.getTimestamp(),
-                decision.getEvidence()
+                decision.getEvidence(),
+                decision.getSpeedAction().name(),
+                decision.getSpeedReason(),
+                decision.getSpeedSourceRule(),
+                decision.getLaneAction().name(),
+                decision.getLaneReason(),
+                decision.getLaneSourceRule(),
+                decision.getProposals().stream().map(proposal -> new ApiDecisionView.ApiProposalView(
+                    proposal.getSourceRule(),
+                    proposal.getAction().name(),
+                    proposal.getChannel().name(),
+                    proposal.getPriority(),
+                    Double.isNaN(proposal.getRecommendedSpeedKmh()) ? null : proposal.getRecommendedSpeedKmh(),
+                    proposal.getOutcome().name(),
+                    proposal.getDetail(),
+                    proposal.getReason()
+                )).toList()
             ),
             snapshot.sensorValues(),
             worldObjects,

@@ -185,10 +185,12 @@ then
     );
 end
 
+// Comfort proposal: it loses to any speed ceiling, hold or maneuver speed in the cycle,
+// so it needs no guard on what else was proposed.
 rule "Green traffic light allows progression when no higher hazard"
 salience 180
 when
-    $ctx : DecisionContext(priority < DecisionPriority.COLLISION_AVOIDANCE)
+    $ctx : DecisionContext()
     TrafficLightStateFact(lightId != "none", state == TrafficLightState.GREEN, distanceMeters <= 40.0)
 then
     droolsSupport.proposeDecision(

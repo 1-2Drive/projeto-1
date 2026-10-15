@@ -127,8 +127,9 @@ public class PrologKnowledgeSession implements AutoCloseable {
         request.put("events", events.stream().map(PrologKnowledgeSession::toJson).toList());
         if (previous != null) {
             request.put("previousDecision", Map.of(
-                "action", previous.getAction().name(),
-                "rule", previous.getSourceRule() == null ? "" : previous.getSourceRule(),
+                "action", previous.getSpeedAction().name(),
+                "laneAction", previous.getLaneAction().name(),
+                "rule", previous.getSpeedSourceRule() == null ? "" : previous.getSpeedSourceRule(),
                 "priority", previous.getPriority()));
         }
         JsonNode reply = process.request(request);

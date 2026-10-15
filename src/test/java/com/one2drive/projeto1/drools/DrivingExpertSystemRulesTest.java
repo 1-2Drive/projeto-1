@@ -16,14 +16,13 @@ import com.one2drive.projeto1.drools.events.LaneOccupancyEvent;
 import com.one2drive.projeto1.drools.events.LeftLaneVehicleEvent;
 import com.one2drive.projeto1.drools.events.PedestrianDetectedEvent;
 import com.one2drive.projeto1.drools.events.PotholeDetectedEvent;
-import com.one2drive.projeto1.drools.events.ReducedGripEvent;
-import com.one2drive.projeto1.drools.events.ReducedVisibilityEvent;
 import com.one2drive.projeto1.drools.events.RelativeSpeedEvent;
 import com.one2drive.projeto1.drools.events.SpeedLimitDetectedEvent;
 import com.one2drive.projeto1.drools.events.StopSignEvent;
 import com.one2drive.projeto1.drools.events.TTCEvent;
 import com.one2drive.projeto1.drools.events.TrafficLightEvent;
 import com.one2drive.projeto1.drools.events.WeatherEvent;
+import com.one2drive.projeto1.drools.facts.CruiseTargetFact;
 import com.one2drive.projeto1.explanation.TimelineEntryType;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -251,7 +250,11 @@ class DrivingExpertSystemRulesTest {
                 new LaneChangeRequestEvent(1_000, "ui", LaneChangeDirection.LEFT),
                 new LaneOccupancyEvent(1_000, "blind", Lane.LEFT, true, 8.0)
             );
-            assertEquals(DrivingAction.KEEP_LANE, decision.getAction());
+            // The lane decision is arbitrated in its own channel: KEEP_LANE is the lane
+            // decision, while the headline action stays the speed action.
+            assertEquals(DrivingAction.KEEP_LANE, decision.getLaneAction());
+            assertEquals("Block lane change when target lane occupied", decision.getLaneSourceRule());
+            assertEquals(DrivingAction.MAINTAIN_SPEED, decision.getAction());
         }
     }
 
@@ -314,14 +317,22 @@ class DrivingExpertSystemRulesTest {
     @Timeout(10)
     void reducedVisibilityAndGripTriggerConservativeReduction() {
         try (DroolsTestHarness harness = new DroolsTestHarness(88.0)) {
+            // The visibility and grip rules read the persistent weather state (updated by the
+            // weather event), no longer the short-lived reduced-visibility/grip events.
             DrivingDecision decision = harness.cycle(
                 1_000,
                 88.0,
-                new ReducedVisibilityEvent(1_000, "environment", 0.55),
-                new ReducedGripEvent(1_000, "environment", 0.55)
+                new WeatherEvent(1_000, "env", WeatherCondition.CLEAR, 0.55, 0.55)
             );
             assertEquals(DrivingAction.REDUCE_SPEED, decision.getAction());
             assertTrue(decision.getRecommendedSpeedKmh() <= 50.0);
+            // Both hold and both are ceilings: the lowest of them (visibility, 41.25 km/h) wins.
+            assertEquals("Low visibility requires stronger speed reduction", decision.getSourceRule());
+            assertEquals(75.0 * 0.55, decision.getRecommendedSpeedKmh(), 0.01);
+
+            DrivingDecision later = harness.cycle(1_600, 88.0);
+            assertEquals(DrivingAction.REDUCE_SPEED, later.getAction(),
+                "the weather is a persistent condition: the ceiling must not lapse between sensor readings");
         }
     }
 
@@ -399,6 +410,67 @@ class DrivingExpertSystemRulesTest {
             assertEquals(DrivingAction.REDUCE_SPEED, decision.getAction());
             assertEquals("Keep safe following distance behind front vehicle", decision.getSourceRule());
             assertEquals(Math.sqrt(2.0 * 2.0 * 28.0) * 3.6, decision.getRecommendedSpeedKmh(), 0.1);
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void brakingBehindACloseFrontVehicleTargetsBelowItsSpeed() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(50.0)) {
+            // 50 km/h, closing at 2 m/s on a vehicle 10 m ahead doing 42.8 km/h: the brake
+            // targets 3 km/h below that vehicle's speed so the gap reopens.
+            DrivingDecision decision = harness.cycle(
+                1_000,
+                50.0,
+                new FrontDistanceEvent(1_000, "front-radar", 10.0, "front-1"),
+                new RelativeSpeedEvent(1_000, "front-radar", 2.0, "front-1")
+            );
+            assertEquals(DrivingAction.BRAKE, decision.getAction());
+            assertEquals("Brake when front vehicle distance low", decision.getSourceRule());
+            assertEquals((50.0 / 3.6 - 2.0) * 3.6 - 3.0, decision.getRecommendedSpeedKmh(), 0.1);
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void followingTooCloseBehindAMovingVehicleReopensTheGap() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(40.0)) {
+            // Same speed as the vehicle 10 m ahead: not closing, so neither the brake nor the
+            // following curve says anything, yet the gap is below the 12 m to keep.
+            DrivingDecision decision = harness.cycle(
+                1_000,
+                40.0,
+                new FrontDistanceEvent(1_000, "front-radar", 10.0, "front-1"),
+                new RelativeSpeedEvent(1_000, "front-radar", 0.0, "front-1")
+            );
+            assertEquals(DrivingAction.REDUCE_SPEED, decision.getAction());
+            assertEquals("Keep safe following distance behind front vehicle", decision.getSourceRule());
+            assertEquals(37.0, decision.getRecommendedSpeedKmh(), 0.1);
+            assertTrue(decision.getReason().startsWith("Reopening the following gap"), decision.getReason());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void vehicleFollowedAtItsSpeedIsOvertakenWhenTheLeftLaneIsClear() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(40.0)) {
+            // No scenario cruise speed: the desired speed is the limit in force (120 km/h).
+            harness.session().getKieSession().insert(new CruiseTargetFact(0.0));
+            // Following a 40 km/h vehicle 20 m ahead at its speed, in CENTER, with the left
+            // lane clear far beyond it. The closing-in overtake cannot start (not closing),
+            // so this is the exit from following. The lane change is decided in the lateral
+            // channel, while the speed channel keeps the following distance.
+            DrivingDecision decision = harness.cycle(
+                1_000,
+                40.0,
+                new FrontDistanceEvent(1_000, "front-radar", 20.0, "front-1"),
+                new RelativeSpeedEvent(1_000, "front-radar", 0.0, "front-1"),
+                new LaneOccupancyEvent(1_000, "blind", Lane.LEFT, false, Double.POSITIVE_INFINITY, true,
+                    Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY)
+            );
+            assertEquals(DrivingAction.CHANGE_LANE_LEFT, decision.getAction());
+            assertEquals(DrivingAction.CHANGE_LANE_LEFT, decision.getLaneAction());
+            assertEquals("Overtake the vehicle being followed", decision.getLaneSourceRule());
         }
     }
 

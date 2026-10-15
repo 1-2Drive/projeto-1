@@ -6,11 +6,16 @@ import com.one2drive.projeto1.domain.DrivingAction
 import com.one2drive.projeto1.domain.RiskLevel
 import com.one2drive.projeto1.domain.WeatherCondition
 import com.one2drive.projeto1.drools.DroolsSupport
-import com.one2drive.projeto1.drools.events.ReducedGripEvent
-import com.one2drive.projeto1.drools.events.ReducedVisibilityEvent
 import com.one2drive.projeto1.drools.facts.WeatherStateFact
 
 global DroolsSupport droolsSupport
+
+// The weather is a persistent condition of the road, so the three rules read the
+// WeatherStateFact (kept up to date by the environment events) instead of short event
+// windows that would let the speed ceiling lapse between two sensor readings. All three
+// propose at ROAD_HAZARD: they are speed ceilings, and the lowest of the ceilings that
+// hold wins the cycle. The visibility and grip thresholds (0.85) are the ones the
+// environment sensor uses to flag reduced visibility and reduced grip.
 
 rule "Rain lowers recommended safe speed"
 salience 340
@@ -27,7 +32,7 @@ then
         DrivingAction.REDUCE_SPEED,
         target,
         RiskLevel.MODERATE,
-        DecisionPriority.SPEED_COMPLIANCE,
+        DecisionPriority.ROAD_HAZARD,
         "Rain and reduced grip require conservative speed",
         drools.getRule().getName(),
         "visibility=" + $visibility + ", grip=" + $grip
@@ -38,7 +43,7 @@ rule "Low visibility requires stronger speed reduction"
 salience 350
 when
     $ctx : DecisionContext()
-    $event : ReducedVisibilityEvent($visibility : visibilityFactor) over window:time(500ms) from entry-point "ENVIRONMENT_STREAM"
+    WeatherStateFact($visibility : visibilityFactor < 0.85)
 then
     double target = Math.max(30.0, 75.0 * $visibility);
     droolsSupport.proposeDecision(
@@ -49,7 +54,7 @@ then
         DecisionPriority.ROAD_HAZARD,
         "Reduced visibility requires conservative speed",
         drools.getRule().getName(),
-        "visibility=" + $visibility + ", source=" + $event.getSourceId()
+        "visibility=" + $visibility
     );
 end
 
@@ -57,7 +62,7 @@ rule "Low road grip requires stronger speed reduction"
 salience 350
 when
     $ctx : DecisionContext()
-    $event : ReducedGripEvent($grip : gripFactor) over window:time(500ms) from entry-point "ENVIRONMENT_STREAM"
+    WeatherStateFact($grip : gripFactor < 0.85)
 then
     double target = Math.max(25.0, 80.0 * $grip);
     droolsSupport.proposeDecision(
@@ -68,6 +73,6 @@ then
         DecisionPriority.ROAD_HAZARD,
         "Reduced grip requires cautious speed",
         drools.getRule().getName(),
-        "grip=" + $grip + ", source=" + $event.getSourceId()
+        "grip=" + $grip
     );
 end

@@ -5,6 +5,7 @@ import com.one2drive.projeto1.domain.Lane;
 import com.one2drive.projeto1.domain.PedestrianCrossingState;
 import com.one2drive.projeto1.domain.TrafficLightState;
 import com.one2drive.projeto1.drools.DroolsTestHarness;
+import com.one2drive.projeto1.drools.facts.CruiseTargetFact;
 import com.one2drive.projeto1.domain.HazardSeverity;
 import com.one2drive.projeto1.domain.LaneChangeDirection;
 import com.one2drive.projeto1.drools.events.AccelerationRequestEvent;
@@ -112,6 +113,13 @@ class PrologDroolsEquivalenceTest {
             Arguments.of("front vehicle pulling away", 50.0, new Object[]{
                 new FrontDistanceEvent(1_000, "front-radar", 20.0, "front-1"),
                 new RelativeSpeedEvent(1_000, "front-radar", -2.0, "front-1")}),
+            Arguments.of("inside the following gap behind a moving front vehicle", 40.0, new Object[]{
+                new FrontDistanceEvent(1_000, "front-radar", 10.0, "front-1"),
+                new RelativeSpeedEvent(1_000, "front-radar", 0.0, "front-1")}),
+            Arguments.of("overtake the vehicle being followed, left lane clear", 40.0, new Object[]{
+                new FrontDistanceEvent(1_000, "front-radar", 20.0, "front-1"),
+                new RelativeSpeedEvent(1_000, "front-radar", 0.0, "front-1"),
+                new LaneOccupancyEvent(1_000, "blind-spot", Lane.LEFT, false, Double.POSITIVE_INFINITY)}),
             // Overtaking. Both harnesses keep the ego in CENTER between dashed markings.
             Arguments.of("overtake a slower front vehicle, left lane clear", 60.0, new Object[]{
                 new FrontDistanceEvent(1_000, "front-radar", 40.0, "front-1"),
@@ -177,11 +185,15 @@ class PrologDroolsEquivalenceTest {
                 new WeatherEvent(1_000, "env", WeatherCondition.RAIN, 0.9, 0.9)}),
             Arguments.of("rain with low visibility and grip", 90.0, new Object[]{
                 new WeatherEvent(1_000, "env", WeatherCondition.RAIN, 0.7, 0.65)}),
+            // The visibility and grip rules read the persistent weather state, not the
+            // reduced-visibility/grip events (which both engines now ignore).
             Arguments.of("reduced visibility", 88.0, new Object[]{
-                new ReducedVisibilityEvent(1_000, "environment", 0.55)}),
+                new WeatherEvent(1_000, "env", WeatherCondition.CLEAR, 0.55, 1.0)}),
             Arguments.of("reduced grip", 88.0, new Object[]{
-                new ReducedGripEvent(1_000, "environment", 0.55)}),
+                new WeatherEvent(1_000, "env", WeatherCondition.CLEAR, 1.0, 0.55)}),
             Arguments.of("reduced visibility and grip", 88.0, new Object[]{
+                new WeatherEvent(1_000, "env", WeatherCondition.CLEAR, 0.55, 0.55)}),
+            Arguments.of("reduced visibility and grip events are ignored", 88.0, new Object[]{
                 new ReducedVisibilityEvent(1_000, "environment", 0.55),
                 new ReducedGripEvent(1_000, "environment", 0.55)}),
             Arguments.of("clear weather", 90.0, new Object[]{
@@ -198,6 +210,7 @@ class PrologDroolsEquivalenceTest {
     void bothBackendsDecideAlike(String name, double speedKmh, Object[] events) {
         try (DroolsTestHarness drools = new DroolsTestHarness(speedKmh);
              PrologTestHarness prolog = new PrologTestHarness()) {
+            seedCruiseTarget(drools);
             DrivingDecision expected = drools.cycle(1_000, speedKmh, events);
             DrivingDecision actual = prolog.cycle(1_000, speedKmh, events);
             assertEquals(expected.getAction(), actual.getAction(), "action; Drools rule: " + expected.getSourceRule()
@@ -206,6 +219,15 @@ class PrologDroolsEquivalenceTest {
             assertEquals(expected.getPriority(), actual.getPriority(), "priority");
             assertEquals(expected.getSourceRule(), baseRuleName(actual.getSourceRule()), "rule");
         }
+    }
+
+    /**
+     * DroolsBackend always inserts the scenario's CruiseTargetFact, and the Prolog session always
+     * holds the cruise speed (0 here: no scenario cruise speed, as PrologTestHarness seeds it), so
+     * the Drools session gets the same fact: rules that read it would otherwise never match.
+     */
+    private static void seedCruiseTarget(DroolsTestHarness drools) {
+        drools.session().getKieSession().insert(new CruiseTargetFact(0.0));
     }
 
     /** One cycle of a multi-cycle comparison: time, speed, position on the road and the events seen then. */
@@ -285,8 +307,8 @@ class PrologDroolsEquivalenceTest {
             Arguments.of("rain persists after the last weather reading", new Step[]{
                 new Step(1_000, 90.0, new WeatherEvent(1_000, "env", WeatherCondition.RAIN, 0.9, 0.9)),
                 new Step(5_000, 90.0)}),
-            Arguments.of("reduced visibility counts for 500 ms", new Step[]{
-                new Step(1_000, 88.0, new ReducedVisibilityEvent(1_000, "environment", 0.55)),
+            Arguments.of("reduced visibility persists after the last weather reading", new Step[]{
+                new Step(1_000, 88.0, new WeatherEvent(1_000, "env", WeatherCondition.CLEAR, 0.55, 1.0)),
                 new Step(1_400, 88.0),
                 new Step(1_600, 88.0)}),
             Arguments.of("move off from a standstill until close to the target", new Step[]{
@@ -381,6 +403,7 @@ class PrologDroolsEquivalenceTest {
     void bothBackendsDecideAlikeOverSeveralCycles(String name, Step[] steps) {
         try (DroolsTestHarness drools = new DroolsTestHarness(steps[0].speedKmh());
              PrologTestHarness prolog = new PrologTestHarness()) {
+            seedCruiseTarget(drools);
             for (Step step : steps) {
                 drools.moveTo(step.positionMeters());
                 prolog.moveTo(step.positionMeters());

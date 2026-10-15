@@ -948,7 +948,12 @@ class SimulationEngineE2ETest {
             actuator.applyDecision(engine.getWorldState(), forced);
             assertEquals(Lane.RIGHT, ego.getTargetLane(), "Unsafe CENTER target is rejected, preserving current lane");
             assertEquals(com.one2drive.projeto1.domain.LaneChangeState.IDLE, ego.getLaneChangeState());
-            assertTrue(ego.getAccelerationMps2() < 0.0, "Rejected unsafe change selects safe deceleration");
+            // The refusal is recorded on the decision and the speed channel eases off; the
+            // vehicle is still at its standstill here, so it simply does not accelerate.
+            assertEquals(DrivingAction.KEEP_LANE, forced.getLaneAction());
+            assertEquals("Actuator safety guard", forced.getSourceRule());
+            assertEquals(DrivingAction.REDUCE_SPEED, forced.getAction(), "Rejected unsafe change selects safe deceleration");
+            assertTrue(ego.getAccelerationMps2() <= 0.0, "Rejected unsafe change never accelerates");
         }
     }
 

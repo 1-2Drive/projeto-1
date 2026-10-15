@@ -25,6 +25,12 @@ global DroolsSupport droolsSupport
 // the vehicle has steered clear the hazard no longer matches and the maneuver
 // cannot oscillate. The laneChangeState guard stops a new request while the
 // previous maneuver is still physically moving.
+//
+// Every rule that changes lane checks the line it would cross: the line between
+// RIGHT and CENTER is the rightMarking, the one between CENTER and LEFT the
+// leftMarking, and a continuous line is never crossed. An obstacle blocks the lane,
+// so going around it is collision avoidance; a pothole is a road hazard the vehicle
+// can also drive over slowly, so avoiding it stays at ROAD_HAZARD.
 
 // The maintain rules keep the lane change as the decision while it is moving. They
 // also match a driver-requested lane change, so they propose at MANEUVER_SAFETY: at
@@ -114,7 +120,7 @@ rule "Avoid pothole in left lane by changing right"
 salience 470
 when
     $ctx : DecisionContext()
-    VehicleStateFact(lane == Lane.LEFT, laneChangeState == LaneChangeState.IDLE)
+    VehicleStateFact(lane == Lane.LEFT, laneChangeState == LaneChangeState.IDLE, leftMarking != RoadMarkingType.CONTINUOUS)
     PotholeStateFact(potholeId != "none", lane == Lane.LEFT,
                      $distance : distanceMeters > 0, distanceMeters <= 50.0)
     LaneOccupancyState(lane == Lane.RIGHT, occupied == false)
@@ -135,7 +141,7 @@ rule "Avoid pothole in right lane by changing left"
 salience 470
 when
     $ctx : DecisionContext()
-    VehicleStateFact(lane == Lane.RIGHT, laneChangeState == LaneChangeState.IDLE)
+    VehicleStateFact(lane == Lane.RIGHT, laneChangeState == LaneChangeState.IDLE, rightMarking != RoadMarkingType.CONTINUOUS)
     PotholeStateFact(potholeId != "none", lane == Lane.RIGHT,
                      $distance : distanceMeters > 0, distanceMeters <= 50.0)
     LaneOccupancyState(lane == Lane.LEFT, occupied == false)
@@ -157,7 +163,7 @@ rule "Avoid obstacle in centre lane by changing left"
 salience 470
 when
     $ctx : DecisionContext()
-    VehicleStateFact(lane == Lane.CENTER, laneChangeState == LaneChangeState.IDLE)
+    VehicleStateFact(lane == Lane.CENTER, laneChangeState == LaneChangeState.IDLE, leftMarking != RoadMarkingType.CONTINUOUS)
     ObstacleStateFact(obstacleId != "none", lane == Lane.CENTER,
                       $distance : distanceMeters > 0, distanceMeters <= 50.0)
     LaneOccupancyState(lane == Lane.LEFT, occupied == false)
@@ -167,7 +173,7 @@ then
         DrivingAction.CHANGE_LANE_LEFT,
         Double.NaN,
         RiskLevel.LOW,
-        DecisionPriority.ROAD_HAZARD,
+        DecisionPriority.COLLISION_AVOIDANCE,
         "Avoiding obstacle by moving into the clear left lane",
         drools.getRule().getName(),
         "obstacle " + $distance + "m ahead in own lane, left lane clear"
@@ -178,7 +184,7 @@ rule "Avoid obstacle in centre lane by changing right when left is occupied"
 salience 470
 when
     $ctx : DecisionContext()
-    VehicleStateFact(lane == Lane.CENTER, laneChangeState == LaneChangeState.IDLE)
+    VehicleStateFact(lane == Lane.CENTER, laneChangeState == LaneChangeState.IDLE, rightMarking != RoadMarkingType.CONTINUOUS)
     ObstacleStateFact(obstacleId != "none", lane == Lane.CENTER,
                       $distance : distanceMeters > 0, distanceMeters <= 50.0)
     LaneOccupancyState(lane == Lane.LEFT, occupied == true)
@@ -189,7 +195,7 @@ then
         DrivingAction.CHANGE_LANE_RIGHT,
         Double.NaN,
         RiskLevel.LOW,
-        DecisionPriority.ROAD_HAZARD,
+        DecisionPriority.COLLISION_AVOIDANCE,
         "Avoiding obstacle by moving into the clear right lane",
         drools.getRule().getName(),
         "obstacle " + $distance + "m ahead in own lane, left occupied, right clear"
@@ -200,7 +206,7 @@ rule "Avoid obstacle in left lane by changing right"
 salience 470
 when
     $ctx : DecisionContext()
-    VehicleStateFact(lane == Lane.LEFT, laneChangeState == LaneChangeState.IDLE)
+    VehicleStateFact(lane == Lane.LEFT, laneChangeState == LaneChangeState.IDLE, leftMarking != RoadMarkingType.CONTINUOUS)
     ObstacleStateFact(obstacleId != "none", lane == Lane.LEFT,
                       $distance : distanceMeters > 0, distanceMeters <= 50.0)
     LaneOccupancyState(lane == Lane.RIGHT, occupied == false)
@@ -210,7 +216,7 @@ then
         DrivingAction.CHANGE_LANE_RIGHT,
         Double.NaN,
         RiskLevel.LOW,
-        DecisionPriority.ROAD_HAZARD,
+        DecisionPriority.COLLISION_AVOIDANCE,
         "Avoiding obstacle by moving into the clear right lane",
         drools.getRule().getName(),
         "obstacle " + $distance + "m ahead in own lane, right lane clear"
@@ -221,7 +227,7 @@ rule "Avoid obstacle in right lane by changing left"
 salience 470
 when
     $ctx : DecisionContext()
-    VehicleStateFact(lane == Lane.RIGHT, laneChangeState == LaneChangeState.IDLE)
+    VehicleStateFact(lane == Lane.RIGHT, laneChangeState == LaneChangeState.IDLE, rightMarking != RoadMarkingType.CONTINUOUS)
     ObstacleStateFact(obstacleId != "none", lane == Lane.RIGHT,
                       $distance : distanceMeters > 0, distanceMeters <= 50.0)
     LaneOccupancyState(lane == Lane.LEFT, occupied == false)
@@ -231,7 +237,7 @@ then
         DrivingAction.CHANGE_LANE_LEFT,
         Double.NaN,
         RiskLevel.LOW,
-        DecisionPriority.ROAD_HAZARD,
+        DecisionPriority.COLLISION_AVOIDANCE,
         "Avoiding obstacle by moving into the clear left lane",
         drools.getRule().getName(),
         "obstacle " + $distance + "m ahead in own lane, left lane clear"

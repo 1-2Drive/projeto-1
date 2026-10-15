@@ -27,7 +27,9 @@ public class ExplanationTrace {
         add(
             decision.getTimestamp(),
             TimelineEntryType.DECISION,
-            decision.getAction() + " reason=" + decision.getReason() + " rule=" + decision.getSourceRule()
+            decision.getSpeedAction() + " reason=" + decision.getSpeedReason() + " rule=" + decision.getSpeedSourceRule()
+                + (decision.isLaneManeuver()
+                    ? " | lane " + decision.getLaneAction() + " rule=" + decision.getLaneSourceRule() : "")
         );
     }
 

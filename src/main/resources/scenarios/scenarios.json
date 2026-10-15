@@ -841,7 +841,7 @@
     "name": "Continuous line prohibits avoidance",
     "initialSpeedKmh": 50,
     "initialLane": "RIGHT",
-    "leftMarking": "CONTINUOUS",
+    "rightMarking": "CONTINUOUS",
     "initialWeather": "CLEAR",
     "actors": [],
     "timedActions": [

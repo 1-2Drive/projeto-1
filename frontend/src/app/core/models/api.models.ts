@@ -47,6 +47,7 @@ export interface ApiTimelineEntry {
 }
 
 export interface ApiDecisionView {
+  /** Headline: the lane maneuver while one executes, the speed action otherwise. */
   action: string;
   recommendedSpeedKmh: number;
   riskLevel: string;
@@ -54,6 +55,25 @@ export interface ApiDecisionView {
   sourceRule: string;
   timestamp: number;
   evidence: string[];
+  speedAction?: string;
+  speedReason?: string;
+  speedSourceRule?: string;
+  laneAction?: string;
+  laneReason?: string;
+  laneSourceRule?: string;
+  proposals?: ApiProposalView[];
+}
+
+/** One rule's proposal in the last cycle and what the arbitration did with it. */
+export interface ApiProposalView {
+  rule: string;
+  action: string;
+  channel: 'LONGITUDINAL' | 'LATERAL';
+  priority: number;
+  recommendedSpeedKmh: number | null;
+  outcome: 'PENDING' | 'WON' | 'LOST_TO' | 'VETOED_BY' | 'REJECTED_BY';
+  detail: string;
+  reason: string;
 }
 
 export interface ApiSimulationSnapshot {

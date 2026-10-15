@@ -35,6 +35,24 @@
         </div>
       }
 
+      <div class="channels" data-testid="decision-channels">
+        @if (speedChannel(); as speed) {
+          <div class="channel" data-testid="decision-speed-channel">
+            <span class="channel__label">Speed</span>
+            <strong class="channel__action" data-testid="decision-speed-action">{{ speed.action }}</strong>
+            <span class="channel__value">{{ speed.recommendedSpeedKmh | number: '1.0-0' }} km/h</span>
+            <span class="channel__rule" data-testid="decision-speed-rule" title="Rule that set the speed">— {{ speed.sourceRule }}</span>
+          </div>
+        }
+        @if (laneChannel(); as lane) {
+          <div class="channel" data-testid="decision-lane-channel">
+            <span class="channel__label">Lane</span>
+            <strong class="channel__action" data-testid="decision-lane-action">{{ lane.action }}</strong>
+            <span class="channel__rule" data-testid="decision-lane-rule" title="Rule that set the lane maneuver">— {{ lane.sourceRule }}</span>
+          </div>
+        }
+      </div>
+
       <div class="decision__grid">
         <div class="cell">
           <span>Recommended</span>
@@ -49,6 +67,41 @@
       </div>
 
       <p class="decision__reason">{{ d.reason }}</p>
+
+      <div class="proposals" data-testid="decision-proposals">
+        <button type="button" class="proposals__toggle" [class.active]="proposalsOpen()"
+                [attr.aria-expanded]="proposalsOpen()" (click)="toggleProposals()"
+                data-testid="decision-proposals-toggle">
+          <span class="proposals__chevron" aria-hidden="true">{{ proposalsOpen() ? '▾' : '▸' }}</span>
+          Proposals
+          <em>{{ proposals().length }}</em>
+        </button>
+
+        @if (proposalsOpen()) {
+          <ul class="proposals__list" data-testid="decision-proposals-list">
+            @for (proposal of proposals(); track proposal.rule + proposal.channel) {
+              <li class="proposal" [class]="'proposal ' + proposal.outcomeClass"
+                  data-testid="decision-proposal-row">
+                <span class="proposal__outcome" data-testid="decision-proposal-outcome">{{ proposal.outcomeLabel }}</span>
+                <span class="proposal__channel">{{ proposal.channel === 'LATERAL' ? 'LANE' : 'SPEED' }}</span>
+                <span class="proposal__rule" [title]="proposal.reason">{{ proposal.rule }}</span>
+                <span class="proposal__action">
+                  {{ proposal.action }}
+                  @if (proposal.recommendedSpeedKmh !== null) {
+                    <em>{{ proposal.recommendedSpeedKmh | number: '1.0-0' }} km/h</em>
+                  }
+                </span>
+                <span class="proposal__priority" title="Decision priority">p{{ proposal.priority }}</span>
+                @if (proposal.detailLabel) {
+                  <span class="proposal__detail" data-testid="decision-proposal-detail">{{ proposal.detailLabel }}</span>
+                }
+              </li>
+            } @empty {
+              <li class="proposals__empty">No rule proposed anything in the last cycle.</li>
+            }
+          </ul>
+        }
+      </div>
 
       <footer class="decision__foot">
         <span class="decision__rule" title="Rule that reached the decision">{{ d.sourceRule }}</span>

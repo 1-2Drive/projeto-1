@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
-import { ApiProposalView, ApiSimulationSnapshot } from '../../core/models/api.models';
+import { ApiLaneCheckView, ApiProposalView, ApiSimulationSnapshot } from '../../core/models/api.models';
 
 type RiskLevel = 'risk-low' | 'risk-medium' | 'risk-high';
 type ActionTone = 'go' | 'caution' | 'stop';
@@ -136,6 +136,10 @@ export class DecisionPanelComponent {
       outcomeClass: `outcome--${proposal.outcome.toLowerCase().replace(/_/g, '-')}`,
       detailLabel: describeDetail(proposal)
     })));
+
+  /** "Why not change lane?", left first, as the engine answered it after the rules fired. */
+  protected readonly laneChecks = computed<ApiLaneCheckView[]>(() =>
+    [...(this.decision()?.laneChecks ?? [])].sort((a, b) => a.side.localeCompare(b.side)));
 
   protected toggleProposals(): void {
     this.proposalsOpen.update(open => !open);

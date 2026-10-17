@@ -345,3 +345,20 @@ partial_match([Condition|Conditions], Depth0, Depth, Rest) :-
 % not holding.
 fails_leniently(Condition) :-
     \+ catch(holds(Condition, _), _, fail).
+
+% subgoal_results(+Goal, -Results): why a goal proved by backward chaining holds or not.
+% Takes the body of the goal's clause and proves each conjunct on its own, so a goal that
+% fails names the sub-goals that fail. Results is a list of SubGoal-true or SubGoal-false.
+subgoal_results(Goal, Results) :-
+    clause(Goal, Body), !,
+    conjuncts(Body, SubGoals),
+    maplist(subgoal_result, SubGoals, Results).
+
+conjuncts((A, B), Goals) :- !,
+    conjuncts(A, GoalsA),
+    conjuncts(B, GoalsB),
+    append(GoalsA, GoalsB, Goals).
+conjuncts(Goal, [Goal]).
+
+subgoal_result(Goal, Goal-Holds) :-
+    (   once(prove_goal(Goal, _)) -> Holds = true ; Holds = false ).

@@ -62,6 +62,16 @@ export interface ApiDecisionView {
   laneReason?: string;
   laneSourceRule?: string;
   proposals?: ApiProposalView[];
+  /** "Why not change lane?" for each side: the sub-goals of the safeToChangeLane query. */
+  laneChecks?: ApiLaneCheckView[];
+}
+
+/** Whether a lane change to one side is safe, and which sub-goal fails when it is not. */
+export interface ApiLaneCheckView {
+  side: 'LEFT' | 'RIGHT';
+  allowed: boolean;
+  explanation: string;
+  subGoals: { goal: string; holds: boolean; detail: string }[];
 }
 
 /** One rule's proposal in the last cycle and what the arbitration did with it. */

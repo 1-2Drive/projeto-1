@@ -2,7 +2,9 @@ package com.one2drive.projeto1.drools;
 
 import com.one2drive.projeto1.config.SimulationConfig;
 import com.one2drive.projeto1.decision.DrivingDecision;
+import com.one2drive.projeto1.decision.LaneChangeCheck;
 import com.one2drive.projeto1.domain.EgoVehicleState;
+import com.one2drive.projeto1.domain.Lane;
 import com.one2drive.projeto1.drools.facts.CruiseTargetFact;
 import com.one2drive.projeto1.drools.facts.CurrentSpeedLimit;
 import com.one2drive.projeto1.drools.facts.VehicleStateFact;
@@ -114,6 +116,7 @@ public class DroolsBackend implements ExpertSystemBackend {
         }
         DrivingDecision decision = knowledgeSession.getDrivingDecision();
         knowledgeSession.getDecisionContext().applyTo(decision);
+        decision.setLaneChecks(List.of(laneCheck(Lane.LEFT), laneCheck(Lane.RIGHT)));
 
         FactHandle decisionHandle = findFactHandle(decision);
         if (decisionHandle != null) {
@@ -164,6 +167,21 @@ public class DroolsBackend implements ExpertSystemBackend {
         vehicleStateFact.setPresentationDemo("S12_PRESENTATION_DEMO".equals(input.scenarioId()));
         vehicleStateFact.setLaneSettledAtMillis(ego.getLaneSettledAtMillis());
         knowledgeSession.getKieSession().update(vehicleStateHandle, vehicleStateFact);
+    }
+
+    /**
+     * "Why not change lane?" asked by backward chaining: each sub-goal of the safeToChangeLane
+     * query (lane-safety.drl) is a query of its own, so the engine says which one fails.
+     */
+    private LaneChangeCheck laneCheck(Lane side) {
+        return new LaneChangeCheck(side, vehicleStateFact.getLane(),
+            holds(LaneChangeCheck.MANEUVER_IDLE),
+            holds(LaneChangeCheck.NO_CONTINUOUS_LINE, side),
+            holds(LaneChangeCheck.SIDE_CLEAR, side));
+    }
+
+    private boolean holds(String query, Object... arguments) {
+        return knowledgeSession.getKieSession().getQueryResults(query, arguments).size() > 0;
     }
 
     private FactHandle findFactHandle(Object object) {

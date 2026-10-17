@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.one2drive.projeto1.decision.DecisionContext;
 import com.one2drive.projeto1.decision.DecisionPriority;
 import com.one2drive.projeto1.decision.DrivingDecision;
+import com.one2drive.projeto1.decision.LaneChangeCheck;
 import com.one2drive.projeto1.decision.StoppingPolicy;
 import com.one2drive.projeto1.domain.DrivingAction;
 import com.one2drive.projeto1.domain.Lane;
@@ -164,8 +165,21 @@ public class PrologKnowledgeSession implements AutoCloseable {
             facts.add(new PrologCycleResult.WorkingMemoryFact(
                 node.path("n").asInt(), node.path("fact").asText(), rule.isNull() ? null : rule.asText()));
         }
+        List<LaneChangeCheck> laneChecks = new ArrayList<>();
+        for (JsonNode node : reply.path("laneChecks")) {
+            Map<String, Boolean> holds = new LinkedHashMap<>();
+            for (JsonNode goal : node.path("subGoals")) {
+                holds.put(goal.path("goal").asText(), goal.path("holds").asBoolean());
+            }
+            laneChecks.add(new LaneChangeCheck(
+                Lane.valueOf(node.path("side").asText().toUpperCase(Locale.ROOT)),
+                vehicle.lane(),
+                holds.getOrDefault("maneuver_idle", false),
+                holds.getOrDefault("no_continuous_line", false),
+                holds.getOrDefault("side_clear", false)));
+        }
         return new PrologCycleResult(List.copyOf(proposals), List.copyOf(facts),
-            reply.path("speedLimitKmh").asDouble());
+            reply.path("speedLimitKmh").asDouble(), List.copyOf(laneChecks));
     }
 
     public PrologCycleResult cycle(long timestampMillis, double speedKmh, Lane lane, List<?> events,

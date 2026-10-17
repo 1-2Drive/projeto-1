@@ -113,6 +113,13 @@ public class ApiModelMapper {
                     proposal.getOutcome().name(),
                     proposal.getDetail(),
                     proposal.getReason()
+                )).toList(),
+                decision.getLaneChecks().stream().map(check -> new ApiDecisionView.ApiLaneCheckView(
+                    check.side().name(),
+                    check.allowed(),
+                    check.explanation(),
+                    check.subGoals().stream().map(subGoal -> new ApiDecisionView.ApiSubGoalView(
+                        subGoal.goal(), subGoal.holds(), subGoal.detail())).toList()
                 )).toList()
             ),
             snapshot.sensorValues(),

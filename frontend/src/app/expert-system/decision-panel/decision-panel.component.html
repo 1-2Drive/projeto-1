@@ -103,6 +103,26 @@
         }
       </div>
 
+      @if (laneChecks().length) {
+        <div class="lane-checks" data-testid="decision-lane-checks">
+          <span class="lane-checks__title">Lane change: safe?</span>
+          @for (check of laneChecks(); track check.side) {
+            <div class="lane-check" [class.lane-check--blocked]="!check.allowed" data-testid="decision-lane-check">
+              <span class="lane-check__side">{{ check.side }}</span>
+              <span class="lane-check__verdict" data-testid="decision-lane-check-verdict">{{ check.allowed ? '✓' : '✗' }}</span>
+              <span class="lane-check__why" data-testid="decision-lane-check-why">{{ check.explanation }}</span>
+              <span class="lane-check__goals">
+                @for (goal of check.subGoals; track goal.goal) {
+                  <span class="lane-check__goal" [class.lane-check__goal--fails]="!goal.holds" [title]="goal.detail">
+                    {{ goal.holds ? '✓' : '✗' }} {{ goal.goal }}
+                  </span>
+                }
+              </span>
+            </div>
+          }
+        </div>
+      }
+
       <footer class="decision__foot">
         <span class="decision__rule" title="Rule that reached the decision">{{ d.sourceRule }}</span>
         <span class="decision__age">active {{ decisionAge() }}</span>

@@ -65,6 +65,31 @@ describe('DecisionPanelComponent', () => {
     fixture = TestBed.createComponent(DecisionPanelComponent);
   });
 
+  it('answers why not change lane for each side, left first', () => {
+    const root = render({
+      ...headlineDecision,
+      laneChecks: [
+        { side: 'RIGHT', allowed: false, explanation: 'no lane to the right', subGoals: [
+          { goal: 'maneuverIdle', holds: true, detail: 'no lane change in progress' },
+          { goal: 'noContinuousLine', holds: false, detail: 'no lane to the right' },
+          { goal: 'sideClear', holds: false, detail: 'blind-spot sensor reports the right side occupied' }] },
+        { side: 'LEFT', allowed: true, explanation: 'safe to change left', subGoals: [
+          { goal: 'maneuverIdle', holds: true, detail: 'no lane change in progress' },
+          { goal: 'noContinuousLine', holds: true, detail: 'no continuous line between RIGHT and CENTER' },
+          { goal: 'sideClear', holds: true, detail: 'blind-spot sensor reports the left side clear' }] }
+      ]
+    });
+
+    const rows = Array.from(root.querySelectorAll('[data-testid=\'decision-lane-check\']')) as HTMLElement[];
+    expect(rows.length).toBe(2);
+    expect(rows[0].textContent).toContain('LEFT');
+    expect(rows[0].classList.contains('lane-check--blocked')).toBeFalse();
+    expect(rows[1].classList.contains('lane-check--blocked')).toBeTrue();
+    expect(rows[1].querySelector('[data-testid=\'decision-lane-check-why\']')?.textContent?.trim())
+      .toBe('no lane to the right');
+    expect(rows[1].querySelectorAll('.lane-check__goal--fails').length).toBe(2);
+  });
+
   it('highlights emergency decision row', () => {
     const root = render(headlineDecision);
 

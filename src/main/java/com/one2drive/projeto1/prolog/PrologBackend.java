@@ -128,6 +128,7 @@ public class PrologBackend implements ExpertSystemBackend {
         // decision still holds the previous cycle's outcome until applyTo below.
         lastResult = session.cycle(context, vehicle, events, decision);
         context.applyTo(decision);
+        decision.setLaneChecks(lastResult.laneChecks());
         traceFiredRules();
         decisionConsumer.accept(decision);
     }

@@ -412,6 +412,40 @@ then
     update($state);
 end
 
+// The lane two to the left (LEFT, seen from RIGHT), from the same front radar.
+rule "Update far left lane vehicle state"
+salience 1000
+no-loop true
+when
+    $e : FarLeftLaneVehicleEvent() from entry-point "PERCEPTION_STREAM"
+    $state : FarLeftLaneVehicleState()
+    eval($e.getTimestamp() >= $state.getTimestamp()
+        && ($e.getTimestamp() > $state.getTimestamp()
+            || !$e.getTargetId().equals($state.getTargetId())
+            || Math.abs($state.getDistanceMeters() - $e.getDistanceMeters()) > 0.01))
+then
+    $state.setTargetId($e.getTargetId());
+    $state.setDistanceMeters($e.getDistanceMeters());
+    $state.setRelativeSpeedMps($e.getRelativeSpeedMps());
+    $state.setTimestamp($e.getTimestamp());
+    update($state);
+end
+
+rule "Clear stale far left lane vehicle perception"
+no-loop true
+salience 900
+when
+    $state : FarLeftLaneVehicleState(targetId != "none", $timestamp : timestamp)
+    VehicleStateFact($now : timestamp)
+    eval($now - $timestamp > 250)
+then
+    $state.setTargetId(FarLeftLaneVehicleState.NO_TARGET);
+    $state.setDistanceMeters(Double.POSITIVE_INFINITY);
+    $state.setRelativeSpeedMps(0.0);
+    $state.setTimestamp($now);
+    update($state);
+end
+
 // Same two-sample rule as the front vehicle: the radar reports every 100 ms.
 rule "Clear stale left lane vehicle perception"
 no-loop true

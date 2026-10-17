@@ -22,6 +22,7 @@ import com.one2drive.projeto1.drools.facts.FrontVehicleState
 import com.one2drive.projeto1.drools.facts.LaneChangeRequestState
 import com.one2drive.projeto1.drools.facts.LaneOccupancyState
 import com.one2drive.projeto1.drools.facts.LeftLaneVehicleState
+import com.one2drive.projeto1.drools.facts.FarLeftLaneVehicleState
 import com.one2drive.projeto1.drools.facts.OvertakingStateFact
 import com.one2drive.projeto1.drools.facts.PedestrianStateFact
 import com.one2drive.projeto1.drools.facts.TrafficLightStateFact
@@ -264,10 +265,11 @@ end
 // CENTER. The new overtake takes over the state (new target, new original lane); the
 // return to the right is the same progressive LEFT -> CENTER -> RIGHT either way.
 //
-// LEFT is the last lane: moving into it only helps if the next vehicle ahead there is
-// clearly further away than the one being passed. Otherwise the ego stays in CENTER and
-// adapts its speed. From RIGHT there is still a lane beyond CENTER, so that step is not
-// held to the same condition.
+// Moving left only helps if the next vehicle ahead in that lane is clearly further away
+// than the one being passed. Otherwise the ego stays where it is and adapts its speed:
+// from CENTER it does not move into LEFT, and from RIGHT it does not move into a CENTER
+// lane that is as slow as its own, which would only start an overtake it then has to
+// give up (Art. 13 CE: keep to the right).
 //
 // The start window grows with the closing speed (5.5 s of time to collision plus 10 m)
 // so the 2.9 s lane change ends with room to spare when the front vehicle is much
@@ -282,13 +284,14 @@ no-loop true
 when
     $ctx : DecisionContext()
     $state : OvertakingStateFact($active : active, $tracked : targetId, $origin : originalLane)
-    VehicleStateFact(lane == Lane.RIGHT || lane == Lane.CENTER, $currentLane : lane, laneChangeState == LaneChangeState.IDLE, leftMarking != RoadMarkingType.CONTINUOUS, $speed : speedKmh, $now : timestamp)
+    VehicleStateFact(lane == Lane.RIGHT || lane == Lane.CENTER, $currentLane : lane, laneChangeState == LaneChangeState.IDLE, $speed : speedKmh, $now : timestamp)
+    noContinuousLine(Lane.LEFT;)
     FrontVehicleState($target : targetId != "none", $distance : distanceMeters > 15.0, $relative : relativeSpeedMps > 0.5, timestamp == $now)
     LaneOccupancyState(lane == Lane.LEFT, occupied == false, $leftFront : frontDistanceMeters)
     not PedestrianStateFact(pedestrianId != "none", inPath == true || crossingState == PedestrianCrossingState.CROSSING)
     not TrafficLightStateFact(lightId != "none", state != TrafficLightState.GREEN, distanceMeters <= 125.0)
     eval((!$active || !$target.equals($tracked) || $currentLane != $origin)
-        && ($currentLane != Lane.CENTER || $leftFront > $distance + 20.0)
+        && $leftFront > $distance + 20.0
         && $distance <= Math.max(50.0, $relative * 5.5 + 10.0)
         && ($speed / 3.6 - $relative >= 1.0 || $distance >= $relative * 5.5))
 then
@@ -322,7 +325,8 @@ no-loop true
 when
     $ctx : DecisionContext()
     $state : OvertakingStateFact($active : active, $tracked : targetId, $origin : originalLane)
-    VehicleStateFact(lane == Lane.RIGHT || lane == Lane.CENTER, $currentLane : lane, laneChangeState == LaneChangeState.IDLE, leftMarking != RoadMarkingType.CONTINUOUS, $speed : speedKmh, $now : timestamp)
+    VehicleStateFact(lane == Lane.RIGHT || lane == Lane.CENTER, $currentLane : lane, laneChangeState == LaneChangeState.IDLE, $speed : speedKmh, $now : timestamp)
+    noContinuousLine(Lane.LEFT;)
     FrontVehicleState($target : targetId != "none", $distance : distanceMeters > 6.0, distanceMeters <= 30.0, $relative : relativeSpeedMps >= -0.5, relativeSpeedMps <= 0.5, timestamp == $now)
     LaneOccupancyState(lane == Lane.LEFT, occupied == false, $leftFront : frontDistanceMeters)
     CruiseTargetFact($cruise : targetKmh)
@@ -330,7 +334,7 @@ when
     not PedestrianStateFact(pedestrianId != "none", inPath == true || crossingState == PedestrianCrossingState.CROSSING)
     not TrafficLightStateFact(lightId != "none", state != TrafficLightState.GREEN, distanceMeters <= 125.0)
     eval((!$active || !$target.equals($tracked) || $currentLane != $origin)
-        && ($currentLane != Lane.CENTER || $leftFront > $distance + 20.0)
+        && $leftFront > $distance + 20.0
         && ($speed / 3.6 - $relative) * 3.6
             <= (CurrentSpeedLimit.DEFAULT_SOURCE.equals($source) && $cruise > 0 ? Math.min($cruise, $limit) : $limit) - 10.0)
 then
@@ -360,7 +364,12 @@ end
 //
 // From RIGHT, when that vehicle is slower than the speed the ego is aiming for (the limit
 // a sign posted, or the scenario cruise speed) and no vehicle in the ego lane is nearer,
-// the ego first moves in behind it (RIGHT -> CENTER) when CENTER can be entered safely. It becomes the tracked
+// the ego first moves in behind it (RIGHT -> CENTER) when CENTER can be entered safely and
+// the lane it would overtake through, LEFT, is clear well beyond that vehicle (the same
+// +20 m the overtake rule asks for; Art. 38 CE: the driver makes sure the road is clear for
+// the whole maneuver). The front radar reports the nearest vehicle in LEFT
+// (FarLeftLaneVehicleState); with LEFT as slow, the ego stays in RIGHT behind the slower
+// vehicle and does not pass it on its right (Art. 36 CE). It becomes the tracked
 // target of the overtake, so once the ego is behind it in CENTER the overtake rule above
 // continues CENTER -> LEFT, and the usual progressive return follows. The overtake rule
 // only accepts that same target again from a different lane and on a radar sample taken
@@ -374,6 +383,7 @@ when
     $state : OvertakingStateFact($active : active, $tracked : targetId)
     VehicleStateFact(lane == Lane.RIGHT, $currentLane : lane, laneChangeState == LaneChangeState.IDLE, rightMarking != RoadMarkingType.CONTINUOUS, $speed : speedKmh, $now : timestamp)
     LeftLaneVehicleState($target : targetId != "none", $distance : distanceMeters > 15.0, $relative : relativeSpeedMps > -0.5, timestamp == $now)
+    FarLeftLaneVehicleState($farLeft : distanceMeters)
     CruiseTargetFact($cruise : targetKmh)
     CurrentSpeedLimit($limit : limitKmh, $source : sourceId)
     not FrontVehicleState(targetId != "none", distanceMeters <= $distance)
@@ -384,7 +394,8 @@ when
         && $speed / 3.6 - $relative >= 1.4
         && (CurrentSpeedLimit.DEFAULT_SOURCE.equals($source) && $cruise > 0 ? Math.min($cruise, $limit) : $limit) / 3.6
             > $speed / 3.6 - $relative + 1.4
-        && $distance <= Math.max(50.0, $relative * 5.5 + 10.0))
+        && $distance <= Math.max(50.0, $relative * 5.5 + 10.0)
+        && $farLeft > $distance + 20.0)
 then
     if ($state.isActive() && $target.equals($state.getTargetId())) {
         return;
@@ -459,7 +470,8 @@ no-loop true
 when
     $ctx : DecisionContext()
     $state : OvertakingStateFact($active : active, $tracked : targetId)
-    VehicleStateFact(lane == Lane.RIGHT || lane == Lane.CENTER, $currentLane : lane, laneChangeState == LaneChangeState.IDLE, leftMarking != RoadMarkingType.CONTINUOUS, $speed : speedKmh < 3.0, $now : timestamp)
+    VehicleStateFact(lane == Lane.RIGHT || lane == Lane.CENTER, $currentLane : lane, laneChangeState == LaneChangeState.IDLE, $speed : speedKmh < 3.0, $now : timestamp)
+    noContinuousLine(Lane.LEFT;)
     FrontVehicleState($target : targetId != "none", $distance : distanceMeters > 6.0, distanceMeters <= 20.0, $relative : relativeSpeedMps > -0.3)
     LaneOccupancyState(lane == Lane.LEFT, occupied == false)
     not PedestrianStateFact(pedestrianId != "none", inPath == true || crossingState == PedestrianCrossingState.CROSSING)
@@ -490,13 +502,17 @@ end
 // cannot be passed before the vehicle has left the lane the overtake started from, nor
 // while the front radar is still looking at that same vehicle. Whatever other vehicle
 // the radar sees in the new lane says nothing about the one being passed.
+// The side reading must also be newer than the end of the last lane change: the blind-spot
+// sensor reads every 200 ms, so for a tick or two after the vehicle settles its right side
+// still describes the right side of the lane it came from. The rules that return right
+// (here, road-law.drl) apply the same condition.
 rule "Mark front vehicle passed once it is behind or cleared"
 salience 480
 no-loop true
 when
     $state : OvertakingStateFact(active == true, passedTarget == false, $origin : originalLane, $tracked : targetId)
-    VehicleStateFact(lane != Lane.RIGHT, lane != $origin, laneChangeState == LaneChangeState.IDLE)
-    LaneOccupancyState(lane == Lane.RIGHT, occupied == false, frontDistanceMeters > 80.0)
+    VehicleStateFact(lane != Lane.RIGHT, lane != $origin, laneChangeState == LaneChangeState.IDLE, $settled : laneSettledAtMillis)
+    LaneOccupancyState(lane == Lane.RIGHT, occupied == false, frontDistanceMeters > 80.0, timestamp > $settled)
     FrontVehicleState(targetId != $tracked)
 then
     modify($state) { setPassedTarget(true) }
@@ -510,8 +526,9 @@ no-loop true
 when
     $ctx : DecisionContext()
     $state : OvertakingStateFact(active == true, passedTarget == true)
-    VehicleStateFact(lane != Lane.RIGHT, laneChangeState == LaneChangeState.IDLE, rightMarking != RoadMarkingType.CONTINUOUS)
-    LaneOccupancyState(lane == Lane.RIGHT, occupied == false, frontDistanceMeters > 80.0)
+    VehicleStateFact(lane != Lane.RIGHT, laneChangeState == LaneChangeState.IDLE, $settled : laneSettledAtMillis)
+    noContinuousLine(Lane.RIGHT;)
+    LaneOccupancyState(lane == Lane.RIGHT, occupied == false, frontDistanceMeters > 80.0, timestamp > $settled)
     not LaneChangeRequestState(active == true)
 then
     droolsSupport.proposeDecision(
@@ -579,7 +596,8 @@ rule "Forget boxed in once the left lane opens"
 salience 535
 when
     $boxed : BoxedInFact()
-    VehicleStateFact(lane != Lane.LEFT, laneChangeState == LaneChangeState.IDLE, leftMarking != RoadMarkingType.CONTINUOUS)
+    VehicleStateFact(lane != Lane.LEFT, laneChangeState == LaneChangeState.IDLE)
+    noContinuousLine(Lane.LEFT;)
     FrontVehicleState(targetId != "none", $distance : distanceMeters > 0, distanceMeters <= 80.0)
     LaneOccupancyState(lane == Lane.LEFT, occupied == false, $leftFront : frontDistanceMeters)
     eval($leftFront > $distance + 20.0)
@@ -626,8 +644,9 @@ no-loop true
 when
     $ctx : DecisionContext()
     BoxedInFact($since : since)
-    VehicleStateFact(lane != Lane.RIGHT, laneChangeState == LaneChangeState.IDLE, rightMarking != RoadMarkingType.CONTINUOUS, $speed : speedKmh, $now : timestamp)
-    LaneOccupancyState(lane == Lane.RIGHT, occupied == false, $rightFront : frontDistanceMeters)
+    VehicleStateFact(lane != Lane.RIGHT, laneChangeState == LaneChangeState.IDLE, $speed : speedKmh, $now : timestamp, $settled : laneSettledAtMillis)
+    noContinuousLine(Lane.RIGHT;)
+    LaneOccupancyState(lane == Lane.RIGHT, occupied == false, $rightFront : frontDistanceMeters, timestamp > $settled)
     WeatherStateFact($condition : condition, $grip : gripFactor)
     not LaneChangeRequestState(active == true)
     eval($now - $since >= 3000

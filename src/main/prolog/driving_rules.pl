@@ -32,7 +32,10 @@
 %   front_vehicle(Target, DistanceM, RelSpeedMps)   RelSpeed > 0: a aproximar-se
 %   front_distance_sample(Target, DistanceM, AgeMs)  front_read_now(Target)
 %   left_lane_vehicle(Target, DistanceM, RelSpeedMps)  left_read_now(Target)
+%   far_left_lane_vehicle(Target, DistanceM, RelSpeedMps)   duas faixas à esquerda (LEFT, visto de RIGHT)
 %   lane_occupancy(left|right, Occupied, FrontDistanceM)   o lado do ego, não uma faixa
+%   lane_occupancy_read(left|right, Ms)   quando esse lado foi lido (LaneOccupancyState.timestamp)
+%   lane_settled_at(Ms)   quando a última mudança de faixa assentou (laneSettledAtMillis), -1 se nenhuma
 %   lane_safe_to_enter(left|right, true|false)   o safeToEnter do sensor de ângulo morto
 %   left_marking(dashed|continuous)  right_marking(dashed|continuous)
 %   adjacent_lane_safe(left|right, true|false)   calculado pelo Java (WorldState.isLaneSafe)
@@ -430,6 +433,7 @@ rule('Mark front vehicle passed once it is behind or cleared',
        lane_change_state(idle),
        lane_occupancy(right, false, RightFront),
        test(RightFront > 80.0),
+       test(fresh_side_reading(right)),
        not(front_vehicle(Target, _, _)) ],
      [ assert(overtake_target_passed) ]).
 
@@ -442,16 +446,15 @@ rule('Deactivate overtaking state once return right completes',
 
 % Art. 35/36 CE: overtake on the left, with the left lane clear. The window to start grows
 % with the closing speed (5.5 s of TTC plus 10 m). A stopped vehicle is only overtaken on
-% the move with that whole margin. Towards the LEFT lane (the last one) it is only worth it
-% if the next vehicle there is clearly further away. Art. 41 CE: never with a pedestrian in
+% the move with that whole margin. Moving left, from CENTER or from RIGHT, is only worth it
+% if the next vehicle in that lane is clearly further away. Art. 41 CE: never with a pedestrian in
 % the way or a red or yellow light ahead.
 rule('Overtake slow front vehicle via left lane',
      525,
      [ ego_lane(Lane),
        test(memberchk(Lane, [right, center])),
        lane_change_state(idle),
-       left_marking(LeftMarking),
-       test(LeftMarking \== continuous),
+       prove(no_continuous_line(left)),
        ego_speed(V),
        time_ms(Now),
        front_vehicle(Target, D, Rel),
@@ -461,7 +464,7 @@ rule('Overtake slow front vehicle via left lane',
        not(pedestrian_conflict(_)),
        not(test(light_forbids_overtaking)),
        test(may_start_overtaking(Target, Lane)),
-       test((Lane \== center ; LeftFront > D + 20.0)),
+       test(LeftFront > D + 20.0),
        test(D =< max(50.0, Rel * 5.5 + 10.0)),
        test((V / 3.6 - Rel >= 1.0 ; D >= Rel * 5.5)) ],
      [ assert(overtake_started(Target, Lane, Now)),
@@ -479,8 +482,7 @@ rule('Overtake the vehicle being followed',
      [ ego_lane(Lane),
        test(memberchk(Lane, [right, center])),
        lane_change_state(idle),
-       left_marking(LeftMarking),
-       test(LeftMarking \== continuous),
+       prove(no_continuous_line(left)),
        ego_speed(V),
        time_ms(Now),
        front_vehicle(Target, D, Rel),
@@ -490,7 +492,7 @@ rule('Overtake the vehicle being followed',
        not(pedestrian_conflict(_)),
        not(test(light_forbids_overtaking)),
        test(may_start_overtaking(Target, Lane)),
-       test((Lane \== center ; LeftFront > D + 20.0)),
+       test(LeftFront > D + 20.0),
        test(desired_speed(Desired)),
        test((V / 3.6 - Rel) * 3.6 =< Desired - 10.0) ],
      [ assert(overtake_started(Target, Lane, Now)),
@@ -499,7 +501,9 @@ rule('Overtake the vehicle being followed',
 
 % Art. 36 CE: a slower vehicle in the left lane is not passed on its right. From the right
 % lane, the ego first moves in behind it (RIGHT -> CENTER) and that vehicle becomes the
-% target; once behind it, the previous rule continues CENTER -> LEFT.
+% target; once behind it, the previous rule continues CENTER -> LEFT. Art. 38 CE: only with
+% LEFT clear well beyond that vehicle (+20 m, as the overtake asks); otherwise the ego stays
+% in RIGHT behind it.
 rule('Move left behind slower left lane vehicle to overtake it on the left',
      525,
      [ ego_lane(right),
@@ -519,7 +523,8 @@ rule('Move left behind slower left lane vehicle to overtake it on the left',
        test(V / 3.6 - Rel >= 1.4),
        test(desired_speed(Desired)),
        test(Desired / 3.6 > V / 3.6 - Rel + 1.4),
-       test(D =< max(50.0, Rel * 5.5 + 10.0)) ],
+       test(D =< max(50.0, Rel * 5.5 + 10.0)),
+       test(far_left_clear_beyond(D)) ],
      [ assert(overtake_started(Target, right, Now)),
        assert(proposal(change_lane_left, no_target, low, maneuver_safety,
                        'Moving left behind a slower vehicle to overtake it on the left (Art. 36 CE)')) ]).
@@ -531,8 +536,7 @@ rule('Go around stationary front vehicle from standstill',
      [ ego_lane(Lane),
        test(memberchk(Lane, [right, center])),
        lane_change_state(idle),
-       left_marking(LeftMarking),
-       test(LeftMarking \== continuous),
+       prove(no_continuous_line(left)),
        ego_speed(V),
        test(V < 3.0),
        time_ms(Now),
@@ -555,10 +559,10 @@ rule('Return to right lane after overtaking slow vehicle',
        ego_lane(Lane),
        test(Lane \== right),
        lane_change_state(idle),
-       right_marking(RightMarking),
-       test(RightMarking \== continuous),
+       prove(no_continuous_line(right)),
        lane_occupancy(right, false, RightFront),
        test(RightFront > 80.0),
+       test(fresh_side_reading(right)),
        not(lane_change_request(_)) ],
      [ assert(proposal(return_right, no_target, low, maneuver_safety,
                        'Portuguese Highway Code Art. 38: return to rightmost lane after overtaking')) ]).
@@ -605,8 +609,7 @@ rule('Forget boxed in once the left lane opens',
        ego_lane(Lane),
        test(Lane \== left),
        lane_change_state(idle),
-       left_marking(LeftMarking),
-       test(LeftMarking \== continuous),
+       prove(no_continuous_line(left)),
        front_vehicle(_, D, _),
        test((D > 0, D =< 80.0)),
        lane_occupancy(left, false, LeftFront),
@@ -637,12 +640,12 @@ rule('Return right when boxed in and the right lane is clear',
        ego_lane(Lane),
        test(Lane \== right),
        lane_change_state(idle),
-       right_marking(RightMarking),
-       test(RightMarking \== continuous),
+       prove(no_continuous_line(right)),
        ego_speed(V),
        time_ms(Now),
        test(Now - Since >= 3000),
        lane_occupancy(right, false, RightFront),
+       test(fresh_side_reading(right)),
        weather(Condition, _, Grip),
        not(lane_change_request(_)),
        test(( ( Condition == rain ; Grip < 0.85 ) -> Seconds = 3.0 ; Seconds = 2.0 )),
@@ -677,13 +680,13 @@ rule('Enforce keep right road law when right lane is safe',
        test(Lane \== right),
        not(presentation_demo),
        lane_change_state(idle),
-       right_marking(RightMarking),
-       test(RightMarking \== continuous),
+       prove(no_continuous_line(right)),
        not(right_lane_blocked_ahead),
        time_ms(Now),
        test(Now >= 4000),
        lane_occupancy(right, false, RightFront),
        test(RightFront > 80.0),
+       test(fresh_side_reading(right)),
        not(move_off_state(true, _)),
        not(obstacle(_, _, _, _)),
        not(pothole(_, _, _, _)),
@@ -769,51 +772,40 @@ rule('Maintain ongoing lane change right avoidance',
 rule('Avoid pothole in centre lane by changing right when right is clear',
      475,
      [ ego_lane(center),
-       lane_change_state(idle),
-       right_marking(RightMarking),
-       test(RightMarking \== continuous),
        pothole(_, D, _, center),
        test((D > 0, D =< 50.0)),
-       lane_occupancy(right, false, _) ],
+       prove(safe_to_change_lane(right)) ],
      [ assert(proposal(change_lane_right, no_target, low, road_hazard,
                        'Avoiding pothole by moving into the clear right lane (rightmost safe lane policy)')) ]).
 
 rule('Avoid pothole in centre lane by changing left when right is occupied',
      470,
      [ ego_lane(center),
-       lane_change_state(idle),
-       left_marking(LeftMarking),
-       test(LeftMarking \== continuous),
        pothole(_, D, _, center),
        test((D > 0, D =< 50.0)),
        lane_occupancy(right, true, _),
-       lane_occupancy(left, false, _) ],
+       prove(safe_to_change_lane(left)) ],
      [ assert(proposal(change_lane_left, no_target, low, road_hazard,
                        'Avoiding pothole by moving into the clear left lane')) ]).
 
 % Every lane change checks the line it crosses: between RIGHT and CENTER the right marking,
-% between CENTER and LEFT the left marking; a continuous line is never crossed.
+% between CENTER and LEFT the left marking; a continuous line is never crossed. The avoidance
+% rules prove it, with the idle maneuver and the clear side, through safe_to_change_lane/1.
 rule('Avoid pothole in left lane by changing right',
      470,
      [ ego_lane(left),
-       lane_change_state(idle),
-       left_marking(LeftMarking),
-       test(LeftMarking \== continuous),
        pothole(_, D, _, left),
        test((D > 0, D =< 50.0)),
-       lane_occupancy(right, false, _) ],
+       prove(safe_to_change_lane(right)) ],
      [ assert(proposal(change_lane_right, no_target, low, road_hazard,
                        'Avoiding pothole by moving into the clear right lane')) ]).
 
 rule('Avoid pothole in right lane by changing left',
      470,
      [ ego_lane(right),
-       lane_change_state(idle),
-       right_marking(RightMarking),
-       test(RightMarking \== continuous),
        pothole(_, D, _, right),
        test((D > 0, D =< 50.0)),
-       lane_occupancy(left, false, _) ],
+       prove(safe_to_change_lane(left)) ],
      [ assert(proposal(change_lane_left, no_target, low, road_hazard,
                        'Avoiding pothole by moving into the clear left lane')) ]).
 
@@ -822,49 +814,37 @@ rule('Avoid pothole in right lane by changing left',
 rule('Avoid obstacle in centre lane by changing left',
      470,
      [ ego_lane(center),
-       lane_change_state(idle),
-       left_marking(LeftMarking),
-       test(LeftMarking \== continuous),
        obstacle(_, D, _, center),
        test((D > 0, D =< 50.0)),
-       lane_occupancy(left, false, _) ],
+       prove(safe_to_change_lane(left)) ],
      [ assert(proposal(change_lane_left, no_target, low, collision_avoidance,
                        'Avoiding obstacle by moving into the clear left lane')) ]).
 
 rule('Avoid obstacle in centre lane by changing right when left is occupied',
      470,
      [ ego_lane(center),
-       lane_change_state(idle),
-       right_marking(RightMarking),
-       test(RightMarking \== continuous),
        obstacle(_, D, _, center),
        test((D > 0, D =< 50.0)),
        lane_occupancy(left, true, _),
-       lane_occupancy(right, false, _) ],
+       prove(safe_to_change_lane(right)) ],
      [ assert(proposal(change_lane_right, no_target, low, collision_avoidance,
                        'Avoiding obstacle by moving into the clear right lane')) ]).
 
 rule('Avoid obstacle in left lane by changing right',
      470,
      [ ego_lane(left),
-       lane_change_state(idle),
-       left_marking(LeftMarking),
-       test(LeftMarking \== continuous),
        obstacle(_, D, _, left),
        test((D > 0, D =< 50.0)),
-       lane_occupancy(right, false, _) ],
+       prove(safe_to_change_lane(right)) ],
      [ assert(proposal(change_lane_right, no_target, low, collision_avoidance,
                        'Avoiding obstacle by moving into the clear right lane')) ]).
 
 rule('Avoid obstacle in right lane by changing left',
      470,
      [ ego_lane(right),
-       lane_change_state(idle),
-       right_marking(RightMarking),
-       test(RightMarking \== continuous),
        obstacle(_, D, _, right),
        test((D > 0, D =< 50.0)),
-       lane_occupancy(left, false, _) ],
+       prove(safe_to_change_lane(left)) ],
      [ assert(proposal(change_lane_left, no_target, low, collision_avoidance,
                        'Avoiding obstacle by moving into the clear left lane')) ]).
 
@@ -884,7 +864,7 @@ rule('Block lane change when target lane occupied',
 rule('Allow lane change left when lane safe',
      420,
      [ lane_change_request(left),
-       lane_occupancy(left, false, _) ],
+       prove(safe_to_change_lane(left)) ],
      [ assert(proposal(change_lane_left, no_target, low, maneuver_safety,
                        'Lane change left is safe')) ]).
 
@@ -898,7 +878,7 @@ rule('Block lane change right when target lane occupied',
 rule('Allow lane change right when lane safe',
      420,
      [ lane_change_request(right),
-       lane_occupancy(right, false, _) ],
+       prove(safe_to_change_lane(right)) ],
      [ assert(proposal(change_lane_right, no_target, low, maneuver_safety,
                        'Lane change right is safe')) ]).
 
@@ -996,17 +976,15 @@ rule('Stop before obstacle when lane change prohibited by continuous line (brake
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Barreiras
 
-% Closed barrier in the ego's lane: move to a lane Java verified safe. The barrier blocks
-% the lane, so going around it is collision avoidance. Each rule checks the line it crosses
-% (RIGHT-CENTER: the right marking; CENTER-LEFT: the left marking): a continuous line is
-% never crossed, and the vehicle stops instead.
+% Closed barrier in the ego's lane: move to a lane the blind-spot sensor reports clear,
+% proved by safe_to_change_lane/1 (Art. 35 and 38 CE). The barrier blocks the lane, so going
+% around it is collision avoidance. No maneuver moving and no continuous line on the line it
+% crosses (RIGHT-CENTER: the right marking; CENTER-LEFT: the left marking); otherwise the
+% vehicle stops.
 rule('Avoid closed barrier by changing left when safe',
      650,
      [ ego_lane(right),
-       lane_change_state(idle),
-       adjacent_lane_safe(left, true),
-       right_marking(RightMarking),
-       test(RightMarking \== continuous),
+       prove(safe_to_change_lane(left)),
        barrier(_, D, false, right),
        test((D > 0, D =< 55.0)) ],
      [ assert(proposal(change_lane_left, no_target, high, collision_avoidance,
@@ -1015,10 +993,7 @@ rule('Avoid closed barrier by changing left when safe',
 rule('Avoid closed barrier by changing left from centre when safe',
      650,
      [ ego_lane(center),
-       lane_change_state(idle),
-       adjacent_lane_safe(left, true),
-       left_marking(LeftMarking),
-       test(LeftMarking \== continuous),
+       prove(safe_to_change_lane(left)),
        barrier(_, D, false, center),
        test((D > 0, D =< 55.0)) ],
      [ assert(proposal(change_lane_left, no_target, high, collision_avoidance,
@@ -1027,11 +1002,8 @@ rule('Avoid closed barrier by changing left from centre when safe',
 rule('Avoid closed barrier by changing right from centre when safe',
      650,
      [ ego_lane(center),
-       lane_change_state(idle),
-       adjacent_lane_safe(left, false),
-       adjacent_lane_safe(right, true),
-       right_marking(RightMarking),
-       test(RightMarking \== continuous),
+       lane_occupancy(left, true, _),
+       prove(safe_to_change_lane(right)),
        barrier(_, D, false, center),
        test((D > 0, D =< 55.0)) ],
      [ assert(proposal(change_lane_right, no_target, high, collision_avoidance,
@@ -1040,10 +1012,7 @@ rule('Avoid closed barrier by changing right from centre when safe',
 rule('Avoid closed barrier by changing right when safe',
      650,
      [ ego_lane(left),
-       lane_change_state(idle),
-       adjacent_lane_safe(right, true),
-       left_marking(LeftMarking),
-       test(LeftMarking \== continuous),
+       prove(safe_to_change_lane(right)),
        barrier(_, D, false, left),
        test((D > 0, D =< 55.0)) ],
      [ assert(proposal(change_lane_right, no_target, high, collision_avoidance,
@@ -1052,8 +1021,8 @@ rule('Avoid closed barrier by changing right when safe',
 rule('Closed barrier requires stop',
      640,
      [ ego_lane(Lane),
-       adjacent_lane_safe(left, false),
-       adjacent_lane_safe(right, false),
+       lane_occupancy(left, true, _),
+       lane_occupancy(right, true, _),
        barrier(_, D, false, Lane),
        test((D >= 0, D =< 55.0)) ],
      [ assert(proposal(stop, 0.0, high, legal_mandatory_stop,
@@ -1370,7 +1339,64 @@ rule('Default maintain speed baseline',
                        'No restrictive condition detected')) ]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Sub-objetivos (encadeamento inverso, chamados com prove/1)
+%
+% "É seguro mudar de faixa para este lado?" é um objetivo provado a partir de sub-objetivos,
+% e estes a partir dos factos; as regras de desvio (encadeamento para a frente) chamam-no
+% nas condições. Replica as queries de lane-safety.drl. Side é o lado do ego (left|right),
+% como em lane_occupancy/3, não uma faixa.
+
+safe_to_change_lane(Side) :-
+    maneuver_idle,
+    no_continuous_line(Side),
+    side_clear(Side).
+
+% Nenhuma mudança de faixa em movimento.
+maneuver_idle :-
+    known(lane_change_state(idle)).
+
+% A linha a cruzar não é contínua: entre RIGHT e CENTER a right marking, entre CENTER e LEFT
+% a left marking.
+no_continuous_line(left) :-
+    known(ego_lane(right)),
+    known(right_marking(Marking)),
+    Marking \== continuous.
+no_continuous_line(left) :-
+    known(ego_lane(center)),
+    known(left_marking(Marking)),
+    Marking \== continuous.
+no_continuous_line(right) :-
+    known(ego_lane(center)),
+    known(right_marking(Marking)),
+    Marking \== continuous.
+no_continuous_line(right) :-
+    known(ego_lane(left)),
+    known(left_marking(Marking)),
+    Marking \== continuous.
+
+% O sensor de ângulo morto dá esse lado livre.
+side_clear(Side) :-
+    known(lane_occupancy(Side, false, _)).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Predicados auxiliares (chamados a partir de test/1)
+
+% The lane two to the left (LEFT, seen from RIGHT) is clear more than 20 m beyond a vehicle D
+% metres ahead in the lane to the left: no vehicle there within radar range, or it is
+% further. Drools: FarLeftLaneVehicleState($farLeft) with $farLeft > $distance + 20.0.
+far_left_clear_beyond(D) :-
+    (   known(far_left_lane_vehicle(_, Far, _))
+    ->  Far > D + 20.0
+    ;   true
+    ).
+
+% The side was read after the last lane change settled: for a tick or two after it settles,
+% the blind-spot sensor (every 200 ms) still describes the sides of the lane it came from.
+% Drools: LaneOccupancyState(timestamp > $settled) with $settled the laneSettledAtMillis.
+fresh_side_reading(Side) :-
+    known(lane_occupancy_read(Side, Read)),
+    known(lane_settled_at(Settled)),
+    Read > Settled.
 
 % Distance needed to stop from V km/h (StoppingPolicy.requiredDistanceMeters): reaction time
 % + braking + stop line offset.

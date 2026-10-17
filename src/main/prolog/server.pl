@@ -9,7 +9,7 @@
 %   {"cmd":"tick", "timestamp":ms, "speedKmh":..., "positionMeters":..., "lane":"RIGHT", "events":[{"type":...}, ...],
 %    "laneChangeState":"IDLE", "targetLane":"CENTER", "leftMarking":"DASHED", "rightMarking":"CONTINUOUS",
 %    "leftAdjacentLaneSafe":true, "rightAdjacentLaneSafe":false,
-%    "rightLaneBlockedAhead":false, "presentationDemo":false,
+%    "rightLaneBlockedAhead":false, "presentationDemo":false, "laneSettledAtMillis":-1,
 %    "previousDecision":{"action":"STOP", "rule":"...", "priority":60}}
 %   (os campos a partir da segunda linha são opcionais)
 %   {"cmd":"whynot", "rule":"<rule id>"}
@@ -66,9 +66,10 @@ reply(tick, R, _{ok: true, proposals: Proposals, facts: Facts, speedLimitKmh: Li
     optional(R, rightLaneBlockedAhead, false, RightBlocked),
     optional(R, presentationDemo, false, Demo),
     optional(R, positionMeters, 0.0, Position),
+    optional(R, laneSettledAtMillis, -1, Settled),
     previous_decision_input(R, Previous),
     update_state(vehicle_input(R.timestamp, R.speedKmh, Position, Lane, LaneChange, LeftMarking-RightMarking,
-                               TargetLane, SafeLeft-SafeRight, RightBlocked-Demo),
+                               TargetLane, SafeLeft-SafeRight, RightBlocked-Demo, Settled),
                  R.events, Previous),
     load_cycle_facts,
     run_rules,

@@ -83,7 +83,17 @@ public class PrologKnowledgeSession implements AutoCloseable {
                                boolean leftAdjacentLaneSafe,
                                boolean rightAdjacentLaneSafe,
                                boolean rightLaneBlockedAhead,
-                               boolean presentationDemo) {
+                               boolean presentationDemo,
+                               long laneSettledAtMillis) {
+
+        /** A vehicle that has not changed lane: laneSettledAtMillis is -1, as in a new VehicleStateFact. */
+        public VehicleInput(long timestampMillis, double speedKmh, double positionMeters, Lane lane,
+                            LaneChangeState laneChangeState, Lane targetLane, RoadMarkingType leftMarking,
+                            RoadMarkingType rightMarking, boolean leftAdjacentLaneSafe, boolean rightAdjacentLaneSafe,
+                            boolean rightLaneBlockedAhead, boolean presentationDemo) {
+            this(timestampMillis, speedKmh, positionMeters, lane, laneChangeState, targetLane, leftMarking,
+                rightMarking, leftAdjacentLaneSafe, rightAdjacentLaneSafe, rightLaneBlockedAhead, presentationDemo, -1L);
+        }
 
         /**
          * A vehicle keeping its lane between dashed markings, neither adjacent lane verified
@@ -98,7 +108,7 @@ public class PrologKnowledgeSession implements AutoCloseable {
         public VehicleInput at(double positionMeters) {
             return new VehicleInput(timestampMillis, speedKmh, positionMeters, lane, laneChangeState, targetLane,
                 leftMarking, rightMarking, leftAdjacentLaneSafe, rightAdjacentLaneSafe, rightLaneBlockedAhead,
-                presentationDemo);
+                presentationDemo, laneSettledAtMillis);
         }
     }
 
@@ -124,6 +134,7 @@ public class PrologKnowledgeSession implements AutoCloseable {
         request.put("rightAdjacentLaneSafe", vehicle.rightAdjacentLaneSafe());
         request.put("rightLaneBlockedAhead", vehicle.rightLaneBlockedAhead());
         request.put("presentationDemo", vehicle.presentationDemo());
+        request.put("laneSettledAtMillis", vehicle.laneSettledAtMillis());
         request.put("events", events.stream().map(PrologKnowledgeSession::toJson).toList());
         if (previous != null) {
             request.put("previousDecision", Map.of(

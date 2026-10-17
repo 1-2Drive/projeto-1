@@ -18,13 +18,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Slow traffic across every lane: three vehicles side by side ahead of the ego. The ego can
- * start an overtake but never finish it. It must then follow without stop-and-go, give up,
- * fall back and return to the right lane without ever getting too close to a vehicle in the
- * lane it is in or moving into, also in rain and with reduced visibility.
+ * Slow traffic across every lane: three vehicles side by side ahead of the ego. From the
+ * right lane the ego does not start an overtake it could never finish: it follows without
+ * stop-and-go. Already in CENTER, it gives up, falls back and returns to the right lane
+ * without ever getting too close to a vehicle in the lane it is in or moving into, also in
+ * rain and with reduced visibility.
  */
 class BoxedInTrafficE2ETest {
 
@@ -32,11 +34,15 @@ class BoxedInTrafficE2ETest {
     private static final double MIN_SAME_LANE_GAP_METERS = 6.0;
 
     private static SimulationEngine boxedIn(ExpertBackendType backend, double aheadMeters) {
+        return boxedIn(backend, aheadMeters, Lane.RIGHT);
+    }
+
+    private static SimulationEngine boxedIn(ExpertBackendType backend, double aheadMeters, Lane egoLane) {
         ScenarioLibrary library = ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json");
         ScenarioDefinition scenario = library.findById("S1").orElseThrow();
         SimulationEngine engine = BackendTestSupport.engine(scenario, backend);
-        engine.getWorldState().getEgo().setLane(Lane.RIGHT);
-        engine.getWorldState().getEgo().setLateralPositionMeters(Lane.RIGHT.centreMeters());
+        engine.getWorldState().getEgo().setLane(egoLane);
+        engine.getWorldState().getEgo().setLateralPositionMeters(egoLane.centreMeters());
         engine.getWorldState().getEgo().setSpeedKmh(40.0);
         engine.start();
         for (Lane lane : Lane.values()) {
@@ -101,12 +107,26 @@ class BoxedInTrafficE2ETest {
     @ParameterizedTest(name = "{0}")
     @EnumSource(ExpertBackendType.class)
     @Timeout(60)
-    @DisplayName("boxed in by slow traffic in every lane: gives up the overtake and returns right without collision")
-    void givesUpAnImpossibleOvertakeAndReturnsRight(ExpertBackendType backend) {
+    @DisplayName("slow traffic in every lane, from the right lane: does not start an overtake it would have to give up")
+    void doesNotStartAnImpossibleOvertakeFromTheRightLane(ExpertBackendType backend) {
         try (SimulationEngine engine = boxedIn(backend, 60.0)) {
             Run run = drive(engine, 900);
             String trace = String.join("\n", run.trace());
-            assertTrue(run.leftRight(), "the ego tries the overtake first\n" + trace);
+            assertFalse(run.leftRight(), "the CENTER lane is as slow as the right one, so the ego stays right\n" + trace);
+            assertEquals(Lane.RIGHT, engine.getWorldState().getEgo().getLane(), trace);
+            assertTrue(run.minGap() >= MIN_SAME_LANE_GAP_METERS,
+                "never closer than " + MIN_SAME_LANE_GAP_METERS + " m to a vehicle in its lane: " + run.minGap() + "\n" + trace);
+        }
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
+    @Timeout(60)
+    @DisplayName("boxed in by slow traffic in every lane, already in CENTER: gives up and returns right without collision")
+    void givesUpAnImpossibleOvertakeAndReturnsRight(ExpertBackendType backend) {
+        try (SimulationEngine engine = boxedIn(backend, 60.0, Lane.CENTER)) {
+            Run run = drive(engine, 900);
+            String trace = String.join("\n", run.trace());
             assertTrue(run.backRight(), "it gives up and returns to the right lane\n" + trace);
             assertEquals(Lane.RIGHT, engine.getWorldState().getEgo().getLane(),
                 "and stays there, behind the slow vehicle, instead of trying again\n" + trace);
@@ -120,7 +140,7 @@ class BoxedInTrafficE2ETest {
     @Timeout(60)
     @DisplayName("boxed in in rain: same outcome, never above the fuzzy weather ceiling")
     void givesUpAndReturnsRightInRain(ExpertBackendType backend) {
-        try (SimulationEngine engine = boxedIn(backend, 60.0)) {
+        try (SimulationEngine engine = boxedIn(backend, 60.0, Lane.CENTER)) {
             engine.setRain(true);
             Run run = drive(engine, 900);
             String trace = String.join("\n", run.trace());
@@ -137,7 +157,7 @@ class BoxedInTrafficE2ETest {
     @Timeout(60)
     @DisplayName("boxed in with reduced visibility: same outcome")
     void givesUpAndReturnsRightWithReducedVisibility(ExpertBackendType backend) {
-        try (SimulationEngine engine = boxedIn(backend, 60.0)) {
+        try (SimulationEngine engine = boxedIn(backend, 60.0, Lane.CENTER)) {
             engine.setWeatherFactors(0.5, 1.0);
             Run run = drive(engine, 900);
             String trace = String.join("\n", run.trace());

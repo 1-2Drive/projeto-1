@@ -12,9 +12,10 @@
            weather_state/4,
            obstacle_track/5, obstacle_reading/5, pothole_track/5, barrier_track/5,
            limit_state/3, pending_limit/4, light_track/5, pedestrian_track/5, ttc_reading/3, stop_track/5,
-           front_track/4, front_distance_reading/3, occupancy/4, left_vehicle_track/4,
+           front_track/4, front_distance_reading/3, occupancy/4, occupancy_read/2, left_vehicle_track/4,
+           far_left_vehicle_track/4,
            overtaking_state/5, last_decision/2, last_priority/1, move_off/2, cruise/1,
-           param/2, priority_value/2.
+           param/2, priority_value/2, lane_settled/1.
 
 % Window of the persistent-TTC rule (window:time(2s) in Drools).
 ttc_window_ms(2000).
@@ -41,9 +42,10 @@ state_predicates([ego_state/3, lane_change/1, markings/2, target_lane_state/1, s
                   weather_state/4,
                   obstacle_track/5, obstacle_reading/5, pothole_track/5, barrier_track/5,
                   limit_state/3, pending_limit/4, light_track/5, pedestrian_track/5, ttc_reading/3, stop_track/5,
-                  front_track/4, front_distance_reading/3, occupancy/4, left_vehicle_track/4,
+                  front_track/4, front_distance_reading/3, occupancy/4, occupancy_read/2, left_vehicle_track/4,
+                  far_left_vehicle_track/4,
                   overtaking_state/5, last_decision/2, last_priority/1, move_off/2, cruise/1,
-                  param/2, priority_value/2]).
+                  param/2, priority_value/2, lane_settled/1]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Reinício da sessão
@@ -72,6 +74,11 @@ reset_state(Cruise, Params, Priorities) :-
     % has not sensed it yet (a pessimistic seed, as in Drools).
     assertz(occupancy(left, true, inf, false)),
     assertz(occupancy(right, true, inf, false)),
+    % occupancy_read(Side, Ms): when that side was last read (LaneOccupancyState.timestamp).
+    assertz(occupancy_read(left, -1)),
+    assertz(occupancy_read(right, -1)),
+    % lane_settled(Ms): when the last lane change settled (laneSettledAtMillis), -1 if none.
+    assertz(lane_settled(-1)),
     % overtaking_state(Active, OriginLane, TargetPassed, StartMs, Target)
     assertz(overtaking_state(false, right, false, 0, none)),
     % boxed_in_state(Active, Lane, SinceMs): Drools' BoxedInFact, absent at the start.
@@ -92,12 +99,13 @@ reset_state(Cruise, Params, Priorities) :-
 % Ciclo: estado do veículo, eventos e esquecimento do que deixou de ser visto
 
 % vehicle_input(Now, SpeedKmh, PositionM, Lane, LaneChange, Left-Right markings, TargetLane,
-%               SafeLeft-SafeRight, RightBlocked-Demo)
+%               SafeLeft-SafeRight, RightBlocked-Demo, LaneSettledMs)
 % The previous decision, already arbitrated by Java: Drools also sees it, as the
 % DrivingDecision fact, and the STOP rule uses it to keep hard braking already under way.
-update_state(vehicle_input(Now, Speed, Position, Lane, LaneChange, Markings, Target, Safe, Flags),
+update_state(vehicle_input(Now, Speed, Position, Lane, LaneChange, Markings, Target, Safe, Flags, Settled),
              Events, previous(Action, Rule, Priority)) :-
     Flags = RightBlocked-Demo,
+    replace(lane_settled(_), lane_settled(Settled)),
     replace(road_flags(_, _), road_flags(RightBlocked, Demo)),
     replace(last_priority(_), last_priority(Priority)),
     replace(ego_position(_), ego_position(Position)),
@@ -296,7 +304,8 @@ on_event('FrontDistanceEvent', E) :-
 on_event('LaneOccupancyEvent', E) :-
     downcase_atom(E.lane, Side),
     distance(E.frontDistanceMeters, Front),
-    replace(occupancy(Side, _, _, _), occupancy(Side, E.occupied, Front, E.safeToEnter)).
+    replace(occupancy(Side, _, _, _), occupancy(Side, E.occupied, Front, E.safeToEnter)),
+    replace(occupancy_read(Side, _), occupancy_read(Side, E.timestamp)).
 
 % "Update left lane vehicle state": the nearest vehicle ahead in the left lane.
 on_event('LeftLaneVehicleEvent', E) :-
@@ -304,6 +313,14 @@ on_event('LeftLaneVehicleEvent', E) :-
     ->  replace(left_vehicle_track(_, _, _, _),
                 left_vehicle_track(E.targetId, E.distanceMeters, E.relativeSpeedMps, E.timestamp))
     ;   retractall(left_vehicle_track(_, _, _, _))
+    ).
+
+% "Update far left lane vehicle state": the nearest vehicle ahead two lanes to the left.
+on_event('FarLeftLaneVehicleEvent', E) :-
+    (   E.targetId \== none, number(E.distanceMeters)
+    ->  replace(far_left_vehicle_track(_, _, _, _),
+                far_left_vehicle_track(E.targetId, E.distanceMeters, E.relativeSpeedMps, E.timestamp))
+    ;   retractall(far_left_vehicle_track(_, _, _, _))
     ).
 
 % "Update front vehicle from relative speed": only for the vehicle already followed.
@@ -335,6 +352,7 @@ expire_old_readings(Now) :-
     expire_window(front_distance_reading(T5, _, _), T5, FrontWindow, Now),
     left_vehicle_validity_ms(LeftValidity),
     expire_track(left_vehicle_track(_, _, _, T6), T6, LeftValidity, Now),
+    expire_track(far_left_vehicle_track(_, _, _, T7), T7, LeftValidity, Now),
     expire_lane_request(Now),
     expire_pending_limit(Now),
     hazard_validity_ms(HazardValidity),
@@ -424,6 +442,8 @@ load_vehicle :-
     safe_lanes(SafeLeft, SafeRight),
     add_fact(adjacent_lane_safe(left, SafeLeft)),
     add_fact(adjacent_lane_safe(right, SafeRight)),
+    lane_settled(Settled),
+    add_fact(lane_settled_at(Settled)),
     road_flags(RightBlocked, Demo),
     (   RightBlocked == true -> add_fact(right_lane_blocked_ahead) ; true ),
     (   Demo == true -> add_fact(presentation_demo) ; true ).
@@ -454,7 +474,9 @@ load_road :-
     add_fact(right_marking(Right)),
     forall(occupancy(Side, Occupied, Front, Safe),
            ( add_fact(lane_occupancy(Side, Occupied, Front)),
-             add_fact(lane_safe_to_enter(Side, Safe)) )).
+             add_fact(lane_safe_to_enter(Side, Safe)) )),
+    forall(occupancy_read(Side, Ms),
+           add_fact(lane_occupancy_read(Side, Ms))).
 
 load_overtaking :-
     overtaking_state(Active, Origin, Passed, Start, Target),
@@ -495,6 +517,8 @@ load_vehicles(Now) :-
     forall(left_vehicle_track(Id, D, Rel, Ms),
            ( add_fact(left_lane_vehicle(Id, D, Rel)),
              (   Ms =:= Now -> add_fact(left_read_now(Id)) ; true ) )),
+    forall(far_left_vehicle_track(Id, D, Rel, _),
+           add_fact(far_left_lane_vehicle(Id, D, Rel))),
     forall(front_distance_reading(Ms, D, Target),
            ( Age is Now - Ms, add_fact(front_distance_sample(Target, D, Age)) )).
 

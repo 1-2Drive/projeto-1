@@ -12,6 +12,10 @@ import com.one2drive.projeto1.drools.facts.LaneOccupancyState
 
 global DroolsSupport droolsSupport
 
+// Lane change requests come from outside the expert system: the operator's LANE LEFT /
+// LANE RIGHT buttons or a scenario's timed action. Art. 35 CE applies to every lane
+// change, so a request is only granted when safeToChangeLane (lane-safety.drl) proves it
+// safe: no maneuver moving, no continuous line to cross and that side clear.
 rule "Block lane change when target lane occupied"
 salience 430
 when
@@ -36,7 +40,7 @@ salience 420
 when
     $ctx : DecisionContext()
     LaneChangeRequestState(active == true, direction == LaneChangeDirection.LEFT)
-    LaneOccupancyState(lane == Lane.LEFT, occupied == false)
+    safeToChangeLane(Lane.LEFT;)
 then
     droolsSupport.proposeDecision(
         $ctx,
@@ -74,7 +78,7 @@ salience 420
 when
     $ctx : DecisionContext()
     LaneChangeRequestState(active == true, direction == LaneChangeDirection.RIGHT)
-    LaneOccupancyState(lane == Lane.RIGHT, occupied == false)
+    safeToChangeLane(Lane.RIGHT;)
 then
     droolsSupport.proposeDecision(
         $ctx,

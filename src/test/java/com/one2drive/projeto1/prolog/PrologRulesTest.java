@@ -588,12 +588,15 @@ class PrologRulesTest {
 
     @Test
     @Timeout(10)
-    void closedBarrierIsAvoidedThroughAVerifiedSafeLane() {
+    void closedBarrierIsAvoidedThroughALaneTheSensorReportsClear() {
         try (PrologTestHarness harness = new PrologTestHarness()) {
             var vehicle = new PrologKnowledgeSession.VehicleInput(1_000, 40.0, 0.0, Lane.CENTER, LaneChangeState.IDLE,
                 Lane.CENTER, RoadMarkingType.DASHED, RoadMarkingType.DASHED, false, true, false, false);
+            // The left side is still the pessimistic seed (occupied); the blind-spot sensor reports
+            // the right side clear. The rules decide from that perception, not from the world.
             DrivingDecision decision = decide(harness, vehicle,
-                new BarrierDetectedEvent(1_000, "camera", 40.0, "barrier-1", false, Lane.CENTER));
+                new BarrierDetectedEvent(1_000, "camera", 40.0, "barrier-1", false, Lane.CENTER),
+                new LaneOccupancyEvent(1_000, "blind-spot", Lane.RIGHT, false, Double.POSITIVE_INFINITY));
             assertEquals(DrivingAction.CHANGE_LANE_RIGHT, decision.getAction());
             assertEquals("Avoid closed barrier by changing right from centre when safe", decision.getSourceRule());
         }

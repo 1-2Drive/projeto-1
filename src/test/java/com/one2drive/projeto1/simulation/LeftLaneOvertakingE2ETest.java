@@ -114,21 +114,25 @@ class LeftLaneOvertakingE2ETest {
     @ParameterizedTest(name = "{0}")
     @EnumSource(ExpertBackendType.class)
     @Timeout(30)
-    @DisplayName("same case with LEFT occupied: the ego moves in behind the CENTER vehicle and adapts its speed")
+    @DisplayName("same case with LEFT occupied: the ego stays in RIGHT behind the CENTER vehicle and adapts its speed")
     void adaptsSpeedBehindCenterVehicleWhenLeftIsOccupied(ExpertBackendType backend) {
         try (SimulationEngine engine = runningEngine(backend, null)) {
             EgoVehicleState ego = engine.getWorldState().getEgo();
             String center = addVehicle(engine, Lane.CENTER, 80.0, SLOW_SPEED_KMH);
-            // A slow vehicle in LEFT just behind the CENTER one: LEFT offers no way past.
+            // A slow vehicle in LEFT just behind the CENTER one: LEFT offers no way past, and the
+            // front radar sees it, so the ego cannot make sure the overtake can be completed
+            // (Art. 38 CE) and does not start it by moving into CENTER.
             addVehicle(engine, Lane.LEFT, 75.0, SLOW_SPEED_KMH);
 
             boolean passedOnTheRight = false;
             double previousGap = Double.MAX_VALUE;
+            boolean leftRight = false;
             boolean enteredLeft = false;
             boolean sawEmergencyBrake = false;
             for (int i = 0; i < 600; i++) {
                 SimulationSnapshot snapshot = engine.tick();
                 sawEmergencyBrake |= snapshot.currentDecision().equals(DrivingAction.EMERGENCY_BRAKE.name());
+                leftRight |= Lane.fromLateralPosition(ego.getLateralPositionMeters()) != Lane.RIGHT;
                 enteredLeft |= Lane.fromLateralPosition(ego.getLateralPositionMeters()) == Lane.LEFT;
                 double gapNow = gapTo(engine, center);
                 if (previousGap > 0.0 && gapNow <= 0.0 && egoIsRightOf(engine, center)) {
@@ -138,6 +142,7 @@ class LeftLaneOvertakingE2ETest {
             }
 
             assertFalse(passedOnTheRight, "the slower CENTER vehicle must not be passed on its right");
+            assertFalse(leftRight, "the ego must stay in RIGHT: an overtake through a LEFT this slow cannot be completed");
             assertFalse(enteredLeft, "the ego must not enter LEFT when that lane gives no way past");
             assertTrue(gapTo(engine, center) > 8.0, "the ego must stay behind the CENTER vehicle, gap was "
                 + gapTo(engine, center) + " m");

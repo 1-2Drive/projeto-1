@@ -162,6 +162,7 @@ public class DroolsBackend implements ExpertSystemBackend {
         vehicleStateFact.setLeftAdjacentLaneSafe(worldState.isLaneSafe(ego.getLane().left(), config.getBlindSpotRangeMeters(), 60.0));
         vehicleStateFact.setRightAdjacentLaneSafe(worldState.isLaneSafe(ego.getLane().right(), config.getBlindSpotRangeMeters(), 60.0));
         vehicleStateFact.setPresentationDemo("S12_PRESENTATION_DEMO".equals(input.scenarioId()));
+        vehicleStateFact.setLaneSettledAtMillis(ego.getLaneSettledAtMillis());
         knowledgeSession.getKieSession().update(vehicleStateHandle, vehicleStateFact);
     }
 

@@ -165,17 +165,17 @@ class MultiVehicleOvertakingE2ETest {
     @ParameterizedTest(name = "{0}")
     @EnumSource(ExpertBackendType.class)
     @Timeout(30)
-    @DisplayName("same case with LEFT occupied: the ego stays in CENTER and adapts its speed")
-    void staysInCenterAndAdaptsSpeedWhenLeftIsOccupied(ExpertBackendType backend) {
+    @DisplayName("same case with every lane slow: the ego stays in RIGHT and adapts its speed")
+    void staysInRightAndAdaptsSpeedWhenEveryLaneIsSlow(ExpertBackendType backend) {
         try (SimulationEngine engine = runningEngine(backend)) {
             EgoVehicleState ego = engine.getWorldState().getEgo();
-            // Three slow vehicles nearly abreast: once in CENTER the ego has the RIGHT vehicle
-            // alongside and a LEFT vehicle just behind the CENTER one, so neither side helps.
-            addVehicle(engine, Lane.RIGHT, 90.0, SLOW_SPEED_KMH);
-            String center = addVehicle(engine, Lane.CENTER, 100.0, SLOW_SPEED_KMH);
+            // Three slow vehicles nearly abreast: the CENTER vehicle is only 10 m beyond the
+            // RIGHT one and LEFT is just as slow, so moving left would gain nothing.
+            String right = addVehicle(engine, Lane.RIGHT, 90.0, SLOW_SPEED_KMH);
+            addVehicle(engine, Lane.CENTER, 100.0, SLOW_SPEED_KMH);
             addVehicle(engine, Lane.LEFT, 95.0, SLOW_SPEED_KMH);
 
-            boolean reachedCenter = false;
+            boolean leftRight = false;
             boolean enteredLeft = false;
             boolean sawEmergencyBrake = false;
             double closest = Double.MAX_VALUE;
@@ -183,17 +183,17 @@ class MultiVehicleOvertakingE2ETest {
                 SimulationSnapshot snapshot = engine.tick();
                 sawEmergencyBrake |= snapshot.currentDecision().equals(DrivingAction.EMERGENCY_BRAKE.name());
                 closest = closestInPhysicalLane(engine, closest);
-                reachedCenter |= ego.getLane() == Lane.CENTER;
+                leftRight |= ego.getLane() != Lane.RIGHT;
                 enteredLeft |= Lane.fromLateralPosition(ego.getLateralPositionMeters()) == Lane.LEFT;
             }
 
-            assertTrue(reachedCenter, "ego must move to CENTER to pass the vehicle in RIGHT");
+            assertFalse(leftRight, "ego must not move into a CENTER lane as slow as its own");
             assertFalse(enteredLeft, "ego must not enter LEFT while it is occupied");
-            assertEquals(Lane.CENTER, ego.getLane(), "ego must remain in CENTER behind the slower vehicle");
-            assertTrue(gapTo(engine, center) > 8.0, "ego must stay behind the CENTER vehicle at a safe distance, gap was "
-                + gapTo(engine, center) + " m");
-            assertEquals(SLOW_SPEED_KMH, ego.getSpeedKmh(), 6.0, "ego must adapt its speed to the CENTER vehicle");
-            assertFalse(sawEmergencyBrake, "adapting to the CENTER vehicle must not need emergency braking");
+            assertEquals(Lane.RIGHT, ego.getLane(), "ego must remain in RIGHT behind the slower vehicle");
+            assertTrue(gapTo(engine, right) > 8.0, "ego must stay behind the RIGHT vehicle at a safe distance, gap was "
+                + gapTo(engine, right) + " m");
+            assertEquals(SLOW_SPEED_KMH, ego.getSpeedKmh(), 6.0, "ego must adapt its speed to the RIGHT vehicle");
+            assertFalse(sawEmergencyBrake, "adapting to the RIGHT vehicle must not need emergency braking");
             assertTrue(closest > 5.0, "ego must keep clear of vehicles in its own lane, closest was " + closest + " m");
         }
     }

@@ -15,6 +15,7 @@ global DroolsSupport droolsSupport
 // A low TTC counts only when it was measured in the rain: a rain reading of the environment
 // sensor within 400 ms of it, the sensor's period (Allen's coincides for point events).
 rule "Persistent low TTC in rain increases conservatism"
+agenda-group "decision"
 salience 560
 when
     $ctx : DecisionContext()

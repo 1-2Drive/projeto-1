@@ -37,6 +37,7 @@ global DroolsSupport droolsSupport
 // also match a driver-requested lane change, so they propose at MANEUVER_SAFETY: at
 // ROAD_HAZARD they would count as a hold and cancel moving off (defaults.drl).
 rule "Maintain ongoing lane change left avoidance"
+agenda-group "decision"
 salience 475
 when
     $ctx : DecisionContext()
@@ -56,6 +57,7 @@ then
 end
 
 rule "Maintain ongoing lane change right avoidance"
+agenda-group "decision"
 salience 475
 when
     $ctx : DecisionContext()
@@ -75,6 +77,7 @@ then
 end
 
 rule "Avoid pothole in centre lane by changing right when right is clear"
+agenda-group "decision"
 salience 475
 when
     $ctx : DecisionContext()
@@ -96,6 +99,7 @@ then
 end
 
 rule "Avoid pothole in centre lane by changing left when right is occupied"
+agenda-group "decision"
 salience 470
 when
     $ctx : DecisionContext()
@@ -118,6 +122,7 @@ then
 end
 
 rule "Avoid pothole in left lane by changing right"
+agenda-group "decision"
 salience 470
 when
     $ctx : DecisionContext()
@@ -139,6 +144,7 @@ then
 end
 
 rule "Avoid pothole in right lane by changing left"
+agenda-group "decision"
 salience 470
 when
     $ctx : DecisionContext()
@@ -161,6 +167,7 @@ end
 
 
 rule "Avoid obstacle in centre lane by changing left"
+agenda-group "decision"
 salience 470
 when
     $ctx : DecisionContext()
@@ -182,6 +189,7 @@ then
 end
 
 rule "Avoid obstacle in centre lane by changing right when left is occupied"
+agenda-group "decision"
 salience 470
 when
     $ctx : DecisionContext()
@@ -204,6 +212,7 @@ then
 end
 
 rule "Avoid obstacle in left lane by changing right"
+agenda-group "decision"
 salience 470
 when
     $ctx : DecisionContext()
@@ -225,6 +234,7 @@ then
 end
 
 rule "Avoid obstacle in right lane by changing left"
+agenda-group "decision"
 salience 470
 when
     $ctx : DecisionContext()

@@ -16,6 +16,7 @@ global DroolsSupport droolsSupport
 // by sliding windows: only recent samples count, and an accumulate yields one match
 // per cycle instead of one per event still alive in the stream.
 rule "Emergency brake when persistent TTC is critical"
+agenda-group "decision"
 salience 900
 when
     $ctx : DecisionContext()
@@ -39,6 +40,7 @@ then
 end
 
 rule "Emergency brake when TTC is immediately critical"
+agenda-group "decision"
 salience 890
 when
     $ctx : DecisionContext()
@@ -57,6 +59,7 @@ then
 end
 
 rule "Emergency stop for pedestrian extremely close"
+agenda-group "decision"
 salience 880
 when
     $ctx : DecisionContext()
@@ -75,6 +78,7 @@ then
 end
 
 rule "Emergency braking for high severity obstacle at critical distance"
+agenda-group "decision"
 salience 870
 when
     $ctx : DecisionContext()

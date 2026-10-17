@@ -20,6 +20,7 @@ global DroolsSupport droolsSupport
 // so this 0.1 km/h rule threshold sits inside that band.
 // "exceeding" and "compliant" must stay exact complements so one of them always wins.
 rule "Reduce speed when exceeding detected limit"
+agenda-group "decision"
 salience 300
 when
     $ctx : DecisionContext()
@@ -46,6 +47,7 @@ end
 // the recommendation follows that speed down to the new limit, and holds it over the last
 // metres before the sign.
 rule "Slow down in time for the speed limit ahead"
+agenda-group "decision"
 salience 310
 when
     $ctx : DecisionContext()
@@ -77,6 +79,7 @@ end
 // vehicle towards 120 km/h as soon as it starts. When no sign governs the road, the
 // scenario cruise speed below is the only target that can speed the vehicle up again.
 rule "Maintain speed when compliant with detected limit"
+agenda-group "decision"
 salience 210
 when
     $ctx : DecisionContext()
@@ -105,6 +108,7 @@ end
 // aside the moment a sign posts a limit and lets the sign's own rules keep the vehicle
 // compliant.
 rule "Build back up to the scenario cruise speed when no sign governs the road"
+agenda-group "decision"
 salience 208
 when
     $ctx : DecisionContext()
@@ -128,6 +132,7 @@ end
 // A driver request is comfort: it only applies when no ceiling, hold or maneuver speed
 // holds in the cycle, which the arbitration settles, so the rule needs no guard.
 rule "Allow acceleration request when safe context"
+agenda-group "decision"
 salience 205
 when
     $ctx : DecisionContext()

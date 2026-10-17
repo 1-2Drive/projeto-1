@@ -40,6 +40,7 @@ global DroolsSupport droolsSupport
 // Too close and still closing: brake to 3 km/h below the front vehicle's speed, so the
 // gap reopens instead of merely holding the closing speed.
 rule "Brake when front vehicle distance low"
+agenda-group "decision"
 salience 520
 when
     $ctx : DecisionContext()
@@ -77,6 +78,7 @@ end
 // vehicle is too close for the curve to say anything (no room left): it then drives
 // 3 km/h slower than the vehicle ahead until the gap has reopened.
 rule "Keep safe following distance behind front vehicle"
+agenda-group "decision"
 salience 510
 when
     $ctx : DecisionContext()
@@ -118,6 +120,7 @@ then
 end
 
 rule "Reduce speed when closing front vehicle"
+agenda-group "decision"
 salience 500
 when
     $ctx : DecisionContext()
@@ -140,6 +143,7 @@ end
 // to another vehicle (after a lane change, or when one cuts in), the jump in distance
 // between the two is not an approach.
 rule "Approaching trend from sliding distance window"
+agenda-group "decision"
 salience 505
 when
     $ctx : DecisionContext()
@@ -181,6 +185,7 @@ end
 // (divided by the grip, at most twice), so in rain the vehicle keeps further back (Art.
 // 18/24 CE). When closing in fast the rules above give lower ceilings, and the lowest wins.
 rule "Follow the front vehicle speed outside the following gap"
+agenda-group "decision"
 salience 508
 when
     $ctx : DecisionContext()
@@ -209,6 +214,7 @@ end
 // make the actuator accelerate towards the vehicle it is approaching. While the vehicle is
 // really closing in, this holds the current speed instead: a lower ceiling, so it wins.
 rule "Hold speed on an approaching trend below its target"
+agenda-group "decision"
 salience 504
 when
     $ctx : DecisionContext()
@@ -246,6 +252,7 @@ end
 // rules only start from an inactive state. One second is longer than the cycle a
 // maneuver needs to start, and a started maneuver is no longer IDLE.
 rule "Cancel overtaking that never left its original lane"
+agenda-group "decision"
 salience 540
 no-loop true
 when
@@ -279,6 +286,7 @@ end
 // Art. 41 CE forbids overtaking right before pedestrian crossings and junctions: no
 // overtake with a pedestrian in the path or a red or yellow traffic light ahead.
 rule "Overtake slow front vehicle via left lane"
+agenda-group "decision"
 salience 525
 no-loop true
 when
@@ -320,6 +328,7 @@ end
 // sign posted, or the scenario cruise speed), it moves left when the left lane is
 // clear. Same lane, line, lane-ahead and legal (Art. 41 CE) conditions as the overtake.
 rule "Overtake the vehicle being followed"
+agenda-group "decision"
 salience 524
 no-loop true
 when
@@ -376,6 +385,7 @@ end
 // in the current cycle, so a stale sample of a vehicle left in the old lane cannot
 // restart it.
 rule "Move left behind slower left lane vehicle to overtake it on the left"
+agenda-group "decision"
 salience 525
 no-loop true
 when
@@ -423,6 +433,7 @@ end
 // or the ego is in CENTER and the slower vehicle is in LEFT, the last lane). A stopped
 // vehicle is not overtaken in the legal sense and is left to the other rules.
 rule "Do not pass a slower left lane vehicle on its right"
+agenda-group "decision"
 salience 508
 when
     $ctx : DecisionContext()
@@ -465,6 +476,7 @@ end
 // close to pass on the move) would otherwise wait there for ever: the overtake above
 // needs the vehicle to be closing in. Same legal limits as the overtake.
 rule "Go around stationary front vehicle from standstill"
+agenda-group "decision"
 salience 525
 no-loop true
 when
@@ -507,6 +519,7 @@ end
 // still describes the right side of the lane it came from. The rules that return right
 // (here, road-law.drl) apply the same condition.
 rule "Mark front vehicle passed once it is behind or cleared"
+agenda-group "decision"
 salience 480
 no-loop true
 when
@@ -521,6 +534,7 @@ end
 // Each step right needs that lane clear ahead as well as alongside: moving in behind a
 // vehicle that is still within 80 m would only start the next overtake.
 rule "Return to right lane after overtaking slow vehicle"
+agenda-group "decision"
 salience 480
 no-loop true
 when
@@ -544,6 +558,7 @@ then
 end
 
 rule "Deactivate overtaking state once return right completes"
+agenda-group "decision"
 salience 455
 no-loop true
 when
@@ -563,6 +578,7 @@ end
 // After 3 s it falls back and returns right (Art. 13 CE), and does not start the same
 // impossible overtake again until the way ahead or to the left opens.
 rule "Note the vehicle is boxed in behind slow traffic"
+agenda-group "decision"
 salience 536
 when
     VehicleStateFact(lane != Lane.RIGHT, $lane : lane, laneChangeState == LaneChangeState.IDLE, $leftMarking : leftMarking, $speed : speedKmh, $now : timestamp)
@@ -583,6 +599,7 @@ end
 // The way opens: no vehicle within 80 m ahead, or a left lane the ego may enter that is
 // clearly freer than its own (the same +20 m the overtake asks for).
 rule "Forget boxed in once nothing is ahead"
+agenda-group "decision"
 salience 535
 when
     $boxed : BoxedInFact()
@@ -593,6 +610,7 @@ then
 end
 
 rule "Forget boxed in once the left lane opens"
+agenda-group "decision"
 salience 535
 when
     $boxed : BoxedInFact()
@@ -609,6 +627,7 @@ end
 // drive 3 km/h below the vehicle ahead, as when reopening the following gap: the traffic
 // pulls ahead and the right lane clears behind it.
 rule "Fall back behind slow traffic to return right"
+agenda-group "decision"
 salience 507
 when
     $ctx : DecisionContext()
@@ -639,6 +658,7 @@ end
 // of the return rules): with the right lane empty, moving there would pass the slow
 // vehicle on its right (Art. 36 CE), so the ego stays behind it instead.
 rule "Return right when boxed in and the right lane is clear"
+agenda-group "decision"
 salience 470
 no-loop true
 when
@@ -671,6 +691,7 @@ end
 // hazard avoidance (it does not hold with an obstacle, pothole, closed barrier or
 // pedestrian to attend to) and never against a lane change the driver asks for.
 rule "Keep the right lane while the lanes ahead stay blocked"
+agenda-group "decision"
 salience 527
 when
     $ctx : DecisionContext()

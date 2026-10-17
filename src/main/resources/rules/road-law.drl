@@ -29,6 +29,7 @@ global DroolsSupport droolsSupport
 // the next begins.
 
 rule "Enforce keep right road law when right lane is safe"
+agenda-group "decision"
 salience 460
 no-loop true
 when

@@ -47,6 +47,7 @@ global DroolsSupport droolsSupport
 // comfortable deceleration run uninterrupted while this rule, and only this rule,
 // decides each tick whether braking is still needed at all.
 rule "Stop sign requires progressive deceleration"
+agenda-group "decision"
 salience 610
 when
     $ctx : DecisionContext()
@@ -109,6 +110,7 @@ then
 end
 
 rule "Stop sign requires full stop near line"
+agenda-group "decision"
 salience 620
 when
     $ctx : DecisionContext()
@@ -132,6 +134,7 @@ end
 // rest at the line is a StoppedAtStopLineEvent, and the stop is complete once a speed reading
 // comes at least 1.2 s after it (after[1200ms]).
 rule "Start stop timer once vehicle is stopped"
+agenda-group "decision"
 salience 630
 when
     $stop : StopSignState($id : signId != "none", satisfied == false, distanceMeters <= 4.0)
@@ -143,6 +146,7 @@ then
 end
 
 rule "Stop sign condition satisfied after full stop hold"
+agenda-group "decision"
 no-loop true
 salience 635
 when
@@ -157,6 +161,7 @@ end
 // The stop counts for one approach to the sign: it is forgotten when the sign is seen again
 // from afar (more than 8 m to the line), or when the sign is no longer perceived.
 rule "Forget the stop when the stop sign is re-armed"
+agenda-group "decision"
 salience 640
 when
     $stopped : StoppedAtStopLineEvent($id : signId)
@@ -166,6 +171,7 @@ then
 end
 
 rule "Proceed after stop sign condition satisfied"
+agenda-group "decision"
 salience 200
 when
     $ctx : DecisionContext()

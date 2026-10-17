@@ -17,6 +17,7 @@ global DroolsSupport droolsSupport
 // change, so a request is only granted when safeToChangeLane (lane-safety.drl) proves it
 // safe: no maneuver moving, no continuous line to cross and that side clear.
 rule "Block lane change when target lane occupied"
+agenda-group "decision"
 salience 430
 when
     $ctx : DecisionContext()
@@ -36,6 +37,7 @@ then
 end
 
 rule "Allow lane change left when lane safe"
+agenda-group "decision"
 salience 420
 when
     $ctx : DecisionContext()
@@ -55,6 +57,7 @@ then
 end
 
 rule "Block lane change right when target lane occupied"
+agenda-group "decision"
 salience 430
 when
     $ctx : DecisionContext()
@@ -74,6 +77,7 @@ then
 end
 
 rule "Allow lane change right when lane safe"
+agenda-group "decision"
 salience 420
 when
     $ctx : DecisionContext()

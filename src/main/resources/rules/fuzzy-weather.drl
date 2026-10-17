@@ -31,6 +31,7 @@ global DroolsSupport droolsSupport
 // with visibility and grip at 0.85 or above. The sets are in FuzzySupport.
 
 rule "Fuzzify visibility"
+agenda-group "decision"
 salience 360
 when
     WeatherStateFact($visibility : visibilityFactor)
@@ -41,6 +42,7 @@ then
 end
 
 rule "Fuzzify grip"
+agenda-group "decision"
 salience 360
 when
     WeatherStateFact($grip : gripFactor)
@@ -51,6 +53,7 @@ then
 end
 
 rule "Fuzzy: poor visibility or poor grip -> very slow"
+agenda-group "decision"
 salience 355
 when
     FuzzyMembership(variable == "visibility", term == "poor", $v : degree)
@@ -61,6 +64,7 @@ then
 end
 
 rule "Fuzzy: reduced visibility or reduced grip -> slow"
+agenda-group "decision"
 salience 355
 when
     FuzzyMembership(variable == "visibility", term == "reduced", $v : degree)
@@ -71,6 +75,7 @@ then
 end
 
 rule "Fuzzy: fair visibility or fair grip -> moderate"
+agenda-group "decision"
 salience 355
 when
     FuzzyMembership(variable == "visibility", term == "fair", $v : degree)
@@ -82,6 +87,7 @@ end
 
 // Rain is crisp (the sensor reports RAIN or CLEAR): it enters the rule with degree 1 or 0.
 rule "Fuzzy: rain with good visibility and good grip -> prudent"
+agenda-group "decision"
 salience 355
 when
     WeatherStateFact(condition == WeatherCondition.RAIN)
@@ -94,6 +100,7 @@ end
 
 // "light" only refines a ceiling another term already set: alone it proposes nothing.
 rule "Fuzzy: no rain with good visibility and good grip -> light"
+agenda-group "decision"
 salience 355
 when
     WeatherStateFact(condition != WeatherCondition.RAIN)
@@ -105,6 +112,7 @@ then
 end
 
 rule "Defuzzify weather speed ceiling"
+agenda-group "decision"
 salience 350
 when
     $ctx : DecisionContext()

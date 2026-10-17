@@ -41,6 +41,7 @@ global DroolsSupport droolsSupport
 // vehicle close in, so that it comes to rest near the pedestrian and not far behind.
 
 rule "Stop for pedestrian in crossing zone"
+agenda-group "decision"
 salience 600
 when
     $ctx : DecisionContext()
@@ -59,6 +60,7 @@ then
 end
 
 rule "Brake for pedestrian proximity"
+agenda-group "decision"
 salience 605
 when
     $ctx : DecisionContext()
@@ -84,6 +86,7 @@ end
 // below the braking curve, nothing would hold it, and it would move off again towards a
 // crossing that is still occupied.
 rule "Hold for pedestrian still crossing"
+agenda-group "decision"
 salience 602
 when
     $ctx : DecisionContext()

@@ -20,6 +20,7 @@ global DroolsSupport droolsSupport
 // sensors perceive (Art. 35 and 38 CE: the driver makes sure the maneuver is safe);
 // otherwise the vehicle stops.
 rule "Avoid closed barrier by changing left when safe"
+agenda-group "decision"
 salience 650
 when
     $ctx : DecisionContext()
@@ -41,6 +42,7 @@ then
 end
 
 rule "Avoid closed barrier by changing left from centre when safe"
+agenda-group "decision"
 salience 650
 when
     $ctx : DecisionContext()
@@ -62,6 +64,7 @@ then
 end
 
 rule "Avoid closed barrier by changing right from centre when safe"
+agenda-group "decision"
 salience 650
 when
     $ctx : DecisionContext()
@@ -84,6 +87,7 @@ then
 end
 
 rule "Avoid closed barrier by changing right when safe"
+agenda-group "decision"
 salience 650
 when
     $ctx : DecisionContext()
@@ -105,6 +109,7 @@ then
 end
 
 rule "Closed barrier requires stop"
+agenda-group "decision"
 salience 640
 when
     $ctx : DecisionContext()
@@ -129,6 +134,7 @@ end
 // Comfort proposal: it loses to any speed ceiling, hold or maneuver speed in the cycle,
 // so it needs no guard on what else was proposed.
 rule "Open barrier allows continue if no higher priority"
+agenda-group "decision"
 salience 170
 when
     $ctx : DecisionContext()

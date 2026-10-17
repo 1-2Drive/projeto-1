@@ -114,7 +114,8 @@ public class PrologBackend implements ExpertSystemBackend {
             world.isLaneSafe(ego.getLane().left(), config.getBlindSpotRangeMeters(), 60.0),
             world.isLaneSafe(ego.getLane().right(), config.getBlindSpotRangeMeters(), 60.0),
             world.hasHazardAheadInLane(Lane.RIGHT, 150.0),
-            "S12_PRESENTATION_DEMO".equals(input.scenarioId()));
+            "S12_PRESENTATION_DEMO".equals(input.scenarioId()),
+            ego.getLaneSettledAtMillis());
     }
 
     @Override
@@ -127,6 +128,7 @@ public class PrologBackend implements ExpertSystemBackend {
         // decision still holds the previous cycle's outcome until applyTo below.
         lastResult = session.cycle(context, vehicle, events, decision);
         context.applyTo(decision);
+        decision.setLaneChecks(lastResult.laneChecks());
         traceFiredRules();
         decisionConsumer.accept(decision);
     }

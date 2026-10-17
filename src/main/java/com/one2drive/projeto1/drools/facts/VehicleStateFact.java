@@ -22,6 +22,7 @@ public class VehicleStateFact {
     private boolean leftAdjacentLaneSafe;
     private boolean rightAdjacentLaneSafe;
     private boolean presentationDemo;
+    private long laneSettledAtMillis = -1L;
 
     public VehicleStateFact(double speedKmh, double positionMeters, Lane lane, long timestamp) {
         this.speedKmh = speedKmh;
@@ -47,6 +48,15 @@ public class VehicleStateFact {
 
     public void setPresentationDemo(boolean presentationDemo) {
         this.presentationDemo = presentationDemo;
+    }
+
+    /** When the vehicle settled into its current lane (EgoVehicleState), -1 if it never changed lane. */
+    public long getLaneSettledAtMillis() {
+        return laneSettledAtMillis;
+    }
+
+    public void setLaneSettledAtMillis(long laneSettledAtMillis) {
+        this.laneSettledAtMillis = laneSettledAtMillis;
     }
 
     public boolean isRightLaneBlockedAhead() {

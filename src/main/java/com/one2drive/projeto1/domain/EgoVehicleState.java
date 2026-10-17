@@ -17,6 +17,7 @@ public class EgoVehicleState {
     private Lane targetLane;
     private LaneChangeState laneChangeState;
     private double laneChangeProgress;
+    private long laneSettledAtMillis = -1L;
     private double laneChangeOriginLateralMeters;
     private DrivingState drivingState;
     private IndicatorState indicatorState;
@@ -95,6 +96,19 @@ public class EgoVehicleState {
 
     public void setLaneChangeState(LaneChangeState laneChangeState) {
         this.laneChangeState = laneChangeState;
+    }
+
+    /**
+     * Simulation time at which the last lane change settled into the committed lane, or -1 if
+     * the vehicle has not changed lane. A side reading taken at or before it describes the
+     * sides of the previous lane.
+     */
+    public long getLaneSettledAtMillis() {
+        return laneSettledAtMillis;
+    }
+
+    public void setLaneSettledAtMillis(long laneSettledAtMillis) {
+        this.laneSettledAtMillis = laneSettledAtMillis;
     }
 
     /** 0 at the start of the maneuver, 1 when the target lane centre is reached. */

@@ -9,11 +9,12 @@
 %   {"cmd":"tick", "timestamp":ms, "speedKmh":..., "positionMeters":..., "lane":"RIGHT", "events":[{"type":...}, ...],
 %    "laneChangeState":"IDLE", "targetLane":"CENTER", "leftMarking":"DASHED", "rightMarking":"CONTINUOUS",
 %    "leftAdjacentLaneSafe":true, "rightAdjacentLaneSafe":false,
-%    "rightLaneBlockedAhead":false, "presentationDemo":false,
+%    "rightLaneBlockedAhead":false, "presentationDemo":false, "laneSettledAtMillis":-1,
 %    "previousDecision":{"action":"STOP", "rule":"...", "priority":60}}
 %   (os campos a partir da segunda linha são opcionais)
 %   {"cmd":"whynot", "rule":"<rule id>"}
-% Respostas: {"ok":true, ...} ou {"ok":false, "error":"..."}.
+% Respostas: {"ok":true, ...} ou {"ok":false, "error":"..."}. A resposta ao tick leva também
+% laneChecks: para cada lado, se cada subobjetivo de safe_to_change_lane/1 se prova.
 % Os avisos e erros do Prolog vão para o stderr; o stdout só leva respostas.
 
 :- use_module(library(http/json)).
@@ -55,7 +56,7 @@ handle_line(Line) :-
 reply(reset, R, _{ok: true}) :-
     reset_state(R.cruiseTargetKmh, R.params, R.priorities).
 
-reply(tick, R, _{ok: true, proposals: Proposals, facts: Facts, speedLimitKmh: Limit}) :-
+reply(tick, R, _{ok: true, proposals: Proposals, facts: Facts, speedLimitKmh: Limit, laneChecks: Checks}) :-
     downcase_atom(R.lane, Lane),
     optional(R, laneChangeState, 'IDLE', LaneChange),
     optional(R, leftMarking, 'DASHED', LeftMarking),
@@ -66,15 +67,17 @@ reply(tick, R, _{ok: true, proposals: Proposals, facts: Facts, speedLimitKmh: Li
     optional(R, rightLaneBlockedAhead, false, RightBlocked),
     optional(R, presentationDemo, false, Demo),
     optional(R, positionMeters, 0.0, Position),
+    optional(R, laneSettledAtMillis, -1, Settled),
     previous_decision_input(R, Previous),
     update_state(vehicle_input(R.timestamp, R.speedKmh, Position, Lane, LaneChange, LeftMarking-RightMarking,
-                               TargetLane, SafeLeft-SafeRight, RightBlocked-Demo),
+                               TargetLane, SafeLeft-SafeRight, RightBlocked-Demo, Settled),
                  R.events, Previous),
     load_cycle_facts,
     run_rules,
     store_conclusions,
     findall(J, ( wm_fact(Id, proposal(_, _, _, _, _)), proposal_json(Id, J) ), Proposals),
     findall(J, ( wm_fact(Id, Fact), fact_json(Id, Fact, J) ), Facts),
+    findall(J, ( member(Side, [left, right]), lane_check_json(Side, J) ), Checks),
     limit_state(Limit, _, _).
 
 reply(whynot, R, _{ok: true, rule: R.rule, failedConditions: Texts}) :-
@@ -114,6 +117,11 @@ evidence_text(Id, Text) :-
     ->  format(atom(Text), '~w (by rule \'~w\')', [Fact, Rule])
     ;   format(atom(Text), '~w', [Fact])
     ).
+
+% "Why not change lane?": each sub-goal of safe_to_change_lane/1, proved on its own.
+lane_check_json(Side, _{side: Side, subGoals: Goals}) :-
+    subgoal_results(safe_to_change_lane(Side), Results),
+    findall(_{goal: Name, holds: Holds}, ( member(Goal-Holds, Results), functor(Goal, Name, _) ), Goals).
 
 fact_json(Id, Fact, _{n: Id, fact: Text, rule: Rule}) :-
     format(atom(Text), '~w', [Fact]),

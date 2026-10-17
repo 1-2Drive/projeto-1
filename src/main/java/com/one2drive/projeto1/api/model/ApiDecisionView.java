@@ -6,6 +6,8 @@ import java.util.List;
  * The decision of the last cycle. {@code action} is the headline (the lane maneuver while
  * one executes, the speed action otherwise); the two channels are also given explicitly,
  * and {@code proposals} lists everything the rules proposed with what became of it.
+ * {@code laneChecks} answers "why not change lane?" for each side, from the sub-goals of
+ * the safeToChangeLane query.
  */
 public record ApiDecisionView(
     String action,
@@ -21,7 +23,8 @@ public record ApiDecisionView(
     String laneAction,
     String laneReason,
     String laneSourceRule,
-    List<ApiProposalView> proposals
+    List<ApiProposalView> proposals,
+    List<ApiLaneCheckView> laneChecks
 ) {
     public record ApiProposalView(
         String rule,
@@ -33,5 +36,11 @@ public record ApiDecisionView(
         String detail,
         String reason
     ) {
+    }
+
+    public record ApiLaneCheckView(String side, boolean allowed, String explanation, List<ApiSubGoalView> subGoals) {
+    }
+
+    public record ApiSubGoalView(String goal, boolean holds, String detail) {
     }
 }

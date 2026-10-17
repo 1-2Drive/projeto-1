@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.one2drive.projeto1.decision.DecisionContext;
 import com.one2drive.projeto1.decision.DecisionPriority;
 import com.one2drive.projeto1.decision.DrivingDecision;
+import com.one2drive.projeto1.decision.LaneChangeCheck;
 import com.one2drive.projeto1.decision.StoppingPolicy;
 import com.one2drive.projeto1.domain.DrivingAction;
 import com.one2drive.projeto1.domain.Lane;
@@ -83,7 +84,17 @@ public class PrologKnowledgeSession implements AutoCloseable {
                                boolean leftAdjacentLaneSafe,
                                boolean rightAdjacentLaneSafe,
                                boolean rightLaneBlockedAhead,
-                               boolean presentationDemo) {
+                               boolean presentationDemo,
+                               long laneSettledAtMillis) {
+
+        /** A vehicle that has not changed lane: laneSettledAtMillis is -1, as in a new VehicleStateFact. */
+        public VehicleInput(long timestampMillis, double speedKmh, double positionMeters, Lane lane,
+                            LaneChangeState laneChangeState, Lane targetLane, RoadMarkingType leftMarking,
+                            RoadMarkingType rightMarking, boolean leftAdjacentLaneSafe, boolean rightAdjacentLaneSafe,
+                            boolean rightLaneBlockedAhead, boolean presentationDemo) {
+            this(timestampMillis, speedKmh, positionMeters, lane, laneChangeState, targetLane, leftMarking,
+                rightMarking, leftAdjacentLaneSafe, rightAdjacentLaneSafe, rightLaneBlockedAhead, presentationDemo, -1L);
+        }
 
         /**
          * A vehicle keeping its lane between dashed markings, neither adjacent lane verified
@@ -98,7 +109,7 @@ public class PrologKnowledgeSession implements AutoCloseable {
         public VehicleInput at(double positionMeters) {
             return new VehicleInput(timestampMillis, speedKmh, positionMeters, lane, laneChangeState, targetLane,
                 leftMarking, rightMarking, leftAdjacentLaneSafe, rightAdjacentLaneSafe, rightLaneBlockedAhead,
-                presentationDemo);
+                presentationDemo, laneSettledAtMillis);
         }
     }
 
@@ -124,6 +135,7 @@ public class PrologKnowledgeSession implements AutoCloseable {
         request.put("rightAdjacentLaneSafe", vehicle.rightAdjacentLaneSafe());
         request.put("rightLaneBlockedAhead", vehicle.rightLaneBlockedAhead());
         request.put("presentationDemo", vehicle.presentationDemo());
+        request.put("laneSettledAtMillis", vehicle.laneSettledAtMillis());
         request.put("events", events.stream().map(PrologKnowledgeSession::toJson).toList());
         if (previous != null) {
             request.put("previousDecision", Map.of(
@@ -153,8 +165,21 @@ public class PrologKnowledgeSession implements AutoCloseable {
             facts.add(new PrologCycleResult.WorkingMemoryFact(
                 node.path("n").asInt(), node.path("fact").asText(), rule.isNull() ? null : rule.asText()));
         }
+        List<LaneChangeCheck> laneChecks = new ArrayList<>();
+        for (JsonNode node : reply.path("laneChecks")) {
+            Map<String, Boolean> holds = new LinkedHashMap<>();
+            for (JsonNode goal : node.path("subGoals")) {
+                holds.put(goal.path("goal").asText(), goal.path("holds").asBoolean());
+            }
+            laneChecks.add(new LaneChangeCheck(
+                Lane.valueOf(node.path("side").asText().toUpperCase(Locale.ROOT)),
+                vehicle.lane(),
+                holds.getOrDefault("maneuver_idle", false),
+                holds.getOrDefault("no_continuous_line", false),
+                holds.getOrDefault("side_clear", false)));
+        }
         return new PrologCycleResult(List.copyOf(proposals), List.copyOf(facts),
-            reply.path("speedLimitKmh").asDouble());
+            reply.path("speedLimitKmh").asDouble(), List.copyOf(laneChecks));
     }
 
     public PrologCycleResult cycle(long timestampMillis, double speedKmh, Lane lane, List<?> events,

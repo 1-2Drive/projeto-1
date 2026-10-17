@@ -3,6 +3,7 @@ package com.one2drive.projeto1.sensors;
 import com.one2drive.projeto1.config.SimulationConfig;
 import com.one2drive.projeto1.domain.Lane;
 import com.one2drive.projeto1.domain.OtherVehicle;
+import com.one2drive.projeto1.drools.events.FarLeftLaneVehicleEvent;
 import com.one2drive.projeto1.drools.events.FrontDistanceEvent;
 import com.one2drive.projeto1.drools.events.LeftLaneVehicleEvent;
 import com.one2drive.projeto1.drools.events.RelativeSpeedEvent;
@@ -57,6 +58,20 @@ public class FrontRadarSensor extends AbstractSensor<Object> {
         if (leftLane != worldState.getEgo().getLane()) {
             worldState.nearestFrontVehicleInLane(leftLane, rangeMeters()).ifPresent(vehicle -> events.add(
                 new LeftLaneVehicleEvent(
+                    timestampMillis,
+                    id(),
+                    worldState.vehicleSignedDistance(vehicle),
+                    worldState.getEgo().getSpeedMps() - vehicle.getSpeedMps(),
+                    vehicle.getId())));
+        }
+
+        // And the lane two to the left (LEFT, seen from RIGHT): before moving in behind a slower
+        // vehicle in the lane to its left to overtake it, the ego must know whether the lane it
+        // would overtake through is clear far enough ahead (Art. 38 CE).
+        Lane farLeftLane = leftLane.left();
+        if (farLeftLane != leftLane) {
+            worldState.nearestFrontVehicleInLane(farLeftLane, rangeMeters()).ifPresent(vehicle -> events.add(
+                new FarLeftLaneVehicleEvent(
                     timestampMillis,
                     id(),
                     worldState.vehicleSignedDistance(vehicle),

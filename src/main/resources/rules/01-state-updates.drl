@@ -13,6 +13,7 @@ import com.one2drive.projeto1.drools.facts.*
 // passed. Making it the current limit on sight slowed the vehicle to a lower limit far too
 // early, and a higher limit behind a lower one was never taken up.
 rule "Track the speed limit sign ahead as pending"
+agenda-group "perception"
 salience 1000
 no-loop true
 when
@@ -31,6 +32,7 @@ end
 // Runs before the rule above, so a sign just passed takes effect before the camera's
 // reading of the next sign replaces it as the pending one.
 rule "Activate the pending speed limit at its sign"
+agenda-group "perception"
 salience 1010
 no-loop true
 when
@@ -50,6 +52,7 @@ end
 // stops being reported while still ahead is gone or out of sight (rain shortens the
 // camera range), so it is not left waiting to take effect.
 rule "Drop a pending speed limit the camera no longer sees"
+agenda-group "perception"
 no-loop true
 salience 900
 when
@@ -62,6 +65,7 @@ then
 end
 
 rule "Update vehicle state from speed sensor"
+agenda-group "perception"
 salience 1000
 no-loop true
 when
@@ -76,6 +80,7 @@ then
 end
 
 rule "Update traffic light state"
+agenda-group "perception"
 salience 1000
 no-loop true
 when
@@ -101,6 +106,7 @@ end
 // StoppingPolicy.STOP_SIGN_OFFSET_METERS before it. The state keeps the distance to that
 // line, so every stop sign rule brings the vehicle to rest short of the sign instead of on it.
 rule "Update stop sign state"
+agenda-group "perception"
 salience 1000
 no-loop true
 when
@@ -117,13 +123,13 @@ then
     $state.setDistanceMeters(toStopLine);
     $state.setDetectedTimestamp($e.getTimestamp());
     if (toStopLine > 8) {
-        $state.setStopStartTimestamp(-1L);
         $state.setSatisfied(false);
     }
     update($state);
 end
 
 rule "Update weather state"
+agenda-group "perception"
 salience 1000
 no-loop true
 when
@@ -143,6 +149,7 @@ then
 end
 
 rule "Update front vehicle from distance"
+agenda-group "perception"
 salience 1000
 no-loop true
 when
@@ -167,6 +174,7 @@ then
 end
 
 rule "Update front vehicle from relative speed"
+agenda-group "perception"
 salience 1000
 no-loop true
 when
@@ -186,6 +194,7 @@ then
 end
 
 rule "Update front vehicle from ttc"
+agenda-group "perception"
 salience 1000
 no-loop true
 when
@@ -207,6 +216,7 @@ then
 end
 
 rule "Update pedestrian state"
+agenda-group "perception"
 salience 1000
 no-loop true
 when
@@ -235,6 +245,7 @@ then
 end
 
 rule "Update pothole state"
+agenda-group "perception"
 salience 1000
 no-loop true
 when
@@ -260,6 +271,7 @@ then
 end
 
 rule "Update barrier state"
+agenda-group "perception"
 salience 1000
 no-loop true
 when
@@ -288,6 +300,7 @@ then
 end
 
 rule "Update lane occupancy left"
+agenda-group "perception"
 salience 1000
 no-loop true
 when
@@ -310,6 +323,7 @@ then
 end
 
 rule "Update lane occupancy right"
+agenda-group "perception"
 salience 1000
 no-loop true
 when
@@ -332,6 +346,7 @@ then
 end
 
 rule "Update acceleration request"
+agenda-group "perception"
 salience 1000
 no-loop true
 when
@@ -346,6 +361,7 @@ then
 end
 
 rule "Update lane change request"
+agenda-group "perception"
 salience 1000
 no-loop true
 when
@@ -363,6 +379,7 @@ then
 end
 
 rule "Expire lane change request"
+agenda-group "perception"
 no-loop true
 salience 900
 when
@@ -379,6 +396,7 @@ end
 // old target for a full second made the rules keep reacting to a vehicle that was no
 // longer in front.
 rule "Clear stale front vehicle perception"
+agenda-group "perception"
 no-loop true
 salience 900
 when
@@ -395,6 +413,7 @@ then
 end
 
 rule "Update left lane vehicle state"
+agenda-group "perception"
 salience 1000
 no-loop true
 when
@@ -412,8 +431,45 @@ then
     update($state);
 end
 
+// The lane two to the left (LEFT, seen from RIGHT), from the same front radar.
+rule "Update far left lane vehicle state"
+agenda-group "perception"
+salience 1000
+no-loop true
+when
+    $e : FarLeftLaneVehicleEvent() from entry-point "PERCEPTION_STREAM"
+    $state : FarLeftLaneVehicleState()
+    eval($e.getTimestamp() >= $state.getTimestamp()
+        && ($e.getTimestamp() > $state.getTimestamp()
+            || !$e.getTargetId().equals($state.getTargetId())
+            || Math.abs($state.getDistanceMeters() - $e.getDistanceMeters()) > 0.01))
+then
+    $state.setTargetId($e.getTargetId());
+    $state.setDistanceMeters($e.getDistanceMeters());
+    $state.setRelativeSpeedMps($e.getRelativeSpeedMps());
+    $state.setTimestamp($e.getTimestamp());
+    update($state);
+end
+
+rule "Clear stale far left lane vehicle perception"
+agenda-group "perception"
+no-loop true
+salience 900
+when
+    $state : FarLeftLaneVehicleState(targetId != "none", $timestamp : timestamp)
+    VehicleStateFact($now : timestamp)
+    eval($now - $timestamp > 250)
+then
+    $state.setTargetId(FarLeftLaneVehicleState.NO_TARGET);
+    $state.setDistanceMeters(Double.POSITIVE_INFINITY);
+    $state.setRelativeSpeedMps(0.0);
+    $state.setTimestamp($now);
+    update($state);
+end
+
 // Same two-sample rule as the front vehicle: the radar reports every 100 ms.
 rule "Clear stale left lane vehicle perception"
+agenda-group "perception"
 no-loop true
 salience 900
 when
@@ -429,6 +485,7 @@ then
 end
 
 rule "Clear stale pedestrian perception"
+agenda-group "perception"
 no-loop true
 salience 900
 when
@@ -451,6 +508,7 @@ end
 // readings are enough to know it is behind: waiting longer kept a vehicle that was braking
 // for a red light braking after it had passed it.
 rule "Clear stale traffic light perception"
+agenda-group "perception"
 no-loop true
 salience 900
 when
@@ -467,6 +525,7 @@ then
 end
 
 rule "Clear stale stop sign perception"
+agenda-group "perception"
 no-loop true
 salience 900
 when
@@ -477,12 +536,12 @@ then
     $state.setSignId("none");
     $state.setDistanceMeters(Double.POSITIVE_INFINITY);
     $state.setDetectedTimestamp($now);
-    $state.setStopStartTimestamp(-1L);
     $state.setSatisfied(false);
     update($state);
 end
 
 rule "Clear stale pothole perception"
+agenda-group "perception"
 no-loop true
 salience 900
 when
@@ -498,6 +557,7 @@ then
 end
 
 rule "Clear stale barrier perception"
+agenda-group "perception"
 no-loop true
 salience 900
 when
@@ -513,6 +573,7 @@ then
 end
 
 rule "Update obstacle state"
+agenda-group "perception"
 salience 1000
 no-loop true
 when
@@ -534,6 +595,7 @@ then
 end
 
 rule "Clear stale obstacle perception"
+agenda-group "perception"
 no-loop true
 salience 900
 when

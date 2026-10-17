@@ -11,13 +11,16 @@
            road_flags/2, lane_request/3, accel_request/2, ego_position/1,
            weather_state/4,
            obstacle_track/5, obstacle_reading/5, pothole_track/5, barrier_track/5,
-           limit_state/3, pending_limit/4, light_track/5, pedestrian_track/5, ttc_reading/3, stop_track/5,
-           front_track/4, front_distance_reading/3, occupancy/4, left_vehicle_track/4,
+           limit_state/3, pending_limit/4, light_track/5, pedestrian_track/5, ttc_reading/3, rain_reading/1, stop_track/5,
+           front_track/4, front_distance_reading/3, occupancy/4, occupancy_read/2, left_vehicle_track/4,
+           far_left_vehicle_track/4,
            overtaking_state/5, last_decision/2, last_priority/1, move_off/2, cruise/1,
-           param/2, priority_value/2.
+           param/2, priority_value/2, lane_settled/1.
 
 % Window of the persistent-TTC rule (window:time(2s) in Drools).
 ttc_window_ms(2000).
+% A low TTC counts when a rain reading is within this of it (coincides[400ms] in Drools).
+rain_coincidence_ms(400).
 % Missed readings after which an object is no longer considered (Drools: 1000/400).
 pedestrian_validity_ms(1000).
 light_validity_ms(400).
@@ -40,10 +43,11 @@ state_predicates([ego_state/3, lane_change/1, markings/2, target_lane_state/1, s
                   road_flags/2, lane_request/3, accel_request/2, ego_position/1,
                   weather_state/4,
                   obstacle_track/5, obstacle_reading/5, pothole_track/5, barrier_track/5,
-                  limit_state/3, pending_limit/4, light_track/5, pedestrian_track/5, ttc_reading/3, stop_track/5,
-                  front_track/4, front_distance_reading/3, occupancy/4, left_vehicle_track/4,
+                  limit_state/3, pending_limit/4, light_track/5, pedestrian_track/5, ttc_reading/3, rain_reading/1, stop_track/5,
+                  front_track/4, front_distance_reading/3, occupancy/4, occupancy_read/2, left_vehicle_track/4,
+                  far_left_vehicle_track/4,
                   overtaking_state/5, last_decision/2, last_priority/1, move_off/2, cruise/1,
-                  param/2, priority_value/2]).
+                  param/2, priority_value/2, lane_settled/1]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Reinício da sessão
@@ -72,8 +76,16 @@ reset_state(Cruise, Params, Priorities) :-
     % has not sensed it yet (a pessimistic seed, as in Drools).
     assertz(occupancy(left, true, inf, false)),
     assertz(occupancy(right, true, inf, false)),
+    % occupancy_read(Side, Ms): when that side was last read (LaneOccupancyState.timestamp).
+    assertz(occupancy_read(left, -1)),
+    assertz(occupancy_read(right, -1)),
+    % lane_settled(Ms): when the last lane change settled (laneSettledAtMillis), -1 if none.
+    assertz(lane_settled(-1)),
     % overtaking_state(Active, OriginLane, TargetPassed, StartMs, Target)
     assertz(overtaking_state(false, right, false, 0, none)),
+    % boxed_in_state(Active, Lane, SinceMs): Drools' BoxedInFact, absent at the start.
+    retractall(boxed_in_state(_, _, _)),
+    assertz(boxed_in_state(false, none, 0)),
     assertz(limit_state(120, default, 0)),
     % pending_limit(SignId, LimitKmh, SignPositionM, Ms): Drools' PendingSpeedLimit.
     assertz(pending_limit(none, 0, inf, -1)),
@@ -89,12 +101,13 @@ reset_state(Cruise, Params, Priorities) :-
 % Ciclo: estado do veículo, eventos e esquecimento do que deixou de ser visto
 
 % vehicle_input(Now, SpeedKmh, PositionM, Lane, LaneChange, Left-Right markings, TargetLane,
-%               SafeLeft-SafeRight, RightBlocked-Demo)
+%               SafeLeft-SafeRight, RightBlocked-Demo, LaneSettledMs)
 % The previous decision, already arbitrated by Java: Drools also sees it, as the
 % DrivingDecision fact, and the STOP rule uses it to keep hard braking already under way.
-update_state(vehicle_input(Now, Speed, Position, Lane, LaneChange, Markings, Target, Safe, Flags),
+update_state(vehicle_input(Now, Speed, Position, Lane, LaneChange, Markings, Target, Safe, Flags, Settled),
              Events, previous(Action, Rule, Priority)) :-
     Flags = RightBlocked-Demo,
+    replace(lane_settled(_), lane_settled(Settled)),
     replace(road_flags(_, _), road_flags(RightBlocked, Demo)),
     replace(last_priority(_), last_priority(Priority)),
     replace(ego_position(_), ego_position(Position)),
@@ -243,9 +256,14 @@ on_event('BarrierDetectedEvent', E) :-
     ).
 
 % "Update weather state": the environment sensor's latest reading; it does not expire. The
-% weather rules read this state alone: the ReducedVisibilityEvent and ReducedGripEvent the
+% weather rules read this state (the rain readings are also kept for the TTC rule, as the
+% WeatherEvents in Drools): the ReducedVisibilityEvent and ReducedGripEvent the
 % sensor also emits below 0.85 are ignored, as in Drools, where no rule reads them any more.
 on_event('WeatherEvent', E) :-
+    (   E.condition == 'RAIN'
+    ->  assertz(rain_reading(E.timestamp))
+    ;   true
+    ),
     weather_state(_, _, _, Since),
     (   E.timestamp >= Since
     ->  downcase_atom(E.condition, Condition),
@@ -293,7 +311,8 @@ on_event('FrontDistanceEvent', E) :-
 on_event('LaneOccupancyEvent', E) :-
     downcase_atom(E.lane, Side),
     distance(E.frontDistanceMeters, Front),
-    replace(occupancy(Side, _, _, _), occupancy(Side, E.occupied, Front, E.safeToEnter)).
+    replace(occupancy(Side, _, _, _), occupancy(Side, E.occupied, Front, E.safeToEnter)),
+    replace(occupancy_read(Side, _), occupancy_read(Side, E.timestamp)).
 
 % "Update left lane vehicle state": the nearest vehicle ahead in the left lane.
 on_event('LeftLaneVehicleEvent', E) :-
@@ -301,6 +320,14 @@ on_event('LeftLaneVehicleEvent', E) :-
     ->  replace(left_vehicle_track(_, _, _, _),
                 left_vehicle_track(E.targetId, E.distanceMeters, E.relativeSpeedMps, E.timestamp))
     ;   retractall(left_vehicle_track(_, _, _, _))
+    ).
+
+% "Update far left lane vehicle state": the nearest vehicle ahead two lanes to the left.
+on_event('FarLeftLaneVehicleEvent', E) :-
+    (   E.targetId \== none, number(E.distanceMeters)
+    ->  replace(far_left_vehicle_track(_, _, _, _),
+                far_left_vehicle_track(E.targetId, E.distanceMeters, E.relativeSpeedMps, E.timestamp))
+    ;   retractall(far_left_vehicle_track(_, _, _, _))
     ).
 
 % "Update front vehicle from relative speed": only for the vehicle already followed.
@@ -322,6 +349,10 @@ expire_track(Template, Stamp, Validity, Now) :-
 expire_old_readings(Now) :-
     ttc_window_ms(TtcWindow),
     expire_window(ttc_reading(T1, _, _), T1, TtcWindow, Now),
+    % A rain reading older than the TTC window and the coincidence cannot match any TTC.
+    rain_coincidence_ms(Coincidence),
+    RainWindow is TtcWindow + Coincidence,
+    expire_window(rain_reading(TR), TR, RainWindow, Now),
     pedestrian_validity_ms(PedestrianValidity),
     expire_track(pedestrian_track(_, _, _, _, T2), T2, PedestrianValidity, Now),
     light_validity_ms(LightValidity),
@@ -332,6 +363,7 @@ expire_old_readings(Now) :-
     expire_window(front_distance_reading(T5, _, _), T5, FrontWindow, Now),
     left_vehicle_validity_ms(LeftValidity),
     expire_track(left_vehicle_track(_, _, _, T6), T6, LeftValidity, Now),
+    expire_track(far_left_vehicle_track(_, _, _, T7), T7, LeftValidity, Now),
     expire_lane_request(Now),
     expire_pending_limit(Now),
     hazard_validity_ms(HazardValidity),
@@ -386,7 +418,8 @@ store_conclusions :-
     replace(overtaking_state(_, _, _, _, _), overtaking_state(Active, Origin, Passed, Start, Target)),
     % Shown in the working memory the user sees: the state the cycle ended with. The rules
     % have already stopped, so none reads it.
-    add_fact(overtaking_result(Active, Origin, Passed, Start, Target)).
+    add_fact(overtaking_result(Active, Origin, Passed, Start, Target)),
+    store_boxed_in.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Estado -> memória de trabalho (os factos iniciais do ciclo)
@@ -409,7 +442,8 @@ load_cycle_facts :-
     load_lights_and_signs,
     load_vehicles(Now),
     load_previous_decision,
-    load_ttc(Now).
+    load_ttc(Now),
+    load_boxed_in.
 
 load_vehicle :-
     lane_change(State),
@@ -419,6 +453,8 @@ load_vehicle :-
     safe_lanes(SafeLeft, SafeRight),
     add_fact(adjacent_lane_safe(left, SafeLeft)),
     add_fact(adjacent_lane_safe(right, SafeRight)),
+    lane_settled(Settled),
+    add_fact(lane_settled_at(Settled)),
     road_flags(RightBlocked, Demo),
     (   RightBlocked == true -> add_fact(right_lane_blocked_ahead) ; true ),
     (   Demo == true -> add_fact(presentation_demo) ; true ).
@@ -449,7 +485,9 @@ load_road :-
     add_fact(right_marking(Right)),
     forall(occupancy(Side, Occupied, Front, Safe),
            ( add_fact(lane_occupancy(Side, Occupied, Front)),
-             add_fact(lane_safe_to_enter(Side, Safe)) )).
+             add_fact(lane_safe_to_enter(Side, Safe)) )),
+    forall(occupancy_read(Side, Ms),
+           add_fact(lane_occupancy_read(Side, Ms))).
 
 load_overtaking :-
     overtaking_state(Active, Origin, Passed, Start, Target),
@@ -490,6 +528,8 @@ load_vehicles(Now) :-
     forall(left_vehicle_track(Id, D, Rel, Ms),
            ( add_fact(left_lane_vehicle(Id, D, Rel)),
              (   Ms =:= Now -> add_fact(left_read_now(Id)) ; true ) )),
+    forall(far_left_vehicle_track(Id, D, Rel, _),
+           add_fact(far_left_lane_vehicle(Id, D, Rel))),
     forall(front_distance_reading(Ms, D, Target),
            ( Age is Now - Ms, add_fact(front_distance_sample(Target, D, Age)) )).
 
@@ -503,4 +543,26 @@ load_previous_decision :-
 
 load_ttc(Now) :-
     forall(ttc_reading(Ms, Ttc, Target),
-           ( Age is Now - Ms, add_fact(ttc_sample(Target, Ttc, Age)) )).
+           ( Age is Now - Ms, add_fact(ttc_sample(Target, Ttc, Age)) )),
+    forall(rain_reading(Ms),
+           ( Age is Now - Ms, add_fact(rain_sample(Age)) )).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Preso atrás de trânsito lento (BoxedInFact no Drools)
+
+:- dynamic boxed_in_state/3.
+
+% Started or cleared by the rules of this cycle; otherwise as it was.
+store_boxed_in :-
+    (   known(boxed_in_started(Lane, Since))
+    ->  replace(boxed_in_state(_, _, _), boxed_in_state(true, Lane, Since))
+    ;   known(boxed_in_cleared)
+    ->  replace(boxed_in_state(_, _, _), boxed_in_state(false, none, 0))
+    ;   true
+    ).
+
+load_boxed_in :-
+    (   boxed_in_state(true, Lane, Since)
+    ->  add_fact(boxed_in(Lane, Since))
+    ;   true
+    ).

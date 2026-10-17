@@ -618,6 +618,8 @@ public class SimulationEngine implements AutoCloseable {
             return;
         }
         ego.setLane(ego.getTargetLane());
+        // The sensors of this tick already read the sides of the previous lane.
+        ego.setLaneSettledAtMillis(simTimeMillis);
         backend.getTrace().add(
             simTimeMillis,
             TimelineEntryType.MANEUVER,

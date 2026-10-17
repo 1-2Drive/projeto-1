@@ -3,6 +3,7 @@ package com.one2drive.projeto1.drools;
 import com.one2drive.projeto1.decision.DecisionContext;
 import com.one2drive.projeto1.decision.DrivingDecision;
 import com.one2drive.projeto1.explanation.ExplanationTrace;
+import com.one2drive.projeto1.drools.events.VehicleSpeedEvent;
 import com.one2drive.projeto1.drools.facts.VehicleStateFact;
 import org.kie.api.runtime.rule.FactHandle;
 import org.kie.api.time.SessionPseudoClock;
@@ -47,6 +48,8 @@ public class DroolsTestHarness implements AutoCloseable {
         knowledgeSession.beginDecisionCycle(timestampMillis, speedKmh);
         DecisionContext context = knowledgeSession.getDecisionContext();
 
+        // As the speed sensor does every tick: CEP rules time the vehicle by these readings.
+        knowledgeSession.getRouter().insertEvent(new VehicleSpeedEvent(timestampMillis, "speed-sensor", speedKmh));
         for (Object event : events) {
             knowledgeSession.getRouter().insertEvent(event);
         }

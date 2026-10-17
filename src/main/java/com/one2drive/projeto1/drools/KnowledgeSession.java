@@ -111,6 +111,8 @@ public class KnowledgeSession implements AutoCloseable {
         kieSession.insert(new FrontVehicleState("none", Double.POSITIVE_INFINITY, 0.0, Double.POSITIVE_INFINITY, 0L));
         kieSession.insert(new com.one2drive.projeto1.drools.facts.LeftLaneVehicleState(
             com.one2drive.projeto1.drools.facts.LeftLaneVehicleState.NO_TARGET, Double.POSITIVE_INFINITY, 0.0, 0L));
+        kieSession.insert(new com.one2drive.projeto1.drools.facts.FarLeftLaneVehicleState(
+            com.one2drive.projeto1.drools.facts.FarLeftLaneVehicleState.NO_TARGET, Double.POSITIVE_INFINITY, 0.0, 0L));
         kieSession.insert(new PedestrianStateFact("none", Double.POSITIVE_INFINITY, false, 0L));
         kieSession.insert(new PotholeStateFact("none", Double.POSITIVE_INFINITY, com.one2drive.projeto1.domain.HazardSeverity.LOW, com.one2drive.projeto1.domain.Lane.CENTER, 0L));
         kieSession.insert(new ObstacleStateFact("none", Double.POSITIVE_INFINITY, com.one2drive.projeto1.domain.HazardSeverity.LOW, com.one2drive.projeto1.domain.Lane.CENTER, 0L));

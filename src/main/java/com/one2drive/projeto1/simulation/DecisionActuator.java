@@ -2,6 +2,7 @@ package com.one2drive.projeto1.simulation;
 
 import com.one2drive.projeto1.config.SimulationConfig;
 import com.one2drive.projeto1.decision.DrivingDecision;
+import com.one2drive.projeto1.decision.StoppingPolicy;
 import com.one2drive.projeto1.domain.DrivingAction;
 import com.one2drive.projeto1.domain.DrivingState;
 import com.one2drive.projeto1.domain.EgoVehicleState;
@@ -25,6 +26,13 @@ public class DecisionActuator {
 
     /** Half-width of the band around the recommended speed in which the car just holds it. */
     private static final double SPEED_DEAD_BAND_KMH = 0.5;
+
+    /**
+     * The gap the following rules keep behind a vehicle ahead ("Keep safe following distance
+     * behind front vehicle", front-vehicle.drl): the ego must still be able to slow to that
+     * vehicle's speed this far behind it, braking at the anticipation deceleration.
+     */
+    private static final double FOLLOWING_GAP_METERS = 12.0;
 
     public DecisionActuator(SimulationConfig config) {
         this.config = config;
@@ -106,7 +114,8 @@ public class DecisionActuator {
 
     /**
      * Executes the lane decision. A maneuver already under way is left to run; a new one
-     * starts only if the target lane can be entered and no continuous line is crossed,
+     * starts only if the target lane can be entered, no continuous line is crossed and the
+     * ego would not end up closer to the vehicle ahead in that lane than it can follow,
      * otherwise the decision records the refusal and the vehicle keeps its lane. The
      * speed decision applies either way: a lane change runs at whatever speed the speed
      * channel decided.
@@ -135,10 +144,41 @@ public class DecisionActuator {
             rejectLane(ego, decision, "a continuous line forbids crossing into " + target);
             return;
         }
+        String tooClose = tooCloseToFollow(worldState, target);
+        if (tooClose != null) {
+            rejectLane(ego, decision, tooClose);
+            return;
+        }
         requestLaneChange(ego, target);
         boolean left = target.centreMeters() < ego.getLane().centreMeters();
         ego.setIndicatorState(left ? IndicatorState.LEFT : IndicatorState.RIGHT);
         ego.setSteeringState(left ? SteeringState.LEFT : SteeringState.RIGHT);
+    }
+
+    /**
+     * Why the ego cannot move into {@code target} behind the nearest vehicle ahead there, or
+     * null if it can. The lane change takes {@link SimulationConfig#getLaneChangeSeconds()},
+     * during which a slower vehicle draws closer; at the end the ego must still be able to
+     * slow to its speed {@value #FOLLOWING_GAP_METERS} m behind it, braking at
+     * {@link StoppingPolicy#ANTICIPATION_DECELERATION_MPS2}, as the following rules require.
+     */
+    private String tooCloseToFollow(WorldState worldState, Lane target) {
+        EgoVehicleState ego = worldState.getEgo();
+        return worldState.nearestFrontVehicleInLane(target, Double.MAX_VALUE)
+            .map(vehicle -> {
+                double gap = worldState.vehicleSignedDistance(vehicle);
+                double egoMps = ego.getSpeedMps();
+                double frontMps = Math.max(0.0, vehicle.getSpeedMps());
+                double gapAfterManeuver = gap - Math.max(0.0, egoMps - frontMps) * config.getLaneChangeSeconds();
+                double room = Math.max(0.0, gapAfterManeuver - FOLLOWING_GAP_METERS);
+                double followableMps = Math.sqrt(frontMps * frontMps
+                    + 2.0 * StoppingPolicy.ANTICIPATION_DECELERATION_MPS2 * room);
+                return egoMps > followableMps
+                    ? String.format(java.util.Locale.ROOT,
+                        "vehicle %.0f m ahead in %s at %.0f km/h is too close to follow safely", gap, target, frontMps * 3.6)
+                    : null;
+            })
+            .orElse(null);
     }
 
     /**

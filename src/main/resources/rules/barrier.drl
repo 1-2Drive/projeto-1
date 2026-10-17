@@ -4,25 +4,28 @@ import com.one2drive.projeto1.decision.DecisionContext
 import com.one2drive.projeto1.decision.DecisionPriority
 import com.one2drive.projeto1.domain.DrivingAction
 import com.one2drive.projeto1.domain.Lane
-import com.one2drive.projeto1.domain.LaneChangeState
 import com.one2drive.projeto1.domain.RiskLevel
-import com.one2drive.projeto1.domain.RoadMarkingType
 import com.one2drive.projeto1.drools.DroolsSupport
 import com.one2drive.projeto1.drools.facts.BarrierStateFact
+import com.one2drive.projeto1.drools.facts.LaneOccupancyState
 import com.one2drive.projeto1.drools.facts.VehicleStateFact
 
 global DroolsSupport droolsSupport
 
 // A closed barrier blocks the lane, so going around it is collision avoidance. Each
-// rule also checks the line it would cross (the line between RIGHT and CENTER is the
-// rightMarking, the one between CENTER and LEFT the leftMarking): a continuous line
-// is never crossed, and the vehicle stops instead.
+// rule proves the lane change safe through safeToChangeLane (lane-safety.drl): no
+// maneuver moving, no continuous line on the line it would cross (the line between
+// RIGHT and CENTER is the rightMarking, the one between CENTER and LEFT the leftMarking)
+// and that side reported clear by the blind-spot sensor. The rules only know what the
+// sensors perceive (Art. 35 and 38 CE: the driver makes sure the maneuver is safe);
+// otherwise the vehicle stops.
 rule "Avoid closed barrier by changing left when safe"
+agenda-group "decision"
 salience 650
 when
     $ctx : DecisionContext()
-    VehicleStateFact(lane == Lane.RIGHT, laneChangeState == LaneChangeState.IDLE,
-                     leftAdjacentLaneSafe == true, rightMarking != RoadMarkingType.CONTINUOUS)
+    VehicleStateFact(lane == Lane.RIGHT)
+    safeToChangeLane(Lane.LEFT;)
     BarrierStateFact(barrierId != "none", open == false, lane == Lane.RIGHT,
                      $distance : distanceMeters > 0, distanceMeters <= 55.0)
 then
@@ -39,11 +42,12 @@ then
 end
 
 rule "Avoid closed barrier by changing left from centre when safe"
+agenda-group "decision"
 salience 650
 when
     $ctx : DecisionContext()
-    VehicleStateFact(lane == Lane.CENTER, laneChangeState == LaneChangeState.IDLE,
-                     leftAdjacentLaneSafe == true, leftMarking != RoadMarkingType.CONTINUOUS)
+    VehicleStateFact(lane == Lane.CENTER)
+    safeToChangeLane(Lane.LEFT;)
     BarrierStateFact(barrierId != "none", open == false, lane == Lane.CENTER,
                      $distance : distanceMeters > 0, distanceMeters <= 55.0)
 then
@@ -60,12 +64,13 @@ then
 end
 
 rule "Avoid closed barrier by changing right from centre when safe"
+agenda-group "decision"
 salience 650
 when
     $ctx : DecisionContext()
-    VehicleStateFact(lane == Lane.CENTER, laneChangeState == LaneChangeState.IDLE,
-                     leftAdjacentLaneSafe == false, rightAdjacentLaneSafe == true,
-                     rightMarking != RoadMarkingType.CONTINUOUS)
+    VehicleStateFact(lane == Lane.CENTER)
+    LaneOccupancyState(lane == Lane.LEFT, occupied == true)
+    safeToChangeLane(Lane.RIGHT;)
     BarrierStateFact(barrierId != "none", open == false, lane == Lane.CENTER,
                      $distance : distanceMeters > 0, distanceMeters <= 55.0)
 then
@@ -82,11 +87,12 @@ then
 end
 
 rule "Avoid closed barrier by changing right when safe"
+agenda-group "decision"
 salience 650
 when
     $ctx : DecisionContext()
-    VehicleStateFact(lane == Lane.LEFT, laneChangeState == LaneChangeState.IDLE,
-                     rightAdjacentLaneSafe == true, leftMarking != RoadMarkingType.CONTINUOUS)
+    VehicleStateFact(lane == Lane.LEFT)
+    safeToChangeLane(Lane.RIGHT;)
     BarrierStateFact(barrierId != "none", open == false, lane == Lane.LEFT,
                      $distance : distanceMeters > 0, distanceMeters <= 55.0)
 then
@@ -103,10 +109,13 @@ then
 end
 
 rule "Closed barrier requires stop"
+agenda-group "decision"
 salience 640
 when
     $ctx : DecisionContext()
-    VehicleStateFact($egoLane : lane, leftAdjacentLaneSafe == false, rightAdjacentLaneSafe == false)
+    VehicleStateFact($egoLane : lane)
+    LaneOccupancyState(lane == Lane.LEFT, occupied == true)
+    LaneOccupancyState(lane == Lane.RIGHT, occupied == true)
     BarrierStateFact(barrierId != "none", open == false, lane == $egoLane,
                      $distance : distanceMeters >= 0, distanceMeters <= 55.0)
 then
@@ -125,6 +134,7 @@ end
 // Comfort proposal: it loses to any speed ceiling, hold or maneuver speed in the cycle,
 // so it needs no guard on what else was proposed.
 rule "Open barrier allows continue if no higher priority"
+agenda-group "decision"
 salience 170
 when
     $ctx : DecisionContext()

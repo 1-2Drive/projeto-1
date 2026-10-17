@@ -101,6 +101,20 @@ class PrologDroolsEquivalenceTest {
             Arguments.of("closing on a slower front vehicle", 60.0, new Object[]{
                 new FrontDistanceEvent(1_000, "front-radar", 30.0, "front-1"),
                 new RelativeSpeedEvent(1_000, "front-radar", 5.0, "front-1")}),
+            // Following just outside the 12 m gap: the ceiling is the front vehicle's speed.
+            Arguments.of("following a slow vehicle at 15 m", 5.0, new Object[]{
+                new FrontDistanceEvent(1_000, "front-radar", 15.0, "front-1"),
+                new RelativeSpeedEvent(1_000, "front-radar", 0.1, "front-1")}),
+            Arguments.of("following a slow vehicle at 18 m", 5.0, new Object[]{
+                new FrontDistanceEvent(1_000, "front-radar", 18.0, "front-1"),
+                new RelativeSpeedEvent(1_000, "front-radar", -0.2, "front-1")}),
+            Arguments.of("following a slow vehicle at 13 m, slightly opening", 4.0, new Object[]{
+                new FrontDistanceEvent(1_000, "front-radar", 13.0, "front-1"),
+                new RelativeSpeedEvent(1_000, "front-radar", -0.2, "front-1")}),
+            Arguments.of("following at 25 m on low grip", 20.0, new Object[]{
+                new WeatherEvent(1_000, "env", WeatherCondition.RAIN, 0.9, 0.65),
+                new FrontDistanceEvent(1_000, "front-radar", 25.0, "front-1"),
+                new RelativeSpeedEvent(1_000, "front-radar", 0.0, "front-1")}),
             Arguments.of("front vehicle far enough", 60.0, new Object[]{
                 new FrontDistanceEvent(1_000, "front-radar", 80.0, "front-1"),
                 new RelativeSpeedEvent(1_000, "front-radar", 1.0, "front-1")}),
@@ -198,6 +212,21 @@ class PrologDroolsEquivalenceTest {
                 new ReducedGripEvent(1_000, "environment", 0.55)}),
             Arguments.of("clear weather", 90.0, new Object[]{
                 new WeatherEvent(1_000, "env", WeatherCondition.CLEAR, 1.0, 1.0)}),
+            // Fuzzy weather controller: degrees between the terms, where the sets overlap.
+            Arguments.of("fuzzy: visibility between fair and good", 90.0, new Object[]{
+                new WeatherEvent(1_000, "env", WeatherCondition.CLEAR, 0.8, 1.0)}),
+            Arguments.of("fuzzy: visibility between reduced and fair", 90.0, new Object[]{
+                new WeatherEvent(1_000, "env", WeatherCondition.CLEAR, 0.6, 1.0)}),
+            Arguments.of("fuzzy: visibility just below good", 90.0, new Object[]{
+                new WeatherEvent(1_000, "env", WeatherCondition.CLEAR, 0.84, 1.0)}),
+            Arguments.of("fuzzy: poor grip", 90.0, new Object[]{
+                new WeatherEvent(1_000, "env", WeatherCondition.CLEAR, 1.0, 0.3)}),
+            Arguments.of("fuzzy: rain with fair visibility", 90.0, new Object[]{
+                new WeatherEvent(1_000, "env", WeatherCondition.RAIN, 0.74, 0.9)}),
+            Arguments.of("fuzzy: rain with poor visibility and grip", 90.0, new Object[]{
+                new WeatherEvent(1_000, "env", WeatherCondition.RAIN, 0.4, 0.45)}),
+            Arguments.of("fuzzy: clear at the threshold", 90.0, new Object[]{
+                new WeatherEvent(1_000, "env", WeatherCondition.CLEAR, 0.85, 0.85)}),
             Arguments.of("green light and pedestrian", 50.0, new Object[]{
                 new TrafficLightEvent(1_000, "camera", TrafficLightState.GREEN, 20.0, "light-1"),
                 new PedestrianDetectedEvent(1_000, "camera", 14.0, "ped-1", true)})
@@ -257,6 +286,16 @@ class PrologDroolsEquivalenceTest {
                 new Step(1_000, 40.0, new FrontDistanceEvent(1_000, "front-radar", 48.0, "front-1")),
                 new Step(1_100, 40.0, new FrontDistanceEvent(1_100, "front-radar", 45.0, "front-1")),
                 new Step(1_200, 40.0, new FrontDistanceEvent(1_200, "front-radar", 42.0, "front-1"))}),
+            Arguments.of("front vehicle: closing trend at low speed holds the speed", new Step[]{
+                new Step(1_000, 20.0,
+                    new FrontDistanceEvent(1_000, "front-radar", 40.0, "front-1"),
+                    new RelativeSpeedEvent(1_000, "front-radar", 5.0, "front-1")),
+                new Step(1_100, 20.0,
+                    new FrontDistanceEvent(1_100, "front-radar", 37.0, "front-1"),
+                    new RelativeSpeedEvent(1_100, "front-radar", 5.0, "front-1")),
+                new Step(1_200, 20.0,
+                    new FrontDistanceEvent(1_200, "front-radar", 34.0, "front-1"),
+                    new RelativeSpeedEvent(1_200, "front-radar", 5.0, "front-1"))}),
             Arguments.of("front vehicle: samples of two vehicles are no trend", new Step[]{
                 new Step(1_000, 40.0, new FrontDistanceEvent(1_000, "front-radar", 48.0, "front-1")),
                 new Step(1_100, 40.0, new FrontDistanceEvent(1_100, "front-radar", 47.5, "front-1")),
@@ -304,6 +343,16 @@ class PrologDroolsEquivalenceTest {
                 new Step(1_300, 80.0,
                     new TTCEvent(1_200, "radar", 2.9, "front-1"),
                     new TTCEvent(1_290, "radar", 2.8, "front-1"))}),
+            Arguments.of("low TTC that no rain reading coincides with", new Step[]{
+                new Step(1_000, 80.0, new WeatherEvent(1_000, "env", WeatherCondition.RAIN, 0.7, 0.65)),
+                new Step(2_000, 80.0,
+                    new TTCEvent(1_900, "radar", 2.9, "front-1"),
+                    new TTCEvent(1_990, "radar", 2.8, "front-1"))}),
+            Arguments.of("stop sign: full stop held 1.2 s, then proceed", new Step[]{
+                new Step(2_000, 4.0, new StopSignEvent(2_000, "camera", 6.0, "stop-1")),
+                new Step(2_200, 0.0, new StopSignEvent(2_200, "camera", 5.5, "stop-1")),
+                new Step(3_300, 0.0, new StopSignEvent(3_300, "camera", 5.5, "stop-1")),
+                new Step(3_400, 0.0, new StopSignEvent(3_400, "camera", 5.5, "stop-1"))}),
             Arguments.of("rain persists after the last weather reading", new Step[]{
                 new Step(1_000, 90.0, new WeatherEvent(1_000, "env", WeatherCondition.RAIN, 0.9, 0.9)),
                 new Step(5_000, 90.0)}),

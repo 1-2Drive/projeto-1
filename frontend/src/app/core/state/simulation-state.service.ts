@@ -119,11 +119,6 @@ export class SimulationStateService {
       });
   }
 
-  /** Driver request only; the rule engine decides whether the target lane is safe. */
-  requestLaneChange(direction: 'LEFT' | 'RIGHT'): void {
-    this.runCommand(this.api.requestLaneChange(direction), `Unable to request lane change ${direction.toLowerCase()}.`);
-  }
-
   loadScenario(id: string): void {
     this.api.loadScenario(id).subscribe({
       next: (response) => {

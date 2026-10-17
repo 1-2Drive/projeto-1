@@ -13,6 +13,11 @@
 %                 test(Goal)   um objetivo Prolog: aritmética, ou um predicado auxiliar que lê
 %                              a memória de trabalho através de known/1; as ligações das
 %                              variáveis passam para o resto da regra
+%                 prove(Goal)  um objetivo provado por encadeamento inverso (prove_goal/2):
+%                              desce pelas cláusulas dos predicados auxiliares até aos factos
+%                              lidos com known/1, que ficam na evidência da regra como os de
+%                              um padrão; os auxiliares só podem usar conjunções, known/1,
+%                              outros auxiliares e predicados do sistema (sem cortes nem ;)
 %   Actions     uma lista de assert(Fact).
 %
 % Ciclo: run_rules/0 avalia todas as regras contra a memória de trabalho e preenche a
@@ -118,6 +123,8 @@ condition_reads(not(C), Keys0, Keys) :- !,
     condition_reads(C, Keys0, Keys).
 condition_reads(test(Goal), Keys0, Keys) :- !,
     goal_reads(Goal, [], _, Keys0, Keys).
+condition_reads(prove(Goal), Keys0, Keys) :- !,
+    goal_reads(Goal, [], _, Keys0, Keys).
 condition_reads(Pattern, Keys, [Name/Arity|Keys]) :-
     functor(Pattern, Name, Arity).
 
@@ -168,11 +175,31 @@ match(Id, inst(Conditions, Evidence, Actions)) :-
     rule(Id, _, Conditions, Actions),
     satisfy(Conditions, Evidence).
 
-satisfy([], []).
-satisfy([Condition|Conditions], Evidence) :-
+satisfy(Conditions, Evidence) :-
+    satisfy(Conditions, [], Evidence).
+
+% Seen: the evidence of the conditions before this one, so a fact a proof reads again (the
+% ego lane, for instance) is listed once.
+satisfy([], _, []).
+satisfy([Condition|Conditions], Seen, Evidence) :-
     holds(Condition, Proof),
-    satisfy(Conditions, Evidence0),
-    (   Proof == none -> Evidence = Evidence0 ; Evidence = [Proof|Evidence0] ).
+    proof_evidence(Proof, Seen, Items),
+    append(Items, Seen, Seen1),
+    satisfy(Conditions, Seen1, Evidence0),
+    append(Items, Evidence0, Evidence).
+
+proof_evidence(none, _, []) :- !.
+proof_evidence(proof(Ids), Seen, Items) :- !,
+    new_ids(Ids, Seen, Items).
+proof_evidence(Proof, _, [Proof]).
+
+new_ids([], _, []).
+new_ids([Id|Ids], Seen, Items) :-
+    (   memberchk(Id, Seen)
+    ->  new_ids(Ids, Seen, Items)
+    ;   Items = [Id|Items0],
+        new_ids(Ids, [Id|Seen], Items0)
+    ).
 
 holds(not(test(Goal)), none) :- !,
     \+ call(Goal).
@@ -180,8 +207,27 @@ holds(not(Pattern), not(Pattern)) :- !,
     \+ wm_fact(_, Pattern).
 holds(test(Goal), none) :- !,
     call(Goal).
+holds(prove(Goal), proof(Ids)) :- !,
+    once(prove_goal(Goal, Ids)).
 holds(Pattern, Id) :-
     wm_fact(Id, Pattern).
+
+% Encadeamento inverso: prove_goal(+Goal, -Ids) proves Goal from the clauses of the helper
+% predicates down to the facts, and returns the ids of the facts it read.
+prove_goal(true, []) :- !.
+prove_goal((A, B), Ids) :- !,
+    prove_goal(A, IdsA),
+    prove_goal(B, IdsB),
+    append(IdsA, IdsB, Ids).
+prove_goal(known(Fact), [Id]) :- !,
+    wm_fact(Id, Fact).
+prove_goal(Goal, Ids) :-
+    functor(Goal, Name, Arity),
+    helper_predicate(Name/Arity), !,
+    clause(Goal, Body),
+    prove_goal(Body, Ids).
+prove_goal(Goal, []) :-
+    call(Goal).
 
 % Replaces the rule's activations with its current matches, leaving out what already fired.
 % Meta-conhecimento: precedência e ordem da regra (do índice) e refração (already_fired/2).
@@ -299,3 +345,20 @@ partial_match([Condition|Conditions], Depth0, Depth, Rest) :-
 % not holding.
 fails_leniently(Condition) :-
     \+ catch(holds(Condition, _), _, fail).
+
+% subgoal_results(+Goal, -Results): why a goal proved by backward chaining holds or not.
+% Takes the body of the goal's clause and proves each conjunct on its own, so a goal that
+% fails names the sub-goals that fail. Results is a list of SubGoal-true or SubGoal-false.
+subgoal_results(Goal, Results) :-
+    clause(Goal, Body), !,
+    conjuncts(Body, SubGoals),
+    maplist(subgoal_result, SubGoals, Results).
+
+conjuncts((A, B), Goals) :- !,
+    conjuncts(A, GoalsA),
+    conjuncts(B, GoalsB),
+    append(GoalsA, GoalsB, Goals).
+conjuncts(Goal, [Goal]).
+
+subgoal_result(Goal, Goal-Holds) :-
+    (   once(prove_goal(Goal, _)) -> Holds = true ; Holds = false ).

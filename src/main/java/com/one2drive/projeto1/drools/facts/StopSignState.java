@@ -4,14 +4,12 @@ public class StopSignState {
     private String signId;
     private double distanceMeters;
     private long detectedTimestamp;
-    private long stopStartTimestamp;
     private boolean satisfied;
 
     public StopSignState(String signId, double distanceMeters, long detectedTimestamp) {
         this.signId = signId;
         this.distanceMeters = distanceMeters;
         this.detectedTimestamp = detectedTimestamp;
-        this.stopStartTimestamp = -1L;
         this.satisfied = false;
     }
 
@@ -39,14 +37,6 @@ public class StopSignState {
         this.detectedTimestamp = detectedTimestamp;
     }
 
-    public long getStopStartTimestamp() {
-        return stopStartTimestamp;
-    }
-
-    public void setStopStartTimestamp(long stopStartTimestamp) {
-        this.stopStartTimestamp = stopStartTimestamp;
-    }
-
     public boolean isSatisfied() {
         return satisfied;
     }
@@ -58,7 +48,6 @@ public class StopSignState {
     @Override
     public String toString() {
         return "StopSignState{signId='" + signId + "', distanceMeters=" + distanceMeters
-            + ", stopStartTimestamp=" + stopStartTimestamp
             + ", satisfied=" + satisfied + "}";
     }
 }

@@ -16,6 +16,7 @@ import com.one2drive.projeto1.drools.facts.VehicleStateFact
 global DroolsSupport droolsSupport
 
 rule "Pothole ahead reduce speed"
+agenda-group "decision"
 salience 460
 when
     $ctx : DecisionContext()
@@ -52,6 +53,7 @@ end
 // (2.8 m/s2, as the actuator applies) stops in the room left; when the deceleration
 // needed (v^2 / 2d) is more than comfortable braking gives, it brakes hard instead.
 rule "Stop before obstacle when no lane is free"
+agenda-group "decision"
 salience 465
 when
     $ctx : DecisionContext()
@@ -90,6 +92,7 @@ end
 // not just the traffic. The line a change crosses follows WorldState.getMarkingBetween:
 // leftMarking lies between LEFT and CENTER, rightMarking between CENTER and RIGHT.
 rule "Stop before obstacle when lane change prohibited by continuous line"
+agenda-group "decision"
 salience 466
 when
     $ctx : DecisionContext()

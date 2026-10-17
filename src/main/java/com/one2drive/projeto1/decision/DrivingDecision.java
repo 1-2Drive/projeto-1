@@ -33,11 +33,13 @@ public class DrivingDecision {
     private final List<String> laneEvidence;
 
     private final List<DecisionProposal> proposals;
+    private final List<LaneChangeCheck> laneChecks;
 
     public DrivingDecision() {
         this.speedEvidence = new ArrayList<>();
         this.laneEvidence = new ArrayList<>();
         this.proposals = new ArrayList<>();
+        this.laneChecks = new ArrayList<>();
         reset(0L);
     }
 
@@ -56,6 +58,7 @@ public class DrivingDecision {
         this.laneSourceRule = "Default lane decision";
         this.laneEvidence.clear();
         this.proposals.clear();
+        this.laneChecks.clear();
     }
 
     /**
@@ -200,6 +203,16 @@ public class DrivingDecision {
     /** Every proposal of the cycle with its outcome, in firing order. */
     public List<DecisionProposal> getProposals() {
         return Collections.unmodifiableList(proposals);
+    }
+
+    /** The engine's answer to "why not change lane?" for each side, after the rules fired. */
+    public List<LaneChangeCheck> getLaneChecks() {
+        return Collections.unmodifiableList(laneChecks);
+    }
+
+    public void setLaneChecks(List<LaneChangeCheck> checks) {
+        this.laneChecks.clear();
+        this.laneChecks.addAll(checks);
     }
 
     @Override

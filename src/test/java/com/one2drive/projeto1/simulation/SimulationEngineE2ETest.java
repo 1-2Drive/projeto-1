@@ -654,10 +654,8 @@ class SimulationEngineE2ETest {
             SimulationSnapshot snapshot = engine.snapshot();
             assertEquals(WeatherCondition.RAIN, engine.getWorldState().getWeatherState().getCondition());
             assertTrue(snapshot.timeline().stream().anyMatch(line -> line.contains("visibility reduced to") || line.contains("road grip reduced to")));
-            assertTrue(snapshot.timeline().stream().anyMatch(line -> line.contains("Low visibility requires stronger speed reduction")
-                || line.contains("Low road grip requires stronger speed reduction")
-                || line.contains("Reduced grip requires cautious speed")
-                || line.contains("Reduced visibility requires conservative speed")));
+            assertTrue(snapshot.timeline().stream().anyMatch(line -> line.contains("Defuzzify weather speed ceiling")
+                || line.contains("Weather conditions (fuzzy) require a reduced speed")));
             assertTrue(snapshot.egoSpeedKmh() < speedBefore);
         }
     }
@@ -1157,8 +1155,9 @@ class SimulationEngineE2ETest {
 
             assertTrue(longestStreak >= 50,
                 "Once the car reaches the recommended rain speed it must stay within 0.5 km/h of it for 50 consecutive ticks");
-            assertEquals(52.0, snapshot.recommendedSpeedKmh(), 1e-9,
-                "the rain rules keep recommending 52 km/h, well below the 85 km/h entry speed");
+            assertEquals(50.57, snapshot.recommendedSpeedKmh(), 0.01,
+                "the fuzzy weather ceiling for rain (visibility 0.70, grip 0.65) keeps recommending 50.6 km/h, "
+                    + "well below the 85 km/h entry speed");
         }
     }
 }

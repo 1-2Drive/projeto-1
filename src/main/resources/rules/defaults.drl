@@ -23,6 +23,7 @@ global DroolsSupport droolsSupport
 // the tie-break, and the proposal that told the vehicle to build up to a detected limit
 // or to answer a driver acceleration request would be discarded in silence.
 rule "Default maintain speed baseline"
+agenda-group "fallback"
 salience -100
 when
     $ctx : DecisionContext(priority <= 0)
@@ -57,6 +58,7 @@ end
 // It ends when a hazard or hold wins a cycle, or once the car is within 1 km/h of the
 // target, where the actuator settles.
 rule "Start moving off after a standstill"
+agenda-group "decision"
 salience 60
 when
     $state : MoveOffState(active == false)
@@ -67,6 +69,7 @@ then
 end
 
 rule "Stop moving off once held or at speed"
+agenda-group "decision"
 salience 60
 when
     $state : MoveOffState(active == true)
@@ -84,6 +87,7 @@ end
 // A vehicle going around a stationary vehicle needs no such step: the lane change is
 // arbitrated in its own channel and moves off at the same time.
 rule "Move off when stopped and nothing holds the vehicle"
+agenda-group "fallback"
 salience -90
 when
     $ctx : DecisionContext()

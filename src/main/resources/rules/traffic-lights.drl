@@ -35,6 +35,7 @@ global DroolsSupport droolsSupport
 // that had already decided. A commitment to drive on only keeps this light from braking the
 // vehicle: pedestrians, vehicles ahead and emergencies still stop it.
 rule "Commit to stop or to proceed at traffic light"
+agenda-group "decision"
 salience 700
 no-loop true
 when
@@ -63,6 +64,7 @@ end
 //   - if even that no longer stops it by the line (the light turned red, or was first
 //     seen, too close): emergency brake.
 rule "Red traffic light progressive approach"
+agenda-group "decision"
 salience 620
 when
     $ctx : DecisionContext()
@@ -105,6 +107,7 @@ end
 // This is a fallback for a line already passed; the rule that the vehicle stops before the
 // line is the approach's, and is unchanged.
 rule "Hold at red traffic light"
+agenda-group "decision"
 salience 640
 when
     $ctx : DecisionContext()
@@ -133,6 +136,7 @@ then
 end
 
 rule "Red traffic light requires full stop and hold"
+agenda-group "decision"
 salience 635
 when
     $ctx : DecisionContext()
@@ -156,6 +160,7 @@ end
 // is no emergency brake here: the commitment was only made with room for a comfortable stop.
 // A vehicle that committed to drive on gets no proposal from the light at all.
 rule "Yellow traffic light: stop before the line"
+agenda-group "decision"
 salience 625
 when
     $ctx : DecisionContext()
@@ -188,6 +193,7 @@ end
 // Comfort proposal: it loses to any speed ceiling, hold or maneuver speed in the cycle,
 // so it needs no guard on what else was proposed.
 rule "Green traffic light allows progression when no higher hazard"
+agenda-group "decision"
 salience 180
 when
     $ctx : DecisionContext()
@@ -206,6 +212,7 @@ then
 end
 
 rule "Green traffic light releases red-light hold"
+agenda-group "decision"
 salience 610
 when
     $ctx : DecisionContext()

@@ -1,0 +1,41 @@
+package rules
+
+import com.one2drive.projeto1.domain.Lane
+import com.one2drive.projeto1.domain.LaneChangeState
+import com.one2drive.projeto1.domain.RoadMarkingType
+import com.one2drive.projeto1.drools.facts.LaneOccupancyState
+import com.one2drive.projeto1.drools.facts.VehicleStateFact
+
+// Backward chaining: "is it safe to change lane to this side?" is a goal, proved from
+// sub-goals that are proved from facts. The avoidance rules (forward chaining, driven by
+// the hazard they see) call it from their conditions, so one rule mixes both strategies.
+//
+// $side is the side of the vehicle (Lane.LEFT or Lane.RIGHT), as in LaneOccupancyState,
+// not a road lane. Queries have no salience and propose nothing: they only replace
+// conditions the rules used to repeat, so the priorities and the arbitration are unchanged.
+// A rule must call them without "?" so it reacts when a sub-goal becomes true later.
+
+query safeToChangeLane(Lane $side)
+    maneuverIdle()
+    noContinuousLine($side;)
+    sideClear($side;)
+end
+
+// No lane change is physically moving.
+query maneuverIdle()
+    VehicleStateFact(laneChangeState == LaneChangeState.IDLE)
+end
+
+// The line the vehicle would cross is not continuous: the line between RIGHT and CENTER is
+// the rightMarking, the one between CENTER and LEFT the leftMarking.
+query noContinuousLine(Lane $side)
+    VehicleStateFact(($side == Lane.LEFT && lane == Lane.RIGHT && rightMarking != RoadMarkingType.CONTINUOUS)
+                  || ($side == Lane.LEFT && lane == Lane.CENTER && leftMarking != RoadMarkingType.CONTINUOUS)
+                  || ($side == Lane.RIGHT && lane == Lane.CENTER && rightMarking != RoadMarkingType.CONTINUOUS)
+                  || ($side == Lane.RIGHT && lane == Lane.LEFT && leftMarking != RoadMarkingType.CONTINUOUS))
+end
+
+// The blind-spot sensor reports that side clear.
+query sideClear(Lane $side)
+    LaneOccupancyState(lane == $side, occupied == false)
+end

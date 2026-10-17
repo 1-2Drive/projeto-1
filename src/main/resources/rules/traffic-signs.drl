@@ -6,6 +6,8 @@ import com.one2drive.projeto1.decision.DrivingDecision
 import com.one2drive.projeto1.domain.DrivingAction
 import com.one2drive.projeto1.domain.RiskLevel
 import com.one2drive.projeto1.drools.DroolsSupport
+import com.one2drive.projeto1.drools.events.StoppedAtStopLineEvent
+import com.one2drive.projeto1.drools.events.VehicleSpeedEvent
 import com.one2drive.projeto1.drools.facts.CurrentSpeedLimit
 import com.one2drive.projeto1.drools.facts.StopSignState
 import com.one2drive.projeto1.drools.facts.VehicleStateFact
@@ -45,6 +47,7 @@ global DroolsSupport droolsSupport
 // comfortable deceleration run uninterrupted while this rule, and only this rule,
 // decides each tick whether braking is still needed at all.
 rule "Stop sign requires progressive deceleration"
+agenda-group "decision"
 salience 610
 when
     $ctx : DecisionContext()
@@ -107,12 +110,13 @@ then
 end
 
 rule "Stop sign requires full stop near line"
+agenda-group "decision"
 salience 620
 when
     $ctx : DecisionContext()
+    // Until the hold below is satisfied: that rule fires first (salience 635), so once the
+    // vehicle has been at rest 1.2 s the stop sign is satisfied before this one is reached.
     $stop : StopSignState( signId != "none", satisfied == false, $distance : distanceMeters <= 4.0 )
-    VehicleStateFact($now : timestamp)
-    eval($stop.getStopStartTimestamp() < 0L || ($now - $stop.getStopStartTimestamp()) < 1200)
 then
     droolsSupport.proposeDecision(
         $ctx,
@@ -126,31 +130,48 @@ then
     );
 end
 
+// The full stop is timed by CEP (Allen's interval algebra): the instant the vehicle comes to
+// rest at the line is a StoppedAtStopLineEvent, and the stop is complete once a speed reading
+// comes at least 1.2 s after it (after[1200ms]).
 rule "Start stop timer once vehicle is stopped"
-no-loop true
+agenda-group "decision"
 salience 630
 when
-    $stop : StopSignState(signId != "none", satisfied == false, stopStartTimestamp < 0L, distanceMeters <= 4.0)
+    $stop : StopSignState($id : signId != "none", satisfied == false, distanceMeters <= 4.0)
+    not StoppedAtStopLineEvent(signId == $id)
     VehicleStateFact($speed : speedKmh, $now : timestamp)
     eval($speed < 0.6)
 then
-    $stop.setStopStartTimestamp($now);
-    update($stop);
+    insert(new StoppedAtStopLineEvent($now, $id));
 end
 
 rule "Stop sign condition satisfied after full stop hold"
+agenda-group "decision"
 no-loop true
 salience 635
 when
-    $stop : StopSignState(signId != "none", satisfied == false, $start : stopStartTimestamp > 0L)
-    VehicleStateFact($now : timestamp)
-    eval($now - $start >= 1200)
+    $stop : StopSignState($id : signId != "none", satisfied == false)
+    $stopped : StoppedAtStopLineEvent(signId == $id)
+    exists VehicleSpeedEvent(this after[1200ms] $stopped) from entry-point "VEHICLE_STREAM"
 then
     $stop.setSatisfied(true);
     update($stop);
 end
 
+// The stop counts for one approach to the sign: it is forgotten when the sign is seen again
+// from afar (more than 8 m to the line), or when the sign is no longer perceived.
+rule "Forget the stop when the stop sign is re-armed"
+agenda-group "decision"
+salience 640
+when
+    $stopped : StoppedAtStopLineEvent($id : signId)
+    StopSignState(signId != $id || distanceMeters > 8.0)
+then
+    delete($stopped);
+end
+
 rule "Proceed after stop sign condition satisfied"
+agenda-group "decision"
 salience 200
 when
     $ctx : DecisionContext()

@@ -95,16 +95,23 @@ public class DecisionContext {
             decision.apply(DrivingAction.MAINTAIN_SPEED, currentSpeedKmh, RiskLevel.LOW, 0,
                 "Maintain current trajectory", "Default base decision", evaluationTimestamp, List.of());
         } else {
-            decision.apply(speed.getAction(), speed.getRecommendedSpeedKmh(), speed.getRiskLevel(),
-                speed.getPriority(), speed.getReason(), speed.getSourceRule(), evaluationTimestamp,
-                speed.getEvidence());
+            double speedKmh = speed.getRecommendedSpeedKmh();
+            List<String> evidence = new ArrayList<>(speed.getEvidence());
+            DecisionProposal cap = ceilingBelow(speed);
+            if (cap != null) {
+                // A mandatory stop or an emergency decides the action, but a ceiling that
+                // binds lower (an obstacle nearer than the stop line) still sets the speed.
+                speedKmh = cap.getRecommendedSpeedKmh();
+                cap.settle(DecisionProposal.Outcome.CAPPED, speed.getSourceRule());
+                evidence.add("speed capped at " + Math.round(speedKmh) + " km/h by " + cap.getSourceRule());
+            }
+            decision.apply(speed.getAction(), speedKmh, speed.getRiskLevel(),
+                speed.getPriority(), speed.getReason(), speed.getSourceRule(), evaluationTimestamp, evidence);
         }
 
-        int speedPriority = speed == null ? 0 : speed.getPriority();
         if (lane == null) {
             decision.applyLane(DrivingAction.KEEP_LANE, 0, "No lane rule holds", "Default lane decision", List.of());
-        } else if (lane.getAction().isLaneManeuver()
-            && speedPriority >= DecisionPriority.LEGAL_MANDATORY_STOP && lane.getPriority() < speedPriority) {
+        } else if (lane.getAction().isLaneManeuver() && speed != null && vetoes(speed, lane)) {
             lane.settle(DecisionProposal.Outcome.VETOED_BY, speed.getSourceRule());
             decision.applyLane(DrivingAction.KEEP_LANE, lane.getPriority(),
                 "Lane change vetoed: " + speed.getReason(), "Arbitration veto",
@@ -115,6 +122,32 @@ public class DecisionContext {
                 lane.getEvidence());
         }
         decision.setProposals(proposals);
+    }
+
+    /**
+     * A mandatory stop or an emergency vetoes a lane maneuver of a lower rung while the
+     * vehicle is actually braking to stop. On the approach, still slowing but not braking,
+     * the maneuver may go ahead: a red light 100 m away must not keep the vehicle from
+     * going around an obstacle 30 m away, and the speed channel keeps governing the speed.
+     */
+    private static boolean vetoes(DecisionProposal speed, DecisionProposal lane) {
+        return speed.getPriority() >= DecisionPriority.LEGAL_MANDATORY_STOP
+            && lane.getPriority() < speed.getPriority()
+            && speed.getAction().isBraking();
+    }
+
+    /** The lowest ceiling that binds below a mandatory-stop or emergency decision, if any. */
+    private DecisionProposal ceilingBelow(DecisionProposal winner) {
+        if (winner.getPriority() < DecisionPriority.LEGAL_MANDATORY_STOP) {
+            return null;
+        }
+        return proposals.stream()
+            .filter(p -> p.getChannel() == DecisionChannel.LONGITUDINAL && isCeiling(p)
+                && !Double.isNaN(p.getRecommendedSpeedKmh())
+                && (Double.isNaN(winner.getRecommendedSpeedKmh())
+                    || p.getRecommendedSpeedKmh() < winner.getRecommendedSpeedKmh() - 1e-6))
+            .min(LOWEST_SPEED_FIRST)
+            .orElse(null);
     }
 
     private DecisionProposal resolveLongitudinal() {

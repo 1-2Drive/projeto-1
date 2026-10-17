@@ -77,12 +77,17 @@ then
     );
 end
 
+// The obstacle is critical only in the lane the vehicle is physically in: a vehicle
+// steering out of the obstacle's lane is past it once its lateral position has left that
+// lane, even while the committed lane (which settles after the actuator) is still the old
+// one. Otherwise every avoidance that passed close to the obstacle ended with a hard brake
+// for an obstacle the vehicle was no longer heading for.
 rule "Emergency braking for high severity obstacle at critical distance"
 agenda-group "decision"
 salience 870
 when
     $ctx : DecisionContext()
-    VehicleStateFact( $lane : lane )
+    VehicleStateFact( $lane : physicalLane )
     $obs : ObstacleDetectedEvent( lane == $lane, distanceMeters > 0, $d : distanceMeters <= 8.0, severity.toString() == "HIGH" )
         over window:time(300ms) from entry-point "ROAD_STREAM"
 then

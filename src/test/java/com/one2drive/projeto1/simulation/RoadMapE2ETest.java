@@ -84,7 +84,7 @@ class RoadMapE2ETest {
                 engine.tick();
                 // Prolog rule ids append the outcome variant, e.g. "... (brake)".
                 String rule = engine.getCurrentDecision().getSourceRule();
-                stopRuleSeen |= rule != null && rule.startsWith("Stop before obstacle when no lane is free");
+                stopRuleSeen |= rule != null && rule.startsWith("Stop before obstacle ahead while still in its lane");
                 DrivingAction action = engine.getCurrentDecision().getAction();
                 double distToWall = engine.getWorldState().distanceAhead(150.0);
                 if (distToWall <= 60.0) {
@@ -93,7 +93,7 @@ class RoadMapE2ETest {
             }
 
             double gap = engine.getWorldState().distanceAhead(150.0);
-            assertTrue(stopRuleSeen, "the rule engine should explain the stop with the no-free-lane rule");
+            assertTrue(stopRuleSeen, "the rule engine should explain the stop with the obstacle-in-lane rule");
             assertFalse(swerved, "No lane is free, so the car must not try to change lane");
             assertEquals(0.0, engine.getWorldState().getEgo().getSpeedKmh(), 0.5);
             assertTrue(gap > 8.0 && gap <= 20.0,
@@ -177,7 +177,9 @@ class RoadMapE2ETest {
     }
 
     @Test
-    @Timeout(15)
+    // The first engine created in the JVM compiles the whole rule base, which alone can
+    // take over 15 s on a loaded machine; the siblings allow 30 s for the same reason.
+    @Timeout(30)
     @DisplayName("from an outer lane the road edge counts as an occupied side")
     void roadEdgeIsAnOccupiedSide() {
         try (SimulationEngine engine = engine(50, new int[100][3])) {

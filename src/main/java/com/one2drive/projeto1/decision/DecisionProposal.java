@@ -25,7 +25,9 @@ public final class DecisionProposal {
         /** A lane change that an emergency or mandatory stop forbade; the detail names the speed rule. */
         VETOED_BY,
         /** A lane change the actuator refused to execute; the detail says why. */
-        REJECTED_BY
+        REJECTED_BY,
+        /** A speed ceiling that bound below a mandatory stop's own speed; the detail names that rule. */
+        CAPPED
     }
 
     private final DrivingAction action;

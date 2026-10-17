@@ -2,6 +2,7 @@ package rules
 
 import com.one2drive.projeto1.decision.DecisionContext
 import com.one2drive.projeto1.decision.DecisionPriority
+import com.one2drive.projeto1.decision.StoppingPolicy
 import com.one2drive.projeto1.domain.DrivingAction
 import com.one2drive.projeto1.domain.Lane
 import com.one2drive.projeto1.domain.LaneChangeState
@@ -46,43 +47,57 @@ then
     );
 end
 
-// An obstacle in the vehicle's own lane with no free lane on either side (another
-// hazard, a vehicle alongside or the road edge) cannot be avoided, so the car must
-// come to rest before it, 10 m short: outside the 8 m emergency zone, so it can steer
-// away once a lane opens. The car follows the speed from which comfortable braking
-// (2.8 m/s2, as the actuator applies) stops in the room left; when the deceleration
-// needed (v^2 / 2d) is more than comfortable braking gives, it brakes hard instead.
-rule "Stop before obstacle when no lane is free"
+// An obstacle in the ego lane is stopped for as long as the vehicle has not started to
+// move out of that lane: whether no side is free, or the avoidance was vetoed by a
+// mandatory stop or refused by the actuator, the vehicle must still be able to stop 10 m
+// before it (StoppingPolicy.OBSTACLE_STOP_OFFSET_METERS). The lane change takes the
+// vehicle out of the obstacle's lane and the rule stops holding.
+// The rule binds from the distance a comfortable stop needs at the current speed (never
+// less than 60 m), so a fast vehicle is held as soon as it could no longer stop early:
+//   - above the comfortable braking curve, the speed is held, so the vehicle stops gaining
+//     speed towards the obstacle;
+//   - on the curve, it brakes to the curve's speed, which brings it to the 50 m where the
+//     avoidance is decided (avoidance.drl) at a speed from which it can still stop. The
+//     curve followed is the anticipation one (2.0 m/s2): the actuator brakes at the
+//     comfortable rate towards it, so the vehicle stays under the comfortable curve with a
+//     margin, instead of riding that curve and tipping over it at every tick;
+//   - when the comfortable braking the room left allows is exceeded by more than 10% (the
+//     obstacle appeared too close), it brakes hard.
+// With a fixed 60 m window, a vehicle at 70 km/h, which needs 77 m, was first seen too
+// close and braked hard before the avoidance could start.
+rule "Stop before obstacle ahead while still in its lane"
 agenda-group "decision"
 salience 465
 when
     $ctx : DecisionContext()
-    VehicleStateFact($lane : lane, $speed : speedKmh)
+    VehicleStateFact($lane : lane, $speed : speedKmh, laneChangeState == LaneChangeState.IDLE)
     ObstacleStateFact(obstacleId != "none", lane == $lane,
-                      $distance : distanceMeters > 0, distanceMeters <= 60.0)
-    LaneOccupancyState(lane == Lane.LEFT, occupied == true)
-    LaneOccupancyState(lane == Lane.RIGHT, occupied == true)
+                      $distance : distanceMeters > 0,
+                      distanceMeters <= Math.max(60.0, StoppingPolicy.requiredDistanceMeters($speed, StoppingPolicy.COMFORT_DECELERATION_MPS2, StoppingPolicy.OBSTACLE_STOP_OFFSET_METERS)))
 then
-    double room = Math.max(0.0, $distance - 10.0);
+    double room = Math.max(0.0, $distance - StoppingPolicy.OBSTACLE_STOP_OFFSET_METERS);
     double speedMps = $speed / 3.6;
     DrivingAction action = DrivingAction.BRAKE;
-    double target = Math.sqrt(2.0 * 2.8 * room) * 3.6;
+    double target = Math.sqrt(2.0 * StoppingPolicy.ANTICIPATION_DECELERATION_MPS2 * room) * 3.6;
     if (room <= 0.5) {
         action = DrivingAction.STOP;
         target = 0.0;
-    } else if (speedMps * speedMps / (2.0 * room) > 2.8 * 1.1) {
+    } else if (speedMps * speedMps / (2.0 * room) > StoppingPolicy.COMFORT_DECELERATION_MPS2 * 1.1) {
         action = DrivingAction.EMERGENCY_BRAKE;
         target = 0.0;
+    } else if (target >= $speed) {
+        action = DrivingAction.MAINTAIN_SPEED;
+        target = $speed;
     }
     droolsSupport.proposeDecision(
         $ctx,
         action,
         target,
-        RiskLevel.HIGH,
+        action == DrivingAction.MAINTAIN_SPEED ? RiskLevel.MODERATE : RiskLevel.HIGH,
         DecisionPriority.COLLISION_AVOIDANCE,
-        "Obstacle ahead and no free lane to avoid it",
+        "Obstacle ahead in own lane; stopping unless a lane change takes the vehicle out of its way",
         drools.getRule().getName(),
-        "obstacle " + $distance + "m ahead in own lane, both sides blocked"
+        "obstacle " + $distance + "m ahead in own lane, not moving out of it"
     );
 end
 
@@ -98,7 +113,8 @@ when
     $ctx : DecisionContext()
     VehicleStateFact($lane : lane, $speed : speedKmh, $left : leftMarking, $right : rightMarking)
     ObstacleStateFact(obstacleId != "none", lane == $lane,
-                      $distance : distanceMeters > 0, distanceMeters <= 60.0)
+                      $distance : distanceMeters > 0,
+                      distanceMeters <= Math.max(60.0, StoppingPolicy.requiredDistanceMeters($speed, StoppingPolicy.COMFORT_DECELERATION_MPS2, StoppingPolicy.OBSTACLE_STOP_OFFSET_METERS)))
     LaneOccupancyState(lane == Lane.LEFT, $leftSafe : safeToEnter)
     LaneOccupancyState(lane == Lane.RIGHT, $rightSafe : safeToEnter)
     eval(!$leftSafe && !$rightSafe
@@ -106,12 +122,15 @@ when
             || ($lane == Lane.RIGHT && $right == RoadMarkingType.CONTINUOUS)
             || ($lane == Lane.LEFT && $left == RoadMarkingType.CONTINUOUS)))
 then
-    double room = Math.max(0.0, $distance - 10.0);
+    double room = Math.max(0.0, $distance - StoppingPolicy.OBSTACLE_STOP_OFFSET_METERS);
     DrivingAction action = DrivingAction.BRAKE;
-    double target = Math.sqrt(2.0 * 2.8 * room) * 3.6;
+    double target = Math.sqrt(2.0 * StoppingPolicy.ANTICIPATION_DECELERATION_MPS2 * room) * 3.6;
     if (room <= 0.5) {
         action = DrivingAction.STOP;
         target = 0.0;
+    } else if (target >= $speed) {
+        action = DrivingAction.MAINTAIN_SPEED;
+        target = $speed;
     }
     droolsSupport.proposeDecision(
         $ctx,

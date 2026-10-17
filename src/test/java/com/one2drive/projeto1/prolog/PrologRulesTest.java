@@ -15,6 +15,7 @@ import com.one2drive.projeto1.drools.events.WeatherEvent;
 import com.one2drive.projeto1.drools.events.FrontDistanceEvent;
 import com.one2drive.projeto1.drools.events.ObstacleDetectedEvent;
 import com.one2drive.projeto1.drools.events.LaneOccupancyEvent;
+import com.one2drive.projeto1.drools.events.LeftLaneVehicleEvent;
 import com.one2drive.projeto1.drools.events.PedestrianDetectedEvent;
 import com.one2drive.projeto1.drools.events.RelativeSpeedEvent;
 import com.one2drive.projeto1.drools.events.SpeedLimitDetectedEvent;
@@ -26,6 +27,7 @@ import org.junit.jupiter.api.Timeout;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PrologRulesTest {
@@ -511,6 +513,110 @@ class PrologRulesTest {
     }
 
     /** One Prolog cycle for a vehicle whose markings, lane change and adjacent lanes a test sets. */
+    @Test
+    @Timeout(10)
+    void highSeverityObstacleCloseAheadInTheVehiclesLaneIsAnEmergency() {
+        try (PrologTestHarness harness = new PrologTestHarness()) {
+            var vehicle = new PrologKnowledgeSession.VehicleInput(1_000, 50.0, 0.0, Lane.CENTER, LaneChangeState.CHANGING,
+                Lane.LEFT, RoadMarkingType.DASHED, RoadMarkingType.DASHED, false, false, false, false);
+            DrivingDecision decision = decide(harness, vehicle,
+                new ObstacleDetectedEvent(1_000, "camera", 5.0, "obstacle-1", HazardSeverity.HIGH, Lane.CENTER));
+            assertEquals(DrivingAction.EMERGENCY_BRAKE, decision.getSpeedAction());
+            assertEquals("Emergency braking for high severity obstacle at critical distance", decision.getSpeedSourceRule());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void highSeverityObstacleIsNotAnEmergencyOnceTheVehicleHasPhysicallyLeftItsLane() {
+        try (PrologTestHarness harness = new PrologTestHarness()) {
+            // Committed lane still CENTER (it settles after the actuator), but the vehicle is
+            // already over the line into LEFT: the obstacle in CENTER is no longer in its way.
+            var vehicle = new PrologKnowledgeSession.VehicleInput(1_000, 50.0, 0.0, Lane.CENTER, LaneChangeState.CHANGING,
+                Lane.LEFT, RoadMarkingType.DASHED, RoadMarkingType.DASHED, false, false, false, false)
+                .physicallyIn(Lane.LEFT);
+            DrivingDecision decision = decide(harness, vehicle,
+                new ObstacleDetectedEvent(1_000, "camera", 5.0, "obstacle-1", HazardSeverity.HIGH, Lane.CENTER));
+            assertNotEquals(DrivingAction.EMERGENCY_BRAKE, decision.getSpeedAction(),
+                "the vehicle has left the obstacle's lane, so the obstacle is not critical");
+        }
+    }
+
+    // Pedestrian at 60 m: the 2.0 m/s2 curve allows 46.7 km/h, the 1.4 m/s2 curve 39.0 km/h.
+    @Test
+    @Timeout(10)
+    void brakingForAPedestrianContinuesBetweenTheCurvesThenHoldsTheSpeed() {
+        try (PrologTestHarness harness = new PrologTestHarness()) {
+            DrivingDecision start = decide(harness,
+                PrologKnowledgeSession.VehicleInput.keepingLane(1_000, 60.0, Lane.CENTER),
+                new PedestrianDetectedEvent(1_000, "camera", 60.0, "ped-1", true));
+            assertEquals(DrivingAction.BRAKE, start.getSpeedAction());
+            assertEquals("Brake for pedestrian proximity (brake)", start.getSpeedSourceRule());
+
+            DrivingDecision between = decide(harness,
+                PrologKnowledgeSession.VehicleInput.keepingLane(1_200, 44.0, Lane.CENTER),
+                new PedestrianDetectedEvent(1_200, "camera", 58.0, "ped-1", true));
+            assertEquals(DrivingAction.BRAKE, between.getSpeedAction(),
+                "between the curves the vehicle keeps braking once it started");
+
+            DrivingDecision under = decide(harness,
+                PrologKnowledgeSession.VehicleInput.keepingLane(1_400, 36.0, Lane.CENTER),
+                new PedestrianDetectedEvent(1_400, "camera", 57.0, "ped-1", true));
+            assertEquals(DrivingAction.MAINTAIN_SPEED, under.getSpeedAction(),
+                "under the lower curve, after braking, the vehicle holds its speed and never speeds up again");
+            assertEquals("Brake for pedestrian proximity (hold speed)", under.getSpeedSourceRule());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void aVehicleBetweenTheCurvesThatWasNotBrakingHoldsItsSpeed() {
+        try (PrologTestHarness harness = new PrologTestHarness()) {
+            DrivingDecision decision = decide(harness,
+                PrologKnowledgeSession.VehicleInput.keepingLane(1_000, 44.0, Lane.CENTER),
+                new PedestrianDetectedEvent(1_000, "camera", 58.0, "ped-1", true));
+            assertEquals(DrivingAction.MAINTAIN_SPEED, decision.getSpeedAction());
+            assertEquals("Brake for pedestrian proximity (hold speed)", decision.getSpeedSourceRule());
+        }
+    }
+
+    // Ego at 40 km/h in CENTER with an obstacle 40 m ahead and the left side clear: the
+    // avoidance goes left only if the ego can still follow the vehicle the radar sees there
+    // (room_to_follow/1 in safe_to_change_lane/1). A 30 km/h vehicle 33 m ahead is too
+    // close after the 3 s lane change; at 60 m there is room.
+    private static Object[] obstacleAheadLeftSideClear(double leftVehicleMeters) {
+        return new Object[] {
+            new ObstacleDetectedEvent(1_000, "camera", 40.0, "obstacle-1", HazardSeverity.MEDIUM, Lane.CENTER),
+            new LaneOccupancyEvent(1_000, "blind-spot", Lane.LEFT, false, Double.POSITIVE_INFINITY, true,
+                Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY),
+            new LeftLaneVehicleEvent(1_000, "front-radar", leftVehicleMeters, 10.0 / 3.6, "left-1")
+        };
+    }
+
+    @Test
+    @Timeout(10)
+    void noLaneChangeIntoALaneWhoseVehicleAheadIsTooCloseToFollow() {
+        try (PrologTestHarness harness = new PrologTestHarness()) {
+            DrivingDecision decision = decide(harness,
+                PrologKnowledgeSession.VehicleInput.keepingLane(1_000, 40.0, Lane.CENTER),
+                obstacleAheadLeftSideClear(33.0));
+            assertNotEquals(DrivingAction.CHANGE_LANE_LEFT, decision.getLaneAction(),
+                "room_to_follow fails, so safe_to_change_lane(left) is not proved and no avoidance goes left");
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void laneChangeIntoALaneWhoseVehicleAheadLeavesRoomToFollow() {
+        try (PrologTestHarness harness = new PrologTestHarness()) {
+            DrivingDecision decision = decide(harness,
+                PrologKnowledgeSession.VehicleInput.keepingLane(1_000, 40.0, Lane.CENTER),
+                obstacleAheadLeftSideClear(60.0));
+            assertEquals(DrivingAction.CHANGE_LANE_LEFT, decision.getLaneAction());
+            assertEquals("Avoid obstacle in centre lane by changing left", decision.getLaneSourceRule());
+        }
+    }
+
     private static DrivingDecision decide(PrologTestHarness harness, PrologKnowledgeSession.VehicleInput vehicle,
                                           Object... events) {
         DecisionContext context = new DecisionContext();
@@ -615,10 +721,12 @@ class PrologRulesTest {
                 new ObstacleDetectedEvent(1_000, "camera", 40.0, "obstacle-1", HazardSeverity.MEDIUM, Lane.RIGHT),
                 new LaneOccupancyEvent(1_000, "blind-spot", Lane.LEFT, false, Double.POSITIVE_INFINITY, false,
                     Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY));
-            assertEquals(DrivingAction.BRAKE, decision.getAction(),
+            // At 30 km/h the obstacle at 40 m is still above the comfortable braking curve
+            // (46.7 km/h stops in the 30 m left), so the speed is held, not yet reduced.
+            assertEquals(DrivingAction.MAINTAIN_SPEED, decision.getAction(),
                 "the left lane is free but the continuous line forbids it");
             assertEquals(DrivingAction.KEEP_LANE, decision.getLaneAction());
-            assertEquals("Stop before obstacle when lane change prohibited by continuous line (brake)",
+            assertEquals("Stop before obstacle when lane change prohibited by continuous line (hold)",
                 decision.getSourceRule());
         }
     }

@@ -146,4 +146,24 @@ class LaneChangeWhyNotE2ETest {
             }
         }
     }
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
+    @Timeout(30)
+    @DisplayName("in RIGHT at 50 km/h with a 20 km/h vehicle 45 m ahead in CENTER: left is clear but there is no room to follow")
+    void namesTheVehicleAheadInTheTargetLaneThatIsTooCloseToFollow(ExpertBackendType backend) {
+        try (SimulationEngine engine = engine(backend, Lane.RIGHT, null)) {
+            // Beyond the 30 m of the blind-spot sensor, so the side is clear; within the front
+            // radar's range. Closing in at 30 km/h, after the 3 s lane change 20 m are left:
+            // not enough to slow to 20 km/h 12 m behind it at 2 m/s2.
+            addVehicle(engine, Lane.CENTER, 45.0, 20.0);
+            tick(engine, 5);
+            LaneChangeCheck left = check(engine, Lane.LEFT);
+            assertTrue(left.sideClear(), "the blind-spot sensor does not see 45 m ahead");
+            assertFalse(left.roomToFollow());
+            assertFalse(left.allowed());
+            assertTrue(left.explanation().contains("vehicle ahead in the CENTER lane too close to follow safely"),
+                left.explanation());
+        }
+    }
 }

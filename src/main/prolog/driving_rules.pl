@@ -25,6 +25,7 @@
 %   stop_sign(Id, DistanceM)  stop_hold_started(Id, Ms)  stop_completed(Id)
 %   previous_decision(Action, Rule)  previous_priority(Value)   a última decisão arbitrada
 %   move_off_state(Active, Ms)   o MoveOffState do Drools
+%   pedestrian_braking_state(Phase, Ms)   o PedestrianBrakingState do Drools (none, braking, holding)
 %   right_lane_blocked_ahead   um perigo na faixa da direita a 150 m ou menos (Java)
 %   presentation_demo          o cenário de demonstração guiada (Java)
 %   lane_change_request(left|right)   um pedido do condutor ainda ativo (1,5 s)
@@ -32,6 +33,7 @@
 %   front_vehicle(Target, DistanceM, RelSpeedMps)   RelSpeed > 0: a aproximar-se
 %   front_distance_sample(Target, DistanceM, AgeMs)  front_read_now(Target)
 %   left_lane_vehicle(Target, DistanceM, RelSpeedMps)  left_read_now(Target)
+%   right_lane_vehicle(Target, DistanceM, RelSpeedMps)   a faixa à direita, do mesmo radar
 %   far_left_lane_vehicle(Target, DistanceM, RelSpeedMps)   duas faixas à esquerda (LEFT, visto de RIGHT)
 %   lane_occupancy(left|right, Occupied, FrontDistanceM)   o lado do ego, não uma faixa
 %   lane_occupancy_read(left|right, Ms)   quando esse lado foi lido (LaneOccupancyState.timestamp)
@@ -71,11 +73,13 @@ rule('Emergency stop for pedestrian extremely close',
      [ assert(proposal(emergency_brake, 0.0, critical, emergency_safety,
                        'Pedestrian critical distance in current path')) ]).
 
-% Only a reading from the last 300 ms counts, and only in the ego's lane.
+% Only a reading from the last 300 ms counts, and only in the lane the vehicle is physically
+% in: steering out of the obstacle's lane, it is past the obstacle once its lateral position
+% has left that lane, even while the committed lane (settled after the actuator) is the old one.
 rule('Emergency braking for high severity obstacle at critical distance',
      870,
      [ obstacle_sample(_, D, high, Lane, Age),
-       ego_lane(Lane),
+       ego_physical_lane(Lane),
        test((D > 0, D =< 8.0, Age < 300)) ],
      [ assert(proposal(emergency_brake, 0.0, critical, emergency_safety,
                        'High severity obstacle critically close')) ]).
@@ -104,26 +108,64 @@ rule('Stop for pedestrian in crossing zone',
      [ assert(proposal(stop, 0.0, high, legal_mandatory_stop,
                        'Pedestrian detected in trajectory')) ]).
 
-% Above the 2.0 m/s2 braking curve that ends 18 m before the pedestrian: brake.
+% The approach phase (pedestrian_braking/2, Drools' PedestrianBrakingState: none, braking,
+% holding) is settled before the proposal of the cycle: braking starts above the 2.0 m/s2
+% curve that ends 18 m before the pedestrian and only ends below the 1.4 m/s2 curve, where
+% the vehicle holds its speed until the upper curve catches it again; the approach is over
+% once no pedestrian is approached any more (gone, no conflict, or within the 32 m stop zone).
+rule('Start braking for pedestrian above the braking curve',
+     607,
+     [ pedestrian_braking_state(Phase, _),
+       test(Phase \== braking),
+       pedestrian_conflict(P),
+       pedestrian(P, D),
+       ego_speed(V),
+       time_ms(Now),
+       test(D > 32.0),
+       test(above_pedestrian_curve(V, D, 2.0)) ],
+     [ assert(pedestrian_braking_started(Now)) ]).
+
+rule('Hold speed for pedestrian once under the lower curve',
+     607,
+     [ pedestrian_braking_state(braking, _),
+       pedestrian_conflict(P),
+       pedestrian(P, D),
+       ego_speed(V),
+       test(D > 32.0),
+       not(test(above_pedestrian_curve(V, D, 1.4))) ],
+     [ assert(pedestrian_braking_ended) ]).
+
+rule('End the pedestrian approach once no pedestrian is approached',
+     607,
+     [ pedestrian_braking_state(Phase, _),
+       test(Phase \== none),
+       not(test(pedestrian_approached(32.0))) ],
+     [ assert(pedestrian_approach_over) ]).
+
+% Braking phase: brake.
 rule('Brake for pedestrian proximity (brake)',
      605,
      [ pedestrian_conflict(P),
        pedestrian(P, D),
        ego_speed(V),
        test(D > 32.0),
-       test(above_pedestrian_curve(V, D, 2.0)),
+       test(pedestrian_phase(braking)),
        test(pedestrian_reason(P, Reason)) ],
      [ assert(proposal(brake, 20.0, high, legal_mandatory_stop, Reason)) ]).
 
-% Between the 1.4 and 2.0 m/s2 curves: hold the speed, never speed up towards the pedestrian.
+% Holding phase, or between the curves before any braking: hold the speed, never speed up
+% towards the pedestrian.
 rule('Brake for pedestrian proximity (hold speed)',
      605,
      [ pedestrian_conflict(P),
        pedestrian(P, D),
        ego_speed(V),
        test(D > 32.0),
-       test(above_pedestrian_curve(V, D, 1.4)),
-       not(test(above_pedestrian_curve(V, D, 2.0))),
+       not(test(pedestrian_phase(braking))),
+       % once/1: a disjunction that holds both ways is one match, not two. The engine keeps
+       % every solution of the conditions as an activation of its own, and with the
+       % dependency index on, a duplicate left in the agenda would fire a second time.
+       test(once(( pedestrian_phase(holding) ; above_pedestrian_curve(V, D, 1.4) ))),
        test(pedestrian_reason(P, Reason)) ],
      [ assert(proposal(maintain_speed, V, moderate, legal_mandatory_stop, Reason)) ]).
 
@@ -810,7 +852,10 @@ rule('Avoid pothole in right lane by changing left',
                        'Avoiding pothole by moving into the clear left lane')) ]).
 
 % Obstacle: from the centre, prefer the left; right only with the left occupied. An obstacle
-% blocks the lane, so going around it is collision avoidance.
+% blocks the lane, so going around it is collision avoidance. Decided at 50 m, inside the
+% 60 m over which the blind-spot sensor reports hazards in the side lanes, so a side found
+% clear is clear for the whole manoeuvre; until then the obstacle stop rule keeps the speed
+% on the comfortable braking curve.
 rule('Avoid obstacle in centre lane by changing left',
      470,
      [ ego_lane(center),
@@ -897,50 +942,72 @@ rule('Pothole ahead reduce speed',
      [ assert(proposal(reduce_speed, Target, moderate, road_hazard,
                        'Pothole ahead requires speed reduction')) ]).
 
-% Obstacle in the ego's lane and both adjacent lanes occupied: stop 10 m before it (outside
-% the 8 m emergency zone, so it can still go around if a lane opens). It follows the
+% Obstacle in the ego's lane while the vehicle has not started to move out of that lane
+% (no side free, avoidance vetoed by a mandatory stop, or refused by the actuator): stop
+% 10 m before it (outside the 8 m emergency zone). The curve only binds when the vehicle
+% is too fast to stop there, so an avoidance that starts in time is not slowed down. It follows the
 % comfortable braking curve; if the deceleration needed exceeds the comfortable one by 10%,
 % it brakes hard.
-rule('Stop before obstacle when no lane is free (stop)',
+rule('Stop before obstacle ahead while still in its lane (stop)',
      465,
      [ ego_lane(Lane),
        obstacle(_, D, _, Lane),
-       test((D > 0, D =< 60.0)),
-       lane_occupancy(left, true, _),
-       lane_occupancy(right, true, _),
+       ego_speed(V),
+       test(obstacle_stop_window(V, W)),
+       test((D > 0, D =< W)),
+       lane_change_state(idle),
        test(obstacle_margin(D, Margin)),
        test(Margin =< 0.5) ],
      [ assert(proposal(stop, 0.0, high, collision_avoidance,
-                       'Obstacle ahead and no free lane to avoid it')) ]).
+                       'Obstacle ahead in own lane; stopping unless a lane change takes the vehicle out of its way')) ]).
 
-rule('Stop before obstacle when no lane is free (emergency)',
+rule('Stop before obstacle ahead while still in its lane (emergency)',
      465,
      [ ego_lane(Lane),
        obstacle(_, D, _, Lane),
-       test((D > 0, D =< 60.0)),
-       lane_occupancy(left, true, _),
-       lane_occupancy(right, true, _),
        ego_speed(V),
+       test(obstacle_stop_window(V, W)),
+       test((D > 0, D =< W)),
+       lane_change_state(idle),
        test(obstacle_margin(D, Margin)),
        test(Margin > 0.5),
        test(obstacle_braking_excessive(V, Margin)) ],
      [ assert(proposal(emergency_brake, 0.0, high, collision_avoidance,
-                       'Obstacle ahead and no free lane to avoid it')) ]).
+                       'Obstacle ahead in own lane; stopping unless a lane change takes the vehicle out of its way')) ]).
 
-rule('Stop before obstacle when no lane is free (brake)',
+rule('Stop before obstacle ahead while still in its lane (brake)',
      465,
      [ ego_lane(Lane),
        obstacle(_, D, _, Lane),
-       test((D > 0, D =< 60.0)),
-       lane_occupancy(left, true, _),
-       lane_occupancy(right, true, _),
        ego_speed(V),
+       test(obstacle_stop_window(V, W)),
+       test((D > 0, D =< W)),
+       lane_change_state(idle),
        test(obstacle_margin(D, Margin)),
        test(Margin > 0.5),
        not(test(obstacle_braking_excessive(V, Margin))),
-       test(obstacle_curve(Margin, Target)) ],
+       test(obstacle_curve(Margin, Target)),
+       test(Target < V) ],
      [ assert(proposal(brake, Target, high, collision_avoidance,
-                       'Obstacle ahead and no free lane to avoid it')) ]).
+                       'Obstacle ahead in own lane; stopping unless a lane change takes the vehicle out of its way')) ]).
+
+% Inside the stopping window but still above the comfortable braking curve: hold the speed
+% while the avoidance is decided, so the vehicle does not gain speed towards the obstacle.
+rule('Stop before obstacle ahead while still in its lane (hold)',
+     465,
+     [ ego_lane(Lane),
+       obstacle(_, D, _, Lane),
+       ego_speed(V),
+       test(obstacle_stop_window(V, W)),
+       test((D > 0, D =< W)),
+       lane_change_state(idle),
+       test(obstacle_margin(D, Margin)),
+       test(Margin > 0.5),
+       not(test(obstacle_braking_excessive(V, Margin))),
+       test(obstacle_curve(Margin, Target)),
+       test(Target >= V) ],
+     [ assert(proposal(maintain_speed, V, moderate, collision_avoidance,
+                       'Obstacle ahead in own lane; stopping unless a lane change takes the vehicle out of its way')) ]).
 
 % Neither side is safe to enter (the blind-spot occupancy already reports a side as not safe
 % when the line towards it is continuous, WorldState.sideLaneOccupancy) and the ego's lane
@@ -950,7 +1017,9 @@ rule('Stop before obstacle when lane change prohibited by continuous line (stop)
      466,
      [ ego_lane(Lane),
        obstacle(_, D, _, Lane),
-       test((D > 0, D =< 60.0)),
+       ego_speed(V),
+       test(obstacle_stop_window(V, W)),
+       test((D > 0, D =< W)),
        lane_safe_to_enter(left, false),
        lane_safe_to_enter(right, false),
        test(continuous_line_closes_lane(Lane)),
@@ -963,14 +1032,34 @@ rule('Stop before obstacle when lane change prohibited by continuous line (brake
      466,
      [ ego_lane(Lane),
        obstacle(_, D, _, Lane),
-       test((D > 0, D =< 60.0)),
+       ego_speed(V),
+       test(obstacle_stop_window(V, W)),
+       test((D > 0, D =< W)),
        lane_safe_to_enter(left, false),
        lane_safe_to_enter(right, false),
        test(continuous_line_closes_lane(Lane)),
        test(obstacle_margin(D, Margin)),
        test(Margin > 0.5),
-       test(obstacle_curve(Margin, Target)) ],
+       test(obstacle_curve(Margin, Target)),
+       test(Target < V) ],
      [ assert(proposal(brake, Target, high, collision_avoidance,
+                       'Continuous line prohibits lane change; stopping before obstacle')) ]).
+
+rule('Stop before obstacle when lane change prohibited by continuous line (hold)',
+     466,
+     [ ego_lane(Lane),
+       obstacle(_, D, _, Lane),
+       ego_speed(V),
+       test(obstacle_stop_window(V, W)),
+       test((D > 0, D =< W)),
+       lane_safe_to_enter(left, false),
+       lane_safe_to_enter(right, false),
+       test(continuous_line_closes_lane(Lane)),
+       test(obstacle_margin(D, Margin)),
+       test(Margin > 0.5),
+       test(obstacle_curve(Margin, Target)),
+       test(Target >= V) ],
+     [ assert(proposal(maintain_speed, V, moderate, collision_avoidance,
                        'Continuous line prohibits lane change; stopping before obstacle')) ]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1350,7 +1439,8 @@ rule('Default maintain speed baseline',
 safe_to_change_lane(Side) :-
     maneuver_idle,
     no_continuous_line(Side),
-    side_clear(Side).
+    side_clear(Side),
+    room_to_follow(Side).
 
 % Nenhuma mudança de faixa em movimento.
 maneuver_idle :-
@@ -1378,6 +1468,33 @@ no_continuous_line(right) :-
 % O sensor de ângulo morto dá esse lado livre.
 side_clear(Side) :-
     known(lane_occupancy(Side, false, _)).
+
+% O radar frontal não vê veículo à frente na faixa desse lado, ou vê um longe e lento o
+% suficiente para ser seguido depois da mudança (StoppingPolicy.roomToFollow): durante a
+% manobra o intervalo encolhe, e no fim o ego tem de conseguir abrandar para a velocidade
+% dele a followingGapMeters, travando à desaceleração de antecipação. Duas cláusulas, sem
+% corte, porque o meta-interpretador prova o corpo conjunto a conjunto.
+room_to_follow(Side) :-
+    side_lane_vehicle(Side, D, Rel),
+    room_to_follow_behind(D, Rel).
+room_to_follow(Side) :-
+    \+ side_lane_vehicle(Side, _, _).
+
+side_lane_vehicle(left, D, Rel) :-
+    known(left_lane_vehicle(_, D, Rel)).
+side_lane_vehicle(right, D, Rel) :-
+    known(right_lane_vehicle(_, D, Rel)).
+
+room_to_follow_behind(D, Rel) :-
+    known(ego_speed(V)),
+    param(followingGapMeters, Gap),
+    param(laneChangeSeconds, T),
+    deceleration(anticipation, A),
+    Ego is max(0.0, V) / 3.6,
+    Front is max(0.0, Ego - Rel),
+    GapAfter is D - max(0.0, Rel) * T,
+    Room is max(0.0, GapAfter - Gap),
+    Ego =< sqrt(Front * Front + 2.0 * A * Room).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Predicados auxiliares (chamados a partir de test/1)
@@ -1579,9 +1696,23 @@ continuous_line_closes_lane(right) :-
 continuous_line_closes_lane(left) :-
     known(left_marking(continuous)).
 
-% Metres to the stopping point, 10 m before the obstacle.
+% Metres to the stopping point, StoppingPolicy.OBSTACLE_STOP_OFFSET_METERS before the obstacle.
 obstacle_margin(D, Margin) :-
-    Margin is max(0.0, D - 10.0).
+    param(obstacleStopOffsetMeters, Offset),
+    Margin is max(0.0, D - Offset).
+
+% Distance from which an obstacle in the ego's lane is stopped for: the comfortable stopping
+% distance at V km/h (reaction + braking + the offset), never less than 60 m.
+obstacle_stop_window(V, W) :-
+    obstacle_stopping_distance(V, D),
+    W is max(60.0, D).
+
+obstacle_stopping_distance(V, D) :-
+    deceleration(comfort, A),
+    param(reactionTimeSeconds, Reaction),
+    param(obstacleStopOffsetMeters, Offset),
+    Vms is max(0.0, V) / 3.6,
+    D is Vms * Reaction + Vms * Vms / (2.0 * A) + Offset.
 
 % The deceleration needed to stop within the margin exceeds comfortable braking by 10%.
 obstacle_braking_excessive(V, Margin) :-
@@ -1589,9 +1720,10 @@ obstacle_braking_excessive(V, Margin) :-
     Vms is V / 3.6,
     Vms * Vms / (2.0 * Margin) > A * 1.1.
 
-% Speed (km/h) on the comfortable braking curve that stops within the margin.
+% Speed (km/h) on the anticipation braking curve (2.0 m/s2) that stops within the margin:
+% braking at the comfortable rate towards it keeps the vehicle under the comfortable curve.
 obstacle_curve(Margin, Target) :-
-    deceleration(comfort, A),
+    deceleration(anticipation, A),
     Target is sqrt(2.0 * A * Margin) * 3.6.
 
 % StoppingPolicy.approachSpeedKmh: the fastest the vehicle may still be going D metres
@@ -1692,6 +1824,29 @@ moving_off :-
 moving_off :-
     \+ known(move_off_ended),
     known(move_off_state(true, _)).
+
+% The pedestrian approach phase after this cycle's state rules. The phase is computed with
+% an unbound argument first, so that the cuts settle it before it is compared with the one
+% asked for (pedestrian_phase(braking) must fail, not fall through to the stored state,
+% once this cycle ended the braking).
+pedestrian_phase(Phase) :-
+    settled_pedestrian_phase(Settled),
+    Phase = Settled.
+
+settled_pedestrian_phase(braking) :-
+    known(pedestrian_braking_started(_)), !.
+settled_pedestrian_phase(none) :-
+    known(pedestrian_approach_over), !.
+settled_pedestrian_phase(holding) :-
+    known(pedestrian_braking_ended), !.
+settled_pedestrian_phase(Phase) :-
+    known(pedestrian_braking_state(Phase, _)).
+
+% A pedestrian in conflict is being approached beyond Min metres.
+pedestrian_approached(Min) :-
+    known(pedestrian_conflict(P)),
+    known(pedestrian(P, D)),
+    D > Min.
 
 % A proposal in the longitudinal (speed) channel: anything but a lane action.
 speed_proposal :-

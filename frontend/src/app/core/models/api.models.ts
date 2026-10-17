@@ -81,7 +81,7 @@ export interface ApiProposalView {
   channel: 'LONGITUDINAL' | 'LATERAL';
   priority: number;
   recommendedSpeedKmh: number | null;
-  outcome: 'PENDING' | 'WON' | 'LOST_TO' | 'VETOED_BY' | 'REJECTED_BY';
+  outcome: 'PENDING' | 'WON' | 'LOST_TO' | 'VETOED_BY' | 'REJECTED_BY' | 'CAPPED';
   detail: string;
   reason: string;
 }

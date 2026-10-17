@@ -7,6 +7,7 @@ import com.one2drive.projeto1.domain.Lane;
 import com.one2drive.projeto1.domain.PedestrianCrossingState;
 import com.one2drive.projeto1.domain.RiskLevel;
 import com.one2drive.projeto1.domain.LaneChangeDirection;
+import com.one2drive.projeto1.domain.LaneChangeState;
 import com.one2drive.projeto1.domain.TrafficLightState;
 import com.one2drive.projeto1.domain.WeatherCondition;
 import com.one2drive.projeto1.drools.events.AccelerationRequestEvent;
@@ -15,6 +16,7 @@ import com.one2drive.projeto1.drools.events.FrontDistanceEvent;
 import com.one2drive.projeto1.drools.events.LaneChangeRequestEvent;
 import com.one2drive.projeto1.drools.events.LaneOccupancyEvent;
 import com.one2drive.projeto1.drools.events.LeftLaneVehicleEvent;
+import com.one2drive.projeto1.drools.events.ObstacleDetectedEvent;
 import com.one2drive.projeto1.drools.events.PedestrianDetectedEvent;
 import com.one2drive.projeto1.drools.events.PotholeDetectedEvent;
 import com.one2drive.projeto1.drools.events.RelativeSpeedEvent;
@@ -1009,6 +1011,107 @@ class DrivingExpertSystemRulesTest {
             var row = results.iterator().next();
             DrivingDecision queried = (DrivingDecision) row.get("$decision");
             assertEquals(decision.getAction(), queried.getAction());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void highSeverityObstacleCloseAheadInTheVehiclesLaneIsAnEmergency() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(50.0)) {
+            harness.maneuver(LaneChangeState.CHANGING, Lane.CENTER.centreMeters());
+            DrivingDecision decision = harness.cycle(
+                1_000,
+                50.0,
+                new ObstacleDetectedEvent(1_000, "camera", 5.0, "obstacle-1", HazardSeverity.HIGH, Lane.CENTER)
+            );
+            assertEquals(DrivingAction.EMERGENCY_BRAKE, decision.getSpeedAction());
+            assertEquals("Emergency braking for high severity obstacle at critical distance", decision.getSpeedSourceRule());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void highSeverityObstacleIsNotAnEmergencyOnceTheVehicleHasPhysicallyLeftItsLane() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(50.0)) {
+            // Committed lane still CENTER (it settles after the actuator), but the vehicle is
+            // already over the line into LEFT: the obstacle in CENTER is no longer in its way.
+            harness.maneuver(LaneChangeState.CHANGING, Lane.LEFT.centreMeters());
+            DrivingDecision decision = harness.cycle(
+                1_000,
+                50.0,
+                new ObstacleDetectedEvent(1_000, "camera", 5.0, "obstacle-1", HazardSeverity.HIGH, Lane.CENTER)
+            );
+            assertNotEquals(DrivingAction.EMERGENCY_BRAKE, decision.getSpeedAction(),
+                "the vehicle has left the obstacle's lane, so the obstacle is not critical");
+        }
+    }
+
+    // Pedestrian at 60 m: the 2.0 m/s2 curve allows 46.7 km/h, the 1.4 m/s2 curve 39.0 km/h.
+    @Test
+    @Timeout(10)
+    void brakingForAPedestrianContinuesBetweenTheCurvesThenHoldsTheSpeed() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(60.0)) {
+            DrivingDecision start = harness.cycle(1_000, 60.0,
+                new PedestrianDetectedEvent(1_000, "camera", 60.0, "ped-1", true));
+            assertEquals(DrivingAction.BRAKE, start.getSpeedAction());
+            assertEquals("Brake for pedestrian proximity", start.getSpeedSourceRule());
+
+            DrivingDecision between = harness.cycle(1_200, 44.0,
+                new PedestrianDetectedEvent(1_200, "camera", 58.0, "ped-1", true));
+            assertEquals(DrivingAction.BRAKE, between.getSpeedAction(),
+                "between the curves the vehicle keeps braking once it started");
+
+            DrivingDecision under = harness.cycle(1_400, 36.0,
+                new PedestrianDetectedEvent(1_400, "camera", 57.0, "ped-1", true));
+            assertEquals(DrivingAction.MAINTAIN_SPEED, under.getSpeedAction(),
+                "under the lower curve, after braking, the vehicle holds its speed and never speeds up again");
+            assertEquals("Brake for pedestrian proximity", under.getSpeedSourceRule());
+            assertEquals(36.0, under.getRecommendedSpeedKmh(), 0.01);
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void aVehicleBetweenTheCurvesThatWasNotBrakingHoldsItsSpeed() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(44.0)) {
+            DrivingDecision decision = harness.cycle(1_000, 44.0,
+                new PedestrianDetectedEvent(1_000, "camera", 58.0, "ped-1", true));
+            assertEquals(DrivingAction.MAINTAIN_SPEED, decision.getSpeedAction());
+            assertEquals("Brake for pedestrian proximity", decision.getSpeedSourceRule());
+            assertEquals(44.0, decision.getRecommendedSpeedKmh(), 0.01);
+        }
+    }
+
+    // Ego at 40 km/h in CENTER with an obstacle 40 m ahead and the left side clear: the
+    // avoidance goes left only if the ego can still follow the vehicle the radar sees there.
+    // A 30 km/h vehicle 33 m ahead: after the 3 s lane change only 25 m are left, not enough
+    // to slow to 30 km/h 12 m behind it at 2 m/s2. At 60 m there is room.
+    private static Object[] obstacleAheadLeftSideClear(double leftVehicleMeters) {
+        return new Object[] {
+            new ObstacleDetectedEvent(1_000, "camera", 40.0, "obstacle-1", HazardSeverity.MEDIUM, Lane.CENTER),
+            new LaneOccupancyEvent(1_000, "blind-spot", Lane.LEFT, false, Double.POSITIVE_INFINITY, true,
+                Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY),
+            new LeftLaneVehicleEvent(1_000, "front-radar", leftVehicleMeters, 10.0 / 3.6, "left-1")
+        };
+    }
+
+    @Test
+    @Timeout(10)
+    void noLaneChangeIntoALaneWhoseVehicleAheadIsTooCloseToFollow() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(40.0)) {
+            DrivingDecision decision = harness.cycle(1_000, 40.0, obstacleAheadLeftSideClear(33.0));
+            assertNotEquals(DrivingAction.CHANGE_LANE_LEFT, decision.getLaneAction(),
+                "roomToFollow fails, so safeToChangeLane(LEFT) is not proved and no avoidance goes left");
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void laneChangeIntoALaneWhoseVehicleAheadLeavesRoomToFollow() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(40.0)) {
+            DrivingDecision decision = harness.cycle(1_000, 40.0, obstacleAheadLeftSideClear(60.0));
+            assertEquals(DrivingAction.CHANGE_LANE_LEFT, decision.getLaneAction());
+            assertEquals("Avoid obstacle in centre lane by changing left", decision.getLaneSourceRule());
         }
     }
 }

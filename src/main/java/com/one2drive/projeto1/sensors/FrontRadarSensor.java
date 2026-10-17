@@ -7,6 +7,7 @@ import com.one2drive.projeto1.drools.events.FarLeftLaneVehicleEvent;
 import com.one2drive.projeto1.drools.events.FrontDistanceEvent;
 import com.one2drive.projeto1.drools.events.LeftLaneVehicleEvent;
 import com.one2drive.projeto1.drools.events.RelativeSpeedEvent;
+import com.one2drive.projeto1.drools.events.RightLaneVehicleEvent;
 import com.one2drive.projeto1.drools.events.TTCEvent;
 import com.one2drive.projeto1.simulation.WorldState;
 
@@ -52,12 +53,24 @@ public class FrontRadarSensor extends AbstractSensor<Object> {
             events.add(new TTCEvent(timestampMillis, id(), ttc, vehicle.getId()));
         });
 
-        // The same forward radar also covers the lane to the left: a slower vehicle there
-        // must not be passed on its right, so the rules need to know about it.
+        // The same forward radar also covers the lanes to either side: a slower vehicle on
+        // the left must not be passed on its right, and before moving into a lane the rules
+        // must know whether the ego can still follow the vehicle ahead there.
         Lane leftLane = worldState.getEgo().getLane().left();
         if (leftLane != worldState.getEgo().getLane()) {
             worldState.nearestFrontVehicleInLane(leftLane, rangeMeters()).ifPresent(vehicle -> events.add(
                 new LeftLaneVehicleEvent(
+                    timestampMillis,
+                    id(),
+                    worldState.vehicleSignedDistance(vehicle),
+                    worldState.getEgo().getSpeedMps() - vehicle.getSpeedMps(),
+                    vehicle.getId())));
+        }
+
+        Lane rightLane = worldState.getEgo().getLane().right();
+        if (rightLane != worldState.getEgo().getLane()) {
+            worldState.nearestFrontVehicleInLane(rightLane, rangeMeters()).ifPresent(vehicle -> events.add(
+                new RightLaneVehicleEvent(
                     timestampMillis,
                     id(),
                     worldState.vehicleSignedDistance(vehicle),

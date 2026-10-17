@@ -30,6 +30,7 @@ const OUTCOME_LABELS: Record<ApiProposalView['outcome'], string> = {
   LOST_TO: 'LOST',
   VETOED_BY: 'VETOED',
   REJECTED_BY: 'REJECTED',
+  CAPPED: 'CAPPED',
   PENDING: 'PENDING'
 };
 
@@ -171,6 +172,8 @@ function describeDetail(proposal: ApiProposalView): string | null {
       return `vetoed by ${detail}`;
     case 'REJECTED_BY':
       return `actuator: ${detail}`;
+    case 'CAPPED':
+      return `sets the speed under ${detail}`;
     default:
       return detail;
   }

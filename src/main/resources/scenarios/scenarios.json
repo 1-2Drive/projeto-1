@@ -577,12 +577,13 @@
   {
     "id": "S8",
     "name": "Critical TTC",
+    "initialLane": "CENTER",
     "initialSpeedKmh": 95,
     "initialWeather": "CLEAR",
     "actors": [
       {
         "type": "FRONT_VEHICLE",
-        "positionMeters": 80,
+        "positionMeters": 40,
         "lane": "CENTER",
         "speedKmh": 30
       }
@@ -592,6 +593,7 @@
   {
     "id": "S9",
     "name": "Lane change blocked",
+    "initialLane": "CENTER",
     "initialSpeedKmh": 75,
     "initialWeather": "CLEAR",
     "actors": [
@@ -620,6 +622,7 @@
   {
     "id": "S11",
     "name": "Complex sequential scenario",
+    "initialLane": "CENTER",
     "initialSpeedKmh": 90,
     "initialWeather": "CLEAR",
     "actors": [],

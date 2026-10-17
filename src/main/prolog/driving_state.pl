@@ -15,7 +15,7 @@
            front_track/4, front_distance_reading/3, occupancy/4, occupancy_read/2, left_vehicle_track/4,
            far_left_vehicle_track/4,
            overtaking_state/5, last_decision/2, last_priority/1, move_off/2, cruise/1,
-           param/2, priority_value/2, lane_settled/1.
+           param/2, priority_value/2, lane_settled/1, physical_lane/1.
 
 % Window of the persistent-TTC rule (window:time(2s) in Drools).
 ttc_window_ms(2000).
@@ -47,7 +47,7 @@ state_predicates([ego_state/3, lane_change/1, markings/2, target_lane_state/1, s
                   front_track/4, front_distance_reading/3, occupancy/4, occupancy_read/2, left_vehicle_track/4,
                   far_left_vehicle_track/4,
                   overtaking_state/5, last_decision/2, last_priority/1, move_off/2, cruise/1,
-                  param/2, priority_value/2, lane_settled/1]).
+                  param/2, priority_value/2, lane_settled/1, physical_lane/1]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Reinício da sessão
@@ -59,6 +59,9 @@ reset_state(Cruise, Params, Priorities) :-
     forall(member(Name/Arity, Predicates),
            ( functor(Head, Name, Arity), retractall(Head) )),
     assertz(ego_state(0.0, center, 0)),
+    % physical_lane(Lane): the lane the vehicle is physically in (VehicleStateFact.physicalLane),
+    % which differs from the committed lane during a lane change and on the tick it completes.
+    assertz(physical_lane(center)),
     assertz(lane_change(idle)),
     assertz(markings(dashed, dashed)),
     assertz(target_lane_state(center)),
@@ -101,13 +104,14 @@ reset_state(Cruise, Params, Priorities) :-
 % Ciclo: estado do veículo, eventos e esquecimento do que deixou de ser visto
 
 % vehicle_input(Now, SpeedKmh, PositionM, Lane, LaneChange, Left-Right markings, TargetLane,
-%               SafeLeft-SafeRight, RightBlocked-Demo, LaneSettledMs)
+%               SafeLeft-SafeRight, RightBlocked-Demo, LaneSettledMs, PhysicalLane)
 % The previous decision, already arbitrated by Java: Drools also sees it, as the
 % DrivingDecision fact, and the STOP rule uses it to keep hard braking already under way.
-update_state(vehicle_input(Now, Speed, Position, Lane, LaneChange, Markings, Target, Safe, Flags, Settled),
+update_state(vehicle_input(Now, Speed, Position, Lane, LaneChange, Markings, Target, Safe, Flags, Settled, Physical),
              Events, previous(Action, Rule, Priority)) :-
     Flags = RightBlocked-Demo,
     replace(lane_settled(_), lane_settled(Settled)),
+    replace(physical_lane(_), physical_lane(Physical)),
     replace(road_flags(_, _), road_flags(RightBlocked, Demo)),
     replace(last_priority(_), last_priority(Priority)),
     replace(ego_position(_), ego_position(Position)),
@@ -430,6 +434,8 @@ load_cycle_facts :-
     add_fact(time_ms(Now)),
     add_fact(ego_speed(Speed)),
     add_fact(ego_lane(Lane)),
+    physical_lane(Physical),
+    add_fact(ego_physical_lane(Physical)),
     ego_position(Position),
     add_fact(ego_position(Position)),
     load_vehicle,

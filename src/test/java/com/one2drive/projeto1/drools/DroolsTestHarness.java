@@ -32,6 +32,15 @@ public class DroolsTestHarness implements AutoCloseable {
         vehicleStateFact.setPositionMeters(positionMeters);
     }
 
+    /**
+     * Puts the vehicle mid manoeuvre for the next cycle: the committed lane stays CENTER,
+     * the lateral position says where it physically is (VehicleStateFact.getPhysicalLane).
+     */
+    public void maneuver(com.one2drive.projeto1.domain.LaneChangeState state, double lateralPositionMeters) {
+        vehicleStateFact.setLaneChangeState(state);
+        vehicleStateFact.setLateralPositionMeters(lateralPositionMeters);
+    }
+
     public DrivingDecision cycle(long timestampMillis, double speedKmh, Object... events) {
         SessionPseudoClock clock = (SessionPseudoClock) knowledgeSession.getKieSession().getSessionClock();
         long now = clock.getCurrentTime();

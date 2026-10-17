@@ -7,6 +7,7 @@ import com.one2drive.projeto1.domain.Lane;
 import com.one2drive.projeto1.domain.PedestrianCrossingState;
 import com.one2drive.projeto1.domain.RiskLevel;
 import com.one2drive.projeto1.domain.LaneChangeDirection;
+import com.one2drive.projeto1.domain.LaneChangeState;
 import com.one2drive.projeto1.domain.TrafficLightState;
 import com.one2drive.projeto1.domain.WeatherCondition;
 import com.one2drive.projeto1.drools.events.AccelerationRequestEvent;
@@ -15,6 +16,7 @@ import com.one2drive.projeto1.drools.events.FrontDistanceEvent;
 import com.one2drive.projeto1.drools.events.LaneChangeRequestEvent;
 import com.one2drive.projeto1.drools.events.LaneOccupancyEvent;
 import com.one2drive.projeto1.drools.events.LeftLaneVehicleEvent;
+import com.one2drive.projeto1.drools.events.ObstacleDetectedEvent;
 import com.one2drive.projeto1.drools.events.PedestrianDetectedEvent;
 import com.one2drive.projeto1.drools.events.PotholeDetectedEvent;
 import com.one2drive.projeto1.drools.events.RelativeSpeedEvent;
@@ -1009,6 +1011,38 @@ class DrivingExpertSystemRulesTest {
             var row = results.iterator().next();
             DrivingDecision queried = (DrivingDecision) row.get("$decision");
             assertEquals(decision.getAction(), queried.getAction());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void highSeverityObstacleCloseAheadInTheVehiclesLaneIsAnEmergency() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(50.0)) {
+            harness.maneuver(LaneChangeState.CHANGING, Lane.CENTER.centreMeters());
+            DrivingDecision decision = harness.cycle(
+                1_000,
+                50.0,
+                new ObstacleDetectedEvent(1_000, "camera", 5.0, "obstacle-1", HazardSeverity.HIGH, Lane.CENTER)
+            );
+            assertEquals(DrivingAction.EMERGENCY_BRAKE, decision.getSpeedAction());
+            assertEquals("Emergency braking for high severity obstacle at critical distance", decision.getSpeedSourceRule());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void highSeverityObstacleIsNotAnEmergencyOnceTheVehicleHasPhysicallyLeftItsLane() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(50.0)) {
+            // Committed lane still CENTER (it settles after the actuator), but the vehicle is
+            // already over the line into LEFT: the obstacle in CENTER is no longer in its way.
+            harness.maneuver(LaneChangeState.CHANGING, Lane.LEFT.centreMeters());
+            DrivingDecision decision = harness.cycle(
+                1_000,
+                50.0,
+                new ObstacleDetectedEvent(1_000, "camera", 5.0, "obstacle-1", HazardSeverity.HIGH, Lane.CENTER)
+            );
+            assertNotEquals(DrivingAction.EMERGENCY_BRAKE, decision.getSpeedAction(),
+                "the vehicle has left the obstacle's lane, so the obstacle is not critical");
         }
     }
 }

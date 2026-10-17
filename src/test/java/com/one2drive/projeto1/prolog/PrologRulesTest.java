@@ -26,6 +26,7 @@ import org.junit.jupiter.api.Timeout;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PrologRulesTest {
@@ -511,6 +512,35 @@ class PrologRulesTest {
     }
 
     /** One Prolog cycle for a vehicle whose markings, lane change and adjacent lanes a test sets. */
+    @Test
+    @Timeout(10)
+    void highSeverityObstacleCloseAheadInTheVehiclesLaneIsAnEmergency() {
+        try (PrologTestHarness harness = new PrologTestHarness()) {
+            var vehicle = new PrologKnowledgeSession.VehicleInput(1_000, 50.0, 0.0, Lane.CENTER, LaneChangeState.CHANGING,
+                Lane.LEFT, RoadMarkingType.DASHED, RoadMarkingType.DASHED, false, false, false, false);
+            DrivingDecision decision = decide(harness, vehicle,
+                new ObstacleDetectedEvent(1_000, "camera", 5.0, "obstacle-1", HazardSeverity.HIGH, Lane.CENTER));
+            assertEquals(DrivingAction.EMERGENCY_BRAKE, decision.getSpeedAction());
+            assertEquals("Emergency braking for high severity obstacle at critical distance", decision.getSpeedSourceRule());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void highSeverityObstacleIsNotAnEmergencyOnceTheVehicleHasPhysicallyLeftItsLane() {
+        try (PrologTestHarness harness = new PrologTestHarness()) {
+            // Committed lane still CENTER (it settles after the actuator), but the vehicle is
+            // already over the line into LEFT: the obstacle in CENTER is no longer in its way.
+            var vehicle = new PrologKnowledgeSession.VehicleInput(1_000, 50.0, 0.0, Lane.CENTER, LaneChangeState.CHANGING,
+                Lane.LEFT, RoadMarkingType.DASHED, RoadMarkingType.DASHED, false, false, false, false)
+                .physicallyIn(Lane.LEFT);
+            DrivingDecision decision = decide(harness, vehicle,
+                new ObstacleDetectedEvent(1_000, "camera", 5.0, "obstacle-1", HazardSeverity.HIGH, Lane.CENTER));
+            assertNotEquals(DrivingAction.EMERGENCY_BRAKE, decision.getSpeedAction(),
+                "the vehicle has left the obstacle's lane, so the obstacle is not critical");
+        }
+    }
+
     private static DrivingDecision decide(PrologTestHarness harness, PrologKnowledgeSession.VehicleInput vehicle,
                                           Object... events) {
         DecisionContext context = new DecisionContext();

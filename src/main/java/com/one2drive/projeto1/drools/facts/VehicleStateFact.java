@@ -140,6 +140,17 @@ public class VehicleStateFact {
         return lateralPositionMeters;
     }
 
+    /**
+     * The lane the vehicle is physically in, from its lateral position. {@link #getLane()}
+     * is the committed lane, which only follows a lane change once it settles
+     * (SimulationEngine.settleManeuver, after the actuator): during the manoeuvre, and on
+     * the tick it completes, the two differ. Rules about what the vehicle is about to hit
+     * read this one; rules about the lane it drives in read the committed lane.
+     */
+    public Lane getPhysicalLane() {
+        return Lane.fromLateralPosition(lateralPositionMeters);
+    }
+
     public void setLateralPositionMeters(double lateralPositionMeters) {
         this.lateralPositionMeters = lateralPositionMeters;
     }

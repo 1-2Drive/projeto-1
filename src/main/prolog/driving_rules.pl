@@ -71,11 +71,13 @@ rule('Emergency stop for pedestrian extremely close',
      [ assert(proposal(emergency_brake, 0.0, critical, emergency_safety,
                        'Pedestrian critical distance in current path')) ]).
 
-% Only a reading from the last 300 ms counts, and only in the ego's lane.
+% Only a reading from the last 300 ms counts, and only in the lane the vehicle is physically
+% in: steering out of the obstacle's lane, it is past the obstacle once its lateral position
+% has left that lane, even while the committed lane (settled after the actuator) is the old one.
 rule('Emergency braking for high severity obstacle at critical distance',
      870,
      [ obstacle_sample(_, D, high, Lane, Age),
-       ego_lane(Lane),
+       ego_physical_lane(Lane),
        test((D > 0, D =< 8.0, Age < 300)) ],
      [ assert(proposal(emergency_brake, 0.0, critical, emergency_safety,
                        'High severity obstacle critically close')) ]).

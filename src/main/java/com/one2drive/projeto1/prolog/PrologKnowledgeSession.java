@@ -85,7 +85,18 @@ public class PrologKnowledgeSession implements AutoCloseable {
                                boolean rightAdjacentLaneSafe,
                                boolean rightLaneBlockedAhead,
                                boolean presentationDemo,
-                               long laneSettledAtMillis) {
+                               long laneSettledAtMillis,
+                               Lane physicalLane) {
+
+        /** A vehicle physically in its committed lane (VehicleStateFact.getPhysicalLane). */
+        public VehicleInput(long timestampMillis, double speedKmh, double positionMeters, Lane lane,
+                            LaneChangeState laneChangeState, Lane targetLane, RoadMarkingType leftMarking,
+                            RoadMarkingType rightMarking, boolean leftAdjacentLaneSafe, boolean rightAdjacentLaneSafe,
+                            boolean rightLaneBlockedAhead, boolean presentationDemo, long laneSettledAtMillis) {
+            this(timestampMillis, speedKmh, positionMeters, lane, laneChangeState, targetLane, leftMarking,
+                rightMarking, leftAdjacentLaneSafe, rightAdjacentLaneSafe, rightLaneBlockedAhead, presentationDemo,
+                laneSettledAtMillis, lane);
+        }
 
         /** A vehicle that has not changed lane: laneSettledAtMillis is -1, as in a new VehicleStateFact. */
         public VehicleInput(long timestampMillis, double speedKmh, double positionMeters, Lane lane,
@@ -94,6 +105,13 @@ public class PrologKnowledgeSession implements AutoCloseable {
                             boolean rightLaneBlockedAhead, boolean presentationDemo) {
             this(timestampMillis, speedKmh, positionMeters, lane, laneChangeState, targetLane, leftMarking,
                 rightMarking, leftAdjacentLaneSafe, rightAdjacentLaneSafe, rightLaneBlockedAhead, presentationDemo, -1L);
+        }
+
+        /** The same input with the vehicle physically in {@code physicalLane}, e.g. mid lane change. */
+        public VehicleInput physicallyIn(Lane physicalLane) {
+            return new VehicleInput(timestampMillis, speedKmh, positionMeters, lane, laneChangeState, targetLane,
+                leftMarking, rightMarking, leftAdjacentLaneSafe, rightAdjacentLaneSafe, rightLaneBlockedAhead,
+                presentationDemo, laneSettledAtMillis, physicalLane);
         }
 
         /**
@@ -109,7 +127,7 @@ public class PrologKnowledgeSession implements AutoCloseable {
         public VehicleInput at(double positionMeters) {
             return new VehicleInput(timestampMillis, speedKmh, positionMeters, lane, laneChangeState, targetLane,
                 leftMarking, rightMarking, leftAdjacentLaneSafe, rightAdjacentLaneSafe, rightLaneBlockedAhead,
-                presentationDemo, laneSettledAtMillis);
+                presentationDemo, laneSettledAtMillis, physicalLane);
         }
     }
 
@@ -136,6 +154,7 @@ public class PrologKnowledgeSession implements AutoCloseable {
         request.put("rightLaneBlockedAhead", vehicle.rightLaneBlockedAhead());
         request.put("presentationDemo", vehicle.presentationDemo());
         request.put("laneSettledAtMillis", vehicle.laneSettledAtMillis());
+        request.put("physicalLane", vehicle.physicalLane().name());
         request.put("events", events.stream().map(PrologKnowledgeSession::toJson).toList());
         if (previous != null) {
             request.put("previousDecision", Map.of(

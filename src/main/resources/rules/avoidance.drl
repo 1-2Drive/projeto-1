@@ -166,6 +166,12 @@ then
 end
 
 
+// The avoidance is decided at 50 m: inside the 60 m over which the blind-spot sensor
+// reports hazards in the side lanes (BlindSpotSensor.HAZARD_LOOKAHEAD_METERS), so a side
+// found clear is clear for the whole manoeuvre. Deciding from further away would move the
+// vehicle into a lane it cannot yet see into. Until then the obstacle stop rule
+// (road-hazards.drl) keeps the speed on the comfortable braking curve, so the vehicle
+// reaches 50 m at a speed from which it can still stop should no side be clear.
 rule "Avoid obstacle in centre lane by changing left"
 agenda-group "decision"
 salience 470

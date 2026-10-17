@@ -810,7 +810,10 @@ rule('Avoid pothole in right lane by changing left',
                        'Avoiding pothole by moving into the clear left lane')) ]).
 
 % Obstacle: from the centre, prefer the left; right only with the left occupied. An obstacle
-% blocks the lane, so going around it is collision avoidance.
+% blocks the lane, so going around it is collision avoidance. Decided at 50 m, inside the
+% 60 m over which the blind-spot sensor reports hazards in the side lanes, so a side found
+% clear is clear for the whole manoeuvre; until then the obstacle stop rule keeps the speed
+% on the comfortable braking curve.
 rule('Avoid obstacle in centre lane by changing left',
      470,
      [ ego_lane(center),
@@ -907,7 +910,9 @@ rule('Stop before obstacle ahead while still in its lane (stop)',
      465,
      [ ego_lane(Lane),
        obstacle(_, D, _, Lane),
-       test((D > 0, D =< 60.0)),
+       ego_speed(V),
+       test(obstacle_stop_window(V, W)),
+       test((D > 0, D =< W)),
        lane_change_state(idle),
        test(obstacle_margin(D, Margin)),
        test(Margin =< 0.5) ],
@@ -918,9 +923,10 @@ rule('Stop before obstacle ahead while still in its lane (emergency)',
      465,
      [ ego_lane(Lane),
        obstacle(_, D, _, Lane),
-       test((D > 0, D =< 60.0)),
-       lane_change_state(idle),
        ego_speed(V),
+       test(obstacle_stop_window(V, W)),
+       test((D > 0, D =< W)),
+       lane_change_state(idle),
        test(obstacle_margin(D, Margin)),
        test(Margin > 0.5),
        test(obstacle_braking_excessive(V, Margin)) ],
@@ -931,14 +937,34 @@ rule('Stop before obstacle ahead while still in its lane (brake)',
      465,
      [ ego_lane(Lane),
        obstacle(_, D, _, Lane),
-       test((D > 0, D =< 60.0)),
-       lane_change_state(idle),
        ego_speed(V),
+       test(obstacle_stop_window(V, W)),
+       test((D > 0, D =< W)),
+       lane_change_state(idle),
        test(obstacle_margin(D, Margin)),
        test(Margin > 0.5),
        not(test(obstacle_braking_excessive(V, Margin))),
-       test(obstacle_curve(Margin, Target)) ],
+       test(obstacle_curve(Margin, Target)),
+       test(Target < V) ],
      [ assert(proposal(brake, Target, high, collision_avoidance,
+                       'Obstacle ahead in own lane; stopping unless a lane change takes the vehicle out of its way')) ]).
+
+% Inside the stopping window but still above the comfortable braking curve: hold the speed
+% while the avoidance is decided, so the vehicle does not gain speed towards the obstacle.
+rule('Stop before obstacle ahead while still in its lane (hold)',
+     465,
+     [ ego_lane(Lane),
+       obstacle(_, D, _, Lane),
+       ego_speed(V),
+       test(obstacle_stop_window(V, W)),
+       test((D > 0, D =< W)),
+       lane_change_state(idle),
+       test(obstacle_margin(D, Margin)),
+       test(Margin > 0.5),
+       not(test(obstacle_braking_excessive(V, Margin))),
+       test(obstacle_curve(Margin, Target)),
+       test(Target >= V) ],
+     [ assert(proposal(maintain_speed, V, moderate, collision_avoidance,
                        'Obstacle ahead in own lane; stopping unless a lane change takes the vehicle out of its way')) ]).
 
 % Neither side is safe to enter (the blind-spot occupancy already reports a side as not safe
@@ -949,7 +975,9 @@ rule('Stop before obstacle when lane change prohibited by continuous line (stop)
      466,
      [ ego_lane(Lane),
        obstacle(_, D, _, Lane),
-       test((D > 0, D =< 60.0)),
+       ego_speed(V),
+       test(obstacle_stop_window(V, W)),
+       test((D > 0, D =< W)),
        lane_safe_to_enter(left, false),
        lane_safe_to_enter(right, false),
        test(continuous_line_closes_lane(Lane)),
@@ -962,14 +990,34 @@ rule('Stop before obstacle when lane change prohibited by continuous line (brake
      466,
      [ ego_lane(Lane),
        obstacle(_, D, _, Lane),
-       test((D > 0, D =< 60.0)),
+       ego_speed(V),
+       test(obstacle_stop_window(V, W)),
+       test((D > 0, D =< W)),
        lane_safe_to_enter(left, false),
        lane_safe_to_enter(right, false),
        test(continuous_line_closes_lane(Lane)),
        test(obstacle_margin(D, Margin)),
        test(Margin > 0.5),
-       test(obstacle_curve(Margin, Target)) ],
+       test(obstacle_curve(Margin, Target)),
+       test(Target < V) ],
      [ assert(proposal(brake, Target, high, collision_avoidance,
+                       'Continuous line prohibits lane change; stopping before obstacle')) ]).
+
+rule('Stop before obstacle when lane change prohibited by continuous line (hold)',
+     466,
+     [ ego_lane(Lane),
+       obstacle(_, D, _, Lane),
+       ego_speed(V),
+       test(obstacle_stop_window(V, W)),
+       test((D > 0, D =< W)),
+       lane_safe_to_enter(left, false),
+       lane_safe_to_enter(right, false),
+       test(continuous_line_closes_lane(Lane)),
+       test(obstacle_margin(D, Margin)),
+       test(Margin > 0.5),
+       test(obstacle_curve(Margin, Target)),
+       test(Target >= V) ],
+     [ assert(proposal(maintain_speed, V, moderate, collision_avoidance,
                        'Continuous line prohibits lane change; stopping before obstacle')) ]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1578,9 +1626,23 @@ continuous_line_closes_lane(right) :-
 continuous_line_closes_lane(left) :-
     known(left_marking(continuous)).
 
-% Metres to the stopping point, 10 m before the obstacle.
+% Metres to the stopping point, StoppingPolicy.OBSTACLE_STOP_OFFSET_METERS before the obstacle.
 obstacle_margin(D, Margin) :-
-    Margin is max(0.0, D - 10.0).
+    param(obstacleStopOffsetMeters, Offset),
+    Margin is max(0.0, D - Offset).
+
+% Distance from which an obstacle in the ego's lane is stopped for: the comfortable stopping
+% distance at V km/h (reaction + braking + the offset), never less than 60 m.
+obstacle_stop_window(V, W) :-
+    obstacle_stopping_distance(V, D),
+    W is max(60.0, D).
+
+obstacle_stopping_distance(V, D) :-
+    deceleration(comfort, A),
+    param(reactionTimeSeconds, Reaction),
+    param(obstacleStopOffsetMeters, Offset),
+    Vms is max(0.0, V) / 3.6,
+    D is Vms * Reaction + Vms * Vms / (2.0 * A) + Offset.
 
 % The deceleration needed to stop within the margin exceeds comfortable braking by 10%.
 obstacle_braking_excessive(V, Margin) :-
@@ -1588,9 +1650,10 @@ obstacle_braking_excessive(V, Margin) :-
     Vms is V / 3.6,
     Vms * Vms / (2.0 * Margin) > A * 1.1.
 
-% Speed (km/h) on the comfortable braking curve that stops within the margin.
+% Speed (km/h) on the anticipation braking curve (2.0 m/s2) that stops within the margin:
+% braking at the comfortable rate towards it keeps the vehicle under the comfortable curve.
 obstacle_curve(Margin, Target) :-
-    deceleration(comfort, A),
+    deceleration(anticipation, A),
     Target is sqrt(2.0 * A * Margin) * 3.6.
 
 % StoppingPolicy.approachSpeedKmh: the fastest the vehicle may still be going D metres

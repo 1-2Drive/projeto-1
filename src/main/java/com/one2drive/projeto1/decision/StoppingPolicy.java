@@ -40,6 +40,12 @@ public final class StoppingPolicy {
     /** Stretch before a speed limit sign over which the vehicle already holds the new limit. */
     public static final double SPEED_LIMIT_APPROACH_BUFFER_METERS = 8.0;
 
+    /**
+     * The vehicle comes to rest this far before an obstacle in its lane: outside the 8 m
+     * emergency zone, so it can still steer away once a lane opens.
+     */
+    public static final double OBSTACLE_STOP_OFFSET_METERS = 10.0;
+
     private StoppingPolicy() {
     }
 

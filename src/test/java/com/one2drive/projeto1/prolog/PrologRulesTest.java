@@ -615,10 +615,12 @@ class PrologRulesTest {
                 new ObstacleDetectedEvent(1_000, "camera", 40.0, "obstacle-1", HazardSeverity.MEDIUM, Lane.RIGHT),
                 new LaneOccupancyEvent(1_000, "blind-spot", Lane.LEFT, false, Double.POSITIVE_INFINITY, false,
                     Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY));
-            assertEquals(DrivingAction.BRAKE, decision.getAction(),
+            // At 30 km/h the obstacle at 40 m is still above the comfortable braking curve
+            // (46.7 km/h stops in the 30 m left), so the speed is held, not yet reduced.
+            assertEquals(DrivingAction.MAINTAIN_SPEED, decision.getAction(),
                 "the left lane is free but the continuous line forbids it");
             assertEquals(DrivingAction.KEEP_LANE, decision.getLaneAction());
-            assertEquals("Stop before obstacle when lane change prohibited by continuous line (brake)",
+            assertEquals("Stop before obstacle when lane change prohibited by continuous line (hold)",
                 decision.getSourceRule());
         }
     }

@@ -225,8 +225,11 @@ simulation runs (`PUT /api/world/map/cells`).
 When an obstacle sits in the car's lane, `Stop before obstacle ahead while still in
 its lane` keeps the car able to stop 10 m short of it for as long as no lane change has
 taken it out of that lane: whether no side is free, or the avoidance was vetoed or
-refused. An avoidance that starts in time is never slowed down. Once a lane opens the
-car steers through it and `Move off when stopped and nothing holds the vehicle` takes it
+refused. The rule binds from the distance a comfortable stop needs at the current speed
+(at least 60 m): above the braking curve the car holds its speed, on it the car brakes,
+so it reaches the 50 m where the avoidance is decided (inside the 60 m the blind-spot
+sensor sees into the side lanes) at a speed from which it can still stop. Once a lane
+opens the car steers through it and `Move off when stopped and nothing holds the vehicle` takes it
 back up to 30 km/h (or the speed limit, if lower). From there
 `Build back up to the scenario cruise speed when no sign governs the road` keeps
 accelerating until the vehicle reaches the scenario's entry speed, so a brake, an

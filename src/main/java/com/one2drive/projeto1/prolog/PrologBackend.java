@@ -46,6 +46,11 @@ public class PrologBackend implements ExpertSystemBackend {
         trace.add(0L, TimelineEntryType.INFO, "SWI-Prolog backend started");
     }
 
+    /** What the last decision cycle produced, its cost included. */
+    public PrologCycleResult lastCycleResult() {
+        return lastResult;
+    }
+
     public PrologKnowledgeSession session() {
         return session;
     }

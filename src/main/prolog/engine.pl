@@ -48,6 +48,20 @@
 % Guard against a rule set that keeps producing new instantiations.
 max_firings_per_cycle(5000).
 
+% Meta-conhecimento (índice de dependências) ligado por omissão. Desligado, cada disparo
+% avalia de novo todas as regras, como um ciclo reconhecer-atuar ingénuo: só serve para medir
+% o que o índice poupa (DependencyIndexBenchmarkTest); as decisões são as mesmas.
+:- dynamic use_dependency_index/1, cycle_stats/3, rematch_count/1.
+use_dependency_index(true).
+rematch_count(0).
+% cycle_stats(Rematches, Firings, Millis): what the last run_rules/0 cost.
+cycle_stats(0, 0, 0.0).
+
+set_dependency_index(Flag) :-
+    must_be(boolean, Flag),
+    retractall(use_dependency_index(_)),
+    assertz(use_dependency_index(Flag)).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Memória de trabalho
 
@@ -232,6 +246,9 @@ prove_goal(Goal, []) :-
 % Replaces the rule's activations with its current matches, leaving out what already fired.
 % Meta-conhecimento: precedência e ordem da regra (do índice) e refração (already_fired/2).
 rematch(Id) :-
+    retract(rematch_count(N0)),
+    N is N0 + 1,
+    assertz(rematch_count(N)),
     retractall(activation(Id, _, _, _, _)),
     rule_precedence(Id, Precedence),
     rule_rank(Id, Rank),
@@ -254,11 +271,19 @@ already_fired(Id, inst(Conditions, _, _)) :-
 
 run_rules :-
     ensure_index,
+    retractall(rematch_count(_)),
+    assertz(rematch_count(0)),
+    get_time(Start),
     forall(rule_rank(Id, _), rematch(Id)),
     max_firings_per_cycle(Max),
-    fire_loop(0, Max).
+    fire_loop(0, Max, Firings),
+    get_time(End),
+    Millis is (End - Start) * 1000.0,
+    rematch_count(Rematches),
+    retractall(cycle_stats(_, _, _)),
+    assertz(cycle_stats(Rematches, Firings, Millis)).
 
-fire_loop(Count, Max) :-
+fire_loop(Count, Max, Firings) :-
     (   best_activation(Id, Inst)
     ->  (   Count >= Max
         ->  throw(error(rule_firing_limit(Max, Id), _))
@@ -266,8 +291,8 @@ fire_loop(Count, Max) :-
         ),
         fire(Id, Inst),
         Next is Count + 1,
-        fire_loop(Next, Max)
-    ;   true
+        fire_loop(Next, Max, Firings)
+    ;   Firings = Count
     ).
 
 % Meta-conhecimento (resolução de conflitos): highest precedence, then rule rank, then match order.
@@ -286,7 +311,10 @@ fire(Id, Inst) :-
     foldl(perform(Id, Evidence), Actions, [], Changed0),
     sort(Changed0, Changed),
     % Meta-conhecimento (índice de dependências): only the rules that read a new fact type.
-    findall(Reader, ( member(Key, Changed), rule_reads(Key, Reader) ), Readers0),
+    (   use_dependency_index(true)
+    ->  findall(Reader, ( member(Key, Changed), rule_reads(Key, Reader) ), Readers0)
+    ;   findall(Reader, rule_rank(Reader, _), Readers0)
+    ),
     sort(Readers0, Readers),
     maplist(rematch, Readers).
 

@@ -178,8 +178,19 @@ public class PrologKnowledgeSession implements AutoCloseable {
                 holds.getOrDefault("no_continuous_line", false),
                 holds.getOrDefault("side_clear", false)));
         }
+        JsonNode stats = reply.path("engineStats");
         return new PrologCycleResult(List.copyOf(proposals), List.copyOf(facts),
-            reply.path("speedLimitKmh").asDouble(), List.copyOf(laneChecks));
+            reply.path("speedLimitKmh").asDouble(), List.copyOf(laneChecks),
+            new PrologCycleResult.EngineStats(stats.path("rematches").asInt(), stats.path("firings").asInt(),
+                stats.path("ruleMillis").asDouble()));
+    }
+
+    /**
+     * Turns the engine's dependency index (meta-knowledge) on or off. It is on unless a
+     * benchmark turns it off to measure what it saves: the decisions are the same either way.
+     */
+    public void setDependencyIndex(boolean enabled) {
+        process.request(Map.of("cmd", "dependencyIndex", "enabled", enabled));
     }
 
     public PrologCycleResult cycle(long timestampMillis, double speedKmh, Lane lane, List<?> events,

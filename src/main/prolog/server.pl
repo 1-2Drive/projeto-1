@@ -13,8 +13,10 @@
 %    "previousDecision":{"action":"STOP", "rule":"...", "priority":60}}
 %   (os campos a partir da segunda linha são opcionais)
 %   {"cmd":"whynot", "rule":"<rule id>"}
+%   {"cmd":"dependencyIndex", "enabled":false}   só para medir o índice (ligado por omissão)
 % Respostas: {"ok":true, ...} ou {"ok":false, "error":"..."}. A resposta ao tick leva também
-% laneChecks: para cada lado, se cada subobjetivo de safe_to_change_lane/1 se prova.
+% laneChecks: para cada lado, se cada subobjetivo de safe_to_change_lane/1 se prova; e
+% engineStats: quantas avaliações de regras e disparos o ciclo custou, e em quanto tempo.
 % Os avisos e erros do Prolog vão para o stderr; o stdout só leva respostas.
 
 :- use_module(library(http/json)).
@@ -56,7 +58,8 @@ handle_line(Line) :-
 reply(reset, R, _{ok: true}) :-
     reset_state(R.cruiseTargetKmh, R.params, R.priorities).
 
-reply(tick, R, _{ok: true, proposals: Proposals, facts: Facts, speedLimitKmh: Limit, laneChecks: Checks}) :-
+reply(tick, R, _{ok: true, proposals: Proposals, facts: Facts, speedLimitKmh: Limit, laneChecks: Checks,
+                 engineStats: _{rematches: Rematches, firings: Firings, ruleMillis: Millis}}) :-
     downcase_atom(R.lane, Lane),
     optional(R, laneChangeState, 'IDLE', LaneChange),
     optional(R, leftMarking, 'DASHED', LeftMarking),
@@ -78,7 +81,12 @@ reply(tick, R, _{ok: true, proposals: Proposals, facts: Facts, speedLimitKmh: Li
     findall(J, ( wm_fact(Id, proposal(_, _, _, _, _)), proposal_json(Id, J) ), Proposals),
     findall(J, ( wm_fact(Id, Fact), fact_json(Id, Fact, J) ), Facts),
     findall(J, ( member(Side, [left, right]), lane_check_json(Side, J) ), Checks),
-    limit_state(Limit, _, _).
+    limit_state(Limit, _, _),
+    cycle_stats(Rematches, Firings, Millis).
+
+reply(dependencyIndex, R, _{ok: true, dependencyIndex: Flag}) :-
+    Flag = R.enabled,
+    set_dependency_index(Flag).
 
 reply(whynot, R, _{ok: true, rule: R.rule, failedConditions: Texts}) :-
     why_not(R.rule, Blocking),

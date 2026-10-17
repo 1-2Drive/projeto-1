@@ -101,27 +101,21 @@ class DecisionActuatorTest {
     }
 
     @Test
-    void refusesALaneChangeThatEndsTooCloseBehindASlowerVehicle() {
-        // 40 km/h behind nothing, a 30 km/h vehicle 33 m ahead in CENTER: clear of the blind spot
-        // and 12 s from a collision, but after the 3 s maneuver only 25 m are left, not enough
-        // to slow to 30 km/h 12 m behind it braking at 2 m/s2.
+    void startsTheLaneChangeTheRulesDecidedWhateverTheVehicleAheadInThatLane() {
+        // A 30 km/h vehicle 33 m ahead in CENTER is too close to follow after the maneuver,
+        // but that is the rules' call (roomToFollow, lane-safety.drl), made from the radar
+        // before the lane change is proposed: the actuator does not judge it again.
         WorldState world = worldAt(40.0);
         world.addActor(new OtherVehicle(33.0, Lane.CENTER, 30.0 / 3.6));
         DrivingDecision decision = changeLaneLeft();
         new DecisionActuator(CONFIG).applyDecision(world, decision);
-        assertEquals(LaneChangeState.IDLE, world.getEgo().getLaneChangeState(), "the lane change does not start");
-        assertEquals(DrivingAction.KEEP_LANE, decision.getLaneAction());
-        assertEquals("Actuator safety guard", decision.getLaneSourceRule());
-        assertTrue(decision.getLaneReason().contains("too close to follow safely"), decision.getLaneReason());
+        assertEquals(LaneChangeState.REQUESTED, world.getEgo().getLaneChangeState(), "the lane change starts");
+        assertEquals(DrivingAction.CHANGE_LANE_LEFT, decision.getLaneAction());
     }
 
     @Test
-    void acceptsALaneChangeWithRoomToFollowTheVehicleAhead() {
-        WorldState world = worldAt(40.0);
-        world.addActor(new OtherVehicle(60.0, Lane.CENTER, 30.0 / 3.6));
-        DrivingDecision decision = changeLaneLeft();
-        new DecisionActuator(CONFIG).applyDecision(world, decision);
-        assertEquals(LaneChangeState.REQUESTED, world.getEgo().getLaneChangeState(), "the lane change starts");
-        assertEquals(DrivingAction.CHANGE_LANE_LEFT, decision.getLaneAction());
+    void theRulesAssumeALaneChangeNoShorterThanTheActuatorPerforms() {
+        assertTrue(CONFIG.getLaneChangeSeconds() <= com.one2drive.projeto1.decision.StoppingPolicy.LANE_CHANGE_SECONDS,
+            "roomToFollow reckons with StoppingPolicy.LANE_CHANGE_SECONDS; a longer real maneuver would end closer");
     }
 }

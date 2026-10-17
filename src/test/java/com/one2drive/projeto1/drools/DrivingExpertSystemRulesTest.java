@@ -1081,4 +1081,37 @@ class DrivingExpertSystemRulesTest {
             assertEquals(44.0, decision.getRecommendedSpeedKmh(), 0.01);
         }
     }
+
+    // Ego at 40 km/h in CENTER with an obstacle 40 m ahead and the left side clear: the
+    // avoidance goes left only if the ego can still follow the vehicle the radar sees there.
+    // A 30 km/h vehicle 33 m ahead: after the 3 s lane change only 25 m are left, not enough
+    // to slow to 30 km/h 12 m behind it at 2 m/s2. At 60 m there is room.
+    private static Object[] obstacleAheadLeftSideClear(double leftVehicleMeters) {
+        return new Object[] {
+            new ObstacleDetectedEvent(1_000, "camera", 40.0, "obstacle-1", HazardSeverity.MEDIUM, Lane.CENTER),
+            new LaneOccupancyEvent(1_000, "blind-spot", Lane.LEFT, false, Double.POSITIVE_INFINITY, true,
+                Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY),
+            new LeftLaneVehicleEvent(1_000, "front-radar", leftVehicleMeters, 10.0 / 3.6, "left-1")
+        };
+    }
+
+    @Test
+    @Timeout(10)
+    void noLaneChangeIntoALaneWhoseVehicleAheadIsTooCloseToFollow() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(40.0)) {
+            DrivingDecision decision = harness.cycle(1_000, 40.0, obstacleAheadLeftSideClear(33.0));
+            assertNotEquals(DrivingAction.CHANGE_LANE_LEFT, decision.getLaneAction(),
+                "roomToFollow fails, so safeToChangeLane(LEFT) is not proved and no avoidance goes left");
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void laneChangeIntoALaneWhoseVehicleAheadLeavesRoomToFollow() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(40.0)) {
+            DrivingDecision decision = harness.cycle(1_000, 40.0, obstacleAheadLeftSideClear(60.0));
+            assertEquals(DrivingAction.CHANGE_LANE_LEFT, decision.getLaneAction());
+            assertEquals("Avoid obstacle in centre lane by changing left", decision.getLaneSourceRule());
+        }
+    }
 }

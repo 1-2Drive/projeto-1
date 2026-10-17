@@ -15,13 +15,16 @@ import java.util.List;
  * @param maneuverIdle     no lane change in progress
  * @param noContinuousLine a lane on that side, and no continuous line to cross into it
  * @param sideClear        the blind-spot sensor reports that side clear
+ * @param roomToFollow     the front radar reports no vehicle ahead in that lane, or one far
+ *                         enough and slow enough to be followed after the lane change
  */
 public record LaneChangeCheck(Lane side, Lane egoLane, boolean maneuverIdle, boolean noContinuousLine,
-                              boolean sideClear) {
+                              boolean sideClear, boolean roomToFollow) {
 
     public static final String MANEUVER_IDLE = "maneuverIdle";
     public static final String NO_CONTINUOUS_LINE = "noContinuousLine";
     public static final String SIDE_CLEAR = "sideClear";
+    public static final String ROOM_TO_FOLLOW = "roomToFollow";
 
     /** One sub-goal, whether it holds, and in words what it means for this side. */
     public record SubGoal(String goal, boolean holds, String detail) {
@@ -29,7 +32,7 @@ public record LaneChangeCheck(Lane side, Lane egoLane, boolean maneuverIdle, boo
 
     /** safeToChangeLane itself: every sub-goal holds. */
     public boolean allowed() {
-        return maneuverIdle && noContinuousLine && sideClear;
+        return maneuverIdle && noContinuousLine && sideClear && roomToFollow;
     }
 
     public List<SubGoal> subGoals() {
@@ -49,7 +52,10 @@ public record LaneChangeCheck(Lane side, Lane egoLane, boolean maneuverIdle, boo
             new SubGoal(NO_CONTINUOUS_LINE, noContinuousLine, line),
             new SubGoal(SIDE_CLEAR, sideClear,
                 sideClear ? "blind-spot sensor reports the " + direction + " side clear"
-                          : "blind-spot sensor reports the " + direction + " side occupied"));
+                          : "blind-spot sensor reports the " + direction + " side occupied"),
+            new SubGoal(ROOM_TO_FOLLOW, roomToFollow,
+                roomToFollow ? "room to follow the vehicle ahead in the " + target + " lane"
+                             : "vehicle ahead in the " + target + " lane too close to follow safely"));
     }
 
     /**

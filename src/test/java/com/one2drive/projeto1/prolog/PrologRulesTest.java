@@ -15,6 +15,7 @@ import com.one2drive.projeto1.drools.events.WeatherEvent;
 import com.one2drive.projeto1.drools.events.FrontDistanceEvent;
 import com.one2drive.projeto1.drools.events.ObstacleDetectedEvent;
 import com.one2drive.projeto1.drools.events.LaneOccupancyEvent;
+import com.one2drive.projeto1.drools.events.LeftLaneVehicleEvent;
 import com.one2drive.projeto1.drools.events.PedestrianDetectedEvent;
 import com.one2drive.projeto1.drools.events.RelativeSpeedEvent;
 import com.one2drive.projeto1.drools.events.SpeedLimitDetectedEvent;
@@ -576,6 +577,43 @@ class PrologRulesTest {
                 new PedestrianDetectedEvent(1_000, "camera", 58.0, "ped-1", true));
             assertEquals(DrivingAction.MAINTAIN_SPEED, decision.getSpeedAction());
             assertEquals("Brake for pedestrian proximity (hold speed)", decision.getSpeedSourceRule());
+        }
+    }
+
+    // Ego at 40 km/h in CENTER with an obstacle 40 m ahead and the left side clear: the
+    // avoidance goes left only if the ego can still follow the vehicle the radar sees there
+    // (room_to_follow/1 in safe_to_change_lane/1). A 30 km/h vehicle 33 m ahead is too
+    // close after the 3 s lane change; at 60 m there is room.
+    private static Object[] obstacleAheadLeftSideClear(double leftVehicleMeters) {
+        return new Object[] {
+            new ObstacleDetectedEvent(1_000, "camera", 40.0, "obstacle-1", HazardSeverity.MEDIUM, Lane.CENTER),
+            new LaneOccupancyEvent(1_000, "blind-spot", Lane.LEFT, false, Double.POSITIVE_INFINITY, true,
+                Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY),
+            new LeftLaneVehicleEvent(1_000, "front-radar", leftVehicleMeters, 10.0 / 3.6, "left-1")
+        };
+    }
+
+    @Test
+    @Timeout(10)
+    void noLaneChangeIntoALaneWhoseVehicleAheadIsTooCloseToFollow() {
+        try (PrologTestHarness harness = new PrologTestHarness()) {
+            DrivingDecision decision = decide(harness,
+                PrologKnowledgeSession.VehicleInput.keepingLane(1_000, 40.0, Lane.CENTER),
+                obstacleAheadLeftSideClear(33.0));
+            assertNotEquals(DrivingAction.CHANGE_LANE_LEFT, decision.getLaneAction(),
+                "room_to_follow fails, so safe_to_change_lane(left) is not proved and no avoidance goes left");
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void laneChangeIntoALaneWhoseVehicleAheadLeavesRoomToFollow() {
+        try (PrologTestHarness harness = new PrologTestHarness()) {
+            DrivingDecision decision = decide(harness,
+                PrologKnowledgeSession.VehicleInput.keepingLane(1_000, 40.0, Lane.CENTER),
+                obstacleAheadLeftSideClear(60.0));
+            assertEquals(DrivingAction.CHANGE_LANE_LEFT, decision.getLaneAction());
+            assertEquals("Avoid obstacle in centre lane by changing left", decision.getLaneSourceRule());
         }
     }
 

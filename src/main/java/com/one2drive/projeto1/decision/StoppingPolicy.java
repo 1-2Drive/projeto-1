@@ -46,7 +46,34 @@ public final class StoppingPolicy {
      */
     public static final double OBSTACLE_STOP_OFFSET_METERS = 10.0;
 
+    /**
+     * The gap the following rules keep behind a vehicle ahead ("Keep safe following distance
+     * behind front vehicle", front-vehicle.drl).
+     */
+    public static final double FOLLOWING_GAP_METERS = 12.0;
+
+    /**
+     * How long the rules assume a lane change takes. SimulationConfig.laneChangeSeconds, the
+     * time the actuator really takes, must not exceed it.
+     */
+    public static final double LANE_CHANGE_SECONDS = 3.0;
+
     private StoppingPolicy() {
+    }
+
+    /**
+     * Whether the ego, moving into the lane of a vehicle {@code gapMeters} ahead that it is
+     * closing in on at {@code relativeSpeedMps}, can still follow that vehicle: during the
+     * lane change the gap shrinks, and at its end the ego must be able to slow to the
+     * vehicle's speed {@link #FOLLOWING_GAP_METERS} behind it, braking at the anticipation
+     * deceleration. With no vehicle (an infinite gap) there is always room.
+     */
+    public static boolean roomToFollow(double egoSpeedKmh, double gapMeters, double relativeSpeedMps) {
+        double egoMps = Math.max(0.0, egoSpeedKmh) / 3.6;
+        double frontMps = Math.max(0.0, egoMps - relativeSpeedMps);
+        double gapAfterManeuver = gapMeters - Math.max(0.0, relativeSpeedMps) * LANE_CHANGE_SECONDS;
+        double room = Math.max(0.0, gapAfterManeuver - FOLLOWING_GAP_METERS);
+        return egoMps <= Math.sqrt(frontMps * frontMps + 2.0 * ANTICIPATION_DECELERATION_MPS2 * room);
     }
 
     /**

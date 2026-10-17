@@ -431,6 +431,42 @@ then
     update($state);
 end
 
+// The lane to the right, from the same front radar.
+rule "Update right lane vehicle state"
+agenda-group "perception"
+salience 1000
+no-loop true
+when
+    $e : RightLaneVehicleEvent() from entry-point "PERCEPTION_STREAM"
+    $state : RightLaneVehicleState()
+    eval($e.getTimestamp() >= $state.getTimestamp()
+        && ($e.getTimestamp() > $state.getTimestamp()
+            || !$e.getTargetId().equals($state.getTargetId())
+            || Math.abs($state.getDistanceMeters() - $e.getDistanceMeters()) > 0.01))
+then
+    $state.setTargetId($e.getTargetId());
+    $state.setDistanceMeters($e.getDistanceMeters());
+    $state.setRelativeSpeedMps($e.getRelativeSpeedMps());
+    $state.setTimestamp($e.getTimestamp());
+    update($state);
+end
+
+rule "Clear stale right lane vehicle perception"
+agenda-group "perception"
+no-loop true
+salience 900
+when
+    $state : RightLaneVehicleState(targetId != "none", $timestamp : timestamp)
+    VehicleStateFact($now : timestamp)
+    eval($now - $timestamp > 250)
+then
+    $state.setTargetId(RightLaneVehicleState.NO_TARGET);
+    $state.setDistanceMeters(Double.POSITIVE_INFINITY);
+    $state.setRelativeSpeedMps(0.0);
+    $state.setTimestamp($now);
+    update($state);
+end
+
 // The lane two to the left (LEFT, seen from RIGHT), from the same front radar.
 rule "Update far left lane vehicle state"
 agenda-group "perception"

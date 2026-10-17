@@ -33,6 +33,7 @@
 %   front_vehicle(Target, DistanceM, RelSpeedMps)   RelSpeed > 0: a aproximar-se
 %   front_distance_sample(Target, DistanceM, AgeMs)  front_read_now(Target)
 %   left_lane_vehicle(Target, DistanceM, RelSpeedMps)  left_read_now(Target)
+%   right_lane_vehicle(Target, DistanceM, RelSpeedMps)   a faixa à direita, do mesmo radar
 %   far_left_lane_vehicle(Target, DistanceM, RelSpeedMps)   duas faixas à esquerda (LEFT, visto de RIGHT)
 %   lane_occupancy(left|right, Occupied, FrontDistanceM)   o lado do ego, não uma faixa
 %   lane_occupancy_read(left|right, Ms)   quando esse lado foi lido (LaneOccupancyState.timestamp)
@@ -1435,7 +1436,8 @@ rule('Default maintain speed baseline',
 safe_to_change_lane(Side) :-
     maneuver_idle,
     no_continuous_line(Side),
-    side_clear(Side).
+    side_clear(Side),
+    room_to_follow(Side).
 
 % Nenhuma mudança de faixa em movimento.
 maneuver_idle :-
@@ -1463,6 +1465,33 @@ no_continuous_line(right) :-
 % O sensor de ângulo morto dá esse lado livre.
 side_clear(Side) :-
     known(lane_occupancy(Side, false, _)).
+
+% O radar frontal não vê veículo à frente na faixa desse lado, ou vê um longe e lento o
+% suficiente para ser seguido depois da mudança (StoppingPolicy.roomToFollow): durante a
+% manobra o intervalo encolhe, e no fim o ego tem de conseguir abrandar para a velocidade
+% dele a followingGapMeters, travando à desaceleração de antecipação. Duas cláusulas, sem
+% corte, porque o meta-interpretador prova o corpo conjunto a conjunto.
+room_to_follow(Side) :-
+    side_lane_vehicle(Side, D, Rel),
+    room_to_follow_behind(D, Rel).
+room_to_follow(Side) :-
+    \+ side_lane_vehicle(Side, _, _).
+
+side_lane_vehicle(left, D, Rel) :-
+    known(left_lane_vehicle(_, D, Rel)).
+side_lane_vehicle(right, D, Rel) :-
+    known(right_lane_vehicle(_, D, Rel)).
+
+room_to_follow_behind(D, Rel) :-
+    known(ego_speed(V)),
+    param(followingGapMeters, Gap),
+    param(laneChangeSeconds, T),
+    deceleration(anticipation, A),
+    Ego is max(0.0, V) / 3.6,
+    Front is max(0.0, Ego - Rel),
+    GapAfter is D - max(0.0, Rel) * T,
+    Room is max(0.0, GapAfter - Gap),
+    Ego =< sqrt(Front * Front + 2.0 * A * Room).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Predicados auxiliares (chamados a partir de test/1)

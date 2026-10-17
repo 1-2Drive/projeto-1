@@ -13,7 +13,7 @@
            obstacle_track/5, obstacle_reading/5, pothole_track/5, barrier_track/5,
            limit_state/3, pending_limit/4, light_track/5, pedestrian_track/5, ttc_reading/3, rain_reading/1, stop_track/5,
            front_track/4, front_distance_reading/3, occupancy/4, occupancy_read/2, left_vehicle_track/4,
-           far_left_vehicle_track/4,
+           right_vehicle_track/4, far_left_vehicle_track/4,
            overtaking_state/5, last_decision/2, last_priority/1, move_off/2, cruise/1,
            param/2, priority_value/2, lane_settled/1, physical_lane/1, pedestrian_braking/2.
 
@@ -45,7 +45,7 @@ state_predicates([ego_state/3, lane_change/1, markings/2, target_lane_state/1, s
                   obstacle_track/5, obstacle_reading/5, pothole_track/5, barrier_track/5,
                   limit_state/3, pending_limit/4, light_track/5, pedestrian_track/5, ttc_reading/3, rain_reading/1, stop_track/5,
                   front_track/4, front_distance_reading/3, occupancy/4, occupancy_read/2, left_vehicle_track/4,
-                  far_left_vehicle_track/4,
+                  right_vehicle_track/4, far_left_vehicle_track/4,
                   overtaking_state/5, last_decision/2, last_priority/1, move_off/2, cruise/1,
                   param/2, priority_value/2, lane_settled/1, physical_lane/1, pedestrian_braking/2]).
 
@@ -328,6 +328,14 @@ on_event('LeftLaneVehicleEvent', E) :-
     ;   retractall(left_vehicle_track(_, _, _, _))
     ).
 
+% "Update right lane vehicle state": the nearest vehicle ahead in the right lane.
+on_event('RightLaneVehicleEvent', E) :-
+    (   E.targetId \== none, number(E.distanceMeters)
+    ->  replace(right_vehicle_track(_, _, _, _),
+                right_vehicle_track(E.targetId, E.distanceMeters, E.relativeSpeedMps, E.timestamp))
+    ;   retractall(right_vehicle_track(_, _, _, _))
+    ).
+
 % "Update far left lane vehicle state": the nearest vehicle ahead two lanes to the left.
 on_event('FarLeftLaneVehicleEvent', E) :-
     (   E.targetId \== none, number(E.distanceMeters)
@@ -369,6 +377,7 @@ expire_old_readings(Now) :-
     expire_window(front_distance_reading(T5, _, _), T5, FrontWindow, Now),
     left_vehicle_validity_ms(LeftValidity),
     expire_track(left_vehicle_track(_, _, _, T6), T6, LeftValidity, Now),
+    expire_track(right_vehicle_track(_, _, _, T8), T8, LeftValidity, Now),
     expire_track(far_left_vehicle_track(_, _, _, T7), T7, LeftValidity, Now),
     expire_lane_request(Now),
     expire_pending_limit(Now),
@@ -546,6 +555,8 @@ load_vehicles(Now) :-
     forall(left_vehicle_track(Id, D, Rel, Ms),
            ( add_fact(left_lane_vehicle(Id, D, Rel)),
              (   Ms =:= Now -> add_fact(left_read_now(Id)) ; true ) )),
+    forall(right_vehicle_track(Id, D, Rel, _),
+           add_fact(right_lane_vehicle(Id, D, Rel))),
     forall(far_left_vehicle_track(Id, D, Rel, _),
            add_fact(far_left_lane_vehicle(Id, D, Rel))),
     forall(front_distance_reading(Ms, D, Target),

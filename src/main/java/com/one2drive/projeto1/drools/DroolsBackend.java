@@ -177,7 +177,8 @@ public class DroolsBackend implements ExpertSystemBackend {
         return new LaneChangeCheck(side, vehicleStateFact.getLane(),
             holds(LaneChangeCheck.MANEUVER_IDLE),
             holds(LaneChangeCheck.NO_CONTINUOUS_LINE, side),
-            holds(LaneChangeCheck.SIDE_CLEAR, side));
+            holds(LaneChangeCheck.SIDE_CLEAR, side),
+            holds(LaneChangeCheck.ROOM_TO_FOLLOW, side));
     }
 
     private boolean holds(String query, Object... arguments) {

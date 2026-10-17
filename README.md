@@ -240,7 +240,7 @@ overtake or a stop never leaves the car stranded below the speed the road asks f
 | Sensor | Rate | Range | Produces |
 |---|---|---|---|
 | Speed | 100 ms | - | `VehicleSpeedEvent` |
-| Front radar | 100 ms | 130 m | `FrontDistanceEvent`, `RelativeSpeedEvent`, `TTCEvent` |
+| Front radar | 100 ms | 130 m | `FrontDistanceEvent`, `RelativeSpeedEvent`, `TTCEvent`; the nearest vehicle ahead in each neighbouring lane as `LeftLaneVehicleEvent`, `RightLaneVehicleEvent`, `FarLeftLaneVehicleEvent` |
 | Camera | 200 ms | 120 m × visibility factor (84 m in rain) | signs, lights, pedestrian, pothole, barrier, obstacle |
 | Blind spot | 200 ms | 30 m | `LaneOccupancyEvent` per side of the car: vehicles alongside, fixed hazards up to 60 m ahead in that lane; past the road edge the side is occupied |
 | Environment | 400 ms | 200 m | weather, visibility, grip |

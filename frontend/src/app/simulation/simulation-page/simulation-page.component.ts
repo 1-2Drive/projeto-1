@@ -79,15 +79,6 @@ export class SimulationPageComponent implements OnInit, OnDestroy {
   protected readonly canResume = computed(() => !this.vm().loading && this.isPaused());
   protected readonly canStop = computed(() => !this.vm().loading && this.simulationStatus() !== 'STOPPED');
   protected readonly canReset = computed(() => !this.vm().loading);
-  /** Lane requests are offered while driving and no maneuver is already in progress. */
-  private readonly canRequestLaneChange = computed(() => {
-    const state = this.snapshot()?.egoVehicle.laneChangeState;
-    return this.canPause() && state !== 'REQUESTED' && state !== 'CHANGING';
-  });
-  protected readonly canChangeLaneLeft = computed(() =>
-    this.canRequestLaneChange() && this.snapshot()?.egoVehicle.lane !== 'LEFT');
-  protected readonly canChangeLaneRight = computed(() =>
-    this.canRequestLaneChange() && this.snapshot()?.egoVehicle.lane !== 'RIGHT');
 
   /** Backend only publishes demo phases while the scripted scenario is loaded. */
   protected readonly demoPhases = computed(() => this.snapshot()?.demoPhases ?? []);
@@ -137,10 +128,6 @@ export class SimulationPageComponent implements OnInit, OnDestroy {
 
   protected switchBackend(backend: ExpertBackend): void {
     this.state.switchBackend(backend);
-  }
-
-  protected requestLaneChange(direction: 'LEFT' | 'RIGHT'): void {
-    this.state.requestLaneChange(direction);
   }
 
   protected runPresentationDemo(): void {

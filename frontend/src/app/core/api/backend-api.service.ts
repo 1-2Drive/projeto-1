@@ -65,10 +65,6 @@ export class BackendApiService {
     return this.http.post<CommandResponse>(`${this.baseUrl}/simulation/reset`, {});
   }
 
-  requestLaneChange(direction: 'LEFT' | 'RIGHT'): Observable<CommandResponse> {
-    return this.http.post<CommandResponse>(`${this.baseUrl}/simulation/lane-change/${direction}`, {});
-  }
-
   setMapCell(request: MapCellRequest): Observable<WorldMutationResponse> {
     return this.http.put<WorldMutationResponse>(`${this.baseUrl}/world/map/cells`, request);
   }

@@ -146,7 +146,6 @@
 }
 
 .controls__primary,
-.controls__driver,
 .controls__engine,
 .controls__demo {
   display: flex;
@@ -155,7 +154,6 @@
   flex-wrap: wrap;
 }
 
-.controls__driver,
 .controls__engine,
 .controls__demo {
   padding-left: var(--ds-space-3);

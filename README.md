@@ -135,10 +135,13 @@ DrivingDecision -> DecisionActuator -> Updated WorldState -> next cycle
     `COMFORT_PROGRESS` (10) only set the base speed the ceilings cap.
   - Lane: highest priority wins, then `RETURN_RIGHT` > `CHANGE_LANE` > `KEEP_LANE`.
     A lane maneuver is vetoed when the speed decision is an emergency or a mandatory
-    stop from a higher priority; the actuator can still refuse it (lane unsafe,
-    continuous line).
+    stop from a higher priority that is braking to stop (`STOP`, `WAIT`, `BRAKE`,
+    `EMERGENCY_BRAKE`); on the approach, still slowing, the maneuver may go ahead. A
+    ceiling lower than a mandatory stop's own speed still caps it. The actuator can
+    still refuse a maneuver (lane unsafe, continuous line).
   - Each proposal records its outcome (`WON`, `LOST_TO rule`, `VETOED_BY rule`,
-    `REJECTED_BY actuator`); the decision panel lists them as the why / why not.
+    `CAPPED` by a lower ceiling, `REJECTED_BY actuator`); the decision panel lists them
+    as the why / why not.
 
 ### CEP / Temporal Reasoning
 
@@ -219,8 +222,10 @@ The **Road map** panel under the road view shows the whole matrix and the car's 
 Pick a value in the palette and click or drag over cells to paint them, also while the
 simulation runs (`PUT /api/world/map/cells`).
 
-When an obstacle blocks the car's lane and neither side lane is free,
-`Stop before obstacle when no lane is free` stops it 10 m short. Once a lane opens the
+When an obstacle sits in the car's lane, `Stop before obstacle ahead while still in
+its lane` keeps the car able to stop 10 m short of it for as long as no lane change has
+taken it out of that lane: whether no side is free, or the avoidance was vetoed or
+refused. An avoidance that starts in time is never slowed down. Once a lane opens the
 car steers through it and `Move off when stopped and nothing holds the vehicle` takes it
 back up to 30 km/h (or the speed limit, if lower). From there
 `Build back up to the scenario cruise speed when no sign governs the road` keeps

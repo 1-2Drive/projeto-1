@@ -317,6 +317,10 @@
     border-color: #6c5a1e;
   }
 
+  &.outcome--capped {
+    border-color: #1f5a7a;
+  }
+
   &.outcome--rejected-by {
     border-color: #7d3232;
   }

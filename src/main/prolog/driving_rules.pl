@@ -897,50 +897,49 @@ rule('Pothole ahead reduce speed',
      [ assert(proposal(reduce_speed, Target, moderate, road_hazard,
                        'Pothole ahead requires speed reduction')) ]).
 
-% Obstacle in the ego's lane and both adjacent lanes occupied: stop 10 m before it (outside
-% the 8 m emergency zone, so it can still go around if a lane opens). It follows the
+% Obstacle in the ego's lane while the vehicle has not started to move out of that lane
+% (no side free, avoidance vetoed by a mandatory stop, or refused by the actuator): stop
+% 10 m before it (outside the 8 m emergency zone). The curve only binds when the vehicle
+% is too fast to stop there, so an avoidance that starts in time is not slowed down. It follows the
 % comfortable braking curve; if the deceleration needed exceeds the comfortable one by 10%,
 % it brakes hard.
-rule('Stop before obstacle when no lane is free (stop)',
+rule('Stop before obstacle ahead while still in its lane (stop)',
      465,
      [ ego_lane(Lane),
        obstacle(_, D, _, Lane),
        test((D > 0, D =< 60.0)),
-       lane_occupancy(left, true, _),
-       lane_occupancy(right, true, _),
+       lane_change_state(idle),
        test(obstacle_margin(D, Margin)),
        test(Margin =< 0.5) ],
      [ assert(proposal(stop, 0.0, high, collision_avoidance,
-                       'Obstacle ahead and no free lane to avoid it')) ]).
+                       'Obstacle ahead in own lane; stopping unless a lane change takes the vehicle out of its way')) ]).
 
-rule('Stop before obstacle when no lane is free (emergency)',
+rule('Stop before obstacle ahead while still in its lane (emergency)',
      465,
      [ ego_lane(Lane),
        obstacle(_, D, _, Lane),
        test((D > 0, D =< 60.0)),
-       lane_occupancy(left, true, _),
-       lane_occupancy(right, true, _),
+       lane_change_state(idle),
        ego_speed(V),
        test(obstacle_margin(D, Margin)),
        test(Margin > 0.5),
        test(obstacle_braking_excessive(V, Margin)) ],
      [ assert(proposal(emergency_brake, 0.0, high, collision_avoidance,
-                       'Obstacle ahead and no free lane to avoid it')) ]).
+                       'Obstacle ahead in own lane; stopping unless a lane change takes the vehicle out of its way')) ]).
 
-rule('Stop before obstacle when no lane is free (brake)',
+rule('Stop before obstacle ahead while still in its lane (brake)',
      465,
      [ ego_lane(Lane),
        obstacle(_, D, _, Lane),
        test((D > 0, D =< 60.0)),
-       lane_occupancy(left, true, _),
-       lane_occupancy(right, true, _),
+       lane_change_state(idle),
        ego_speed(V),
        test(obstacle_margin(D, Margin)),
        test(Margin > 0.5),
        not(test(obstacle_braking_excessive(V, Margin))),
        test(obstacle_curve(Margin, Target)) ],
      [ assert(proposal(brake, Target, high, collision_avoidance,
-                       'Obstacle ahead and no free lane to avoid it')) ]).
+                       'Obstacle ahead in own lane; stopping unless a lane change takes the vehicle out of its way')) ]).
 
 % Neither side is safe to enter (the blind-spot occupancy already reports a side as not safe
 % when the line towards it is continuous, WorldState.sideLaneOccupancy) and the ego's lane

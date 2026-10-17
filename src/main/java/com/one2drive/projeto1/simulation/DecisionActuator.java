@@ -66,6 +66,12 @@ public class DecisionActuator {
                 ego.setAccelerationMps2(ego.getSpeedKmh() < 0.6 ? 0.0 : -config.getComfortableDecelerationMps2());
             } else if (action == DrivingAction.EMERGENCY_BRAKE) {
                 ego.setAccelerationMps2(-config.getEmergencyDecelerationMps2());
+            } else if (!Double.isNaN(recommendedSpeed) && ego.getSpeedKmh() > recommendedSpeed + SPEED_DEAD_BAND_KMH) {
+                // Holding or resuming under a mandatory stop, but a ceiling capped the speed
+                // lower (an obstacle nearer than the stop line): slow down to it.
+                ego.setAccelerationMps2(ego.getSpeedKmh() > recommendedSpeed + 2.0
+                    ? -config.getComfortableDecelerationMps2()
+                    : -Math.max(1.0, (ego.getSpeedKmh() - recommendedSpeed) * 1.5));
             }
             if ((action == DrivingAction.STOP || action == DrivingAction.WAIT) && ego.getSpeedKmh() < 0.6) {
                 ego.setSpeedKmh(0.0);

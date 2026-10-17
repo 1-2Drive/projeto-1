@@ -46,22 +46,20 @@ then
     );
 end
 
-// An obstacle in the vehicle's own lane with no free lane on either side (another
-// hazard, a vehicle alongside or the road edge) cannot be avoided, so the car must
-// come to rest before it, 10 m short: outside the 8 m emergency zone, so it can steer
-// away once a lane opens. The car follows the speed from which comfortable braking
-// (2.8 m/s2, as the actuator applies) stops in the room left; when the deceleration
-// needed (v^2 / 2d) is more than comfortable braking gives, it brakes hard instead.
-rule "Stop before obstacle when no lane is free"
+// An obstacle in the ego lane is stopped for as long as the vehicle has not started to
+// move out of that lane: whether no side is free, or the avoidance was vetoed by a
+// mandatory stop or refused by the actuator, the vehicle must still be able to stop 10 m
+// before it. The stopping curve only binds when the vehicle is too fast to stop there, so
+// an avoidance that starts in time is not slowed down. The lane change takes the vehicle
+// out of the obstacle's lane and the rule stops holding.
+rule "Stop before obstacle ahead while still in its lane"
 agenda-group "decision"
 salience 465
 when
     $ctx : DecisionContext()
-    VehicleStateFact($lane : lane, $speed : speedKmh)
+    VehicleStateFact($lane : lane, $speed : speedKmh, laneChangeState == LaneChangeState.IDLE)
     ObstacleStateFact(obstacleId != "none", lane == $lane,
                       $distance : distanceMeters > 0, distanceMeters <= 60.0)
-    LaneOccupancyState(lane == Lane.LEFT, occupied == true)
-    LaneOccupancyState(lane == Lane.RIGHT, occupied == true)
 then
     double room = Math.max(0.0, $distance - 10.0);
     double speedMps = $speed / 3.6;
@@ -80,9 +78,9 @@ then
         target,
         RiskLevel.HIGH,
         DecisionPriority.COLLISION_AVOIDANCE,
-        "Obstacle ahead and no free lane to avoid it",
+        "Obstacle ahead in own lane; stopping unless a lane change takes the vehicle out of its way",
         drools.getRule().getName(),
-        "obstacle " + $distance + "m ahead in own lane, both sides blocked"
+        "obstacle " + $distance + "m ahead in own lane, not moving out of it"
     );
 end
 

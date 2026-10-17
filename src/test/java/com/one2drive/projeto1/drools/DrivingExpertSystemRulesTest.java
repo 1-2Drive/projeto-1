@@ -1045,4 +1045,40 @@ class DrivingExpertSystemRulesTest {
                 "the vehicle has left the obstacle's lane, so the obstacle is not critical");
         }
     }
+
+    // Pedestrian at 60 m: the 2.0 m/s2 curve allows 46.7 km/h, the 1.4 m/s2 curve 39.0 km/h.
+    @Test
+    @Timeout(10)
+    void brakingForAPedestrianContinuesBetweenTheCurvesThenHoldsTheSpeed() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(60.0)) {
+            DrivingDecision start = harness.cycle(1_000, 60.0,
+                new PedestrianDetectedEvent(1_000, "camera", 60.0, "ped-1", true));
+            assertEquals(DrivingAction.BRAKE, start.getSpeedAction());
+            assertEquals("Brake for pedestrian proximity", start.getSpeedSourceRule());
+
+            DrivingDecision between = harness.cycle(1_200, 44.0,
+                new PedestrianDetectedEvent(1_200, "camera", 58.0, "ped-1", true));
+            assertEquals(DrivingAction.BRAKE, between.getSpeedAction(),
+                "between the curves the vehicle keeps braking once it started");
+
+            DrivingDecision under = harness.cycle(1_400, 36.0,
+                new PedestrianDetectedEvent(1_400, "camera", 57.0, "ped-1", true));
+            assertEquals(DrivingAction.MAINTAIN_SPEED, under.getSpeedAction(),
+                "under the lower curve, after braking, the vehicle holds its speed and never speeds up again");
+            assertEquals("Brake for pedestrian proximity", under.getSpeedSourceRule());
+            assertEquals(36.0, under.getRecommendedSpeedKmh(), 0.01);
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void aVehicleBetweenTheCurvesThatWasNotBrakingHoldsItsSpeed() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(44.0)) {
+            DrivingDecision decision = harness.cycle(1_000, 44.0,
+                new PedestrianDetectedEvent(1_000, "camera", 58.0, "ped-1", true));
+            assertEquals(DrivingAction.MAINTAIN_SPEED, decision.getSpeedAction());
+            assertEquals("Brake for pedestrian proximity", decision.getSpeedSourceRule());
+            assertEquals(44.0, decision.getRecommendedSpeedKmh(), 0.01);
+        }
+    }
 }

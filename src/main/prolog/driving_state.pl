@@ -15,7 +15,7 @@
            front_track/4, front_distance_reading/3, occupancy/4, occupancy_read/2, left_vehicle_track/4,
            far_left_vehicle_track/4,
            overtaking_state/5, last_decision/2, last_priority/1, move_off/2, cruise/1,
-           param/2, priority_value/2, lane_settled/1, physical_lane/1.
+           param/2, priority_value/2, lane_settled/1, physical_lane/1, pedestrian_braking/2.
 
 % Window of the persistent-TTC rule (window:time(2s) in Drools).
 ttc_window_ms(2000).
@@ -47,7 +47,7 @@ state_predicates([ego_state/3, lane_change/1, markings/2, target_lane_state/1, s
                   front_track/4, front_distance_reading/3, occupancy/4, occupancy_read/2, left_vehicle_track/4,
                   far_left_vehicle_track/4,
                   overtaking_state/5, last_decision/2, last_priority/1, move_off/2, cruise/1,
-                  param/2, priority_value/2, lane_settled/1, physical_lane/1]).
+                  param/2, priority_value/2, lane_settled/1, physical_lane/1, pedestrian_braking/2]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Reinício da sessão
@@ -96,6 +96,8 @@ reset_state(Cruise, Params, Priorities) :-
     assertz(last_priority(0)),
     % move_off(Active, Ms): Drools' MoveOffState.
     assertz(move_off(false, 0)),
+    % pedestrian_braking(Phase, Ms): Drools' PedestrianBrakingState (none, braking, holding).
+    assertz(pedestrian_braking(none, 0)),
     assertz(cruise(Cruise)),
     forall(get_dict(Name, Params, Value), assertz(param(Name, Value))),
     forall(get_dict(Name, Priorities, Value), assertz(priority_value(Name, Value))).
@@ -418,6 +420,16 @@ store_conclusions :-
     ->  move_off(_, Previous), replace(move_off(_, _), move_off(false, Previous))
     ;   true
     ),
+    (   known(pedestrian_braking_started(BrakeSince))
+    ->  replace(pedestrian_braking(_, _), pedestrian_braking(braking, BrakeSince))
+    ;   known(pedestrian_approach_over)
+    ->  pedestrian_braking(_, BrakePrevious),
+        replace(pedestrian_braking(_, _), pedestrian_braking(none, BrakePrevious))
+    ;   known(pedestrian_braking_ended)
+    ->  pedestrian_braking(_, BrakePrevious),
+        replace(pedestrian_braking(_, _), pedestrian_braking(holding, BrakePrevious))
+    ;   true
+    ),
     current_overtaking(Active, Origin, Passed, Start, Target),
     replace(overtaking_state(_, _, _, _, _), overtaking_state(Active, Origin, Passed, Start, Target)),
     % Shown in the working memory the user sees: the state the cycle ended with. The rules
@@ -545,7 +557,9 @@ load_previous_decision :-
     last_priority(Priority),
     add_fact(previous_priority(Priority)),
     move_off(Active, Since),
-    add_fact(move_off_state(Active, Since)).
+    add_fact(move_off_state(Active, Since)),
+    pedestrian_braking(Braking, BrakeSince),
+    add_fact(pedestrian_braking_state(Braking, BrakeSince)).
 
 load_ttc(Now) :-
     forall(ttc_reading(Ms, Ttc, Target),

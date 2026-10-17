@@ -132,7 +132,9 @@ class PedestrianConflictE2ETest {
             double gap = pedestrianPosition - ego.getPositionMeters();
             assertEquals(0.0, ego.getSpeedKmh(), 0.5, "the ego must be stopped");
             assertFalse(sawEmergencyBrake, "a pedestrian seen from afar must not need the emergency brake");
-            assertTrue(gap >= 8.0 && gap <= 24.0, "the ego must stop near the pedestrian, it stopped " + gap + " m away");
+            // The stop zone begins 32 m before the pedestrian; the approach arrives there between
+            // the 1.4 and 2.0 m/s2 curves (22 to 27 km/h), from which a comfortable stop takes 7 to 10 m.
+            assertTrue(gap >= 8.0 && gap <= 26.0, "the ego must stop near the pedestrian, it stopped " + gap + " m away");
         }
     }
 

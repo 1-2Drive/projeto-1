@@ -25,6 +25,7 @@
 %   stop_sign(Id, DistanceM)  stop_hold_started(Id, Ms)  stop_completed(Id)
 %   previous_decision(Action, Rule)  previous_priority(Value)   a última decisão arbitrada
 %   move_off_state(Active, Ms)   o MoveOffState do Drools
+%   pedestrian_braking_state(Phase, Ms)   o PedestrianBrakingState do Drools (none, braking, holding)
 %   right_lane_blocked_ahead   um perigo na faixa da direita a 150 m ou menos (Java)
 %   presentation_demo          o cenário de demonstração guiada (Java)
 %   lane_change_request(left|right)   um pedido do condutor ainda ativo (1,5 s)
@@ -106,26 +107,61 @@ rule('Stop for pedestrian in crossing zone',
      [ assert(proposal(stop, 0.0, high, legal_mandatory_stop,
                        'Pedestrian detected in trajectory')) ]).
 
-% Above the 2.0 m/s2 braking curve that ends 18 m before the pedestrian: brake.
+% The approach phase (pedestrian_braking/2, Drools' PedestrianBrakingState: none, braking,
+% holding) is settled before the proposal of the cycle: braking starts above the 2.0 m/s2
+% curve that ends 18 m before the pedestrian and only ends below the 1.4 m/s2 curve, where
+% the vehicle holds its speed until the upper curve catches it again; the approach is over
+% once no pedestrian is approached any more (gone, no conflict, or within the 32 m stop zone).
+rule('Start braking for pedestrian above the braking curve',
+     607,
+     [ pedestrian_braking_state(Phase, _),
+       test(Phase \== braking),
+       pedestrian_conflict(P),
+       pedestrian(P, D),
+       ego_speed(V),
+       time_ms(Now),
+       test(D > 32.0),
+       test(above_pedestrian_curve(V, D, 2.0)) ],
+     [ assert(pedestrian_braking_started(Now)) ]).
+
+rule('Hold speed for pedestrian once under the lower curve',
+     607,
+     [ pedestrian_braking_state(braking, _),
+       pedestrian_conflict(P),
+       pedestrian(P, D),
+       ego_speed(V),
+       test(D > 32.0),
+       not(test(above_pedestrian_curve(V, D, 1.4))) ],
+     [ assert(pedestrian_braking_ended) ]).
+
+rule('End the pedestrian approach once no pedestrian is approached',
+     607,
+     [ pedestrian_braking_state(Phase, _),
+       test(Phase \== none),
+       not(test(pedestrian_approached(32.0))) ],
+     [ assert(pedestrian_approach_over) ]).
+
+% Braking phase: brake.
 rule('Brake for pedestrian proximity (brake)',
      605,
      [ pedestrian_conflict(P),
        pedestrian(P, D),
        ego_speed(V),
        test(D > 32.0),
-       test(above_pedestrian_curve(V, D, 2.0)),
+       test(pedestrian_phase(braking)),
        test(pedestrian_reason(P, Reason)) ],
      [ assert(proposal(brake, 20.0, high, legal_mandatory_stop, Reason)) ]).
 
-% Between the 1.4 and 2.0 m/s2 curves: hold the speed, never speed up towards the pedestrian.
+% Holding phase, or between the curves before any braking: hold the speed, never speed up
+% towards the pedestrian.
 rule('Brake for pedestrian proximity (hold speed)',
      605,
      [ pedestrian_conflict(P),
        pedestrian(P, D),
        ego_speed(V),
        test(D > 32.0),
-       test(above_pedestrian_curve(V, D, 1.4)),
-       not(test(above_pedestrian_curve(V, D, 2.0))),
+       not(test(pedestrian_phase(braking))),
+       test(( pedestrian_phase(holding) ; above_pedestrian_curve(V, D, 1.4) )),
        test(pedestrian_reason(P, Reason)) ],
      [ assert(proposal(maintain_speed, V, moderate, legal_mandatory_stop, Reason)) ]).
 
@@ -1756,6 +1792,29 @@ moving_off :-
 moving_off :-
     \+ known(move_off_ended),
     known(move_off_state(true, _)).
+
+% The pedestrian approach phase after this cycle's state rules. The phase is computed with
+% an unbound argument first, so that the cuts settle it before it is compared with the one
+% asked for (pedestrian_phase(braking) must fail, not fall through to the stored state,
+% once this cycle ended the braking).
+pedestrian_phase(Phase) :-
+    settled_pedestrian_phase(Settled),
+    Phase = Settled.
+
+settled_pedestrian_phase(braking) :-
+    known(pedestrian_braking_started(_)), !.
+settled_pedestrian_phase(none) :-
+    known(pedestrian_approach_over), !.
+settled_pedestrian_phase(holding) :-
+    known(pedestrian_braking_ended), !.
+settled_pedestrian_phase(Phase) :-
+    known(pedestrian_braking_state(Phase, _)).
+
+% A pedestrian in conflict is being approached beyond Min metres.
+pedestrian_approached(Min) :-
+    known(pedestrian_conflict(P)),
+    known(pedestrian(P, D)),
+    D > Min.
 
 % A proposal in the longitudinal (speed) channel: anything but a lane action.
 speed_proposal :-

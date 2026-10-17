@@ -541,6 +541,44 @@ class PrologRulesTest {
         }
     }
 
+    // Pedestrian at 60 m: the 2.0 m/s2 curve allows 46.7 km/h, the 1.4 m/s2 curve 39.0 km/h.
+    @Test
+    @Timeout(10)
+    void brakingForAPedestrianContinuesBetweenTheCurvesThenHoldsTheSpeed() {
+        try (PrologTestHarness harness = new PrologTestHarness()) {
+            DrivingDecision start = decide(harness,
+                PrologKnowledgeSession.VehicleInput.keepingLane(1_000, 60.0, Lane.CENTER),
+                new PedestrianDetectedEvent(1_000, "camera", 60.0, "ped-1", true));
+            assertEquals(DrivingAction.BRAKE, start.getSpeedAction());
+            assertEquals("Brake for pedestrian proximity (brake)", start.getSpeedSourceRule());
+
+            DrivingDecision between = decide(harness,
+                PrologKnowledgeSession.VehicleInput.keepingLane(1_200, 44.0, Lane.CENTER),
+                new PedestrianDetectedEvent(1_200, "camera", 58.0, "ped-1", true));
+            assertEquals(DrivingAction.BRAKE, between.getSpeedAction(),
+                "between the curves the vehicle keeps braking once it started");
+
+            DrivingDecision under = decide(harness,
+                PrologKnowledgeSession.VehicleInput.keepingLane(1_400, 36.0, Lane.CENTER),
+                new PedestrianDetectedEvent(1_400, "camera", 57.0, "ped-1", true));
+            assertEquals(DrivingAction.MAINTAIN_SPEED, under.getSpeedAction(),
+                "under the lower curve, after braking, the vehicle holds its speed and never speeds up again");
+            assertEquals("Brake for pedestrian proximity (hold speed)", under.getSpeedSourceRule());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void aVehicleBetweenTheCurvesThatWasNotBrakingHoldsItsSpeed() {
+        try (PrologTestHarness harness = new PrologTestHarness()) {
+            DrivingDecision decision = decide(harness,
+                PrologKnowledgeSession.VehicleInput.keepingLane(1_000, 44.0, Lane.CENTER),
+                new PedestrianDetectedEvent(1_000, "camera", 58.0, "ped-1", true));
+            assertEquals(DrivingAction.MAINTAIN_SPEED, decision.getSpeedAction());
+            assertEquals("Brake for pedestrian proximity (hold speed)", decision.getSpeedSourceRule());
+        }
+    }
+
     private static DrivingDecision decide(PrologTestHarness harness, PrologKnowledgeSession.VehicleInput vehicle,
                                           Object... events) {
         DecisionContext context = new DecisionContext();

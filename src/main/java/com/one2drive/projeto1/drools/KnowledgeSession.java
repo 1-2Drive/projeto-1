@@ -122,6 +122,8 @@ public class KnowledgeSession implements AutoCloseable {
         kieSession.insert(new AccelerationRequestState(0.0, 0L));
         kieSession.insert(new LaneChangeRequestState(false, com.one2drive.projeto1.domain.LaneChangeDirection.LEFT, -1L));
         kieSession.insert(new MoveOffState(false, 0L));
+        kieSession.insert(new com.one2drive.projeto1.drools.facts.PedestrianBrakingState(
+            com.one2drive.projeto1.drools.facts.PedestrianBrakingState.Phase.NONE, 0L));
         kieSession.insert(new com.one2drive.projeto1.drools.facts.OvertakingStateFact(false, com.one2drive.projeto1.domain.Lane.RIGHT, false, 0L));
 
         LiveQuery liveQuery = null;

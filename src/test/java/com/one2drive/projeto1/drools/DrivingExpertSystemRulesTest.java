@@ -456,6 +456,32 @@ class DrivingExpertSystemRulesTest {
 
     @Test
     @Timeout(10)
+    void lowTtcCountsInRainOnlyWhenARainReadingCoincidesWithIt() {
+        try (DroolsTestHarness harness = new DroolsTestHarness(80.0)) {
+            harness.cycle(1_000, 80.0, new WeatherEvent(1_000, "env", WeatherCondition.RAIN, 0.7, 0.65));
+            // Still raining, but the last rain reading is 900 ms before these TTC readings.
+            DrivingDecision decision = harness.cycle(
+                2_000,
+                80.0,
+                new TTCEvent(1_900, "radar", 2.9, "front-1"),
+                new TTCEvent(1_990, "radar", 2.8, "front-1")
+            );
+            assertTrue(decision.getProposals().stream()
+                    .noneMatch(p -> "Persistent low TTC in rain increases conservatism".equals(p.getSourceRule())),
+                "no rain reading within 400 ms of the low TTC readings");
+
+            DrivingDecision withRain = harness.cycle(
+                2_100,
+                80.0,
+                new WeatherEvent(2_100, "env", WeatherCondition.RAIN, 0.7, 0.65)
+            );
+            assertEquals(DrivingAction.BRAKE, withRain.getAction(),
+                "a rain reading within 400 ms of both readings makes them count");
+        }
+    }
+
+    @Test
+    @Timeout(10)
     void closingOnStationaryVehicleFollowsTheSafeDistanceCurve() {
         try (DroolsTestHarness harness = new DroolsTestHarness(60.0)) {
             // 60 km/h, stationary vehicle 40 m ahead: 28 m of room before the 12 m gap.

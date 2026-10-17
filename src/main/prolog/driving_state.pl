@@ -11,7 +11,7 @@
            road_flags/2, lane_request/3, accel_request/2, ego_position/1,
            weather_state/4,
            obstacle_track/5, obstacle_reading/5, pothole_track/5, barrier_track/5,
-           limit_state/3, pending_limit/4, light_track/5, pedestrian_track/5, ttc_reading/3, stop_track/5,
+           limit_state/3, pending_limit/4, light_track/5, pedestrian_track/5, ttc_reading/3, rain_reading/1, stop_track/5,
            front_track/4, front_distance_reading/3, occupancy/4, occupancy_read/2, left_vehicle_track/4,
            far_left_vehicle_track/4,
            overtaking_state/5, last_decision/2, last_priority/1, move_off/2, cruise/1,
@@ -19,6 +19,8 @@
 
 % Window of the persistent-TTC rule (window:time(2s) in Drools).
 ttc_window_ms(2000).
+% A low TTC counts when a rain reading is within this of it (coincides[400ms] in Drools).
+rain_coincidence_ms(400).
 % Missed readings after which an object is no longer considered (Drools: 1000/400).
 pedestrian_validity_ms(1000).
 light_validity_ms(400).
@@ -41,7 +43,7 @@ state_predicates([ego_state/3, lane_change/1, markings/2, target_lane_state/1, s
                   road_flags/2, lane_request/3, accel_request/2, ego_position/1,
                   weather_state/4,
                   obstacle_track/5, obstacle_reading/5, pothole_track/5, barrier_track/5,
-                  limit_state/3, pending_limit/4, light_track/5, pedestrian_track/5, ttc_reading/3, stop_track/5,
+                  limit_state/3, pending_limit/4, light_track/5, pedestrian_track/5, ttc_reading/3, rain_reading/1, stop_track/5,
                   front_track/4, front_distance_reading/3, occupancy/4, occupancy_read/2, left_vehicle_track/4,
                   far_left_vehicle_track/4,
                   overtaking_state/5, last_decision/2, last_priority/1, move_off/2, cruise/1,
@@ -254,9 +256,14 @@ on_event('BarrierDetectedEvent', E) :-
     ).
 
 % "Update weather state": the environment sensor's latest reading; it does not expire. The
-% weather rules read this state alone: the ReducedVisibilityEvent and ReducedGripEvent the
+% weather rules read this state (the rain readings are also kept for the TTC rule, as the
+% WeatherEvents in Drools): the ReducedVisibilityEvent and ReducedGripEvent the
 % sensor also emits below 0.85 are ignored, as in Drools, where no rule reads them any more.
 on_event('WeatherEvent', E) :-
+    (   E.condition == 'RAIN'
+    ->  assertz(rain_reading(E.timestamp))
+    ;   true
+    ),
     weather_state(_, _, _, Since),
     (   E.timestamp >= Since
     ->  downcase_atom(E.condition, Condition),
@@ -342,6 +349,10 @@ expire_track(Template, Stamp, Validity, Now) :-
 expire_old_readings(Now) :-
     ttc_window_ms(TtcWindow),
     expire_window(ttc_reading(T1, _, _), T1, TtcWindow, Now),
+    % A rain reading older than the TTC window and the coincidence cannot match any TTC.
+    rain_coincidence_ms(Coincidence),
+    RainWindow is TtcWindow + Coincidence,
+    expire_window(rain_reading(TR), TR, RainWindow, Now),
     pedestrian_validity_ms(PedestrianValidity),
     expire_track(pedestrian_track(_, _, _, _, T2), T2, PedestrianValidity, Now),
     light_validity_ms(LightValidity),
@@ -532,7 +543,9 @@ load_previous_decision :-
 
 load_ttc(Now) :-
     forall(ttc_reading(Ms, Ttc, Target),
-           ( Age is Now - Ms, add_fact(ttc_sample(Target, Ttc, Age)) )).
+           ( Age is Now - Ms, add_fact(ttc_sample(Target, Ttc, Age)) )),
+    forall(rain_reading(Ms),
+           ( Age is Now - Ms, add_fact(rain_sample(Age)) )).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Preso atrás de trânsito lento (BoxedInFact no Drools)

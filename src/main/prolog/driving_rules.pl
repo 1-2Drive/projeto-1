@@ -21,7 +21,7 @@
 %   pending_speed_limit(Kmh, SignPositionM)   sinal lido à frente, ainda não alcançado
 %   traffic_light(Id, red|yellow|green, DistanceM)  light_commitment(Id, stop|proceed)
 %   pedestrian(Id, DistanceM)  crossing_state(Id, waiting|crossing|crossed)  pedestrian_in_path(Id)
-%   ttc_sample(Target, TtcS, AgeMs)
+%   ttc_sample(Target, TtcS, AgeMs)  rain_sample(AgeMs)   uma leitura de chuva do sensor de ambiente
 %   stop_sign(Id, DistanceM)  stop_hold_started(Id, Ms)  stop_completed(Id)
 %   previous_decision(Action, Rule)  previous_priority(Value)   a última decisão arbitrada
 %   move_off_state(Active, Ms)   o MoveOffState do Drools
@@ -1117,11 +1117,12 @@ rule('Defuzzify weather speed ceiling',
      [ assert(proposal(reduce_speed, Target, Risk, road_hazard,
                        'Weather conditions (fuzzy) require a reduced speed')) ]).
 
-% In rain, two TTC readings below 3 s within 2 s are enough to brake.
+% In rain, two TTC readings below 3 s within 2 s are enough to brake. A reading counts only
+% when it was measured in the rain: a rain reading within 400 ms of it (coincides[400ms]).
 rule('Persistent low TTC in rain increases conservatism',
      560,
      [ weather(rain, _, _),
-       test(persistent_low_ttc(3.0, Count)),
+       test(persistent_low_ttc_in_rain(3.0, Count)),
        test(Count >= 2) ],
      [ assert(proposal(brake, 15.0, high, collision_avoidance,
                        'Rain + persistent low TTC => conservative braking')) ]).
@@ -1194,7 +1195,7 @@ rule('Stop sign condition satisfied after full stop hold',
      [ stop_hold_started(S, Start),
        not(stop_completed(S)),
        time_ms(Now),
-       test(Now - Start >= 1200) ],
+       test(allen_after(Now, Start, 1200)) ],
      [ assert(stop_completed(S)) ]).
 
 % While the stop has not lasted 1.2 s. The condition reads the time, not only
@@ -1642,7 +1643,7 @@ hard_braking_for_stop(V, D) :-
 
 stop_hold_complete(S, Now) :-
     known(stop_hold_started(S, Start)),
-    Now - Start >= 1200.
+    allen_after(Now, Start, 1200).
 
 pedestrian_reason(P, 'Pedestrian ahead in path; prepare stop') :-
     known(pedestrian_in_path(P)), !.
@@ -1662,6 +1663,22 @@ persistent_low_ttc(Threshold, Count) :-
     aggregate_all(count,
                   ( known(ttc_sample(_, T, Age)), T > 0.0, T < Threshold, Age < Window ),
                   Count).
+
+% The same count, of the readings a rain reading coincides with.
+persistent_low_ttc_in_rain(Threshold, Count) :-
+    ttc_window_ms(Window),
+    rain_coincidence_ms(Coincidence),
+    aggregate_all(count,
+                  ( known(ttc_sample(_, T, Age)), T > 0.0, T < Threshold, Age < Window,
+                    once(( known(rain_sample(RainAge)), allen_coincides(Age, RainAge, Coincidence) )) ),
+                  Count).
+
+% Allen's relations between point events (Drools CEP), on their times in ms:
+% after[Min]: Later comes at least Min ms after Earlier; coincides[Max]: at most Max ms apart.
+allen_after(Later, Earlier, Min) :-
+    Later - Earlier >= Min.
+allen_coincides(T1, T2, Max) :-
+    abs(T1 - T2) =< Max.
 
 % The previous cycle's decision had at most the priority Name.
 previous_priority_at_most(Name) :-

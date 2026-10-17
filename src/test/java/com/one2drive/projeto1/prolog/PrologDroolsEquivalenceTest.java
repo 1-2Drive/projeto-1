@@ -343,6 +343,16 @@ class PrologDroolsEquivalenceTest {
                 new Step(1_300, 80.0,
                     new TTCEvent(1_200, "radar", 2.9, "front-1"),
                     new TTCEvent(1_290, "radar", 2.8, "front-1"))}),
+            Arguments.of("low TTC that no rain reading coincides with", new Step[]{
+                new Step(1_000, 80.0, new WeatherEvent(1_000, "env", WeatherCondition.RAIN, 0.7, 0.65)),
+                new Step(2_000, 80.0,
+                    new TTCEvent(1_900, "radar", 2.9, "front-1"),
+                    new TTCEvent(1_990, "radar", 2.8, "front-1"))}),
+            Arguments.of("stop sign: full stop held 1.2 s, then proceed", new Step[]{
+                new Step(2_000, 4.0, new StopSignEvent(2_000, "camera", 6.0, "stop-1")),
+                new Step(2_200, 0.0, new StopSignEvent(2_200, "camera", 5.5, "stop-1")),
+                new Step(3_300, 0.0, new StopSignEvent(3_300, "camera", 5.5, "stop-1")),
+                new Step(3_400, 0.0, new StopSignEvent(3_400, "camera", 5.5, "stop-1"))}),
             Arguments.of("rain persists after the last weather reading", new Step[]{
                 new Step(1_000, 90.0, new WeatherEvent(1_000, "env", WeatherCondition.RAIN, 0.9, 0.9)),
                 new Step(5_000, 90.0)}),

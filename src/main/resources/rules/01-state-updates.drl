@@ -117,7 +117,6 @@ then
     $state.setDistanceMeters(toStopLine);
     $state.setDetectedTimestamp($e.getTimestamp());
     if (toStopLine > 8) {
-        $state.setStopStartTimestamp(-1L);
         $state.setSatisfied(false);
     }
     update($state);
@@ -511,7 +510,6 @@ then
     $state.setSignId("none");
     $state.setDistanceMeters(Double.POSITIVE_INFINITY);
     $state.setDetectedTimestamp($now);
-    $state.setStopStartTimestamp(-1L);
     $state.setSatisfied(false);
     update($state);
 end

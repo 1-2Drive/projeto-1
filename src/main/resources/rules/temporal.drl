@@ -7,17 +7,21 @@ import com.one2drive.projeto1.domain.RiskLevel
 import com.one2drive.projeto1.domain.WeatherCondition
 import com.one2drive.projeto1.drools.DroolsSupport
 import com.one2drive.projeto1.drools.events.TTCEvent
+import com.one2drive.projeto1.drools.events.WeatherEvent
 import com.one2drive.projeto1.drools.facts.WeatherStateFact
 
 global DroolsSupport droolsSupport
 
+// A low TTC counts only when it was measured in the rain: a rain reading of the environment
+// sensor within 400 ms of it, the sensor's period (Allen's coincides for point events).
 rule "Persistent low TTC in rain increases conservatism"
 salience 560
 when
     $ctx : DecisionContext()
     WeatherStateFact(condition == WeatherCondition.RAIN)
     accumulate(
-        TTCEvent( $sample : ttcSeconds > 0.0, ttcSeconds < 3.0 ) over window:time(2s) from entry-point "PERCEPTION_STREAM";
+        $low : TTCEvent( $sample : ttcSeconds > 0.0, ttcSeconds < 3.0 ) over window:time(2s) from entry-point "PERCEPTION_STREAM"
+        and exists WeatherEvent( condition == WeatherCondition.RAIN, this coincides[400ms] $low ) from entry-point "ENVIRONMENT_STREAM";
         $count : count(1),
         $ttc : min($sample);
         $count >= 2

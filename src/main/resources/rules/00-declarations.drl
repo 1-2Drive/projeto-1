@@ -19,6 +19,7 @@ import com.one2drive.projeto1.drools.events.SpeedLimitDetectedEvent
 import com.one2drive.projeto1.drools.events.StopSignEvent
 import com.one2drive.projeto1.drools.events.TTCEvent
 import com.one2drive.projeto1.drools.events.TrafficLightEvent
+import com.one2drive.projeto1.drools.events.StoppedAtStopLineEvent
 import com.one2drive.projeto1.drools.events.VehicleSpeedEvent
 import com.one2drive.projeto1.drools.events.VisibilityEvent
 import com.one2drive.projeto1.drools.events.WeatherEvent
@@ -153,4 +154,10 @@ declare LaneChangeRequestEvent
     @role( event )
     @timestamp( timestamp )
     @expires( 3s )
+end
+
+declare StoppedAtStopLineEvent
+    @role( event )
+    @timestamp( timestamp )
+    @expires( 30s )
 end

@@ -162,7 +162,10 @@ rule('Brake for pedestrian proximity (hold speed)',
        ego_speed(V),
        test(D > 32.0),
        not(test(pedestrian_phase(braking))),
-       test(( pedestrian_phase(holding) ; above_pedestrian_curve(V, D, 1.4) )),
+       % once/1: a disjunction that holds both ways is one match, not two. The engine keeps
+       % every solution of the conditions as an activation of its own, and with the
+       % dependency index on, a duplicate left in the agenda would fire a second time.
+       test(once(( pedestrian_phase(holding) ; above_pedestrian_curve(V, D, 1.4) ))),
        test(pedestrian_reason(P, Reason)) ],
      [ assert(proposal(maintain_speed, V, moderate, legal_mandatory_stop, Reason)) ]).
 

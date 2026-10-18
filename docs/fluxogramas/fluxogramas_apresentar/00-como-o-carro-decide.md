@@ -19,7 +19,7 @@ flowchart LR
 Além das regras de condução, o sistema tem conhecimento sobre as próprias regras (metaconhecimento):
 
 - **Que regras correm primeiro.** Uma regra de controlo põe as regras por fases em cada ciclo: primeiro as que percebem o que os sensores viram, depois as que decidem, por fim a decisão por omissão.
-- **Que regras vale a pena voltar a avaliar.** No motor Prolog, cada regra sabe que tipos de informação lê. Quando aparece uma informação nova, só voltam a ser avaliadas as regras que a leem. Medido nos 15 cenários: 81% menos trabalho, com exatamente as mesmas decisões.
+- **Que regras vale a pena voltar a avaliar.** No motor Prolog, cada regra sabe que tipos de informação lê. Quando aparece uma informação nova, só voltam a ser avaliadas as regras que a leem. Medido nos 14 cenários: 81% menos trabalho, com exatamente as mesmas decisões.
 
 ## A pergunta "posso mudar para este lado?"
 

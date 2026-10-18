@@ -190,7 +190,7 @@ A margem de 10 m de R5 e R6 fica fora da zona de 8 m de R7, para o veículo pode
 |---|---|
 | Sensor | `CameraSensor.observe()` (até 120 m × visibilidade); `WorldState.nearestObstacleAhead()` |
 | Código do mapa | 1 = obstáculo de gravidade alta (README, secção "Road map") |
-| Cenários de demonstração | `S13_MATRIX_COURSE`, `S15_CONTINUOUS_LINE_BLOCKED` |
+| Cenários de demonstração | `S13_MATRIX_COURSE`. O `S15_CONTINUOUS_LINE_BLOCKED` está comentado em `scenarios.json` (fora da lista; para o recuperar basta tirar o comentário); a mesma situação (linha contínua à direita, obstáculo a 45 m) é montada no teste `RoadLawAndOvertakingE2ETest.continuousLineBlocksLaneChangeAndBrakesBeforeObstacle` |
 | Pergunta de segurança (encadeamento inverso) | `lane-safety.drl:21` (`safeToChangeLane` e os subobjetivos nas linhas 29, 35, 43 e 51); Prolog `driving_rules.pl:1458` (`safe_to_change_lane/1`) |
 | Testes | `CentreAvoidanceNoRoomToFollowE2ETest`: `obstacleIsGoneRoundOnTheRightWhenTheLeftHasNoRoomToFollow`, `slowerVehicleOnTheLeftIsNotPassedOnItsRightAfterTheAvoidance` (Drools e Prolog); `RoadMapE2ETest`: `wallOfObstaclesStopsTheCarUntilALaneOpens` (76), `obstacleCourseIsDrivenWithoutCollisions` (120); `RoadLawAndOvertakingE2ETest`: `continuousLineBlocksLaneChangeAndBrakesBeforeObstacle` (140), `regressionTestReturnRightAfterObstacleAvoidance` (288) |
 

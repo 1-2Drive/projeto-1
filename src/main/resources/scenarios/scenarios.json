@@ -646,17 +646,17 @@
         "type": "ADD_ACTOR",
         "actor": {
           "type": "FRONT_VEHICLE",
-          "positionMeters": 95,
+          "positionMeters": 150,
           "lane": "CENTER",
           "speedKmh": 35
         }
       },
       {
-        "triggerTimeMillis": 9300,
+        "triggerTimeMillis": 11000,
         "type": "ADD_ACTOR",
         "actor": {
           "type": "PEDESTRIAN",
-          "positionMeters": 70,
+          "positionMeters": 150,
           "lane": "CENTER",
           "speedKmh": 3
         }

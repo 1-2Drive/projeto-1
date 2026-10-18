@@ -47,5 +47,6 @@ O carro lembra-se de que já começou a travar por um peão: trava até ficar ab
 | Peão que saiu da faixa do carro mas ainda está a atravessar | Continua parado até ele chegar ao passeio |
 | Peão parado no passeio ou noutra faixa, sem atravessar | Apenas o vigia |
 | Peão a 6 m ou menos | Travagem de emergência |
+| Peão a atravessar à frente de outro carro | O outro carro também pára e espera; depois retoma (comportamento dos outros veículos na simulação) |
 
 O peão tem prioridade sobre o semáforo verde e sobre a aproximação a um semáforo ou STOP.

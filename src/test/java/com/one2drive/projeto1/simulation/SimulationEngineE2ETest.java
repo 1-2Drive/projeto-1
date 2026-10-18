@@ -567,7 +567,8 @@ class SimulationEngineE2ETest {
 
             ScenarioRoadElementDefinition pothole = new ScenarioRoadElementDefinition();
             pothole.setType(ScenarioRoadElementType.POTHOLE);
-            pothole.setLane(Lane.CENTER);
+            // In the ego's lane: a pothole in another lane is not a hazard to react to (Art. 24 CE).
+            pothole.setLane(engine.getWorldState().getEgo().getLane());
             pothole.setPositionMeters(90.0);
             pothole.setSeverity(com.one2drive.projeto1.domain.HazardSeverity.HIGH);
             engine.addRoadElementAhead(pothole);

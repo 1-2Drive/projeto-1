@@ -472,6 +472,37 @@ then
     );
 end
 
+// The same for a slower vehicle two lanes to the left (LEFT, seen from RIGHT), which the
+// rule above does not see: a vehicle that went round a hazard in the centre on the right
+// must not then draw level with a slower vehicle in LEFT and pass it on its right (Art. 36
+// CE). It ends up matching that vehicle's speed 35 m behind it, along the same curve; there
+// is no lane to move into behind it from here, so there is no falling back to let it read free.
+rule "Do not pass a slower far left lane vehicle on its right"
+agenda-group "decision"
+salience 508
+when
+    $ctx : DecisionContext()
+    VehicleStateFact($speed : speedKmh)
+    FarLeftLaneVehicleState(targetId != "none", $distance : distanceMeters > 0, $relative : relativeSpeedMps > -2.5)
+    eval($speed / 3.6 - $relative >= 1.4
+        && ($distance <= 37.0
+            || $speed / 3.6 > Math.sqrt(Math.pow($speed / 3.6 - $relative, 2) + 2.0 * 2.0 * Math.max(0.0, $distance - 35.0))))
+then
+    double farLeftSpeedMps = $speed / 3.6 - $relative;
+    double curveKmh = Math.sqrt(farLeftSpeedMps * farLeftSpeedMps + 2.0 * 2.0 * Math.max(0.0, $distance - 35.0)) * 3.6;
+    boolean closingIn = $speed > curveKmh;
+    droolsSupport.proposeDecision(
+        $ctx,
+        closingIn ? DrivingAction.REDUCE_SPEED : DrivingAction.MAINTAIN_SPEED,
+        closingIn ? curveKmh : Math.min($speed, farLeftSpeedMps * 3.6),
+        RiskLevel.MODERATE,
+        DecisionPriority.SPEED_COMPLIANCE,
+        "Slower vehicle two lanes to the left must not be passed on its right (Art. 36 CE)",
+        drools.getRule().getName(),
+        "far left lane vehicle " + $distance + "m ahead at " + Math.round(farLeftSpeedMps * 3.6) + " km/h"
+    );
+end
+
 // A vehicle that had to stop behind a stationary vehicle (left lane occupied, or too
 // close to pass on the move) would otherwise wait there for ever: the overtake above
 // needs the vehicle to be closing in. Same legal limits as the overtake.

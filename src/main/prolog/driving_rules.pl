@@ -38,6 +38,7 @@
 %   lane_occupancy(left|right, Occupied, FrontDistanceM)   o lado do ego, não uma faixa
 %   lane_occupancy_read(left|right, Ms)   quando esse lado foi lido (LaneOccupancyState.timestamp)
 %   lane_settled_at(Ms)   quando a última mudança de faixa assentou (laneSettledAtMillis), -1 se nenhuma
+%   lane_request_at(Ms)   quando o condutor pediu a última mudança de faixa (LaneChangeRequestState.timestamp), -1 se nenhuma
 %   lane_safe_to_enter(left|right, true|false)   o safeToEnter do sensor de ângulo morto
 %   left_marking(dashed|continuous)  right_marking(dashed|continuous)
 %   adjacent_lane_safe(left|right, true|false)   calculado pelo Java (WorldState.isLaneSafe)
@@ -736,6 +737,7 @@ rule('Enforce keep right road law when right lane is safe',
        not(pedestrian_conflict(_)),
        not(test(front_vehicle_within(80.0))),
        not(lane_change_request(_)),
+       not(test(driver_lane_change_hold(Now))),
        not(test(current_overtaking(true, _, _, _, _))) ],
      [ assert(proposal(return_right, no_target, low, maneuver_safety,
                        'Portuguese Highway Code Art. 13: Drive on the rightmost available safe lane')) ]).
@@ -779,6 +781,32 @@ rule('Do not pass a slower left lane vehicle on its right (hold)',
        test(Target is min(V, (V / 3.6 - Rel) * 3.6)) ],
      [ assert(proposal(maintain_speed, Target, moderate, speed_compliance,
                        'Slower vehicle in the left lane must not be passed on its right (Art. 36 CE)')) ]).
+
+% The same for a slower vehicle two lanes to the left (LEFT, seen from RIGHT), as in Drools:
+% after going round a hazard in the centre on the right, it is not passed on its right
+% (Art. 36 CE). No falling back: there is no lane to move into behind it from here.
+rule('Do not pass a slower far left lane vehicle on its right (closing in)',
+     508,
+     [ ego_speed(V),
+       far_left_lane_vehicle(_, D, Rel),
+       test((D > 0, Rel > -2.5)),
+       test(must_not_pass_on_right(V, D, Rel)),
+       test(left_vehicle_curve(V, D, Rel, Curve)),
+       test(V > Curve) ],
+     [ assert(proposal(reduce_speed, Curve, moderate, speed_compliance,
+                       'Slower vehicle two lanes to the left must not be passed on its right (Art. 36 CE)')) ]).
+
+rule('Do not pass a slower far left lane vehicle on its right (hold)',
+     508,
+     [ ego_speed(V),
+       far_left_lane_vehicle(_, D, Rel),
+       test((D > 0, Rel > -2.5)),
+       test(must_not_pass_on_right(V, D, Rel)),
+       test(left_vehicle_curve(V, D, Rel, Curve)),
+       test(V =< Curve),
+       test(Target is min(V, (V / 3.6 - Rel) * 3.6)) ],
+     [ assert(proposal(maintain_speed, Target, moderate, speed_compliance,
+                       'Slower vehicle two lanes to the left must not be passed on its right (Art. 36 CE)')) ]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Desvio de perigos na faixa do ego
@@ -825,7 +853,7 @@ rule('Avoid pothole in centre lane by changing left when right is occupied',
      [ ego_lane(center),
        pothole(_, D, _, center),
        test((D > 0, D =< 50.0)),
-       lane_occupancy(right, true, _),
+       not(test(safe_to_change_lane(right))),
        prove(safe_to_change_lane(left)) ],
      [ assert(proposal(change_lane_left, no_target, low, road_hazard,
                        'Avoiding pothole by moving into the clear left lane')) ]).
@@ -870,7 +898,7 @@ rule('Avoid obstacle in centre lane by changing right when left is occupied',
      [ ego_lane(center),
        obstacle(_, D, _, center),
        test((D > 0, D =< 50.0)),
-       lane_occupancy(left, true, _),
+       not(test(safe_to_change_lane(left))),
        prove(safe_to_change_lane(right)) ],
      [ assert(proposal(change_lane_right, no_target, low, collision_avoidance,
                        'Avoiding obstacle by moving into the clear right lane')) ]).
@@ -930,14 +958,17 @@ rule('Allow lane change right when lane safe',
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Perigos que não se podem contornar
 
-% Pothole within 40 m (any lane) with no free lane to move into: slow down.
+% Pothole within 40 m in the ego's lane that cannot be avoided, no side being a safe way past
+% (occupied, the road edge, or clear with no room to follow): slow down. Art. 24 CE: speed is
+% adapted to the hazards of the lane being driven, not of the others.
 rule('Pothole ahead reduce speed',
      460,
      [ lane_change_state(idle),
-       pothole(_, D, _, _),
-       test((D > 0, D =< 40.0)),
        ego_lane(Lane),
-       test(no_free_adjacent_lane(Lane)),
+       pothole(_, D, _, Lane),
+       test((D > 0, D =< 40.0)),
+       not(test(safe_to_change_lane(left))),
+       not(test(safe_to_change_lane(right))),
        test((D < 15 -> Target = 20.0 ; Target = 30.0)) ],
      [ assert(proposal(reduce_speed, Target, moderate, road_hazard,
                        'Pothole ahead requires speed reduction')) ]).
@@ -1091,7 +1122,7 @@ rule('Avoid closed barrier by changing left from centre when safe',
 rule('Avoid closed barrier by changing right from centre when safe',
      650,
      [ ego_lane(center),
-       lane_occupancy(left, true, _),
+       not(test(safe_to_change_lane(left))),
        prove(safe_to_change_lane(right)),
        barrier(_, D, false, center),
        test((D > 0, D =< 55.0)) ],
@@ -1107,13 +1138,35 @@ rule('Avoid closed barrier by changing right when safe',
      [ assert(proposal(change_lane_right, no_target, high, collision_avoidance,
                        'Closed barrier ahead; changing right to a verified clear lane')) ]).
 
+% Stop whenever the barrier cannot be gone around safely, for whatever reason
+% safe_to_change_lane/1 fails on both sides, so the vehicle always avoids or stops. Only while
+% it has not started to move out of the lane; from the comfortable stopping distance (never
+% less than 55 m); braking hard when comfortable braking no longer stops before the barrier.
+rule('Closed barrier requires stop (emergency)',
+     640,
+     [ ego_lane(Lane),
+       lane_change_state(idle),
+       not(test(safe_to_change_lane(left))),
+       not(test(safe_to_change_lane(right))),
+       ego_speed(V),
+       barrier(_, D, false, Lane),
+       test(barrier_stop_window(V, W)),
+       test((D >= 0, D =< W)),
+       test(barrier_hard_braking(V, D)) ],
+     [ assert(proposal(emergency_brake, 0.0, high, legal_mandatory_stop,
+                       'Closed barrier ahead, no adjacent lane is safe and comfortable braking no longer stops in time')) ]).
+
 rule('Closed barrier requires stop',
      640,
      [ ego_lane(Lane),
-       lane_occupancy(left, true, _),
-       lane_occupancy(right, true, _),
+       lane_change_state(idle),
+       not(test(safe_to_change_lane(left))),
+       not(test(safe_to_change_lane(right))),
+       ego_speed(V),
        barrier(_, D, false, Lane),
-       test((D >= 0, D =< 55.0)) ],
+       test(barrier_stop_window(V, W)),
+       test((D >= 0, D =< W)),
+       not(test(barrier_hard_braking(V, D))) ],
      [ assert(proposal(stop, 0.0, high, legal_mandatory_stop,
                        'Closed barrier ahead and no adjacent lane is safe')) ]).
 
@@ -1288,14 +1341,30 @@ rule('Stop sign condition satisfied after full stop hold',
      [ assert(stop_completed(S)) ]).
 
 % While the stop has not lasted 1.2 s. The condition reads the time, not only
-% stop_completed, so it does not depend on which of the two rules fires first.
+% stop_completed, so it does not depend on which of the two rules fires first. Reached too
+% fast (a sign first seen with the line already behind), the same test as the approach
+% brakes hard and stops as soon as possible, still owing the full stop (Art. 21 CE, sign B2).
+rule('Stop sign requires full stop near line (emergency)',
+     620,
+     [ stop_sign(S, D),
+       test(D =< 4.0),
+       not(stop_completed(S)),
+       time_ms(Now),
+       not(test(stop_hold_complete(S, Now))),
+       ego_speed(V),
+       test(hard_braking_for_stop(V, D)) ],
+     [ assert(proposal(emergency_brake, 0.0, high, legal_mandatory_stop,
+                       'Stop sign passed at speed; stop as soon as possible')) ]).
+
 rule('Stop sign requires full stop near line',
      620,
      [ stop_sign(S, D),
        test(D =< 4.0),
        not(stop_completed(S)),
        time_ms(Now),
-       not(test(stop_hold_complete(S, Now))) ],
+       not(test(stop_hold_complete(S, Now))),
+       ego_speed(V),
+       not(test(hard_braking_for_stop(V, D))) ],
      [ assert(proposal(stop, 0.0, high, legal_mandatory_stop,
                        'Stop sign reached; full stop required')) ]).
 
@@ -1508,6 +1577,16 @@ far_left_clear_beyond(D) :-
     ;   true
     ).
 
+% A lane change the driver asked for is not undone at once: the lane settled within 4.5 s of
+% the request (1.5 s for it to be granted + a 3 s manoeuvre), so keep right waits 5 s.
+driver_lane_change_hold(Now) :-
+    known(lane_request_at(Requested)),
+    known(lane_settled_at(Settled)),
+    Requested >= 0,
+    Requested =< Settled,
+    Requested >= Settled - 4500,
+    Now - Settled < 5000.
+
 % The side was read after the last lane change settled: for a tick or two after it settles,
 % the blind-spot sensor (every 200 ms) still describes the sides of the lane it came from.
 % Drools: LaneOccupancyState(timestamp > $settled) with $settled the laneSettledAtMillis.
@@ -1676,15 +1755,6 @@ left_vehicle_curve(V, D, Rel, Curve) :-
     Left is V / 3.6 - Rel,
     Curve is sqrt(Left * Left + 2.0 * A * max(0.0, D - 35.0)) * 3.6.
 
-% No free lane to move into, seen from the ego's lane.
-no_free_adjacent_lane(center) :-
-    known(lane_occupancy(left, true, _)),
-    known(lane_occupancy(right, true, _)).
-no_free_adjacent_lane(left) :-
-    known(lane_occupancy(right, true, _)).
-no_free_adjacent_lane(right) :-
-    known(lane_occupancy(left, true, _)).
-
 % A continuous line on a side of the ego's lane: the right marking lies between CENTER and
 % RIGHT, the left marking between LEFT and CENTER (WorldState.getMarkingBetween).
 continuous_line_closes_lane(center) :-
@@ -1700,6 +1770,20 @@ continuous_line_closes_lane(left) :-
 obstacle_margin(D, Margin) :-
     param(obstacleStopOffsetMeters, Offset),
     Margin is max(0.0, D - Offset).
+
+% Distance from which a closed barrier in the ego's lane is stopped for: the comfortable
+% stopping distance at V km/h (reaction + braking), never less than 55 m.
+barrier_stop_window(V, W) :-
+    deceleration(comfort, A),
+    param(reactionTimeSeconds, Reaction),
+    Vms is max(0.0, V) / 3.6,
+    W is max(55.0, Vms * Reaction + Vms * Vms / (2.0 * A)).
+
+% Comfortable braking (with 10% to spare) no longer stops the vehicle before the barrier.
+barrier_hard_braking(V, D) :-
+    deceleration(comfort, A),
+    Vms is max(0.0, V) / 3.6,
+    Vms * Vms / (2.0 * max(0.1, D)) > A * 1.1.
 
 % Distance from which an obstacle in the ego's lane is stopped for: the comfortable stopping
 % distance at V km/h (reaction + braking + the offset), never less than 60 m.

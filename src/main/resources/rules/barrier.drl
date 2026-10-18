@@ -2,12 +2,14 @@ package rules
 
 import com.one2drive.projeto1.decision.DecisionContext
 import com.one2drive.projeto1.decision.DecisionPriority
+import com.one2drive.projeto1.decision.StoppingPolicy
 import com.one2drive.projeto1.domain.DrivingAction
 import com.one2drive.projeto1.domain.Lane
+import com.one2drive.projeto1.domain.LaneChangeState
 import com.one2drive.projeto1.domain.RiskLevel
 import com.one2drive.projeto1.drools.DroolsSupport
 import com.one2drive.projeto1.drools.facts.BarrierStateFact
-import com.one2drive.projeto1.drools.facts.LaneOccupancyState
+import com.one2drive.projeto1.drools.facts.SafeLaneSide
 import com.one2drive.projeto1.drools.facts.VehicleStateFact
 
 global DroolsSupport droolsSupport
@@ -69,7 +71,8 @@ salience 650
 when
     $ctx : DecisionContext()
     VehicleStateFact(lane == Lane.CENTER)
-    LaneOccupancyState(lane == Lane.LEFT, occupied == true)
+    // Right only when left is not a safe way past: occupied, or clear with no room to follow.
+    not SafeLaneSide(side == Lane.LEFT)
     safeToChangeLane(Lane.RIGHT;)
     BarrierStateFact(barrierId != "none", open == false, lane == Lane.CENTER,
                      $distance : distanceMeters > 0, distanceMeters <= 55.0)
@@ -108,26 +111,38 @@ then
     );
 end
 
+// The vehicle stops whenever it cannot go around the barrier safely, for whatever reason
+// safeToChangeLane fails on both sides (a side reported clear with no room to follow the
+// vehicle ahead in it is not a safe side either): the avoidance rules above and this one
+// ask the same question, so the vehicle always does one or the other. It holds only while
+// the vehicle has not started to move out of the lane (during the avoidance the question
+// fails on both sides, and a stop here would veto it). It binds from the distance a
+// comfortable stop needs at the current speed (never less than 55 m), and brakes hard when
+// comfortable braking would no longer stop the vehicle before the barrier.
 rule "Closed barrier requires stop"
 agenda-group "decision"
 salience 640
 when
     $ctx : DecisionContext()
-    VehicleStateFact($egoLane : lane)
-    LaneOccupancyState(lane == Lane.LEFT, occupied == true)
-    LaneOccupancyState(lane == Lane.RIGHT, occupied == true)
+    VehicleStateFact($egoLane : lane, $speed : speedKmh, laneChangeState == LaneChangeState.IDLE)
+    not SafeLaneSide(side == Lane.LEFT)
+    not SafeLaneSide(side == Lane.RIGHT)
     BarrierStateFact(barrierId != "none", open == false, lane == $egoLane,
-                     $distance : distanceMeters >= 0, distanceMeters <= 55.0)
+                     $distance : distanceMeters >= 0,
+                     distanceMeters <= Math.max(55.0, StoppingPolicy.requiredDistanceMeters($speed, StoppingPolicy.COMFORT_DECELERATION_MPS2, 0.0)))
 then
+    double speedMps = $speed / 3.6;
+    boolean hard = speedMps * speedMps / (2.0 * Math.max(0.1, $distance)) > StoppingPolicy.COMFORT_DECELERATION_MPS2 * 1.1;
     droolsSupport.proposeDecision(
         $ctx,
-        DrivingAction.STOP,
+        hard ? DrivingAction.EMERGENCY_BRAKE : DrivingAction.STOP,
         0.0,
         RiskLevel.HIGH,
         DecisionPriority.LEGAL_MANDATORY_STOP,
-        "Closed barrier ahead and no adjacent lane is safe",
+        hard ? "Closed barrier ahead, no adjacent lane is safe and comfortable braking no longer stops in time"
+            : "Closed barrier ahead and no adjacent lane is safe",
         drools.getRule().getName(),
-        "distance=" + $distance + "m, both adjacent lanes blocked"
+        "distance=" + $distance + "m, no adjacent lane is safe to change into"
     );
 end
 

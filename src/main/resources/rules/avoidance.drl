@@ -9,6 +9,7 @@ import com.one2drive.projeto1.domain.RiskLevel
 import com.one2drive.projeto1.drools.DroolsSupport
 import com.one2drive.projeto1.drools.facts.FrontVehicleState
 import com.one2drive.projeto1.drools.facts.LaneOccupancyState
+import com.one2drive.projeto1.drools.facts.SafeLaneSide
 import com.one2drive.projeto1.drools.facts.ObstacleStateFact
 import com.one2drive.projeto1.drools.facts.OvertakingStateFact
 import com.one2drive.projeto1.drools.facts.PotholeStateFact
@@ -106,7 +107,9 @@ when
     VehicleStateFact(lane == Lane.CENTER)
     PotholeStateFact(potholeId != "none", lane == Lane.CENTER,
                      $distance : distanceMeters > 0, distanceMeters <= 50.0)
-    LaneOccupancyState(lane == Lane.RIGHT, occupied == true)
+    // Left only when right is not a safe way past: occupied, or clear with no room to
+    // follow the vehicle ahead in it (Art. 35 and 18 CE).
+    not SafeLaneSide(side == Lane.RIGHT)
     safeToChangeLane(Lane.LEFT;)
 then
     droolsSupport.proposeDecision(
@@ -202,7 +205,9 @@ when
     VehicleStateFact(lane == Lane.CENTER)
     ObstacleStateFact(obstacleId != "none", lane == Lane.CENTER,
                       $distance : distanceMeters > 0, distanceMeters <= 50.0)
-    LaneOccupancyState(lane == Lane.LEFT, occupied == true)
+    // Right only when left is not a safe way past: occupied, or clear with no room to
+    // follow the vehicle ahead in it (Art. 35 and 18 CE).
+    not SafeLaneSide(side == Lane.LEFT)
     safeToChangeLane(Lane.RIGHT;)
 then
     droolsSupport.proposeDecision(

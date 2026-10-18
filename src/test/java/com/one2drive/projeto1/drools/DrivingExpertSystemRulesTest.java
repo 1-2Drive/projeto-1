@@ -295,13 +295,29 @@ class DrivingExpertSystemRulesTest {
     @Test
     @Timeout(10)
     void barrierClosedTriggersStop() {
+        // 30 km/h: comfortable braking stops well within the 22 m left.
+        try (DroolsTestHarness harness = new DroolsTestHarness(60.0)) {
+            DrivingDecision decision = harness.cycle(
+                1_000,
+                30.0,
+                new BarrierDetectedEvent(1_000, "camera", 22.0, "bar-1", false)
+            );
+            assertEquals(DrivingAction.STOP, decision.getAction());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void barrierClosedTooCloseForComfortableBrakingTriggersEmergencyBrake() {
+        // 60 km/h needs ~50 m to stop comfortably; with 22 m left it must brake hard.
         try (DroolsTestHarness harness = new DroolsTestHarness(60.0)) {
             DrivingDecision decision = harness.cycle(
                 1_000,
                 60.0,
                 new BarrierDetectedEvent(1_000, "camera", 22.0, "bar-1", false)
             );
-            assertEquals(DrivingAction.STOP, decision.getAction());
+            assertEquals(DrivingAction.EMERGENCY_BRAKE, decision.getAction());
+            assertEquals("Closed barrier requires stop", decision.getSourceRule());
         }
     }
 

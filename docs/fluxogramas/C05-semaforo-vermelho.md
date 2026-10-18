@@ -104,7 +104,7 @@ Os casos (A01 a A22, B01 a B08) estão descritos em `relatorio-validacao.md`, se
 | ID | C05 |
 | Nome | Semáforo vermelho |
 | Objetivo | Estar parado antes da linha de paragem, com travagem progressiva, e manter o veículo parado enquanto estiver vermelho |
-| Condição de ativação | `TrafficLightStateFact(lightId != "none", state == RED)`. O semáforo vale para **todas as faixas**: a câmara reporta o mais próximo à frente, em qualquer faixa (`WorldState.nearestTrafficLight`) |
+| Condição de ativação | `TrafficLightStateFact(lightId != "none", state == RED)`. O semáforo vale para **todas as faixas**: a câmara reporta o mais próximo à frente que manda parar, em qualquer faixa (o mais próximo, se nenhum manda parar; `WorldState.nearestTrafficLight`) |
 | Dados de entrada | Distância ao semáforo, `VehicleStateFact.speedKmh`, `CurrentSpeedLimit.limitKmh` |
 
 **Lógica**
@@ -136,7 +136,7 @@ Um `STOP` não é instantâneo e a distância que as regras conhecem tem uma lei
 
 | Elemento | Local |
 |---|---|
-| Sensor | `CameraSensor.observe()`: semáforo mais próximo à frente, a até 120 m × visibilidade |
+| Sensor | `CameraSensor.observe()`: semáforo à frente, em qualquer faixa, a até 120 m × visibilidade: o mais próximo que manda parar (vermelho ou amarelo), ou o mais próximo se nenhum manda parar (`WorldState.nearestTrafficLight`). Assim um verde perto não esconde um vermelho logo a seguir, cuja linha de paragem pode até ficar antes do verde (teste `TwoTrafficLightsE2ETest`, dois vermelhos a 10 m) |
 | Facto | `drools/facts/TrafficLightStateFact.java`; valor inicial em `KnowledgeSession.java:123` |
 | Cenário de demonstração | `S3` (Red traffic light) — `scenarios.json:121` |
 | Testes | `DrivingExpertSystemRulesTest.redLightTriggersStop` (143); `SimulationEngineE2ETest.redTrafficLightStopsAndHoldsThenGreenResumesAndResetClearsFact` (803); `RedTrafficLightStopE2ETest`: `at70KmhBrakesEarlyAndRestsBeforeTheStopLine` (86), `neverPassesTheStopLineAtAnySpeed` (146), `staysAtRestWhileTheLightIsRed` (168), `drivesOnWhenTheLightTurnsGreen` (197); `PedestrianConflictE2ETest.afterThePedestrianHasCrossedTheRedLightIsStillRespected` (248) |

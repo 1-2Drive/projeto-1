@@ -148,7 +148,7 @@ R2 não tem guarda: é uma proposta de conforto (10) e a arbitragem (M02) dá-lh
 
 | Elemento | Local |
 |---|---|
-| Sensor | `CameraSensor.observe()`: semáforo mais próximo à frente, em qualquer faixa, a até 120 m × visibilidade |
+| Sensor | `CameraSensor.observe()`: semáforo à frente, em qualquer faixa, a até 120 m × visibilidade: o mais próximo que manda parar (vermelho ou amarelo), ou o mais próximo se nenhum manda parar (`WorldState.nearestTrafficLight`). Assim um verde perto não esconde um vermelho logo a seguir, cuja linha de paragem pode até ficar antes do verde (teste `TwoTrafficLightsE2ETest`, dois vermelhos a 10 m) |
 | Estados possíveis | `domain/TrafficLightState.java` (`RED`, `YELLOW`, `GREEN`) |
 | Ciclo | `domain/TrafficLight.java`; durações em `config/SimulationConfig.java` |
 | Distâncias | `decision/StoppingPolicy.java` (as mesmas do vermelho, ver C05) |

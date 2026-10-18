@@ -286,12 +286,23 @@ public class WorldState {
             .min(java.util.Comparator.comparingDouble(sign -> signedDistance(sign.getPositionMeters())));
     }
 
-    /** A traffic light governs the whole road, so the next one ahead counts whatever lane it stands in. */
+    /**
+     * A traffic light governs the whole road, so the next one ahead counts whatever lane it
+     * stands in. The camera reports the nearest light that tells the vehicle to stop (red or
+     * yellow), and the nearest light only when none does: a green light close ahead must not
+     * hide a red one just beyond it, whose stop line may even lie before the green light.
+     */
     public Optional<TrafficLight> nearestTrafficLight(double maxDistance) {
-        return activeRoadElementsInFront(maxDistance).stream()
+        java.util.Comparator<TrafficLight> nearestFirst =
+            java.util.Comparator.comparingDouble(light -> signedDistance(light.getPositionMeters()));
+        List<TrafficLight> ahead = activeRoadElementsInFront(maxDistance).stream()
             .filter(TrafficLight.class::isInstance)
             .map(TrafficLight.class::cast)
-            .min(java.util.Comparator.comparingDouble(light -> signedDistance(light.getPositionMeters())));
+            .toList();
+        return ahead.stream()
+            .filter(light -> light.getState() != com.one2drive.projeto1.domain.TrafficLightState.GREEN)
+            .min(nearestFirst)
+            .or(() -> ahead.stream().min(nearestFirst));
     }
 
     /** A stop sign only binds the lane it stands in: one in another lane is not the vehicle's to obey. */

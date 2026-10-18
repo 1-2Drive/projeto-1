@@ -41,4 +41,5 @@ flowchart TD
 | A 60 km/h, vê o vermelho a 100 m | Segue até cerca de 96 m, deixa de acelerar, a cerca de 76 m trava com conforto e pára antes da linha |
 | O vermelho aparece já muito perto | Trava a fundo para perder o máximo de velocidade |
 | Está parado na linha | Espera; o semáforo passa a verde 5 segundos depois de o carro parar |
+| Dois semáforos seguidos, o primeiro já verde e o segundo vermelho | Avança só até à linha do segundo e espera por ele |
 | Há um carro mais lento à frente durante a aproximação | Vale a velocidade mais baixa: o semáforo decide que tem de parar e o carro da frente pode obrigar a ir ainda mais devagar |

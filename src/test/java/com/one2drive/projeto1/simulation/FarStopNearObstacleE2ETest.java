@@ -22,13 +22,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * A mandatory stop far ahead must not keep the vehicle from going around an obstacle
- * close ahead: a red light at 65 m already governs the speed on the approach, and an
- * obstacle fills the ego lane at 30 m with the centre lane free. The vehicle moves around
- * the obstacle while slowing down, and then stops at the light's stop line.
+ * close ahead: a red light at 80 m governs the speed on the approach, and an obstacle
+ * fills the ego lane at 45 m with the centre lane free: far enough for a lane change to
+ * leave the lane before it (StoppingPolicy.roomToLeaveLane, 40 m at 50 km/h). The vehicle
+ * moves around the obstacle while slowing down, and then stops at the light's stop line.
  */
 class FarStopNearObstacleE2ETest {
-    private static final double LIGHT_METERS = 65.0;
-    private static final double OBSTACLE_METERS = 30.0;
+    private static final double LIGHT_METERS = 80.0;
+    private static final double OBSTACLE_METERS = 45.0;
     private static final double STOP_LINE_METERS = LIGHT_METERS - StoppingPolicy.RED_LIGHT_STOP_LINE_OFFSET_METERS;
 
     private static SimulationEngine engine(ExpertBackendType backend) {

@@ -47,6 +47,18 @@ public final class StoppingPolicy {
     public static final double OBSTACLE_STOP_OFFSET_METERS = 10.0;
 
     /**
+     * The vehicle comes to rest this far before a closed barrier in its path, as before an
+     * obstacle: outside the emergency zone, so it can still steer away once a lane opens.
+     */
+    public static final double BARRIER_STOP_OFFSET_METERS = 10.0;
+
+    /** Speed a pothole is driven over at when it cannot be gone round (road-hazards.drl). */
+    public static final double POTHOLE_CROSSING_SPEED_KMH = 30.0;
+
+    /** How long a fixed hazard is along the road: one road block (RoadMap default). */
+    public static final double HAZARD_LENGTH_METERS = 5.0;
+
+    /**
      * The gap the following rules keep behind a vehicle ahead ("Keep safe following distance
      * behind front vehicle", front-vehicle.drl).
      */
@@ -58,7 +70,57 @@ public final class StoppingPolicy {
      */
     public static final double LANE_CHANGE_SECONDS = 3.0;
 
+    /**
+     * Time from the start of a lane change until the vehicle is clear of the lane it leaves:
+     * two thirds of {@link #LANE_CHANGE_SECONDS}, when the eased lateral motion
+     * (WorldPhysicsEngine.advanceLaneChange) has covered three quarters of the way to the
+     * next lane.
+     */
+    public static final double LANE_EXIT_SECONDS = 2.0;
+
     private StoppingPolicy() {
+    }
+
+    /**
+     * Whether a lane change started now takes the vehicle out of its lane before it reaches
+     * a hazard {@code distanceMeters} ahead: the ground covered while reacting and until the
+     * vehicle is clear of the lane, plus the hazard's own length. Closer than that the
+     * manoeuvre would carry the vehicle over the hazard, so it is not a way past it.
+     */
+    public static boolean roomToLeaveLane(double speedKmh, double distanceMeters) {
+        double speedMps = Math.max(0.0, speedKmh) / 3.6;
+        return distanceMeters >= speedMps * (REACTION_TIME_SECONDS + LANE_EXIT_SECONDS) + HAZARD_LENGTH_METERS;
+    }
+
+    /**
+     * Fastest speed from which slowing at {@code decelerationMps2} over {@code roomMeters}
+     * ends at {@code targetKmh}: the braking curve the approach rules hold the vehicle on.
+     */
+    public static double curveSpeedKmh(double targetKmh, double decelerationMps2, double roomMeters) {
+        double targetMps = Math.max(0.0, targetKmh) / 3.6;
+        return Math.sqrt(targetMps * targetMps + 2.0 * decelerationMps2 * Math.max(0.0, roomMeters)) * 3.6;
+    }
+
+    /**
+     * Distance needed to slow from {@code speedKmh} to {@code targetKmh}: the ground covered
+     * while reacting, plus the braking at {@code decelerationMps2}. Nothing when already at
+     * or under the target.
+     */
+    public static double slowingDistanceMeters(double speedKmh, double targetKmh, double decelerationMps2) {
+        double speedMps = Math.max(0.0, speedKmh) / 3.6;
+        double targetMps = Math.min(speedMps, Math.max(0.0, targetKmh) / 3.6);
+        return speedMps * REACTION_TIME_SECONDS
+            + (speedMps * speedMps - targetMps * targetMps) / (2.0 * decelerationMps2);
+    }
+
+    /**
+     * Ground the ego gains on a vehicle ahead while it sheds a closing speed of
+     * {@code relativeSpeedMps} at {@code decelerationMps2}, reaction time included. Larger
+     * than the gap, comfortable braking would carry the ego past that vehicle.
+     */
+    public static double closingDistanceMeters(double relativeSpeedMps, double decelerationMps2) {
+        double closing = Math.max(0.0, relativeSpeedMps);
+        return closing * REACTION_TIME_SECONDS + closing * closing / (2.0 * decelerationMps2);
     }
 
     /**

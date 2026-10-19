@@ -544,9 +544,11 @@ class RoadLawAndOvertakingE2ETest {
         scenario.setInitialLane(Lane.CENTER);
         scenario.setInitialWeather(WeatherCondition.CLEAR);
 
+        // 90 m: at 70 km/h a lane change needs 54 m to leave the lane before the pothole, so the
+        // slow-down brings the speed to the 50 m where the avoidance is decided (avoidance.drl).
         var potholeDef = new ScenarioRoadElementDefinition();
         potholeDef.setType(ScenarioRoadElementType.POTHOLE);
-        potholeDef.setPositionMeters(40.0);
+        potholeDef.setPositionMeters(90.0);
         potholeDef.setLane(Lane.CENTER);
         potholeDef.setSeverity(HazardSeverity.HIGH);
 
@@ -590,9 +592,11 @@ class RoadLawAndOvertakingE2ETest {
         scenario.setInitialLane(Lane.CENTER);
         scenario.setInitialWeather(WeatherCondition.CLEAR);
 
+        // 90 m: at 70 km/h a lane change needs 54 m to leave the lane before the pothole, so the
+        // slow-down brings the speed to the 50 m where the avoidance is decided (avoidance.drl).
         var potholeDef = new ScenarioRoadElementDefinition();
         potholeDef.setType(ScenarioRoadElementType.POTHOLE);
-        potholeDef.setPositionMeters(40.0);
+        potholeDef.setPositionMeters(90.0);
         potholeDef.setLane(Lane.CENTER);
         potholeDef.setSeverity(HazardSeverity.HIGH);
 

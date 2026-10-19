@@ -332,7 +332,7 @@ public class WorldState {
 
     @SuppressWarnings("unchecked")
     private <T extends RoadElement> Optional<T> nearestByType(Class<T> type, double maxDistance) {
-        Lane egoLane = ego.getLane();
+        Lane egoLane = ego.getPathLane();
         T nearestOwnLane = null;
         T nearestAnyLane = null;
         double bestOwnLane = Double.MAX_VALUE;
@@ -358,12 +358,15 @@ public class WorldState {
     }
 
     /**
-     * Nearest hazard of the given type ahead, preferring the vehicle's own lane. A
-     * forward camera sees every lane and reports the lane with the hazard, but with a
-     * map full of hazards the one in the vehicle's path is the one the rules must see.
+     * Nearest hazard of the given type ahead, preferring the lane the vehicle's path runs
+     * along: its own lane, or the lane it is moving into while a lane change is under way
+     * ({@link EgoVehicleState#getPathLane()}). A forward camera sees every lane and reports
+     * the lane with the hazard, but with a map full of hazards the one in the vehicle's path
+     * is the one the rules must see.
      */
     @SuppressWarnings("unchecked")
     private <T extends RoadElement> Optional<T> nearestHazardAhead(Class<T> type, double maxDistance) {
+        Lane pathLane = ego.getPathLane();
         T nearestOwnLane = null;
         T nearestAnyLane = null;
         double bestOwnLane = Double.MAX_VALUE;
@@ -380,7 +383,7 @@ public class WorldState {
                 bestAnyLane = d;
                 nearestAnyLane = (T) element;
             }
-            if (element.getLane() == ego.getLane() && d < bestOwnLane) {
+            if (element.getLane() == pathLane && d < bestOwnLane) {
                 bestOwnLane = d;
                 nearestOwnLane = (T) element;
             }

@@ -2,6 +2,7 @@ package rules
 
 import com.one2drive.projeto1.decision.DecisionContext
 import com.one2drive.projeto1.decision.DecisionPriority
+import com.one2drive.projeto1.decision.StoppingPolicy
 import com.one2drive.projeto1.domain.DrivingAction
 import com.one2drive.projeto1.domain.PedestrianCrossingState
 import com.one2drive.projeto1.domain.Lane
@@ -383,7 +384,9 @@ end
 // continues CENTER -> LEFT, and the usual progressive return follows. The overtake rule
 // only accepts that same target again from a different lane and on a radar sample taken
 // in the current cycle, so a stale sample of a vehicle left in the old lane cannot
-// restart it.
+// restart it. The lane change is proved through safeToChangeLane (lane-safety.drl), which
+// includes the room to follow the very vehicle it moves in behind: closing in fast on it,
+// the ego first slows down (the rule below) and moves in once it can follow.
 rule "Move left behind slower left lane vehicle to overtake it on the left"
 agenda-group "decision"
 salience 525
@@ -391,13 +394,13 @@ no-loop true
 when
     $ctx : DecisionContext()
     $state : OvertakingStateFact($active : active, $tracked : targetId)
-    VehicleStateFact(lane == Lane.RIGHT, $currentLane : lane, laneChangeState == LaneChangeState.IDLE, rightMarking != RoadMarkingType.CONTINUOUS, $speed : speedKmh, $now : timestamp)
+    VehicleStateFact(lane == Lane.RIGHT, $currentLane : lane, $speed : speedKmh, $now : timestamp)
     LeftLaneVehicleState($target : targetId != "none", $distance : distanceMeters > 15.0, $relative : relativeSpeedMps > -0.5, timestamp == $now)
     FarLeftLaneVehicleState($farLeft : distanceMeters)
     CruiseTargetFact($cruise : targetKmh)
     CurrentSpeedLimit($limit : limitKmh, $source : sourceId)
     not FrontVehicleState(targetId != "none", distanceMeters <= $distance)
-    LaneOccupancyState(lane == Lane.LEFT, occupied == false)
+    safeToChangeLane(Lane.LEFT;)
     not PedestrianStateFact(pedestrianId != "none", inPath == true || crossingState == PedestrianCrossingState.CROSSING)
     not TrafficLightStateFact(lightId != "none", state != TrafficLightState.GREEN, distanceMeters <= 125.0)
     eval((!$active || !$target.equals($tracked))
@@ -431,7 +434,10 @@ end
 // very vehicle to be overtaken. This
 // also covers the cases where the maneuver is not possible (CENTER cannot be entered,
 // or the ego is in CENTER and the slower vehicle is in LEFT, the last lane). A stopped
-// vehicle is not overtaken in the legal sense and is left to the other rules.
+// vehicle is not overtaken in the legal sense and is left to the other rules. When
+// comfortable braking would carry the ego more than a vehicle length past it
+// (StoppingPolicy.closingDistanceMeters against the gap), it brakes hard: passing on the
+// right is what the article forbids; drawing level and falling back is not.
 rule "Do not pass a slower left lane vehicle on its right"
 agenda-group "decision"
 salience 508
@@ -447,24 +453,33 @@ then
     double curveKmh = Math.sqrt(leftSpeedMps * leftSpeedMps + 2.0 * 2.0 * Math.max(0.0, $distance - 35.0)) * 3.6;
     DrivingAction action;
     double target;
-    if ($speed > curveKmh) {
+    if (StoppingPolicy.closingDistanceMeters($relative, StoppingPolicy.COMFORT_DECELERATION_MPS2)
+            > $distance + StoppingPolicy.HAZARD_LENGTH_METERS) {
+        // Comfortable braking would carry the ego past it: brake hard to stay behind.
+        action = DrivingAction.EMERGENCY_BRAKE;
+        target = curveKmh;
+    } else if ($speed > curveKmh) {
         // Closing in: brake along the curve that matches its speed 35 m behind it.
         action = DrivingAction.REDUCE_SPEED;
         target = curveKmh;
-    } else if ($distance < 33.0 && $relative > -0.3) {
-        // Too close to move in behind it: fall back a little so the lane reads free.
+    } else if ($distance < 33.0) {
+        // Too close to move in behind it: fall back a little, until the 35 m are open, so
+        // the lane reads free. Decided on the distance alone: made to depend on the relative
+        // speed as well, it alternated with the hold below every tick and never opened the gap.
         action = DrivingAction.REDUCE_SPEED;
         target = Math.max(0.0, leftSpeedMps - 1.5) * 3.6;
     } else {
-        // In place behind it: hold, and never speed up past its speed.
+        // In place behind it: match its speed, never more. After falling back the ego is a
+        // little slower than it, and matching it again is what lets the move in behind it
+        // ("Move left behind slower left lane vehicle", relative speed above -0.5 m/s) start.
         action = DrivingAction.MAINTAIN_SPEED;
-        target = Math.min($speed, leftSpeedMps * 3.6);
+        target = leftSpeedMps * 3.6;
     }
     droolsSupport.proposeDecision(
         $ctx,
         action,
         target,
-        RiskLevel.MODERATE,
+        action == DrivingAction.EMERGENCY_BRAKE ? RiskLevel.HIGH : RiskLevel.MODERATE,
         DecisionPriority.SPEED_COMPLIANCE,
         "Slower vehicle in the left lane must not be passed on its right (Art. 36 CE)",
         drools.getRule().getName(),
@@ -491,11 +506,14 @@ then
     double farLeftSpeedMps = $speed / 3.6 - $relative;
     double curveKmh = Math.sqrt(farLeftSpeedMps * farLeftSpeedMps + 2.0 * 2.0 * Math.max(0.0, $distance - 35.0)) * 3.6;
     boolean closingIn = $speed > curveKmh;
+    // Comfortable braking would carry the ego past it: brake hard to stay behind.
+    boolean hard = StoppingPolicy.closingDistanceMeters($relative, StoppingPolicy.COMFORT_DECELERATION_MPS2)
+        > $distance + StoppingPolicy.HAZARD_LENGTH_METERS;
     droolsSupport.proposeDecision(
         $ctx,
-        closingIn ? DrivingAction.REDUCE_SPEED : DrivingAction.MAINTAIN_SPEED,
-        closingIn ? curveKmh : Math.min($speed, farLeftSpeedMps * 3.6),
-        RiskLevel.MODERATE,
+        hard ? DrivingAction.EMERGENCY_BRAKE : closingIn ? DrivingAction.REDUCE_SPEED : DrivingAction.MAINTAIN_SPEED,
+        hard || closingIn ? curveKmh : farLeftSpeedMps * 3.6,
+        hard ? RiskLevel.HIGH : RiskLevel.MODERATE,
         DecisionPriority.SPEED_COMPLIANCE,
         "Slower vehicle two lanes to the left must not be passed on its right (Art. 36 CE)",
         drools.getRule().getName(),

@@ -323,6 +323,98 @@ class DrivingExpertSystemRulesTest {
 
     @Test
     @Timeout(10)
+    void closedBarrierFarAheadIsApproachedOnTheBrakingCurve() {
+        // 90 km/h, barrier 130 m ahead (the approach binds from 134 m), both sides clear: the
+        // mandatory stop needs no side to be safe, so the approach rule alone brakes to the
+        // anticipation curve, 79 km/h with 120 m of room before the stopping point 10 m short
+        // of the barrier.
+        try (DroolsTestHarness harness = new DroolsTestHarness(90.0)) {
+            DrivingDecision decision = harness.cycle(
+                1_000,
+                90.0,
+                new BarrierDetectedEvent(1_000, "camera", 130.0, "bar-1", false, Lane.CENTER),
+                new LaneOccupancyEvent(1_000, "blind", Lane.LEFT, false, Double.POSITIVE_INFINITY),
+                new LaneOccupancyEvent(1_000, "blind", Lane.RIGHT, false, Double.POSITIVE_INFINITY)
+            );
+            assertEquals(DrivingAction.BRAKE, decision.getSpeedAction());
+            assertEquals("Stop before closed barrier while still in its lane", decision.getSpeedSourceRule());
+            assertEquals(78.9, decision.getRecommendedSpeedKmh(), 0.5);
+            assertFalse(decision.getLaneAction().isLaneManeuver(), "130 m is beyond the 55 m the avoidance decides at");
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void closedBarrierTooCloseToGoRoundIsBrakedForInsteadOfAvoided() {
+        // 60 km/h, barrier 25 m ahead, right side clear: a lane change would not leave the lane
+        // before the barrier (47 m needed), so the vehicle keeps its lane and brakes hard.
+        try (DroolsTestHarness harness = new DroolsTestHarness(60.0)) {
+            DrivingDecision decision = harness.cycle(
+                1_000,
+                60.0,
+                new BarrierDetectedEvent(1_000, "camera", 25.0, "bar-1", false, Lane.CENTER),
+                new LaneOccupancyEvent(1_000, "blind", Lane.RIGHT, false, Double.POSITIVE_INFINITY)
+            );
+            assertFalse(decision.getLaneAction().isLaneManeuver(), "too close to go round: " + decision.getLaneSourceRule());
+            assertEquals(DrivingAction.EMERGENCY_BRAKE, decision.getSpeedAction());
+            assertEquals("Stop before closed barrier while still in its lane", decision.getSpeedSourceRule());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void potholeTooCloseToGoRoundIsCrossedSlowly() {
+        // 60 km/h, pothole 20 m ahead, right side clear: no room to leave the lane before it,
+        // so it is driven over at the crossing speed instead (Art. 24 CE).
+        try (DroolsTestHarness harness = new DroolsTestHarness(60.0)) {
+            DrivingDecision decision = harness.cycle(
+                1_000,
+                60.0,
+                new PotholeDetectedEvent(1_000, "camera", 20.0, "pth-1", HazardSeverity.HIGH, Lane.CENTER),
+                new LaneOccupancyEvent(1_000, "blind", Lane.RIGHT, false, Double.POSITIVE_INFINITY)
+            );
+            assertFalse(decision.getLaneAction().isLaneManeuver(), "too close to go round: " + decision.getLaneSourceRule());
+            assertEquals(DrivingAction.REDUCE_SPEED, decision.getSpeedAction());
+            assertEquals("Pothole ahead reduce speed", decision.getSpeedSourceRule());
+            assertEquals(30.0, decision.getRecommendedSpeedKmh(), 0.1);
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void potholeFarAheadIsApproachedOnTheCurveToTheCrossingSpeed() {
+        // 90 km/h, pothole 100 m ahead and no safe side: the slow-down starts from the distance
+        // a comfortable slow-down to 30 km/h needs (112 m), along the anticipation curve.
+        try (DroolsTestHarness harness = new DroolsTestHarness(90.0)) {
+            DrivingDecision decision = harness.cycle(
+                1_000,
+                90.0,
+                new PotholeDetectedEvent(1_000, "camera", 100.0, "pth-1", HazardSeverity.HIGH, Lane.CENTER)
+            );
+            assertEquals(DrivingAction.REDUCE_SPEED, decision.getSpeedAction());
+            assertEquals("Pothole ahead reduce speed", decision.getSpeedSourceRule());
+            assertEquals(78.1, decision.getRecommendedSpeedKmh(), 0.5);
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void fastEgoBrakesHardRatherThanPassASlowerLeftLaneVehicleOnItsRight() {
+        // 90 km/h, a vehicle doing 30 km/h 40 m ahead in the lane to the left: comfortable
+        // braking would gain 58 m on it, so the ego would draw level and pass on the right.
+        try (DroolsTestHarness harness = new DroolsTestHarness(90.0)) {
+            DrivingDecision decision = harness.cycle(
+                1_000,
+                90.0,
+                new LeftLaneVehicleEvent(1_000, "front-radar", 40.0, 60.0 / 3.6, "left-1")
+            );
+            assertEquals(DrivingAction.EMERGENCY_BRAKE, decision.getSpeedAction());
+            assertEquals("Do not pass a slower left lane vehicle on its right", decision.getSpeedSourceRule());
+        }
+    }
+
+    @Test
+    @Timeout(10)
     void rainAdjustsSafeSpeed() {
         try (DroolsTestHarness harness = new DroolsTestHarness(90.0)) {
             DrivingDecision decision = harness.cycle(

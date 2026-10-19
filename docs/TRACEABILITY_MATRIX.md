@@ -1,0 +1,209 @@
+# Traceability Matrix
+
+**Audience:** evaluators, maintainers and developers who need to see, for each requirement or scenario, which rules implement it, which files contain them, which tests check them, and what is missing.
+
+**Related documents:** [BUSINESS_RULES.md](BUSINESS_RULES.md) (rule details and audit findings R-01…R-26), [TESTING.md](TESTING.md) (test evidence, gaps T-01…T-20), [ARCHITECTURE.md](ARCHITECTURE.md#92-audit-findings) (findings A-01…A-14).
+
+---
+
+## 1. How to Read This Matrix
+
+### 1.1 Origin of the requirements
+
+The repository contains **no formally approved requirements specification**. All requirements below are **inferred**, and none should be read as an approved requirement. The origin of each one is given in the "Requirement or Scenario" column:
+
+| Code | Source | Nature |
+|---|---|---|
+| RPT | `Relatorio_Previo_ENGCIA/seccoes/sensores.tex` and the section headings of the same draft report (case studies, explanation, conflict resolution, uncertainty), in Portuguese | Draft; only the sensors chapter has content |
+| CM | `diagrams/first_diagram.md`, a conceptual decision flowchart in Portuguese | Draft |
+| README | `README.md` (project goals, scenario list, behaviour descriptions) | Current project documentation |
+| CODE | Rule names, reason texts and comments in the DRL and Prolog files and in Java Javadoc (e.g. citations of the Portuguese Highway Code, "CE") | Implementation intent |
+| SCN | Scenario names in `src/main/resources/scenarios/scenarios.json` | Implementation intent |
+
+REQ-01…REQ-57 keep the IDs of the baseline analysis (commit `96d80f7`). REQ-58…REQ-64 were added for features that appeared afterwards.
+
+### 1.2 Coverage status values
+
+| Status | Meaning |
+|---|---|
+| **Implemented and tested** | Implementation identified, and at least one existing automated test that **was executed** in this analysis checks the behaviour |
+| **Implemented, no test identified** | Implementation identified, but no executed test checks it |
+| **Partially implemented** | Only part of the expected behaviour exists, or a confirmed defect contradicts it |
+| **Not implemented or no implementation identified** | No implementation found in the repository (including features removed since the baseline) |
+| **Not verifiable with available information** | Implementation or result could not be confirmed, e.g. it is covered only by tests that could not run here |
+
+**Test evidence used in this matrix:**
+
+- At `70082b4`, 218 JUnit tests were executed and passed. The 255 Prolog-dependent JUnit tests were **skipped**, because SWI-Prolog is not installed.
+- Of the 57 Angular unit tests, 52 passed and 5 failed (the failing ones are not used as evidence here).
+- The 18 Playwright tests were **not** executed ([TESTING.md §4](TESTING.md#4-test-execution-in-this-analysis)).
+- Test-class abbreviations (RT, SE, RL, LC, RM, BX, CW, FS, LL, WN, LO, MV, PC, PD, RH, RS, SR, SF, TC, PS) are defined in [BUSINESS_RULES.md §1](BUSINESS_RULES.md#1-how-to-read-this-catalogue); DC = `DecisionContextTest`, PW = Playwright.
+- Probe results (P-nn) are evidence from this analysis, not tests.
+
+---
+
+## 2. Functional Requirements (Inferred)
+
+| ID | Requirement or Scenario | Expected Behavior | Rule/Predicate | File | Associated Test | Coverage Status |
+|---|---|---|---|---|---|---|
+| REQ-01 | Respect the posted speed limit (README; CM "speed exceeds limit → reduce to legal limit") | Be at the limit when reaching a sign; never exceed the limit in force | "Track the speed limit sign ahead as pending"; "Activate the pending speed limit at its sign"; "Slow down in time for the speed limit ahead"; "Reduce speed when exceeding detected limit"; "Maintain speed when compliant with detected limit" | `01-state-updates.drl`, `speed.drl` | RT `speedLimitTriggersReduceSpeed`, `lowerLimitFarAheadDoesNotSlowTheVehicleYet`, `signAboveCurrentSpeedBecomesTheTargetToBuildUpTo`; SE `speedSignFlowWorldToSensorToDroolsToVehicleResponse`, `speedLimitsTakeEffectAtTheirSignsInSequence`, `singleSpeedLimitSignGovernsEveryLaneAndSurvivesALaneChange`; RL `bug1RegressionSpeedLimit50NeverExceedsOrStabilizesAt51`; P-01, P-09 | Implemented and tested (old defect R-01 fixed) |
+| REQ-02 | Comply with speed radars (baseline README S18) | Be at or below the radar limit when passing a radar | — (speed-radar feature removed after the baseline) | — | — | Not implemented or no implementation identified (removed; R-10 obsolete) |
+| REQ-03 | Recover the cruising speed after slowing down when no sign applies (CODE `speed.drl`, `CruiseTargetFact`) | Build back up to the scenario speed | "Build back up to the scenario cruise speed when no sign governs the road" | `speed.drl` | SE `vehicleBuildsBackUpToScenarioCruiseSpeedAfterBrakingWithNoSign`; P-15 | Implemented and tested (in rain the speed can exceed the cruise speed, R-23) |
+| REQ-04 | Accept a driver acceleration request only when safe (CODE) | Accelerate on request unless a more important rule applies | "Allow acceleration request when safe context" | `speed.drl` | RT `conflictAccelerationAndCriticalTtcEmergencyWins` (negative case only) | Implemented and tested (only the conflict case; no REST entry point, R-18) |
+| REQ-05 | Adapt speed to rain (RPT case study "speed adaptation in rain"; CM "heavy rain → reduce speed") | Lower speed in rain | Fuzzy weather rules, in particular "Fuzzy: rain with good visibility and good grip -> prudent" and "Defuzzify weather speed ceiling" | `fuzzy-weather.drl`, `FuzzySupport.java` | RT `rainAdjustsSafeSpeed`, `rainAloneIsAModerateFuzzyCeilingOf65`, `fuzzyFactsAreRetractedWhenTheWeatherClears`; `FuzzySupportTest`; SE `rainSpeedSettlesOnTheRecommendedSpeedWithoutHunting`; P-06 (S10) | Implemented and tested (with no sign, a slower car is raised to the ceiling, R-23) |
+| REQ-06 | Reduce speed in low visibility (CM; RPT "speed must drop when visibility drops") | Lower speed as visibility drops | Fuzzy weather rules (visibility terms poor/reduced/fair/good) | `fuzzy-weather.drl` | RT `reducedVisibilityAndGripTriggerConservativeReduction`; SE `weatherMutationDuringRunChangesRecommendationsAndVehicleBehavior`; BX `givesUpAndReturnsRightWithReducedVisibility` | Implemented and tested |
+| REQ-07 | Reduce speed on a slippery road (CM "wet/icy/oily road"; RPT) | Lower speed as grip drops | Fuzzy weather rules (grip terms) | `fuzzy-weather.drl` | as REQ-06; BX `givesUpAndReturnsRightInRain` | Implemented and tested (grip does not change the braking physics) |
+| REQ-08 | Increase the safety distance in rain or on a wet road (CM; RPT "4–5 s in rain or fog") | Larger gap to the vehicle ahead in rain | "Follow the front vehicle speed outside the following gap" (window 20 m ÷ grip, up to 40 m); "Return right when boxed in and the right lane is clear" (3 s gap in rain); "Persistent low TTC in rain increases conservatism" | `front-vehicle.drl`, `temporal.drl` | RT `conflictRainAndTtcRiskConservativeAction`, `lowTtcCountsInRainOnlyWhenARainReadingCoincidesWithIt`; BX `givesUpAndReturnsRightInRain` | **Partially implemented** — grip widens the following window and the return gap, but there is no 4–5 s time-gap rule |
+| REQ-09 | Keep a safe following distance; minimum time headway 3 s (RPT THW; RPT case study; CM) | Gap to the vehicle ahead ≥ 3 s × own speed | "Keep safe following distance behind front vehicle" (12 m gap + 2.0 m/s² curve); "Brake when front vehicle distance low"; "Follow the front vehicle speed outside the following gap"; "Reduce speed when closing front vehicle"; "Approaching trend from sliding distance window"; "Hold speed on an approaching trend below its target" | `front-vehicle.drl`, `StoppingPolicy.java` | RT `closingOnStationaryVehicleFollowsTheSafeDistanceCurve`, `brakingBehindACloseFrontVehicleTargetsBelowItsSpeed`, `followingTooCloseBehindAMovingVehicleReopensTheGap`; BX `followsTheSlowVehicleWithoutStopAndGo` (minimum gap); P-02c, P-02d | **Partially implemented** — distance-based gap (12 m plus a braking curve), not a 3 s headway; trend rule misfires (R-09); a reduction can accelerate (R-02). Gap erosion (old R-03) fixed |
+| REQ-10 | Emergency braking when the collision risk is critical (RPT TTC; CM "critical TTC → emergency braking") | Brake as hard as possible when TTC is critical | "Emergency brake when persistent TTC is critical"; "Emergency brake when TTC is immediately critical" | `emergency.drl` | RT `ttcCriticalTriggersEmergency`, `repeatedTtcInsideWindowTriggersPersistentEmergency`, `isolatedTtcSampleDoesNotTriggerPersistentRule`; SE `ttcFlowProducesEmergencyBrakeAndRecoversRisk`, `emergencyDecisionAppliesEmergencyDecelerationToWorldState`; P-04, P-06 (S8) | Implemented and tested (server). In the JavaFX client these rules cannot fire (A-07) |
+| REQ-11 | Criticality from braking distance with reaction time and grip-dependent deceleration, not a fixed TTC (RPT, expert indication) | Compare distance with `v·t_r + v²/(2a)` | `StoppingPolicy.requiredDistanceMeters` (0.5 s reaction + braking + margin) used by the red-light, yellow-light and obstacle-stop rules; braking curves for stop signs and pedestrians | `StoppingPolicy.java`, `traffic-lights.drl`, `road-hazards.drl`, `traffic-signs.drl`, `pedestrian.drl` | TC `redLightFirstSeenPastTheStopLineIsBrakedForHard`; RS `neverPassesTheStopLineAtAnySpeed`; FS `avoidsTheObstacleAndStopsAtTheLight` | **Partially implemented** — braking-distance criteria exist for lights, obstacles, stop signs and pedestrians, but the deceleration does not depend on grip, and the TTC emergency rules keep fixed thresholds |
+| REQ-12 | Warn the driver at least 0.8 s before emergency braking (RPT, UNECE R152) | Driver warning precedes emergency braking | — | — | — | Not implemented or no implementation identified |
+| REQ-13 | Pedestrian in the path: slow down, stop, emergency brake (RPT case study; CM "pedestrian") | Stop before a pedestrian in the path or on the crossing | "Start braking for pedestrian above the braking curve"; "Hold speed for pedestrian once under the lower curve"; "Brake for pedestrian proximity"; "Stop for pedestrian in crossing zone"; "Hold for pedestrian still crossing"; "Emergency stop for pedestrian extremely close" | `pedestrian.drl`, `emergency.drl` | RT `pedestrianTriggersBraking`, `brakingForAPedestrianContinuesBetweenTheCurvesThenHoldsTheSpeed`, `pedestrianWithin6MetersTriggersEmergencyBrake`; PC `stopsNearAPedestrianStandingInItsLane`, `neverSpeedsUpWhileThePedestrianIsStillOnTheCrossing`, `staysStoppedAfterThePedestrianLeavesItsLaneButIsStillCrossing`; SE `priorityConflictPedestrianOverridesGreenLight`; P-08, P-10 | **Partially implemented** — stops from up to 90 km/h; from 120 km/h the pedestrian is reached at 74.5 km/h (R-04 residual, P-10) |
+| REQ-14 | Monitor pedestrians or cyclists who may enter the trajectory (CM "may enter the trajectory?") | Anticipate road users near the path | Pedestrian crossing state (`CROSSING` counts in any lane); waiting pedestrians on the road are tracked | `CameraSensor.java`, `WorldState.nearestPedestrianAhead`, `pedestrian.drl` | PC `anticipatesPedestrianCrossingFromLeftTowardsTheEgoLane`, `doesNotBrakeForPedestrianInLeftLaneThatWillNotCross`; RT `pedestrianCrossingIntoThePathIsBrakedForBeforeItIsInThePath`, `visiblePedestrianWithoutConflictIsOnlyMonitored` | **Partially implemented** — crossing pedestrians are anticipated; a pedestrian waiting at the roadside is only monitored; no cyclists |
+| REQ-15 | Obstacle in the trajectory: swerve if there is safe space, otherwise brake (CM "obstacle"; RPT case study "frontal obstacle") | Avoid via a safe lane; otherwise stop before the obstacle | Four "Avoid obstacle …" rules with `safeToChangeLane`; "Stop before obstacle ahead while still in its lane"; "Stop before obstacle when lane change prohibited by continuous line"; "Emergency braking for high severity obstacle at critical distance" | `avoidance.drl`, `road-hazards.drl`, `emergency.drl`, `lane-safety.drl` | RM `wallOfObstaclesStopsTheCarUntilALaneOpens`, `obstacleCourseIsDrivenWithoutCollisions`; RL `regressionTestReturnRightAfterObstacleAvoidance`, `continuousLineBlocksLaneChangeAndBrakesBeforeObstacle`; FS `avoidsTheObstacleAndStopsAtTheLight`; RT `highSeverityObstacleCloseAheadInTheVehiclesLaneIsAnEmergency`; P-11 | Implemented and tested (old R-06/R-07 fixed; emergency hidden by a simultaneous pedestrian stop, R-11, P-14; "Avoid obstacle in left lane by changing right" never fired in tests) |
+| REQ-16 | Avoid potholes or slow down for them (README S5) | Change lane around a pothole; otherwise reduce speed | Four "Avoid pothole …" rules; "Pothole ahead reduce speed" | `avoidance.drl`, `road-hazards.drl` | RT `potholeAdjustsSpeed`, `conflictSpeedLimitAndPotholePotholeWins`; RL `bug2RegressionCenterPotholeBothLanesFreeChoosesRight`, `bug2RegressionCenterPotholeRightBlockedChoosesLeft`, `bug2RegressionCenterPotholeBothBlockedNoLaneChange`; LC `potholeAvoidanceMovesVehicleLeft`, `potholeAvoidancePrefersRightWhenLeftOccupied`, `rainDoesNotBlockPotholeAvoidance`; SE `potholeInRightLaneChangesLeftOnlyWhenCenterIsClear` | Implemented and tested (pothole lane not checked by the slow-down, R-15) |
+| REQ-17 | Stop before a closed barrier when no adjacent lane is safe (README S6) | Stop before the barrier | "Closed barrier requires stop" | `barrier.drl` | RT `barrierClosedTriggersStop`; P-13 | **Partially implemented** — fixed 55 m window and comfortable braking: the barrier is reached from 70 km/h and above (R-22, P-13) |
+| REQ-18 | Avoid a closed barrier when an adjacent lane is safe (CODE) | Change lane around the barrier | Four "Avoid closed barrier …" rules with `safeToChangeLane` | `barrier.drl`, `lane-safety.drl` | LL `closedBarrierIsPassedThroughTheLaneTheSensorReportsClear`; P-06 (S6) | Implemented and tested (only the CENTER → RIGHT rule fired in tests) |
+| REQ-19 | Pass an open barrier (CODE) | Continue through an open barrier | "Open barrier allows continue if no higher priority" | `barrier.drl` | none (never fired in the suite); P-03d | Implemented, no test identified (it lowers the speed to 35 km/h, R-24) |
+| REQ-20 | Stop sign: full stop, hold, proceed (README S4; CM "sign permits advancing?") | Stop at the line before the sign, wait 1.2 s, proceed | Six stop-sign rules (Allen `after[1200ms]`) | `traffic-signs.drl`, `01-state-updates.drl` | RT `stopSignTriggersStopSequence`, `stopSignTooCloseForComfortableBrakingTriggersEmergencyBrake`; SE `stopSignFlowBringsVehicleToFullStopThenProceeds`, `stopSignApproachBrakesSteadilyInsteadOfPulsingEmergencyBrake`, `stopSignStopsOnlyTheVehicleDrivingInItsLane` | Implemented and tested (never completes with the JavaFX realtime clock, A-07, P-04b) |
+| REQ-21 | Red light: stop before the line, hold, resume on green (README S3; CM "stop before the safety line") | Stop before the stop line; wait; resume on green | "Commit to stop or to proceed at traffic light"; "Red traffic light progressive approach"; "Hold at red traffic light"; "Red traffic light requires full stop and hold"; "Green traffic light releases red-light hold" | `traffic-lights.drl` | RT `redLightTriggersStop`, `redLightPastTheStopLineIsStoppedForComfortablyWhenThatStillFitsBeforeTheLight`; RS (5 tests); RH (3); TC `redLightAtANormalDistanceIsStillApproachedProgressively`, `redLightBehindTheEgoDoesNotBrakeIt`; SE `redTrafficLightStopsAndHoldsThenGreenResumesAndResetClearsFact`; P-15 | Implemented and tested (old stale-light defect R-08 fixed) |
+| REQ-22 | Yellow light: stop if it is still safe to stop, otherwise clear the light (CODE, art. 69 RST cited in `traffic-lights.drl`) | Commit once; stop comfortably or drive on | "Commit to stop or to proceed at traffic light"; "Yellow traffic light: stop before the line" | `traffic-lights.drl` | RT `yellowLightWithRoomToStopCommitsToStopAndDoesNotChangeItsMind`, `yellowLightTooCloseToStopCommitsToProceedAndDoesNotChangeItsMind`; TC `yellowFarAheadStopsBeforeTheLine`, `yellowTooCloseIsDrivenThroughWithoutBraking`, `keepsDrivingOnWhenTheYellowTurnsRedBeforeItHasPassed` | Implemented and tested |
+| REQ-23 | Green light: proceed with caution (CM "confirm free zone, advance with caution") | Continue through a green light unless a hazard applies | "Green traffic light allows progression when no higher hazard"; "Green traffic light releases red-light hold" | `traffic-lights.drl` | RS `drivesOnWhenTheLightTurnsGreen`; TC `staysStoppedThroughRedAndDrivesOnAtGreen`; RT `conflictGreenLightAndPedestrianPedestrianWins`; P-03c | **Partially implemented** — proceeds and resumes on green, but the progression rule lowers the speed to 50 km/h near every green light (R-24) |
+| REQ-24 | Intersections and right of way: yield or stop when without priority (CM "intersection / priority / give way") | Yield to traffic with priority | — | — | — | Not implemented or no implementation identified |
+| REQ-25 | Give way to emergency vehicles (CM "emergency vehicle") | Slow down, make way, stop if necessary | — | — | — | Not implemented or no implementation identified |
+| REQ-26 | Overtake a slower vehicle only when permitted and safe (visibility, space, oncoming traffic, time to complete), cancelling otherwise (CM "overtaking"; CODE Art. 35/36/38/41 CE) | Overtake on the left when safe; cancel if conditions change | "Overtake slow front vehicle via left lane"; "Overtake the vehicle being followed"; "Go around stationary front vehicle from standstill"; "Cancel overtaking that never left its original lane"; "Mark front vehicle passed…"; "Return to right lane after overtaking slow vehicle"; "Deactivate overtaking state…"; `roomToFollow` | `front-vehicle.drl`, `lane-safety.drl` | RL `overtakingSlowVehiclePassesAndReturnsToRightLane`, `bug3…` (4); LO (6); MV (4); SF (3); RT `vehicleFollowedAtItsSpeedIsOvertakenWhenTheLeftLaneIsClear`; P-02 | **Partially implemented** — space, legality and room to follow are checked; no oncoming traffic in the model; a started lane change cannot be cancelled (A-12). Overtaking latch (old R-05) fixed |
+| REQ-27 | Drive in the rightmost available lane; return right after overtaking or avoiding (CODE Art. 13 and Art. 38) | Return right, one lane at a time, when safe | "Enforce keep right road law when right lane is safe"; "Return to right lane after overtaking slow vehicle"; "Return right when boxed in and the right lane is clear" | `road-law.drl`, `front-vehicle.drl` | RL `regressionTestExactScreenshotStateCenterReturnsToRight`, `regressionTestMultiLaneReturnLeftToCenterToRight`, `regressionTestBlockedReturnRightWaitsForSafety`, `bug3RegressionAfterOvertakingProgressivelyReturnsRight`; LO `returnsProgressivelyToRightAfterOvertakingOnTheLeft`; SR `returnRightUsesASideReadingTakenInTheCurrentLane`; LC `doesNotOscillateAfterAvoidance` | Implemented and tested |
+| REQ-28 | Change lane only when the target lane is safe, with the indicator on (CM "indicator on? lane change safe?") | Refuse unsafe lane changes; signal before changing | `safeToChangeLane` and sub-goals; four `lane-change.drl` rules; blind-spot occupancy; actuator guard | `lane-safety.drl`, `lane-change.drl`, `BlindSpotSensor.java`, `WorldState.java`, `DecisionActuator.java` | RT `laneChangeBlocked`, `laneChangeSafe`, `noLaneChangeIntoALaneWhoseVehicleAheadIsTooCloseToFollow`; LC `driverRequestedLaneChangeLeftIsExecuted`, `driverRequestedLaneChangeIntoOccupiedLaneIsRefused`; WN (5 executed); SE `actuatorRejectsLaneChangeIntoOccupiedTargetLane`; P-06 (S9) | Implemented and tested (a started lane change cannot be aborted, A-12) |
+| REQ-29 | Never cross a continuous line (CODE; S15) | No lane change across a continuous line | `noContinuousLine`; blind-spot occupancy; actuator refusal; "Stop before obstacle when lane change prohibited by continuous line" | `lane-safety.drl`, `WorldState.java`, `DecisionActuator.java`, `road-hazards.drl` | RL `continuousLineBlocksLaneChangeAndBrakesBeforeObstacle`; LL `overtakingFromRightIgnoresTheLineItDoesNotCross`; WN `continuousLineForbidsChangingLeft`; P-11 | Implemented and tested (old marking defect R-06 fixed) |
+| REQ-30 | Detect and correct unintentional lane departure (RPT case study and TLC; CM "vehicle within lane? → correct trajectory") | Warn and correct drift out of the lane | — | — | — | Not implemented or no implementation identified |
+| REQ-31 | Move off after a standstill once nothing holds the vehicle (CODE; README) | Resume up to 30 km/h | "Start moving off after a standstill"; "Stop moving off once held or at speed"; "Move off when stopped and nothing holds the vehicle" | `defaults.drl` | RL `movingOffAndContinuousEgoMovementIncreasesWorldPosition`; LC `driverRequestedLaneChangeWhileMovingOff`; RM `wallOfObstaclesStopsTheCarUntilALaneOpens`; RS `drivesOnWhenTheLightTurnsGreen` | Implemented and tested |
+| REQ-32 | Default behaviour when nothing applies (CODE) | Keep the current speed and lane | "Default maintain speed baseline"; `DecisionContext` defaults | `defaults.drl`, `DecisionContext.java` | RT `sessionSeedLimitAloneIsNotATargetToSpeedUpTo` | Implemented and tested |
+| REQ-33 | Resolve rule conflicts through an explicit action hierarchy (RPT heading "hierarchy of actions and conflict resolution"; README) | The most important concern wins; every ceiling is respected; speed and lane decided separately | `DecisionPriority`; `DecisionContext` channel arbitration (overrides, ceilings, bases, caps, veto) | `decision/DecisionPriority.java`, `decision/DecisionContext.java` | DC (5); RT `conflictGreenLightAndPedestrianPedestrianWins`, `conflictSpeedLimitAndPotholePotholeWins`, `conflictAccelerationAndCriticalTtcEmergencyWins`, `conflictRainAndTtcRiskConservativeAction`, `pedestrianAt35MetersPrevailsOverRedLightApproach`; FS | Implemented and tested (a mandatory stop can hide an emergency-brake ceiling, R-11) |
+| REQ-34 | "Why" explanation: observed data, activated rule, chosen action (RPT "Why"; CM "Why explanation") | Each decision shows its reason, rule and evidence; timeline of reasoning | `DrivingDecision` (both channels); `ExplanationTrace`; listeners; `InferenceNarrator`; query "Current Driving Decision"; fuzzy evidence lines | `decision/`, `explanation/`, `drools/listeners/`, `api/service/InferenceNarrator.java`, `queries.drl` | RT `listenersReceiveRuleAndFactEvents`, `queryReturnsCurrentDecision`; `FactDescriptionTest` (7); Angular `decision-panel.component.spec.ts` | Implemented and tested |
+| REQ-35 | "Why-not" explanation: why other actions were not chosen (RPT; CM "Why-not explanation") | Show rejected proposals and the reason | `DecisionProposal` outcomes (`LOST_TO`, `VETOED_BY`, `CAPPED`, `REJECTED_BY`); `LaneChangeCheck` from the `safeToChangeLane` sub-goals; Prolog `why_not/2` | `decision/DecisionProposal.java`, `decision/LaneChangeCheck.java`, `lane-safety.drl`, `DroolsBackend.java`, `engine.pl` | DC (outcomes, veto); WN (5 executed); Angular `decision-panel.component.spec.ts` (why-not per side, outcome badges) | Implemented and tested (Prolog `why_not/2` only in a skipped test) |
+| REQ-36 | Uncertainty management (RPT heading "uncertainty management") | Represent and reason with uncertain perception | Fuzzy weather controller (vague visibility and grip terms); radar distance noise | `fuzzy-weather.drl`, `FuzzySupport.java`, `FrontRadarSensor.java` | `FuzzySupportTest`; RT fuzzy tests | **Partially implemented** — vagueness of weather terms is handled with fuzzy logic; uncertain perception (confidence, probability) is not represented |
+| REQ-37 | Each sensor fact records the sensor, the time and a confidence level (RPT) | Facts carry source, timestamp, confidence | Event fields `sourceId`, `timestamp` | `drools/events/BaseEvent.java` | `FactDescriptionTest` | **Partially implemented** — no confidence level |
+| REQ-38 | A perception is valid only while the object is within sensor range (RPT, expert indication) | Forget objects that are no longer seen | Ten "Clear stale …" rules; "Drop a pending speed limit the camera no longer sees" | `01-state-updates.drl`; `driving_state.pl` | TC `commitmentIsClearedOnceTheLightIsBehind`, `redLightBehindTheEgoDoesNotBrakeIt`; MV `overtakenVehicleBehindIsNotTrackedAsFrontVehicle`; P-03 | Implemented and tested (barrier and pending-limit clearing never fired in tests) |
+| REQ-39 | Traffic signs change the vehicle state instead of being remembered as objects (RPT, expert indication) | A sign sets the current limit at the sign, which persists after it | `PendingSpeedLimit` → `CurrentSpeedLimit` | `01-state-updates.drl`, `speed.drl` | RT `lowerLimitFarAheadDoesNotSlowTheVehicleYet`; SE `speedLimitsTakeEffectAtTheirSignsInSequence`, `singleSpeedLimitSignGovernsEveryLaneAndSurvivesALaneChange` | Implemented and tested |
+| REQ-40 | Represent missing sensor data explicitly as "unknown", never as "free road" (RPT) | Unknown state for silent sensors | Pessimistic seed for side lanes (`KnowledgeSession.create`) | `KnowledgeSession.java`, `driving_state.pl` | indirectly RT `potholeAdjustsSpeed` | **Partially implemented** — only for side lanes; elsewhere silence = nothing there |
+| REQ-41 | Require a second reading in normal situations, act on the first in critical ones (RPT) | Confirmation depends on criticality | Persistent TTC (3 samples) vs immediate TTC (1 sample < 1.3 s); rain + TTC (2 samples) | `emergency.drl`, `temporal.drl` | RT `isolatedTtcSampleDoesNotTriggerPersistentRule`, `repeatedTtcInsideWindowTriggersPersistentEmergency` | **Partially implemented** — only for TTC |
+| REQ-42 | Fuse camera and radar; use LiDAR as a third source; stop when sensors disagree and risk is high (RPT) | Decision-level fusion and tie-breaking | — | — | — | Not implemented or no implementation identified |
+| REQ-43 | On sensor failure: controlled stop or degraded mode (RPT; CM "sensors operational? → degraded mode") | Safe reaction to sensor failure | — (sensors never fail; only an inference-backend failure is handled, REQ-59) | — | — | Not implemented or no implementation identified |
+| REQ-44 | Speed must allow stopping within the effective sensor range, which shrinks in fog or rain (RPT, Highway Code) | Speed bounded by stopping distance within the effective range | Camera range × visibility (`CameraSensor.effectiveRangeMeters`); the fuzzy ceiling lowers the speed as visibility drops | `CameraSensor.java`, `fuzzy-weather.drl` | `CameraSensorTest.reducedVisibilityShortensTheCameraRange`; RT `reducedVisibilityAndGripTriggerConservativeReduction` | **Partially implemented** — range and speed both shrink with visibility, but no rule bounds the speed by the stopping distance within the range |
+| REQ-45 | Driver state checks: alcohol, fatigue, medication, seat belts, distraction (CM "driver assessment") | Block or warn according to driver state | — | — | — | Not implemented or no implementation identified |
+| REQ-46 | Vehicle state checks: faults, energy, tyres (CM "vehicle state") | Reduce speed or stop on faults | — | — | — | Not implemented or no implementation identified |
+| REQ-47 | Global risk level drives the driving mode (CM "global risk level") | Mode changes with aggregated risk | `RiskLevel` attached to each decision | `domain/RiskLevel.java` | — | **Partially implemented** — risk is a label only |
+| REQ-48 | Continuous perception–decision–action loop (README goal) | World → sensors → rules → decision → actuator → world, every 100 ms | `SimulationEngine.tick()`; `SimulationRuntimeService.startLoop()` | `simulation/SimulationEngine.java`, `api/service/SimulationRuntimeService.java` | SE (26 executed), RL, LC, RM and the other E2E classes | Implemented and tested |
+| REQ-49 | All driving policy lives in the rule base; the UI only presents (README) | No decisions outside the knowledge base | Rules; Angular presentation code | `rules/`, `src/main/prolog/`, `frontend/src/app/` | — (architectural; UI verified by reading) | **Partially implemented** — the UI holds no policy, but the actuator can refuse maneuvers and replace the speed decision (A-02) |
+| REQ-50 | The expert system knows only what sensors detect (README "world truth vs sensor perception") | Objects influence decisions only once in sensor range | Sensors; event routing; perception rules | `sensors/`, `drools/`, `driving_state.pl` | SE `speedSignFlowWorldToSensorToDroolsToVehicleResponse`, `pedestrianDynamicallyAddedOnlyDetectedWithinRangeAndTriggersSafetyRule`; `CameraSensorTest` | **Partially implemented** — some inputs come from world truth (A-01) |
+| REQ-51 | Reset isolates runs (README) | No perception state survives a reset or a backend switch | `SimulationEngine.reset` / `switchBackend`; new session | `simulation/SimulationEngine.java`, `drools/KnowledgeSession.java` | SE `resetClearsPerceptionStateAndRebuildsKieSession`, `stoppedWorldReportsRestAndStartAppliesScenarioSpeed` | Implemented and tested |
+| REQ-52 | The simulation starts stopped and moves only after START (README) | Speed 0 and status STOPPED until START | `SimulationEngine.holdVehicleAtRest`, `start` | `simulation/SimulationEngine.java` | SE `stoppedWorldReportsRestAndStartAppliesScenarioSpeed`; PW test 1 (not executed) | Implemented and tested |
+| REQ-53 | The world can be changed while running; changes are perceived through sensors (README) | Mutations applied at the next tick and detected in range | `enqueueWorldMutation`, `flushPendingMutations`; controllers | `simulation/SimulationEngine.java`, `api/controller/WorldController.java` | SE `dynamicWorldMutationPotholeDuringRunTriggersReaction`, `pedestrianDynamicallyAddedOnlyDetectedWithinRangeAndTriggersSafetyRule`; RM `paintingACellChangesWhatTheCameraSees` | Implemented and tested (REST layer itself untested, T-16) |
+| REQ-54 | Inspect working memory and timeline in the UI and API (README) | Facts, rules and decisions visible, for either backend | `WorkingMemoryInspector`, `ExplanationTrace`, `PrologBackend.factViews`, `DroolsController`, Angular expert-system panels | `drools/`, `prolog/`, `explanation/`, `api/controller/`, `frontend/src/app/expert-system/` | RT `listenersReceiveRuleAndFactEvents`; `FactDescriptionTest`; Angular unit tests (mocked data) | Implemented and tested (Prolog views only in a skipped test) |
+| REQ-55 | Status indicators reflect real backend and engine health (README manual test step) | Status values true to the system state | `SimulationRuntimeService.systemStatus` | `api/service/SimulationRuntimeService.java` | none | **Partially implemented** — the engine status reflects backend errors; the "backend" field is constant (A-08) |
+| REQ-56 | The JavaFX client shares the same expert system (README) | Same rule behaviour as the server | `DrivingExpertSystemApp` (Drools, realtime session clock) | `ui/DrivingExpertSystemApp.java` | none | **Partially implemented** — time-based rules misbehave with the realtime clock; a stop sign is never completed (A-07, P-04, P-04b) |
+| REQ-57 | 90-second presentation demo progresses through its phases (README) | Phases marked from observed evidence; safe behaviour throughout | `S12_PRESENTATION_DEMO` timed actions; `SimulationEngine.markDemoEvidence`; `ApiModelMapper` demo phases | `scenarios.json`, `simulation/SimulationEngine.java`, `api/service/ApiModelMapper.java` | PD `demoOvertakesInsteadOfTailgating` (Drools run); PW test 10 (not executed) | Implemented and tested (driving behaviour; the UI phase display is only in Playwright) |
+| REQ-58 | Two interchangeable inference engines that decide alike (README "Rule engines"; `ExpertSystemBackend` Javadoc) | Same proposals and decisions from Drools and Prolog | Whole Drools and Prolog knowledge bases; `ExpertSystemBackend` | `rules/`, `src/main/prolog/`, `inference/`, `prolog/` | `PrologDroolsEquivalenceTest` (110), `PrologRulesTest` (56), PROLOG runs of 17 E2E classes — all **skipped** here | Not verifiable with available information (SWI-Prolog not installed; A-14) |
+| REQ-59 | Stop deciding rather than drive on a default when the engine fails (`ExpertSystemException` Javadoc; README) | Pause with the error shown; a failed switch keeps the previous engine | `SimulationEngine.tick` (catch), `switchBackend`; `ApiExceptionHandler` (HTTP 503) | `simulation/SimulationEngine.java`, `api/controller/ApiExceptionHandler.java` | PS `failedSwitchKeepsThePreviousBackend` (executed) | Implemented and tested (the pause on a failure during a tick has no executed test) |
+| REQ-60 | Do not pass a slower vehicle on its right; overtake on the left (CODE Art. 36 CE) | Slow down behind a slower vehicle in the left lane, or move in behind it and overtake on the left | "Do not pass a slower left lane vehicle on its right"; "Move left behind slower left lane vehicle to overtake it on the left" | `front-vehicle.drl` | RT `slowerVehicleInTheLeftLaneIsNotPassedOnItsRight`, `fasterVehicleInTheLeftLaneDoesNotSlowTheEgoDown`; LO (6); P-06 (S9) | Implemented and tested (adjacent left lane only, R-26) |
+| REQ-61 | No overtaking right before a pedestrian crossing or a red/yellow light (CODE Art. 41 CE) | No overtake with a conflicting pedestrian or a non-green light within 125 m | Conditions of the four overtaking rules | `front-vehicle.drl` | RT `redLightAheadForbidsGoingAroundStationaryVehicle` | Implemented and tested |
+| REQ-62 | Give up an impossible overtake and return right when boxed in by slow traffic (CODE Art. 13 CE) | No endless following in CENTER/LEFT; return right safely | Six boxed-in rules (`BoxedInFact`) | `front-vehicle.drl` | BX (5 executed); MV `staysInRightAndAdaptsSpeedWhenEveryLaneIsSlow`; P-02d | Implemented and tested (decision oscillation at the 30 m window edge, R-25) |
+| REQ-63 | Traffic lights follow a cycle (README; CODE) | Yellow turns red; red turns green after the red time | `TrafficLight.advance`; `WorldPhysicsEngine.updateWorld` | `domain/TrafficLight.java`, `simulation/WorldPhysicsEngine.java` | RH `redTimeStartsWhenTheEgoIsAtRestBeforeTheLine`, `redTimeCountsFromTheStopHoweverLongTheApproachTakes`; TC `staysStoppedThroughRedAndDrivesOnAtGreen` | Implemented and tested (the red time only runs while the ego waits at the line) |
+| REQ-64 | Crosswalks as road elements (README legend code 5) | A crosswalk is painted across the road and stays after the pedestrian | `Crosswalk`; `CameraSensor` emits `CrosswalkDetectedEvent` | `domain/Crosswalk.java`, `SimulationEngine.java` | CW (2) | Implemented and tested (no rule reacts to a crosswalk, R-18) |
+
+---
+
+## 3. Predefined Scenarios
+
+Scenario IDs are those of `scenarios.json` at `70082b4`. After the baseline, the scenarios were renumbered and S18 was removed:
+
+| New ID | Baseline ID |
+|---|---|
+| S5 | S6 |
+| S6 | S7 |
+| S7 | S8 |
+| S8 | S9 |
+| S9 | S10 |
+| S10 | S11 |
+| S11 | S12 |
+| S12_PRESENTATION_DEMO | S14_… |
+| S13_MATRIX_COURSE | S15_… |
+| S14_SLOW_VEHICLE_OVERTAKE | S16_… |
+| S15_CONTINUOUS_LINE_BLOCKED | S17_… |
+
+| ID | Requirement or Scenario | Expected Behavior | Rule/Predicate | File | Associated Test | Coverage Status |
+|---|---|---|---|---|---|---|
+| SCN-S1 | S1 Empty safe road (SCN) | Cruise at 60 km/h with nothing to react to | "Default maintain speed baseline" | `scenarios.json`, `defaults.drl` | Base scenario of many E2E tests | Implemented and tested |
+| SCN-S2 | S2 90 to 50 speed limit (SCN) | Slow from 90 to 50 km/h before the sign | Speed-limit rules (REQ-01) | `scenarios.json`, `speed.drl` | SE (loads S2); P-09 | Implemented and tested |
+| SCN-S3 | S3 Red traffic light (SCN) | Stop before the red light; move off on green | Traffic-light rules (REQ-21) | `scenarios.json`, `traffic-lights.drl` | none loads S3 (equivalents in RS, TC); P-06, P-15 | Implemented, no test identified |
+| SCN-S4 | S4 Stop sign (SCN) | Stop, hold, proceed | Stop-sign rules (REQ-20) | `scenarios.json`, `traffic-signs.drl` | SE `stopSignFlowBringsVehicleToFullStopThenProceeds` | Implemented and tested |
+| SCN-S5 | S5 Pothole (SCN) | Avoid the pothole | Pothole rules (REQ-16) | `scenarios.json`, `avoidance.drl` | SE (loads S5) | Implemented and tested |
+| SCN-S6 | S6 Closed barrier (SCN) | Go around the closed barrier | Barrier rules (REQ-18) | `scenarios.json`, `barrier.drl` | none loads S6 (equivalent LL); P-06 | Implemented, no test identified |
+| SCN-S7 | S7 Pedestrian crossing (SCN) | Brake or stop for the pedestrian, resume afterwards | Pedestrian rules (REQ-13) | `scenarios.json`, `pedestrian.drl` | RL `pedestrianCrossingBrakesThenResumesAfterCrossingClears` (braking only); P-06 | Implemented and tested (resumption asserted only by PC equivalents) |
+| SCN-S8 | S8 Critical TTC (SCN) | Emergency braking behind a much slower vehicle | TTC rules (REQ-10); overtaking | `scenarios.json`, `emergency.drl` | none loads S8; P-06 | Implemented, no test identified |
+| SCN-S9 | S9 Lane change blocked (SCN) | Requested lane change refused | Lane-change rules (REQ-28) | `scenarios.json`, `lane-change.drl` | none loads S9 (equivalents RT `laneChangeBlocked`, LC `driverRequestedLaneChangeIntoOccupiedLaneIsRefused`); P-06 | Implemented, no test identified |
+| SCN-S10 | S10 Rain low grip (SCN) | Slower driving in rain | Fuzzy weather rules (REQ-05–07) | `scenarios.json`, `fuzzy-weather.drl` | SE (loads S10); P-06 | Implemented and tested |
+| SCN-S11 | S11 Complex sequential scenario (SCN) | Sign, rain, slower vehicle and pedestrian handled in sequence | Several | `scenarios.json` | none loads S11; P-06 | Implemented, no test identified |
+| SCN-S12 | S12_PRESENTATION_DEMO (SCN, README) | Phases: speed limit, weather, slower vehicle, pedestrian, clear weather | Several | `scenarios.json` | PD (Drools run); PW test 10 (not executed) | Implemented and tested |
+| SCN-S13 | S13_MATRIX_COURSE (SCN) | Slalom through obstacles every lap without touching them | Avoidance rules (REQ-15/16) | `scenarios.json`, `avoidance.drl` | RM `obstacleCourseIsDrivenWithoutCollisions` | Implemented and tested |
+| SCN-S14 | S14_SLOW_VEHICLE_OVERTAKE (SCN) | Overtake and return right | Overtaking rules (REQ-26/27) | `scenarios.json`, `front-vehicle.drl` | RL `overtakingSlowVehiclePassesAndReturnsToRightLane`; PW test 11 | Implemented and tested |
+| SCN-S15 | S15_CONTINUOUS_LINE_BLOCKED (SCN) | Do not cross the continuous CENTER\|RIGHT line; stop before the obstacle | Continuous-line rules (REQ-29) | `scenarios.json`, `road-hazards.drl` | RL `continuousLineBlocksLaneChangeAndBrakesBeforeObstacle`; P-11 | Implemented and tested |
+
+---
+
+## 4. Summary
+
+### 4.1 Counts by status
+
+| Status | Requirements (64) | Scenarios (15) |
+|---|---|---|
+| Implemented and tested | 35 | 10 |
+| Implemented, no test identified | 1 | 5 |
+| Partially implemented | 18 | 0 |
+| Not implemented or no implementation identified | 9 | 0 |
+| Not verifiable with available information | 1 | 0 |
+
+**Main changes since the baseline:**
+
+- Requirements:
+  - Now implemented and tested: REQ-01, REQ-22, REQ-29, REQ-35 and REQ-38.
+  - Moved from tested to partially implemented: REQ-13 (residual at 120 km/h) and REQ-17 (barrier at speed).
+  - Moved from not implemented to partially implemented: REQ-11, REQ-14, REQ-36 and REQ-44.
+  - REQ-02 removed with the speed-radar feature.
+  - Seven requirements added (REQ-58…REQ-64).
+- Scenarios: all scenarios now exercise the rules they are named after.
+
+### 4.2 Features without an identifiable implementation
+
+- REQ-02 speed radars (removed);
+- REQ-12 driver warning;
+- REQ-24 intersections and right of way;
+- REQ-25 emergency vehicles;
+- REQ-30 lane-departure detection;
+- REQ-42 sensor fusion and LiDAR;
+- REQ-43 sensor failure handling;
+- REQ-45 driver state;
+- REQ-46 vehicle state.
+
+### 4.3 Implemented features without an identified test
+
+- **Requirements:**
+  - REQ-19 (open barrier).
+  - Untested parts of other requirements:
+    - REQ-18: three of the four barrier-avoidance rules;
+    - REQ-38: barrier and pending-sign clearing;
+    - REQ-59: the pause on a failure during a tick.
+- **Scenarios:** S3, S6, S8, S9 and S11 are not loaded by any executed test; all five were verified by probes.
+- **Rules:** 8 rules never fired in the test suite ([TESTING.md §6](TESTING.md#6-rules-and-behaviours-covered)).
+
+### 4.4 Requirements that cannot be verified with the available information
+
+- **REQ-58 (equivalence of the two engines)** and every Prolog-specific behaviour. The tests exist but were skipped, because SWI-Prolog is not installed on the analysis machine.
+- **Visual and layout behaviours covered only by Playwright** (tests 3–5, 12–18): not executed.
+- **Numeric thresholds** (2.5 s TTC, 12 m gap, 2.0/2.8 m/s² curves, fuzzy sets, 55 m barrier window) were not checked against real-world standards. The repository contains no reference values except the draft report's 3 s time headway and 0.8 s warning, which are not implemented.
+
+### 4.5 Consistency with other documents
+
+- Rule names, files and tests in this matrix match the per-rule entries in [BUSINESS_RULES.md](BUSINESS_RULES.md).
+- Finding references (R-, A-, T-, P-) match [BUSINESS_RULES.md §17](BUSINESS_RULES.md#17-consistency-audit), [ARCHITECTURE.md §9.2](ARCHITECTURE.md#92-audit-findings) and [TESTING.md](TESTING.md).
+- A test that was not executed, or was skipped, is never counted as evidence of passing.

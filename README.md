@@ -61,7 +61,7 @@ The project is inspired by the perception/decision loop of ADAS systems. It does
 
 - Java 17 (compiler release 17)
 - Maven 3.9+
-- Spring Boot 3.3.4 (REST + SSE realtime stream)
+- Spring Boot 3.3.4 (REST commands + WebSocket realtime channel)
 - Drools / KIE 8.44.0.Final (DRL, CEP, entry points, live query)
 - JavaFX 21.0.2 (legacy client retained)
 - Angular 18 (`frontend/`)
@@ -74,8 +74,8 @@ The project is inspired by the perception/decision loop of ADAS systems. It does
 ```text
 Angular Frontend (presentation only)
         |
-        | REST + SSE
-        v
+        | REST (commands)  ^ WebSocket (a snapshot every tick)
+        v                  |
 Spring Boot API
         |
         v
@@ -99,7 +99,7 @@ DrivingDecision -> DecisionActuator -> Updated WorldState -> next cycle
 - `src/main/java/com/one2drive/projeto1/simulation` - world model, physics, actuator, tick cycle.
 - `src/main/java/com/one2drive/projeto1/sensors` - speed/radar/camera/blind-spot/environment perception.
 - `src/main/java/com/one2drive/projeto1/drools` - KieSession, router, facts/events, listeners, query support.
-- `src/main/java/com/one2drive/projeto1/api` - Spring Boot API, request/response models, realtime SSE publishing.
+- `src/main/java/com/one2drive/projeto1/api` - Spring Boot API, request/response models, realtime WebSocket publishing.
 - `src/main/java/com/one2drive/projeto1/ui` - JavaFX legacy consumer.
 - `src/main/resources/rules` - DRL knowledge base.
 
@@ -123,7 +123,9 @@ DrivingDecision -> DecisionActuator -> Updated WorldState -> next cycle
 
 ### Inference engine
 
-- Stateful `KieSession` in stream mode (`kmodule.xml`).
+- Stateful `KieSession` in stream mode (`kmodule.xml`); its lifecycle and how its
+  decisions reach the browser are in
+  [Realtime communication and the Drools session](#realtime-communication-and-the-drools-session).
 - Forward chaining on real sensor events.
 - Conflict handling in `DecisionContext`, per control channel. Every rule proposal
   of a cycle is kept and arbitrated separately for the speed (longitudinal) and the
@@ -336,17 +338,19 @@ The API can add road objects and actors while the simulation is running. Mutatio
 - `GET /api/drools/timeline/recent`
 - `GET /api/explanations/recent`
 
-### Realtime SSE
+### Realtime WebSocket
 
-- `GET /api/stream/snapshots` (Server-Sent Events)
+- `ws://localhost:8080/api/ws/simulation` (plain WebSocket, JSON text frames)
 
-The publisher pushes a `snapshot` event containing the full mapped snapshot on
-every tick and after every command/mutation. Disconnected clients are removed
-without interrupting the simulation loop.
+Every frame is `{"event":"snapshot","payload":{...}}` with the full mapped snapshot.
+A client gets the last snapshot as soon as it connects, then one on every tick and
+after every command/mutation. The channel is one way, backend to frontend; commands
+stay on REST. Details in
+[Realtime communication and the Drools session](#realtime-communication-and-the-drools-session).
 
 ### Snapshot payload
 
-`GET /api/simulation/state` (and the SSE payload) returns the ego state,
+`GET /api/simulation/state` (and the WebSocket payload) returns the ego state,
 environment, speed advisor, current decision with evidence, sensor readings, world
 objects, Working Memory rows, the bounded recent timeline, recent rules/facts,
 the active pipeline stage, tick size, backend-observed detection IDs (all, camera,
@@ -357,7 +361,85 @@ Verified local URLs:
 - Angular UI: `http://localhost:4200`
 - Backend: `http://localhost:8080`
 - Status: `http://localhost:8080/api/simulation/status`
-- SSE: `http://localhost:8080/api/stream/snapshots`
+- WebSocket: `ws://localhost:8080/api/ws/simulation`
+
+## Realtime communication and the Drools session
+
+Commands go from the browser to the backend over REST, each with its own response.
+Everything the backend knows goes back over one WebSocket, pushed on every tick: the
+frontend never polls.
+
+### Which Drools session
+
+The server uses one **stateful** `KieSession` (`drivingKsession`, `type="stateful"` in
+`kmodule.xml`) in a kbase with `eventProcessingMode="stream"`. A stateless session
+starts from nothing on every call, but the rules depend on what earlier ticks left in
+working memory: the current speed limit, the stop-sign hold, the traffic-light
+commitment, lane occupancy, the overtaking state, and the sliding windows over events
+of earlier ticks (persistent TTC, distance trend).
+
+`kmodule.xml` declares a realtime clock; the server and the tests replace it with the
+**pseudo clock** (`KnowledgeSession.createPseudoClock`), advanced by exactly one tick
+(100 ms) per simulation tick. CEP windows therefore follow simulation time: a paused
+simulation or a slow browser never ages an event.
+
+### Session lifecycle
+
+| Moment | Where | What happens to the session |
+| --- | --- | --- |
+| Server start | `SimulationCoreConfig` → `SimulationEngine` → `DroolsBackend` → `KnowledgeSession.create` | A new `KieSession` from the classpath `KieContainer`, with the listeners, the `droolsSupport` global, the seed facts and the `Current Driving Decision` live query |
+| Every running tick (100 ms) | `SimulationEngine.tick` on the `simulation-api-loop` thread | Clock advanced, decision cycle opened, sensor events inserted into the entry points, `VehicleStateFact` updated, `fireAllRules(5000)`, proposals arbitrated |
+| Driver command | `POST /api/simulation/lane-change/{direction}` → `SimulationEngine.requestLaneChange` | A command event inserted into `COMMAND_STREAM`; the rules take it on the next tick |
+| Reset, scenario load, engine switch | `SimulationEngine.reset` / `switchBackend` | Live query closed, session disposed, a new session from an empty working memory |
+| Server shutdown | `SimulationEngine.close()` (bean destroy method) | Live query closed, session disposed |
+
+A `KieSession` is not thread-safe. The scheduler tick and every REST call reach it only
+through `synchronized` methods of `SimulationEngine`, so one thread at a time is inside
+the session. The WebSocket threads never touch it.
+
+### How decisions reach the browser
+
+```text
+simulation-api-loop thread, every 100 ms         ws-sender thread, one per client
+----------------------------------------         --------------------------------
+tick(): sensors -> KieSession.fireAllRules()
+        -> DecisionContext arbitration
+        -> DecisionActuator -> world updated
+snapshot mapped (under the lock)
+publish(snapshot), outside the lock  ------------>  latest snapshot -> JSON -> WebSocket frame
+```
+
+1. The snapshot is built after the whole tick, so one frame carries the decision of that
+   tick (both channels, the deciding rules, every proposal with its outcome, including a
+   lane change the actuator refused), the rules fired and the facts changed (agenda and
+   working-memory listeners, shown as the timeline), the working memory, and the world
+   the decision produced. A decision reaches the browser in the tick it is inferred.
+2. `publish` never waits for a client. Each client has its own sender holding only the
+   latest snapshot: a slow browser skips frames instead of piling them up, and a stuck
+   one only times out its own connection.
+3. Commands (start, pause, scenario load, world edits, environment, engine switch)
+   publish a snapshot at once, so their effect shows without waiting for a tick.
+
+The `Current Driving Decision` live query also fires inside `fireAllRules`, but the
+server does not push from it: at that moment the actuator has not applied the decision
+(it can still refuse a lane change) and the world has not moved. The snapshot taken
+after the tick is the consistent picture. The live query feeds the JavaFX client.
+
+### Connection handling
+
+| Situation | Backend | Frontend |
+| --- | --- | --- |
+| Connect | Session registered; the last snapshot sent at once | `RealtimeStreamService` opens `ws(s)://<host>/api/ws/simulation`; the first snapshot turns the Stream badge `LIVE` |
+| Normal traffic | A snapshot every tick, also while stopped or paused | Each frame replaces the state signal |
+| Browser page from another origin | Handshake refused (403); only `http://localhost:4200` is allowed | — |
+| A write fails or times out | Client dropped, session closed | The socket closes, so it reconnects |
+| Server stops, connection drops | Session unregistered | Stream `RECONNECTING` with the error banner; new attempts after 1 s, 2 s, 4 s, then every 8 s; the first snapshot resets the wait and clears the banner |
+| Socket silent for 5 s (sleep, network change) | — | Treated as dropped and reopened |
+| Frame that is not JSON | — | Socket closed and reopened |
+| Page closed | Session unregistered | Socket closed with code 1000 |
+
+During development `ng serve` forwards the WebSocket with the rest of `/api`
+(`proxy.conf.json`, `"ws": true`).
 
 ## Angular Frontend
 
@@ -565,7 +647,7 @@ separate control that freezes the simulation itself.
 | --- | --- |
 | Angular UI | <http://localhost:4200> |
 | Backend status | <http://localhost:8080/api/simulation/status> |
-| Realtime stream (SSE) | <http://localhost:8080/api/stream/snapshots> |
+| Realtime WebSocket | `ws://localhost:8080/api/ws/simulation` |
 | Working memory | <http://localhost:8080/api/drools/working-memory> |
 | Recent decisions | <http://localhost:8080/api/explanations/recent> |
 
@@ -683,7 +765,7 @@ frontend terminal to complete the browser E2E step.
 ## Browser E2E
 
 The Playwright suite runs against the **real** stack: real Angular app, real
-Spring Boot API, real `SimulationEngine`, real sensors, real SSE stream, and real
+Spring Boot API, real `SimulationEngine`, real sensors, real WebSocket channel, and real
 Drools session. It does not mock `DrivingDecision`.
 
 1. Start the backend (`mvn spring-boot:run`)
@@ -770,7 +852,7 @@ The direct integration suite covers 81 backend tests: 23 rule/CEP tests, 7 fact 
 
 ## Known limitations
 
-- SSE is used for realtime state streaming; WebSocket can be added later if bidirectional stream semantics are needed.
+- The WebSocket is one way (backend to frontend) and sends the full snapshot each tick, not a diff; commands stay on REST. Fine for one local simulation and a few browsers.
 - World model remains simplified for academic clarity: a looping road map of 5 m blocks and three lanes, with continuous longitudinal movement.
 - JavaFX interaction is still manual in GUI environments; automated UI acceptance targets Angular.
 - The world is an in-memory single-simulation academic model with simplified one-dimensional physics and lane abstraction; it is not a production ADAS controller.

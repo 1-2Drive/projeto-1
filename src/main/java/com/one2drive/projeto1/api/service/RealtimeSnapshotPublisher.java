@@ -1,20 +1,27 @@
 package com.one2drive.projeto1.api.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.one2drive.projeto1.api.model.ApiSimulationSnapshot;
 import com.one2drive.projeto1.api.model.ApiSnapshotPayload;
 import jakarta.annotation.PreDestroy;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import org.springframework.web.socket.CloseStatus;
+import org.springframework.web.socket.TextMessage;
+import org.springframework.web.socket.WebSocketSession;
 
 import java.io.IOException;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Pushes snapshots to the SSE clients without ever making the caller wait for one.
+ * Pushes snapshots to the WebSocket clients without ever making the caller wait for one.
  *
  * <p>The simulation loop publishes every tick. A browser that stops reading (busy, throttled
  * in a background tab) fills its socket buffer, and a blocking write then stalls until the
@@ -22,39 +29,59 @@ import java.util.concurrent.atomic.AtomicReference;
  * API call waiting on it for the whole timeout. So each client has its own sender: at most one
  * write in flight, and only the latest snapshot waiting. A slow client skips the snapshots it
  * could not take (each one is a full state, so nothing is lost but intermediate frames) and a
- * stuck client only times out its own connection.
+ * stuck client only times out its own connection. One sender per session also keeps writes to
+ * a {@link WebSocketSession}, which is not thread-safe, one at a time.
+ *
+ * <p>A client that connects, or reconnects, gets the last published snapshot at once instead
+ * of waiting for the next tick.
  */
 @Component
 public class RealtimeSnapshotPublisher {
-    private final CopyOnWriteArrayList<Client> clients = new CopyOnWriteArrayList<>();
+    public static final String SNAPSHOT_EVENT = "snapshot";
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeSnapshotPublisher.class);
+
+    private final ObjectMapper objectMapper;
+    private final Map<String, Client> clients = new ConcurrentHashMap<>();
     private final ExecutorService senders = Executors.newCachedThreadPool(runnable -> {
-        Thread thread = new Thread(runnable, "sse-sender");
+        Thread thread = new Thread(runnable, "ws-sender");
         thread.setDaemon(true);
         return thread;
     });
+    /** Guarded by this: a client registering never misses, nor reorders, a concurrent publish. */
+    private ApiSnapshotPayload lastPublished;
 
-    public SseEmitter register() {
-        return register(new SseEmitter(0L));
+    /** {@code objectMapper} is Spring's, so a frame is the same JSON as the REST snapshot. */
+    public RealtimeSnapshotPublisher(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
     }
 
-    SseEmitter register(SseEmitter emitter) {
-        Client client = new Client(emitter);
-        clients.add(client);
-        emitter.onCompletion(() -> clients.remove(client));
-        emitter.onTimeout(() -> clients.remove(client));
-        emitter.onError(error -> clients.remove(client));
-        return emitter;
+    public void register(WebSocketSession session) {
+        Client client = new Client(session);
+        synchronized (this) {
+            clients.put(session.getId(), client);
+            if (lastPublished != null) {
+                client.offer(lastPublished);
+            }
+        }
+    }
+
+    public void unregister(WebSocketSession session) {
+        clients.remove(session.getId());
     }
 
     /** Hands the snapshot to every client's sender and returns at once. */
     public void publish(ApiSimulationSnapshot snapshot) {
-        ApiSnapshotPayload payload = new ApiSnapshotPayload("snapshot", snapshot);
-        for (Client client : clients) {
-            client.offer(payload);
+        ApiSnapshotPayload payload = new ApiSnapshotPayload(SNAPSHOT_EVENT, snapshot);
+        synchronized (this) {
+            lastPublished = payload;
+            for (Client client : clients.values()) {
+                client.offer(payload);
+            }
         }
     }
 
-    int clientCount() {
+    public int clientCount() {
         return clients.size();
     }
 
@@ -64,12 +91,12 @@ public class RealtimeSnapshotPublisher {
     }
 
     private final class Client {
-        private final SseEmitter emitter;
+        private final WebSocketSession session;
         private final AtomicReference<ApiSnapshotPayload> latest = new AtomicReference<>();
         private final AtomicBoolean sending = new AtomicBoolean(false);
 
-        Client(SseEmitter emitter) {
-            this.emitter = emitter;
+        Client(WebSocketSession session) {
+            this.session = session;
         }
 
         void offer(ApiSnapshotPayload payload) {
@@ -93,16 +120,24 @@ public class RealtimeSnapshotPublisher {
                         }
                         continue;
                     }
-                    emitter.send(SseEmitter.event().name("snapshot").data(payload));
+                    String json;
+                    try {
+                        json = objectMapper.writeValueAsString(payload);
+                    } catch (JsonProcessingException ex) {
+                        // A mapping bug, not a broken connection: skip the frame, keep the client.
+                        LOGGER.error("Snapshot could not be serialized", ex);
+                        continue;
+                    }
+                    session.sendMessage(new TextMessage(json));
                 }
             } catch (IOException | IllegalStateException ex) {
                 // The connection is gone (closed, or timed out writing): drop this client.
                 // The frontend reconnects and gets a new one.
-                clients.remove(this);
+                clients.remove(session.getId(), this);
                 try {
-                    emitter.complete();
-                } catch (IllegalStateException ignored) {
-                    // The client may have completed the emitter concurrently.
+                    session.close(CloseStatus.SESSION_NOT_RELIABLE);
+                } catch (IOException | IllegalStateException ignored) {
+                    // The session may have been closed concurrently.
                 }
             }
         }

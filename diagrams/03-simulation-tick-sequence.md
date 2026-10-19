@@ -6,7 +6,8 @@ sequenceDiagram
     participant SNS as SensorManager
     participant KIE as KnowledgeSession/KieSession
     participant ACT as DecisionActuator
-    participant SSE as SSE Publisher
+    participant PUB as RealtimeSnapshotPublisher
+    participant WS as ws-sender (per client)
     participant ANG as Angular Frontend
 
     API->>ENG: tick()
@@ -29,6 +30,7 @@ sequenceDiagram
     ACT-->>ENG: ego acceleration/lane updated
     ENG->>KIE: trace DECISION + ACTUATOR entries
     ENG-->>API: SimulationSnapshot
-    API->>SSE: publish(snapshot)
-    SSE-->>ANG: realtime update
+    API->>PUB: publish(snapshot), outside the lock
+    PUB->>WS: keep only the latest snapshot
+    WS-->>ANG: WebSocket frame {event: snapshot, payload}
 ```

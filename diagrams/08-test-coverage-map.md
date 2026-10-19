@@ -24,7 +24,7 @@ flowchart LR
     E2E --> EMERGENCY[Emergency actuation]
 
     FE[Angular unit tests - 11 tests] --> STATE[SimulationStateService]
-    FE --> SSE[SSE client]
+    FE --> WSC[WebSocket client]
     FE --> ROAD[Road coordinate mapping]
     FE --> TOOLBOX[Scenario toolbox]
     FE --> ADVISOR[Speed advisor]

@@ -38,7 +38,7 @@ The architecture has six layers:
 | Layer | Implementation | Responsibility |
 |---|---|---|
 | Presentation | Angular app (`frontend/`), legacy JavaFX client (`ui/`) | Visualise snapshots, send commands. No driving policy (verified: only rendering and form validation in TypeScript) |
-| Service / API | Spring Boot (`api/`) | REST commands, SSE snapshot stream, 100 ms scheduler, DTO mapping, backend switch |
+| Service / API | Spring Boot (`api/`) | REST commands, WebSocket snapshot channel, 100 ms scheduler, DTO mapping, backend switch |
 | Simulation core | `simulation/`, `sensors/`, `scenario/`, `domain/`, `config/` | World model, physics, traffic-light cycle, sensors, actuator, tick orchestration, scenarios |
 | Inference abstraction | `inference/` | `ExpertSystemBackend` interface: the same five calls per tick for every backend |
 | Knowledge layer | `drools/` + `src/main/resources/rules/*.drl`; `prolog/` + `src/main/prolog/*.pl` | Drools: stateful session, 119 rules, 6 queries. Prolog: persistent process, 107 rules |
@@ -63,7 +63,7 @@ The architecture has six layers:
 | Physics | [`WorldPhysicsEngine`](../src/main/java/com/one2drive/projeto1/simulation/WorldPhysicsEngine.java) | Longitudinal motion, lateral lane-change motion (1.2 m/s, smoothstep), actor motion, traffic-light cycle (yellow 3 s → red; red → green after the ego has waited 5 s at the line) | `domain`, `config` |
 | Sensors | [`sensors/`](../src/main/java/com/one2drive/projeto1/sensors) | Speed (100 ms); front radar (100 ms, ≤ 130 m: own lane with noise, plus left, right and far-left lanes); camera (200 ms, 120 m × visibility); blind spot (200 ms, both sides); environment (400 ms) | `WorldState`, `drools.events` |
 | Explanation | [`ExplanationTrace`](../src/main/java/com/one2drive/projeto1/explanation/ExplanationTrace.java), [`listeners/`](../src/main/java/com/one2drive/projeto1/drools/listeners), [`SensorSignificance`](../src/main/java/com/one2drive/projeto1/simulation/SensorSignificance.java), [`InferenceNarrator`](../src/main/java/com/one2drive/projeto1/api/service/InferenceNarrator.java) | Timeline (500 entries) of perception changes, rule firings, fact changes, decisions, actuator and maneuver events; narrative for the UI. For Prolog, `PrologBackend` writes equivalent entries from the cycle result | backends |
-| Runtime service | [`SimulationRuntimeService`](../src/main/java/com/one2drive/projeto1/api/service/SimulationRuntimeService.java), [`RealtimeSnapshotPublisher`](../src/main/java/com/one2drive/projeto1/api/service/RealtimeSnapshotPublisher.java) | Single-thread scheduler at a fixed 100 ms calling `tick()` (exceptions logged, loop kept alive); SSE publishing through one sender per client that only keeps the latest snapshot | engine, mapper |
+| Runtime service | [`SimulationRuntimeService`](../src/main/java/com/one2drive/projeto1/api/service/SimulationRuntimeService.java), [`RealtimeSnapshotPublisher`](../src/main/java/com/one2drive/projeto1/api/service/RealtimeSnapshotPublisher.java) | Single-thread scheduler at a fixed 100 ms calling `tick()` (exceptions logged, loop kept alive); WebSocket publishing through one sender per client that only keeps the latest snapshot; [`RealtimeWebSocketHandler`](../src/main/java/com/one2drive/projeto1/api/controller/RealtimeWebSocketHandler.java) registers each session at `/api/ws/simulation` | engine, mapper |
 | Scenario subsystem | [`ScenarioLibrary`](../src/main/java/com/one2drive/projeto1/scenario/ScenarioLibrary.java), [`ScenarioFactory`](../src/main/java/com/one2drive/projeto1/scenario/ScenarioFactory.java) | Loads `scenarios.json` (15 scenarios); builds a `WorldState` (default lane RIGHT; rain = visibility 0.7, grip 0.65) | Jackson |
 
 ### 2.1 Component diagram
@@ -77,7 +77,7 @@ flowchart TB
     subgraph API["Spring Boot API (api/)"]
         CTRL["REST controllers"]
         RTS["SimulationRuntimeService<br/>100 ms scheduler"]
-        PUB["RealtimeSnapshotPublisher<br/>(SSE, per-client sender)"]
+        PUB["RealtimeSnapshotPublisher<br/>(WebSocket, per-client sender)"]
         MAP["ApiModelMapper / InferenceNarrator"]
     end
     subgraph Core["Simulation core"]
@@ -99,8 +99,8 @@ flowchart TB
     end
     EXP["ExplanationTrace (timeline)"]
 
-    NG -->|REST and SSE| CTRL
-    PUB -.->|SSE snapshot| NG
+    NG -->|REST commands| CTRL
+    PUB -.->|WebSocket snapshot| NG
     CTRL --> RTS
     RTS --> ENG
     RTS --> PUB
@@ -159,7 +159,7 @@ flowchart LR
     PH --> W
     W -.->|"direct read: ego state, markings, right-lane hazard"| F
     W -.->|"direct read: lane safety, markings"| A
-    D --> SNAP["Snapshot → SSE → UI"]
+    D --> SNAP["Snapshot → WebSocket → UI"]
 ```
 
 The dotted arrows are deviations from the intended "world → sensor → belief" separation (finding A-01).
@@ -186,6 +186,7 @@ The dotted arrows are deviations from the intended "world → sensor → belief"
 - **Clock.** The XML says `realtime`, but the code overrides it:
   - The Spring server and all tests use a **pseudo clock**, advanced by exactly 100 ms per tick, so event timestamps (simulation milliseconds) and CEP windows share one time base.
   - The JavaFX client uses a realtime clock (A-07).
+- **Session and the realtime channel.** The session is stateful because beliefs and event windows must survive from tick to tick. It is only touched through `synchronized` `SimulationEngine` methods (scheduler tick, REST commands), never by the WebSocket threads; the snapshot built after each tick is what the browser receives. Lifecycle table and push flow: [README, Realtime communication and the Drools session](../README.md#realtime-communication-and-the-drools-session).
 - **Phases.** Every rule belongs to the agenda group `perception` (32 rules), `decision` (84) or `fallback` (2). The control rule "Control: perceive, then decide, then fall back" (salience 10000) pushes the focus so that the groups run in that order in every cycle.
 - **Forward chaining.**
   - Inserting or updating a fact re-evaluates the affected rule conditions; within a group, rules fire in salience order.
@@ -331,8 +332,8 @@ Because non-braking reductions still track targets, a "reduction" whose target l
 
 | Interface | Direction | Description |
 |---|---|---|
-| REST API (`/api/...`) | UI → backend | Lifecycle, scenarios, world mutations, environment, inspection, backend switch; full list in [PROJECT_STRUCTURE.md §9.4](PROJECT_STRUCTURE.md#94-rest-and-sse-interface). `ExpertSystemException` → HTTP 503 |
-| SSE stream (`GET /api/stream/snapshots`) | backend → UI | Event `snapshot` with `ApiSimulationSnapshot`: ego, environment, decision (both channels, all proposals with outcomes, lane checks), sensor telemetry, world objects, working memory, timeline, road map, lane safety, demo phases, active backend and its error. Published every tick and after each command; slow clients skip frames |
+| REST API (`/api/...`) | UI → backend | Lifecycle, scenarios, world mutations, environment, inspection, backend switch; full list in [PROJECT_STRUCTURE.md §9.4](PROJECT_STRUCTURE.md#94-rest-and-websocket-interface). `ExpertSystemException` → HTTP 503 |
+| WebSocket (`ws://…/api/ws/simulation`) | backend → UI | JSON frame `{"event":"snapshot","payload":…}` with `ApiSimulationSnapshot`: ego, environment, decision (both channels, all proposals with outcomes, lane checks), sensor telemetry, world objects, working memory, timeline, road map, lane safety, demo phases, active backend and its error. The last one is sent on connect, then one every tick and after each command; slow clients skip frames; only the `http://localhost:4200` origin may connect from a browser |
 | Drools API | engine ↔ session | `insert`/`update`, `getEntryPoint().insert`, `fireAllRules(5000)`, pseudo clock `advanceTime`, `getQueryResults` (why-not), `openLiveQuery`, listeners |
 | Prolog process | engine ↔ `swipl` | One JSON request and one JSON reply per line (UTF-8), 2 s timeout:<br>• `{"cmd":"reset", cruiseTargetKmh, params, priorities}`<br>• `{"cmd":"tick", timestamp, speedKmh, positionMeters, lane, laneChangeState, targetLane, leftMarking, rightMarking, leftAdjacentLaneSafe, rightAdjacentLaneSafe, rightLaneBlockedAhead, presentationDemo, laneSettledAtMillis, physicalLane, events[], previousDecision}` → `{ok, proposals[], facts[], speedLimitKmh, laneChecks[], engineStats}`<br>• `{"cmd":"whynot", rule}`<br>• `{"cmd":"dependencyIndex", enabled}`<br>Errors → `{"ok":false,"error":…}`; Prolog warnings go to stderr |
 | Scenario file | classpath → engine | `scenarios/scenarios.json`, read once by Jackson |
@@ -417,7 +418,8 @@ Only decisions with evidence in the repository are listed.
 | Adjacent lanes start as *occupied* | Comment in `KnowledgeSession.create` | "A vehicle must never steer into a lane that has simply not been sensed yet" |
 | Lane changes executed progressively, never reversed | `LaneChangeState`, `DecisionActuator.requestLaneChange` | No teleporting, no oscillation between lanes |
 | Stop-sign approach recommends the current speed | Comment in `traffic-signs.drl` | Let the actuator's constant deceleration run; avoid repeated hard-brake bursts |
-| SSE with a non-blocking per-client sender | `RealtimeSnapshotPublisher` Javadoc | A slow browser must not freeze the simulation thread |
+| WebSocket with a non-blocking per-client sender | `RealtimeSnapshotPublisher` Javadoc | A slow browser must not freeze the simulation thread |
+| Snapshot pushed after the tick, not from the live query | [README](../README.md#how-decisions-reach-the-browser) | The live query fires before the actuator applies (or refuses) the decision; the snapshot after the tick is consistent |
 | Reset and backend switch rebuild the session | `SimulationEngine.reset`, `switchBackend` | No perception state leaks between runs or engines |
 
 ---
@@ -553,7 +555,7 @@ Low.
 - **Drools internals.** Behaviour that depends on Drools internals was confirmed by developer comments in the code or by executing probes.
 - **Probe scope.** Probes ran on a copy of the repository with the pseudo clock and deterministic radar noise. They show that a behaviour occurs in a given set-up, not how often.
 - **Not run:** the JavaFX client, the full Angular + Spring stack and the Playwright suite ([TESTING.md §4](TESTING.md#4-test-execution-in-this-analysis)).
-- **Thread safety** was reviewed only at the level of `synchronized` methods and the SSE sender design; no concurrency tests were run.
+- **Thread safety** was reviewed only at the level of `synchronized` methods and the WebSocket sender design; the publisher has a stalled-client test, no other concurrency tests were run.
 
 ### 9.4 Discrepancies with Existing Documentation
 
@@ -572,4 +574,3 @@ Low.
 | `DecisionActuator` Javadoc | Never decides whether a maneuver is safe or desirable | It refuses unsafe or illegal maneuvers and can replace the speed decision (A-02) |
 | `docs/report-implementation-audit.md` | 80 rules; `ABORTED` lane-change state; 2.5 s lane change; nonexistent files; fields of view; "PASS (100% Fully Verified)" | 119 rules; no `ABORTED`; ≈ 2.9 s; files do not exist; no fields of view; open findings remain (§9.2). The report predates the Prolog backend and channel arbitration |
 | `diagrams/` (02, 04, 08) | Speed radar on `ROAD_STREAM`; stop-sign approach from 35 m; old test counts | Speed radar removed; stop-sign approach on a braking curve up to 125 m; current counts in [TESTING.md](TESTING.md). The diagrams predate the Prolog backend |
-| `frontend/src/app/core/websocket/` | Folder name suggests WebSocket | SSE (`EventSource`) |

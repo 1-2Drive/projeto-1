@@ -20,7 +20,7 @@
 | Build tool | Apache Maven (3.9.x; 3.9.11 used for the verification runs) | [`pom.xml`](../pom.xml) |
 | Rule engine 1 (default) | Drools / KIE **8.44.0.Final**: DRL rules, stream (CEP) mode, entry points, agenda groups, queries, live query, truth maintenance | [`pom.xml`](../pom.xml), [`kmodule.xml`](../src/main/resources/META-INF/kmodule.xml), [`rules/`](../src/main/resources/rules) |
 | Rule engine 2 | **SWI-Prolog 9.x** (external program, not a Maven dependency) running the project's [`engine.pl`](../src/main/prolog/engine.pl) | [`src/main/prolog/`](../src/main/prolog), `pom.xml` resource entry, README |
-| Backend web layer | Spring Boot **3.3.4** (`spring-boot-starter-web`, `spring-boot-starter-validation`): REST and Server-Sent Events (SSE) | [`pom.xml`](../pom.xml), `src/main/java/com/one2drive/projeto1/api/` |
+| Backend web layer | Spring Boot **3.3.4** (`spring-boot-starter-web`, `spring-boot-starter-websocket`, `spring-boot-starter-validation`): REST and a plain WebSocket | [`pom.xml`](../pom.xml), `src/main/java/com/one2drive/projeto1/api/` |
 | JSON | Jackson 2.17.2 (scenario file; Prolog protocol) | [`pom.xml`](../pom.xml) |
 | Legacy desktop client | JavaFX **21.0.2** | [`DrivingExpertSystemApp.java`](../src/main/java/com/one2drive/projeto1/ui/DrivingExpertSystemApp.java) |
 | Web frontend | Angular **18.2** (18.2.14 installed), RxJS 7.8, TypeScript 5.5 | [`frontend/package.json`](../frontend/package.json) |
@@ -47,7 +47,7 @@ projeto-1/
 ├── src/
 │   ├── main/
 │   │   ├── java/com/one2drive/projeto1/        178 files
-│   │   │   ├── api/                Spring Boot application, REST controllers, DTOs, mappers, runtime loop, SSE
+│   │   │   ├── api/                Spring Boot application, REST controllers, DTOs, mappers, runtime loop, WebSocket
 │   │   │   ├── config/             SimulationConfig: numeric simulation parameters
 │   │   │   ├── decision/           DecisionPriority, DecisionContext, DecisionProposal, DrivingDecision,
 │   │   │   │                       LaneChangeCheck, StoppingPolicy
@@ -75,10 +75,10 @@ projeto-1/
 │       ├── prolog/                 Prolog rule tests, Drools/Prolog equivalence, Prolog E2E, harness
 │       └── simulation/             Engine-level end-to-end tests (most run on both backends)
 └── frontend/                       Angular application, Karma unit tests, Playwright end-to-end tests
-    ├── src/app/                    core/ (API, SSE, state, models), simulation/, scenario/, telemetry/,
+    ├── src/app/                    core/ (API, WebSocket, state, models), simulation/, scenario/, telemetry/,
     │                               expert-system/, shared/
-    ├── e2e/simulation.spec.ts      18 Playwright tests
-    ├── proxy.conf.json             Dev-server proxy: /api → http://localhost:8080
+    ├── e2e/                        20 Playwright tests (simulation.spec.ts, realtime.spec.ts)
+    ├── proxy.conf.json             Dev-server proxy: /api → http://localhost:8080 (REST and WebSocket)
     └── playwright.config.ts
 ```
 
@@ -94,8 +94,8 @@ All Java sources are under `src/main/java/com/one2drive/projeto1/`.
 |---|---|---|
 | `api` | `DrivingExpertSystemServerApplication` | Spring Boot entry point (`main`) |
 | `api.config` | `SimulationCoreConfig`, `CorsConfig` | Creates the singleton `SimulationEngine` (pseudo clock, scenario S1, backend from `expert.backend`), loads the scenario library, allows CORS from `http://localhost:4200` |
-| `api.controller` | `SimulationController`, `ScenarioController`, `WorldController`, `EnvironmentController`, `DroolsController`, `ExplanationController`, `StreamController`, `ApiExceptionHandler` | REST and SSE endpoints (§9.4); `ExpertSystemException` → HTTP 503 |
-| `api.service` | `SimulationRuntimeService`, `RealtimeSnapshotPublisher`, `ApiModelMapper`, `ApiRequestMapper`, `InferenceNarrator` | 100 ms scheduler, backend switch, DTO mapping, non-blocking SSE publishing, narrative |
+| `api.controller` | `SimulationController`, `ScenarioController`, `WorldController`, `EnvironmentController`, `DroolsController`, `ExplanationController`, `RealtimeWebSocketHandler`, `ApiExceptionHandler` | REST and WebSocket endpoints (§9.4); `ExpertSystemException` → HTTP 503 |
+| `api.service` | `SimulationRuntimeService`, `RealtimeSnapshotPublisher`, `ApiModelMapper`, `ApiRequestMapper`, `InferenceNarrator` | 100 ms scheduler, backend switch, DTO mapping, non-blocking WebSocket publishing, narrative |
 | `api.model` | `ApiSimulationSnapshot`, `ApiDecisionView` (speed and lane channels, proposals, lane checks), `ApiSystemStatus`, request DTOs | Data transfer objects with Bean Validation constraints |
 | `config` | `SimulationConfig` | Tick, map, accelerations, sensor ranges and rates, light timings (§5.2) |
 | `decision` | `DecisionPriority`, `DecisionContext`, `DecisionProposal`, `DrivingDecision`, `LaneChangeCheck`, `StoppingPolicy` | Priority levels; per-channel arbitration of all proposals; the decision; why-not; stopping figures and formulas |
@@ -248,8 +248,8 @@ The 15 scenarios are listed in [BUSINESS_DOMAIN.md §4](BUSINESS_DOMAIN.md#4-mai
 
 | Entry point | How to start | What happens |
 |---|---|---|
-| Spring Boot server (primary) | `mvn spring-boot:run` | Spring creates `SimulationConfig`, `ScenarioLibrary` and `SimulationEngine` (S1, pseudo clock, backend from `expert.backend`, status `STOPPED`). `SimulationRuntimeService.startLoop()` schedules `tick()` + SSE publish every 100 ms. Ticks do nothing until `POST /api/simulation/start` |
-| Angular UI | `cd frontend && npm start` | `ng serve` on port 4200 with `/api` proxied to 8080; the page subscribes to `GET /api/stream/snapshots` |
+| Spring Boot server (primary) | `mvn spring-boot:run` | Spring creates `SimulationConfig`, `ScenarioLibrary` and `SimulationEngine` (S1, pseudo clock, backend from `expert.backend`, status `STOPPED`). `SimulationRuntimeService.startLoop()` schedules `tick()` + WebSocket publish every 100 ms. Ticks do nothing until `POST /api/simulation/start` |
+| Angular UI | `cd frontend && npm start` | `ng serve` on port 4200 with `/api` proxied to 8080, WebSocket included; the page opens `ws://localhost:4200/api/ws/simulation` |
 | Full stack | `./scripts/dev.sh` (macOS/Linux) or `scripts\dev.cmd` (Windows) | Starts both services, waits until both answer, stops both on Ctrl-C |
 | JavaFX client (legacy) | `mvn javafx:run` | `DrivingExpertSystemApp` builds its own `SimulationEngine` with Drools and a **realtime** clock (A-07) |
 | Prolog backend | select `prolog` in the UI toggle, set `expert.backend=prolog`, or `POST /api/simulation/backend/prolog` | `PrologProcess` starts `swipl -q -g main -t halt server.pl` from a temporary copy of `src/main/prolog` |
@@ -265,7 +265,7 @@ flowchart LR
     be -->|prolog| pl["PrologBackend → swipl server.pl"]
     spring --> rt["SimulationRuntimeService.startLoop()"]
     rt -->|every 100 ms| tick["SimulationEngine.tick()"]
-    rt -->|every 100 ms| sse["RealtimeSnapshotPublisher.publish()"]
+    rt -->|every 100 ms| pub["RealtimeSnapshotPublisher.publish() → WebSocket"]
 ```
 
 The per-tick sequence is in [EXECUTION_FLOW.md](EXECUTION_FLOW.md).
@@ -276,7 +276,7 @@ The per-tick sequence is in [EXECUTION_FLOW.md](EXECUTION_FLOW.md).
 
 ```mermaid
 flowchart TD
-    FE["frontend (Angular)"] -->|REST + SSE| API["api (controllers, services)"]
+    FE["frontend (Angular)"] -->|REST + WebSocket| API["api (controllers, services)"]
     API --> SIM["simulation (SimulationEngine)"]
     JFX["ui (JavaFX)"] --> SIM
     SIM --> SEN["sensors"]
@@ -358,9 +358,9 @@ Plugins: `maven-compiler-plugin` 3.13.0, `maven-surefire-plugin` 3.2.5, `spring-
 
 - Angular UI: `http://localhost:4200`
 - Backend status: `http://localhost:8080/api/simulation/status`
-- Snapshot stream (SSE): `http://localhost:8080/api/stream/snapshots`
+- Snapshot channel (WebSocket): `ws://localhost:8080/api/ws/simulation`
 
-### 9.4 REST and SSE interface
+### 9.4 REST and WebSocket interface
 
 | Method and path | Purpose |
 |---|---|
@@ -375,9 +375,9 @@ Plugins: `maven-compiler-plugin` 3.13.0, `maven-surefire-plugin` 3.2.5, `spring-
 | `POST /api/world/actors`, `PUT/DELETE /api/world/actors/{id}` | Add, update, remove vehicles and pedestrians (`speedKmh` 0–180) |
 | `POST /api/environment` | `rain` flag and/or `visibilityFactor`, `gripFactor` (0.2–1.0) |
 | `GET /api/drools/working-memory`, `/decision`, `/rules/recent`, `/timeline/recent`; `GET /api/explanations/recent` | Inspection (the `/api/drools/...` paths serve whichever backend is active) |
-| `GET /api/stream/snapshots` | SSE stream; event name `snapshot`, every tick and after each command |
+| `ws://…/api/ws/simulation` | WebSocket, backend to frontend; JSON frames `{"event":"snapshot","payload":…}`: the last one on connect, then every tick and after each command |
 
-World mutations sent while the simulation runs are queued and applied at the start of the next tick. CORS allows `http://localhost:4200` only.
+World mutations sent while the simulation runs are queued and applied at the start of the next tick. CORS, and the WebSocket origin check, allow `http://localhost:4200` only.
 
 ---
 
@@ -385,8 +385,8 @@ World mutations sent while the simulation runs are queued and applied at the sta
 
 | Suite | Location | Command | Count |
 |---|---|---|---|
-| Backend (JUnit 5) | `src/test/java/com/one2drive/projeto1/` | `mvn test` (single class: `mvn test -Dtest=SimulationEngineE2ETest`) | 473 test runs in 32 classes, of which 255 need SWI-Prolog |
-| Frontend unit (Karma/Jasmine) | `frontend/src/app/**/*.spec.ts` | `cd frontend && npm test` | 57 cases in 10 files |
+| Backend (JUnit 5) | `src/test/java/com/one2drive/projeto1/` | `mvn test` (single class: `mvn test -Dtest=SimulationEngineE2ETest`) | 479 test runs in 33 classes, of which 255 need SWI-Prolog |
+| Frontend unit (Karma/Jasmine) | `frontend/src/app/**/*.spec.ts` | `cd frontend && npm test` | 62 cases in 10 files |
 | Browser end-to-end (Playwright) | `frontend/e2e/simulation.spec.ts` | start backend + frontend, then `cd frontend && npm run e2e` | 18 tests |
 
 Notes:
@@ -434,6 +434,5 @@ Details and evidence are in [ARCHITECTURE.md §9](ARCHITECTURE.md#9-architectura
   - no rule reads `VisibilityEvent`, `RoadGripEvent`, `ReducedVisibilityEvent`, `ReducedGripEvent` or `CrosswalkDetectedEvent`;
   - `DrivingAction.WAIT` is never proposed;
   - no rule reads `VehicleStateFact.leftAdjacentLaneSafe` or `rightAdjacentLaneSafe`.
-- **Naming:** the folder `frontend/src/app/core/websocket/` contains an SSE client (`EventSource`), not a WebSocket client.
 - **Screenshots in the repository root:** the current Playwright suite writes only `screenshot_viewport_1440x900.png`, `screenshot_viewport_1920x1080.png`, `screenshot_toolbox_objects_road.png` and `screenshot_clean_ego_badge.png`. The other nine are leftovers, four of which are named after the removed speed radar (`screenshot_A_far_from_radar.png` … `screenshot_D_passed_radar.png`).
 - **Outdated statements elsewhere:** some statements in `README.md`, `docs/report-implementation-audit.md` and `diagrams/` no longer match the code (test counts, rule counts, `window:length(5)`, `ABORTED`, Prolog rule names). The list is in [ARCHITECTURE.md §9.4](ARCHITECTURE.md#94-discrepancies-with-existing-documentation).

@@ -5,6 +5,8 @@ const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE
 
 export default defineConfig({
   testDir: './e2e',
+  // Every test drives the one simulation the backend runs, so tests never run side by side.
+  workers: 1,
   timeout: 180_000,
   expect: {
     timeout: 12_000

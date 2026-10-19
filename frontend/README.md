@@ -45,7 +45,7 @@ Output goes to `dist/frontend`.
 ## End-to-end tests
 
 The E2E suite runs against the **real** stack (real Angular app, real Spring Boot
-API, real SimulationEngine, real sensors, real Drools session, real SSE stream).
+API, real SimulationEngine, real sensors, real Drools session, real WebSocket channel).
 Start the backend and this dev server first.
 
 ```bash
@@ -66,7 +66,7 @@ PLAYWRIGHT_CHROMIUM_EXECUTABLE="/path/to/chrome" npm run e2e
 
 ```text
 src/app/
-  core/          REST client, SSE client, models, signal-based state
+  core/          REST client, WebSocket client, models, signal-based state
   simulation/    page composition, road canvas, world state
   scenario/      scenario toolbox, element configuration, scenario library
   telemetry/     vehicle, speed advisor, sensors

@@ -1,8 +1,8 @@
-import { TestBed } from '@angular/core/testing';
+import { fakeAsync, TestBed, tick } from '@angular/core/testing';
 import { SimulationStateService } from './simulation-state.service';
 import { BackendApiService } from '../api/backend-api.service';
 import { RealtimeStreamService } from '../websocket/realtime-stream.service';
-import { Observable, of } from 'rxjs';
+import { Observable, of, Subject } from 'rxjs';
 
 class BackendApiServiceMock {
   getState() {
@@ -92,46 +92,48 @@ class BackendApiServiceMock {
   }
 }
 
+const REALTIME_MESSAGE = {
+  event: 'snapshot',
+  payload: {
+    simulationTimeMillis: 100,
+    status: 'RUNNING',
+    egoVehicle: { speedKmh: 40, positionMeters: 10, lane: 'CENTER', accelerationMps2: 0 },
+    environment: { weatherCondition: 'CLEAR', visibilityFactor: 1, gripFactor: 1 },
+    speedAdvisor: { currentKmh: 40, legalLimitKmh: 50, recommendedKmh: 50, action: 'REDUCE_SPEED' },
+    currentDecision: {
+      action: 'REDUCE_SPEED',
+      recommendedSpeedKmh: 50,
+      riskLevel: 'MODERATE',
+      reason: '',
+      sourceRule: '',
+      timestamp: 100,
+      evidence: []
+    },
+    sensorReadings: {},
+    worldObjects: [],
+    workingMemory: [],
+    recentTimeline: [],
+    recentRules: [],
+    recentFacts: [],
+    activeStage: 'DECISION',
+    tickMillis: 100,
+    detectedObjectIds: [],
+    cameraDetectedObjectIds: [],
+    radarDetectedObjectIds: [],
+    sensorRanges: {
+      cameraRangeMeters: 120,
+      radarRangeMeters: 80,
+      blindSpotRangeMeters: 25,
+      cameraRateMillis: 200,
+      radarRateMillis: 100
+    },
+    demoPhases: []
+  }
+};
+
 class RealtimeStreamServiceMock {
   connect(): Observable<any> {
-    return of({
-      event: 'snapshot',
-      payload: {
-        simulationTimeMillis: 100,
-        status: 'RUNNING',
-        egoVehicle: { speedKmh: 40, positionMeters: 10, lane: 'CENTER', accelerationMps2: 0 },
-        environment: { weatherCondition: 'CLEAR', visibilityFactor: 1, gripFactor: 1 },
-        speedAdvisor: { currentKmh: 40, legalLimitKmh: 50, recommendedKmh: 50, action: 'REDUCE_SPEED' },
-        currentDecision: {
-          action: 'REDUCE_SPEED',
-          recommendedSpeedKmh: 50,
-          riskLevel: 'MODERATE',
-          reason: '',
-          sourceRule: '',
-          timestamp: 100,
-          evidence: []
-        },
-        sensorReadings: {},
-        worldObjects: [],
-        workingMemory: [],
-        recentTimeline: [],
-        recentRules: [],
-        recentFacts: [],
-        activeStage: 'DECISION',
-        tickMillis: 100,
-        detectedObjectIds: [],
-        cameraDetectedObjectIds: [],
-        radarDetectedObjectIds: [],
-        sensorRanges: {
-          cameraRangeMeters: 120,
-          radarRangeMeters: 80,
-          blindSpotRangeMeters: 25,
-          cameraRateMillis: 200,
-          radarRateMillis: 100
-        },
-        demoPhases: []
-      }
-    });
+    return of(REALTIME_MESSAGE);
   }
 }
 
@@ -178,6 +180,47 @@ describe('SimulationStateService', () => {
     expect(service.connection().simulationStatus).toBe('STOPPED');
     expect(service.loading()).toBeFalse();
   });
+
+  it('reconnects a dropped realtime channel, waiting longer after each failed attempt', fakeAsync(() => {
+    const stream = TestBed.inject(RealtimeStreamService);
+    const connections: Subject<any>[] = [];
+    spyOn(stream, 'connect').and.callFake(() => {
+      const connection = new Subject<any>();
+      connections.push(connection);
+      return connection;
+    });
+    service.initialize();
+    connections[0].next(REALTIME_MESSAGE);
+    expect(service.connection().streamStatus).toBe('LIVE');
+
+    connections[0].error(new Error('closed'));
+    expect(service.connection().streamStatus).toBe('RECONNECTING');
+    expect(service.connection().backendConnected).toBeFalse();
+    expect(service.error()).toContain('reconnect');
+    tick(999);
+    expect(connections.length).toBe(1);
+    tick(1);
+    expect(connections.length).toBe(2);
+
+    connections[1].error(new Error('refused'));
+    tick(1999);
+    expect(connections.length).toBe(2);
+    tick(1);
+    expect(connections.length).toBe(3);
+
+    // A snapshot means the channel is back: live again, and the next drop waits the least.
+    connections[2].next(REALTIME_MESSAGE);
+    expect(service.connection().streamStatus).toBe('LIVE');
+    expect(service.connection().backendConnected).toBeTrue();
+    expect(service.error()).toBeNull();
+    connections[2].error(new Error('closed'));
+    tick(1000);
+    expect(connections.length).toBe(4);
+
+    service.destroy();
+    expect(service.connection().streamStatus).toBe('DISCONNECTED');
+    expect(connections[3].observed).toBeFalse();
+  }));
 
   it('shows why a switch failed', () => {
     const api = TestBed.inject(BackendApiService) as unknown as BackendApiServiceMock;

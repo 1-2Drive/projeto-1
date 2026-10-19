@@ -216,7 +216,7 @@ The Prolog backend has no session clock: each request carries the simulation tim
 
 **Sliding window** — A Drools CEP construct that limits a pattern to recent events, e.g. `over window:time(2s)` (events of the last 2 seconds). This project uses only time windows. The Prolog backend keeps the equivalent windows itself (`driving_state.pl`).
 
-**Snapshot / SSE** — A snapshot is the full state sent to the user interface (`ApiSimulationSnapshot`). SSE (Server-Sent Events) is the one-way HTTP streaming used to push a snapshot every 100 ms (`GET /api/stream/snapshots`).
+**Snapshot / WebSocket** — A snapshot is the full state sent to the user interface (`ApiSimulationSnapshot`). The WebSocket at `/api/ws/simulation` pushes one as a JSON frame on connect, every 100 ms tick and after each command; it is one way, backend to frontend.
 
 **Stale perception** — A belief that is no longer confirmed by the sensors. Beliefs are reset after 250 ms (vehicles), 400 ms (traffic lights), 1 s (pedestrians, hazards, pending signs) or 1.5 s (stop signs) without a report. The speed limit in force is never reset.
 

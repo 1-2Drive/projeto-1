@@ -24,7 +24,8 @@ classDiagram
     }
 
     class RealtimeSnapshotPublisher {
-      +register() SseEmitter
+      +register(WebSocketSession)
+      +unregister(WebSocketSession)
       +publish(ApiSimulationSnapshot)
     }
 
@@ -32,7 +33,7 @@ classDiagram
     class WorldController
     class ScenarioController
     class DroolsController
-    class StreamController
+    class RealtimeWebSocketHandler
 
     class KnowledgeSession {
       +getKieSession()
@@ -61,7 +62,7 @@ classDiagram
     WorldController --> SimulationRuntimeService
     ScenarioController --> SimulationRuntimeService
     DroolsController --> SimulationRuntimeService
-    StreamController --> RealtimeSnapshotPublisher
+    RealtimeWebSocketHandler --> RealtimeSnapshotPublisher
     SimulationRuntimeService --> RealtimeSnapshotPublisher
     SimulationEngine --> KnowledgeSession
     SimulationEngine --> SensorManager

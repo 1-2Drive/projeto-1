@@ -70,7 +70,7 @@ This folder documents the **Drools Realtime Driving Expert System** (Maven proje
   - rain, visibility and grip with fuzzy logic;
   - moving off after a stop.
 - **Technical:**
-  - Java 17, Maven, Spring Boot REST and Server-Sent Events;
+  - Java 17, Maven, Spring Boot REST and a WebSocket realtime channel;
   - an inference-backend interface;
   - Drools: stateful session in stream (CEP) mode with a pseudo clock, six entry points, three agenda groups, 119 rules, 6 queries (including backward chaining for lane-change safety), truth maintenance, Allen temporal operators;
   - SWI-Prolog: a persistent process with its own production-rule interpreter (dependency index, refraction, meta-interpreter for backward chaining);

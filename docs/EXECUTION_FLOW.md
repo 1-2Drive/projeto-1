@@ -33,7 +33,7 @@ flowchart TD
     DEC --> ACT["Step 12: DecisionActuator.applyDecision<br/>(lane decision, then speed decision)"]
     ACT --> BOOK["Step 13: maneuver, passed-object and demo bookkeeping"]
     BOOK --> SNAP["snapshot()"]
-    SNAP --> PUB["Publish SSE 'snapshot' → Angular UI"]
+    SNAP --> PUB["Publish WebSocket 'snapshot' frame → Angular UI"]
     PUB --> LOOP
     CMD(["REST commands:<br/>start / pause / stop / reset / load scenario /<br/>switch backend / world mutations / lane-change request"]) -.-> TICK
 ```
@@ -171,7 +171,7 @@ After inference:
   - actuator changes (when the action or the acceleration changes by ≥ 0.25 m/s²);
   - maneuver start and completion;
   - backend errors.
-- **Snapshot:** `SimulationEngine.snapshot()` → `ApiModelMapper` → `ApiSimulationSnapshot` → SSE event `snapshot`, also returned by `GET /api/simulation/state`. It carries the ego, environment, speed advisor, both decision channels, the proposals and their outcomes, the lane checks, sensor telemetry, world objects, working memory, timeline, road map, lane safety, demo phases, and the active backend and its error.
+- **Snapshot:** `SimulationEngine.snapshot()` → `ApiModelMapper` → `ApiSimulationSnapshot` → WebSocket frame `snapshot` (`/api/ws/simulation`), also returned by `GET /api/simulation/state`. It carries the ego, environment, speed advisor, both decision channels, the proposals and their outcomes, the lane checks, sensor telemetry, world objects, working memory, timeline, road map, lane safety, demo phases, and the active backend and its error.
 - **Decision panel (Angular):** shows the speed and lane channels with their rules, the proposal list with outcomes, and the engine toggle.
 
 ### 2.9 State updates and repeated execution

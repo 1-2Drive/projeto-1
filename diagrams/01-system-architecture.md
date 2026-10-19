@@ -1,6 +1,6 @@
 ```mermaid
 flowchart LR
-    ANG[Angular Frontend] --> API[Spring Boot REST + SSE API]
+    ANG[Angular Frontend] -->|REST commands| API[Spring Boot REST + WebSocket API]
     JAVA_FX[JavaFX Legacy UI] --> ENGINE[SimulationEngine]
     API --> ENGINE
 
@@ -41,5 +41,5 @@ flowchart LR
     TRACE --> JAVA_FX
     API --> ANG
     API --> PUBLISHER[RealtimeSnapshotPublisher]
-    PUBLISHER -->|SSE snapshots| ANG
+    PUBLISHER -->|WebSocket snapshots| ANG
 ```

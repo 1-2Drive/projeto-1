@@ -43,7 +43,7 @@ Not present: Spring MVC test support (MockMvc, controller tests), JaCoCo or any 
 
 ## 3. Test Organisation (Existing Tests)
 
-### 3.1 Backend (JUnit 5): 473 test runs in 32 classes
+### 3.1 Backend (JUnit 5): 479 test runs in 33 classes
 
 All classes are under `src/test/java/com/one2drive/projeto1/`. "E2E" in a Java class name means an **engine-level integration test**: it runs the real `SimulationEngine` with sensors, rules and actuator, but without HTTP or a browser.
 
@@ -58,7 +58,8 @@ All classes are under `src/test/java/com/one2drive/projeto1/`. "E2E" in a Java c
 | `decision/DecisionContextTest` | 5 | 0 | Ceilings by minimum, base capped by ceilings, mandatory stop capped by a lower ceiling, veto only while braking, lane tie-breaks |
 | `domain/EgoVehicleStateTest` | 6 | 0 | Driving state reported for each action |
 | `sensors/CameraSensorTest` | 5 | 0 | Range shortened by visibility; stop signs only in the ego lane |
-| `api/service/RealtimeSnapshotPublisherTest` | 2 | 0 | A stalled SSE client does not block the publisher; failing clients are dropped |
+| `api/service/RealtimeSnapshotPublisherTest` | 4 | 0 | A stalled WebSocket client does not block the publisher or the other clients; a client whose write fails is dropped and closed; a new client gets the last snapshot at once; a closed client is no longer sent |
+| `api/RealtimeWebSocketE2ETest` | 4 | 0 | The real server on a free port and a real WebSocket client: the current snapshot on connect; S8's Drools `EMERGENCY_BRAKE` (rule, timeline, working memory) arriving in the tick it is inferred; a closed client dropped and a reconnecting one resumed at once; a foreign browser origin refused (403) |
 | `simulation/DecisionActuatorTest` | 8 | 0 | Dead band, gentle acceleration, proportional and comfortable braking, `BRAKE` never raises the speed, lane change started as decided, lane-change duration assumption |
 | `simulation/RoadMapTest` | 5 | 0 | Road matrix: cells, wrap-around, snapping, legend, invalid input |
 | `simulation/CrosswalkE2ETest` | 2 | 0 | A pedestrian gets a crosswalk; the crosswalk outlives the pedestrian |
@@ -83,11 +84,11 @@ All classes are under `src/test/java/com/one2drive/projeto1/`. "E2E" in a Java c
 | `prolog/PrologRulesTest` | 56 | 56 | Prolog rules in isolation, mirroring the Drools rule tests; why-not |
 | `prolog/PrologDroolsEquivalenceTest` | 110 | 110 | Same inputs to both engines, single cycles and sequences: same decision |
 | `prolog/PrologSimulationE2ETest` | 7 | 6 | Prolog in the full loop (lights, stop sign, working memory, switching); one test checks that a failed switch keeps the previous backend (runs without SWI-Prolog) |
-| **Total** | **473** | **255** | |
+| **Total** | **479** | **255** | |
 
 Helpers (not test classes): `DroolsTestHarness`, `PrologTestHarness`, `BackendTestSupport`, `OvertakingProbe`, `TrafficLightProbe`.
 
-Scenarios loaded from `scenarios.json` by tests that run without Prolog: S1, S2, S4, S5, S7, S10, S12_PRESENTATION_DEMO, S13_MATRIX_COURSE, S14_SLOW_VEHICLE_OVERTAKE, S15_CONTINUOUS_LINE_BLOCKED. `DependencyIndexBenchmarkTest` loads all 15, but it is Prolog-only.
+Scenarios loaded from `scenarios.json` by tests that run without Prolog: S1, S2, S4, S5, S7, S8, S10, S12_PRESENTATION_DEMO, S13_MATRIX_COURSE, S14_SLOW_VEHICLE_OVERTAKE, S15_CONTINUOUS_LINE_BLOCKED. `DependencyIndexBenchmarkTest` loads all 15, but it is Prolog-only.
 
 **How the rule harness differs from production.** Since the baseline, `DroolsTestHarness.cycle` follows the production order: `beginDecisionCycle` with session update, a `VehicleSpeedEvent` each cycle, arbitration and the decision update. It still:
 
@@ -95,14 +96,14 @@ Scenarios loaded from `scenarios.json` by tests that run without Prolog: S1, S2,
 - has no sensors, actuator or physics;
 - inserts the events the test chooses.
 
-### 3.2 Frontend unit tests (Karma/Jasmine): 57 cases in 10 files
+### 3.2 Frontend unit tests (Karma/Jasmine): 62 cases in 10 files
 
 | Spec file (under `frontend/src/app/`) | Declared `it(…)` | Topics |
 |---|---|---|
 | `app.component.spec.ts` | 1 | creates the app |
 | `core/api/backend-api.service.spec.ts` | 2 | state request, start command |
-| `core/state/simulation-state.service.spec.ts` | 4 | snapshot handling; active rule engine; backend switch and its failure |
-| `core/websocket/realtime-stream.service.spec.ts` | 1 | SSE messages |
+| `core/state/simulation-state.service.spec.ts` | 5 | snapshot handling; active rule engine; backend switch and its failure; realtime reconnection with back-off |
+| `core/websocket/realtime-stream.service.spec.ts` | 5 | WebSocket URL and snapshot frames; error on close and on a non-JSON frame; close on unsubscribe; silent-socket watchdog |
 | `expert-system/decision-panel/decision-panel.component.spec.ts` | 7 | why-not per side, speed and lane channel lines, proposal outcome badges, collapse, emergency highlighting, empty state |
 | `scenario/toolbox/toolbox.component.spec.ts` | 10 | control grouping, rain toggles, visibility slider, configuration drawer, road-wide elements without a lane, stop-sign lane, distance validation |
 | `simulation/road-canvas/road-canvas.component.spec.ts` | 23 | world items, road-wide signs and lights, sensor fields (camera cone shortened by rain, radar corridor, blind-spot pads), lane-change motion, badges, passed objects, crosswalk, turn-signal lamps |
@@ -110,11 +111,11 @@ Scenarios loaded from `scenarios.json` by tests that run without Prolog: S1, S2,
 | `simulation/simulation-page/simulation-page.component.spec.ts` | 2 | button states, demo button |
 | `telemetry/speed-advisor/speed-advisor.component.spec.ts` | 1 | above-recommendation styling |
 
-Some cases are generated in loops (e.g. one per turn-signal state), so Karma executes 57 cases from 54 declarations. These tests check presentation and HTTP/SSE plumbing with mocked data; they do not test driving rules.
+Some cases are generated in loops (e.g. one per turn-signal state), so Karma executes 62 cases from 59 declarations. These tests check presentation and HTTP/WebSocket plumbing with mocked data; they do not test driving rules.
 
-### 3.3 Browser end-to-end tests (Playwright): 18 tests
+### 3.3 Browser end-to-end tests (Playwright): 20 tests
 
-File `frontend/e2e/simulation.spec.ts`. They run against the real stack (Angular + Spring Boot + the active backend) and need both servers running. Tests:
+Files `frontend/e2e/simulation.spec.ts` (1–18) and `frontend/e2e/realtime.spec.ts` (19–20). They run against the real stack (Angular + Spring Boot + the active backend) and need both servers running. They share that one simulation, so `playwright.config.ts` runs them one at a time (`workers: 1`). Tests:
 
 1. starts on a clean stopped road and only runs after START;
 2. manual speed limit added at 150 m drives the expert system;
@@ -133,7 +134,9 @@ File `frontend/e2e/simulation.spec.ts`. They run against the real stack (Angular
 15. TEST E: clean EGO badge;
 16. capture evidence screenshots;
 17. world mutation drawer layout stability;
-18. VISUAL E2E: forward motion and approaching objects.
+18. VISUAL E2E: forward motion and approaching objects;
+19. simulation updates arrive over the WebSocket, without HTTP polling;
+20. a dropped channel reconnects on its own and goes live again.
 
 Notes:
 
@@ -299,7 +302,7 @@ The per-rule numbers are in the "Tests" fields of [BUSINESS_RULES.md](BUSINESS_R
 - pothole avoidance;
 - the arbitration rules (`DecisionContextTest`);
 - actuator speed tracking;
-- SSE back-pressure;
+- WebSocket back-pressure, reconnection and origin check;
 - reset isolation.
 
 ---
@@ -361,7 +364,7 @@ The per-rule numbers are in the "Tests" fields of [BUSINESS_RULES.md](BUSINESS_R
 - the vehicle stays at rest until START;
 - a scenario without a lane starts in RIGHT;
 - an overtaken vehicle is not re-tracked;
-- a stalled SSE client.
+- a stalled WebSocket client.
 
 **Edge cases and conflicts not covered:**
 

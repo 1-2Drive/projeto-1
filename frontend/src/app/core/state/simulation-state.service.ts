@@ -14,6 +14,10 @@ import {
 } from '../models/api.models';
 import { finalize, forkJoin, Observable, Subscription } from 'rxjs';
 
+/** First wait before reopening a dropped realtime channel; it doubles per failed attempt. */
+const RECONNECT_BASE_MS = 1000;
+const RECONNECT_MAX_MS = 8000;
+
 @Injectable({
   providedIn: 'root'
 })
@@ -22,6 +26,7 @@ export class SimulationStateService {
   private readonly stream = inject(RealtimeStreamService);
   private streamSubscription?: Subscription;
   private reconnectTimer?: ReturnType<typeof setTimeout>;
+  private reconnectAttempts = 0;
   private destroyed = false;
 
   private readonly state = signal<UiModel>({
@@ -48,6 +53,7 @@ export class SimulationStateService {
 
   initialize(): void {
     this.destroyed = false;
+    this.reconnectAttempts = 0;
     this.patch({ loading: true, error: null });
     forkJoin({
       snapshot: this.api.getState(),
@@ -194,6 +200,7 @@ export class SimulationStateService {
 
     this.streamSubscription = this.stream.connect().subscribe({
       next: (message) => {
+        this.reconnectAttempts = 0;
         this.patch({
           error: null,
           snapshot: message.payload,
@@ -215,7 +222,10 @@ export class SimulationStateService {
             streamStatus: 'RECONNECTING'
           }
         });
-        this.reconnectTimer = setTimeout(() => this.connectRealtime(), 1200);
+        // Back off while the backend stays unreachable; the first snapshot resets the wait.
+        const delay = Math.min(RECONNECT_MAX_MS, RECONNECT_BASE_MS * 2 ** this.reconnectAttempts);
+        this.reconnectAttempts++;
+        this.reconnectTimer = setTimeout(() => this.connectRealtime(), delay);
       }
     });
   }

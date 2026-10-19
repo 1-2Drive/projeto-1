@@ -104,6 +104,8 @@
   gap: 0.4rem;
 }
 
+.entry--inspectable { cursor: pointer; }
+
 .entry__rail {
   position: relative;
   display: grid;

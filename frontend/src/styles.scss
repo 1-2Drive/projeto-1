@@ -112,3 +112,8 @@ select {
     animation-duration: 0.01ms !important;
   }
 }
+
+@keyframes indicator-blink {
+  0% { opacity: 1; }
+  50% { opacity: 0; }
+}

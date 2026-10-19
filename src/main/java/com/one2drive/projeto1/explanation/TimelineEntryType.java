@@ -15,5 +15,7 @@ public enum TimelineEntryType {
     DECISION,
     ACTUATOR,
     /** Maneuver lifecycle: requested, started, completed. */
-    MANEUVER
+    MANEUVER,
+    WORLD_CHANGE,
+    SESSION
 }

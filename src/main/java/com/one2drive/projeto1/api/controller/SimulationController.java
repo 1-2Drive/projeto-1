@@ -3,6 +3,7 @@ package com.one2drive.projeto1.api.controller;
 import com.one2drive.projeto1.api.model.ApiCommandResponse;
 import com.one2drive.projeto1.api.model.ApiSimulationSnapshot;
 import com.one2drive.projeto1.api.model.ApiSystemStatus;
+import com.one2drive.projeto1.api.model.ApiStopResponse;
 import com.one2drive.projeto1.api.service.SimulationRuntimeService;
 import com.one2drive.projeto1.domain.LaneChangeDirection;
 import com.one2drive.projeto1.inference.ExpertBackendType;
@@ -41,9 +42,14 @@ public class SimulationController {
     }
 
     @PostMapping("/stop")
-    public ResponseEntity<ApiCommandResponse> stop() {
-        runtime.stop();
-        return ResponseEntity.ok(new ApiCommandResponse(true, "Simulation stopped"));
+    public ResponseEntity<ApiStopResponse> stop() {
+        try {
+            String sessionId = runtime.stop();
+            return ResponseEntity.ok(new ApiStopResponse(true, "Simulation stopped", sessionId));
+        } catch (RuntimeException error) {
+            return ResponseEntity.internalServerError().body(new ApiStopResponse(false,
+                "Simulation stopped, but the session could not be saved. Historical WHY/WHY-NOT is unavailable for this trip.", null));
+        }
     }
 
     @PostMapping("/reset")

@@ -45,6 +45,7 @@ public class DecisionContext {
     private long evaluationTimestamp;
     private double currentSpeedKmh;
     private int priority;
+    private boolean controlDispatched;
 
     public DecisionContext() {
         beginCycle(0L, 0.0);
@@ -54,6 +55,7 @@ public class DecisionContext {
         this.evaluationTimestamp = evaluationTimestamp;
         this.currentSpeedKmh = Math.max(0.0, currentSpeedKmh);
         this.priority = 0;
+        this.controlDispatched = false;
         this.proposals.clear();
     }
 
@@ -82,6 +84,11 @@ public class DecisionContext {
     public int getPriority() {
         return priority;
     }
+
+    /** Control agenda focus is dispatched once per cycle, even as proposals mutate this fact. */
+    public boolean isControlDispatched() { return controlDispatched; }
+
+    public void setControlDispatched(boolean controlDispatched) { this.controlDispatched = controlDispatched; }
 
     public List<DecisionProposal> getProposals() {
         return List.copyOf(proposals);

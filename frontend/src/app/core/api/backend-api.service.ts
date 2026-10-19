@@ -2,10 +2,15 @@ import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import {
   ApiDecisionView,
+  ApiSessionDetail,
+  ApiSessionSummary,
   ApiSimulationSnapshot,
   ApiSystemStatus,
   ApiTimelineEntry,
   ApiWorkingMemoryRow,
+  ApiWhyAnswer,
+  StopResponse,
+  WhyMode,
   CommandResponse,
   CreateActorRequest,
   CreateRoadElementRequest,
@@ -52,8 +57,8 @@ export class BackendApiService {
     return this.http.post<CommandResponse>(`${this.baseUrl}/simulation/resume`, {});
   }
 
-  stopSimulation(): Observable<CommandResponse> {
-    return this.http.post<CommandResponse>(`${this.baseUrl}/simulation/stop`, {});
+  stopSimulation(): Observable<StopResponse> {
+    return this.http.post<StopResponse>(`${this.baseUrl}/simulation/stop`, {});
   }
 
   /** Switches the deciding rule engine; the backend reloads the current scenario. */
@@ -95,5 +100,18 @@ export class BackendApiService {
 
   getRecentExplanations(): Observable<ApiTimelineEntry[]> {
     return this.http.get<ApiTimelineEntry[]>(`${this.baseUrl}/explanations/recent`);
+  }
+
+  getSessions(): Observable<ApiSessionSummary[]> {
+    return this.http.get<ApiSessionSummary[]>(`${this.baseUrl}/history/sessions`);
+  }
+
+  getSession(id: string): Observable<ApiSessionDetail> {
+    return this.http.get<ApiSessionDetail>(`${this.baseUrl}/history/sessions/${encodeURIComponent(id)}`);
+  }
+
+  askWhy(id: string, question: string, timestampMillis?: number, mode: WhyMode = 'WHY'): Observable<ApiWhyAnswer> {
+    return this.http.post<ApiWhyAnswer>(`${this.baseUrl}/history/sessions/${encodeURIComponent(id)}/why`,
+      { question, timestampMillis, mode });
   }
 }

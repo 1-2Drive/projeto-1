@@ -1,0 +1,66 @@
+:host { position: fixed; inset: 0; z-index: 1000; }
+
+.trip-dialog__scrim {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(2, 8, 14, 0.78);
+  backdrop-filter: blur(8px);
+}
+
+.trip-dialog {
+  display: grid;
+  gap: 0.8rem;
+  width: min(47rem, 100%);
+  max-height: min(90vh, 56rem);
+  overflow: auto;
+  padding: clamp(1rem, 3vw, 1.6rem);
+  color: #e8f0f6;
+  background: linear-gradient(145deg, #111d28, #0b1219 72%);
+  border: 1px solid rgba(105, 164, 199, 0.45);
+  border-radius: 1rem;
+  box-shadow: 0 2rem 6rem rgba(0, 0, 0, 0.65), 0 0 2rem rgba(50, 141, 186, 0.12);
+}
+
+.trip-dialog__header { display: flex; justify-content: space-between; gap: 1rem; border-bottom: 1px solid rgba(163, 190, 210, 0.18); padding-bottom: 0.8rem; }
+.trip-dialog__eyebrow, .trip-answer__eyebrow { margin: 0 0 0.3rem; color: #75c9eb; font: 600 0.67rem/1.4 var(--ds-font-mono); letter-spacing: 0.11em; }
+.trip-dialog h2 { margin: 0; color: #f5f9fc; font: 700 clamp(1.15rem, 3vw, 1.55rem)/1.2 'Space Grotesk', sans-serif; letter-spacing: 0.06em; }
+.trip-dialog__subtitle { max-width: 38rem; margin: 0.55rem 0 0; color: #a8bac8; font-size: 0.85rem; line-height: 1.5; }
+.trip-dialog__close { flex: 0 0 auto; width: 2.35rem; height: 2.35rem; border: 1px solid #344653; border-radius: 0.6rem; background: #15232e; color: #dce8ef; font-size: 1.5rem; cursor: pointer; }
+.trip-dialog__label { color: #d8e4ec; font-size: 0.75rem; font-weight: 650; }
+.trip-dialog textarea, .trip-dialog select { box-sizing: border-box; width: 100%; border: 1px solid #3a5262; border-radius: 0.6rem; background: #08121a; color: #f1f7fb; padding: 0.75rem 0.85rem; font: 0.9rem/1.5 inherit; outline: none; }
+.trip-dialog textarea { resize: vertical; min-height: 5rem; }
+.trip-dialog textarea:focus, .trip-dialog select:focus { border-color: #51b7e2; box-shadow: 0 0 0 3px rgba(81, 183, 226, 0.15); }
+.trip-dialog__hint { margin: -0.55rem 0 0; color: #768b9b; font-size: 0.68rem; }
+.trip-dialog__modes { display: flex; gap: 0.45rem; }
+.trip-dialog__modes button { border: 1px solid #354b59; border-radius: 999px; background: #121f29; color: #aebdca; padding: 0.45rem 0.95rem; font: 650 0.72rem var(--ds-font-mono); cursor: pointer; }
+.trip-dialog__modes button.is-selected { border-color: #51b7e2; color: #dcf5ff; background: rgba(45, 132, 172, 0.28); }
+.trip-dialog__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.55rem; }
+.trip-dialog__primary, .trip-dialog__secondary { border-radius: 0.55rem; padding: 0.62rem 1.15rem; font: 700 0.72rem var(--ds-font-mono); letter-spacing: 0.04em; cursor: pointer; }
+.trip-dialog__primary { border: 1px solid #5fc9ed; color: #06131b; background: linear-gradient(135deg, #78dbf6, #46acd6); }
+.trip-dialog__primary:disabled { opacity: 0.55; cursor: wait; }
+.trip-dialog__secondary { border: 1px solid #394b57; color: #c0ced7; background: #121d25; }
+.trip-dialog__error { margin: 0; color: #ffb2a8; border-left: 3px solid #d9675b; padding: 0.4rem 0.7rem; background: rgba(150, 43, 35, 0.12); font-size: 0.78rem; }
+.trip-answer { display: grid; gap: 0.45rem; padding: 0.85rem; border: 1px solid rgba(80, 163, 196, 0.3); border-radius: 0.7rem; background: rgba(11, 26, 36, 0.84); }
+.trip-answer h3 { margin: 0; color: #bcecff; font: 700 1rem 'Space Grotesk', sans-serif; }
+.trip-answer h4 { margin: 0.35rem 0 0; color: #91b4c7; font: 650 0.68rem var(--ds-font-mono); text-transform: uppercase; }
+.trip-answer ul { display: grid; gap: 0.28rem; margin: 0; padding-left: 1.15rem; }
+.trip-answer li { color: #cfdae2; font-size: 0.77rem; line-height: 1.45; overflow-wrap: anywhere; }
+.trip-answer__how { display: grid; gap: 0.5rem; margin: 0; padding-left: 1.2rem; }
+.trip-answer__how > li { color: #bcecff; font: 650 0.72rem var(--ds-font-mono); text-transform: uppercase; letter-spacing: 0.06em; }
+.trip-answer__how > li > ul { margin-top: 0.3rem; }
+.trip-answer__how > li > ul > li { color: #cfdae2; font: 400 0.77rem/1.45 var(--ds-font-mono); text-transform: none; letter-spacing: normal; }
+.trip-answer__summary { margin: 0.3rem 0 0; padding-top: 0.55rem; border-top: 1px solid rgba(163, 190, 210, 0.15); color: #dce9f0; font-size: 0.82rem; line-height: 1.5; }
+.trip-answer__technical-toggle { justify-self: start; border: 0; background: transparent; color: #70c5e5; padding: 0.4rem 0; font: 650 0.67rem var(--ds-font-mono); cursor: pointer; }
+.trip-answer__technical { max-height: 17rem; overflow: auto; border-top: 1px solid rgba(163, 190, 210, 0.15); padding-top: 0.55rem; }
+.trip-answer__technical code { color: #d5c4f0; font: 0.66rem/1.45 var(--ds-font-mono); overflow-wrap: anywhere; }
+.trip-answer__technical p { color: #91a5b4; font: 0.67rem var(--ds-font-mono); }
+.trip-answer > button:not(.trip-answer__technical-toggle) { text-align: left; border: 1px solid #314653; border-radius: 0.45rem; padding: 0.55rem 0.7rem; color: #d8e8f1; background: #111f29; cursor: pointer; }
+
+@media (max-width: 600px) {
+  .trip-dialog__scrim { padding: 0.45rem; align-items: end; }
+  .trip-dialog { width: 100%; max-height: 94dvh; border-radius: 0.9rem 0.9rem 0.35rem 0.35rem; padding: 0.9rem; }
+  .trip-dialog__actions > button { flex: 1 1 auto; }
+}

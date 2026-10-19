@@ -184,6 +184,49 @@ test.describe('Driving expert simulation UI', () => {
       .toContainText(/MANEUVER STARTED|MANEUVER COMPLETED/i, { timeout: 15000 });
   });
 
+  test('STOP saves the trip and opens a session-bound WHY / WHY-NOT dialog', async ({ page }) => {
+    test.setTimeout(90000);
+    await page.goto('/');
+    await loadScenario(page, 'S1 Empty safe road');
+    await page.locator('[data-testid="start-btn"]').click();
+    await expect(page.locator('[data-testid="simulation-status"]')).toContainText('RUNNING');
+    await page.locator('[data-testid="add-pothole"]').click();
+    await page.locator('[data-testid="lane-select"]').selectOption('RIGHT');
+    await page.locator('[data-testid="drawer-distance-input"]').fill('25');
+    await page.locator('[data-testid="apply-config"]').click();
+    await expect(page.locator('[data-testid="decision-action"]')).toContainText('CHANGE_LANE_LEFT', { timeout: 45000 });
+    await page.locator('[data-testid="stop-btn"]').click();
+
+    const dialog = page.locator('[data-testid="trip-questions-dialog"]');
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText('ASK ABOUT THIS TRIP');
+    await expect(page.locator('[data-testid="trip-question-input"]')).toBeFocused();
+    const sessionId = await dialog.getAttribute('data-session-id');
+    expect(sessionId).toBeTruthy();
+    const saved = await page.request.get('/api/history/sessions/' + sessionId);
+    expect(saved.ok()).toBeTruthy();
+    const session = await saved.json();
+    expect(session.decisionSnapshots.some((item: any) => item.decision.action === 'CHANGE_LANE_LEFT')).toBeTruthy();
+
+    await page.locator('[data-testid="trip-question-input"]').fill('Why did the vehicle change to the left lane?');
+    await page.locator('[data-testid="ask-trip-question"]').click();
+    await expect(page.locator('[data-testid="trip-answer"]')).toContainText('Avoid pothole in right lane by changing left');
+    await expect(page.locator('[data-testid="trip-answer"]')).toContainText('18.3');
+
+    await page.locator('[data-testid="why-not-mode"]').click();
+    await page.locator('[data-testid="trip-question-input"]').fill("Why didn't it brake?");
+    await page.locator('[data-testid="ask-trip-question"]').click();
+    await expect(page.locator('[data-testid="trip-answer"]')).toContainText('pothole rule');
+    await expect(page.locator('[data-testid="trip-answer"]')).toContainText('BRAKE was not proposed');
+
+    await page.reload();
+    await page.locator('button:has-text("Explanation")').click();
+    await page.locator('[data-testid="session-select"]').selectOption(sessionId!);
+    await expect(page.locator('[data-testid="historical-decision"]')).toContainText('CHANGE_LANE_LEFT');
+    await page.locator('[data-testid="reset-btn"]').click();
+    expect(await page.request.get('/api/history/sessions/' + sessionId).then((response) => response.ok())).toBeTruthy();
+  });
+
   test('blocked right lane forces pothole avoidance to use clear left lane', async ({ page }) => {
     test.setTimeout(90000);
 

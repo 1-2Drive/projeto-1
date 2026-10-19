@@ -35,6 +35,8 @@ import com.one2drive.projeto1.inference.DecisionInput;
 import com.one2drive.projeto1.inference.ExpertBackendType;
 import com.one2drive.projeto1.inference.ExpertSystemBackend;
 import com.one2drive.projeto1.inference.ExpertSystemException;
+import com.one2drive.projeto1.history.SessionSnapshot;
+import com.one2drive.projeto1.history.VehicleSample;
 import com.one2drive.projeto1.prolog.PrologBackend;
 import com.one2drive.projeto1.scenario.ScenarioActorDefinition;
 import com.one2drive.projeto1.scenario.ScenarioDefinition;
@@ -96,6 +98,8 @@ public class SimulationEngine implements AutoCloseable {
     private final Set<String> demoEvidence;
     private final boolean pseudoClock;
     private final Consumer<DrivingDecision> decisionConsumer;
+    private Consumer<SessionSnapshot> sessionSnapshotConsumer;
+    private SessionSnapshot lastSessionSnapshot;
 
     private WorldState worldState;
     private long simTimeMillis;
@@ -109,7 +113,7 @@ public class SimulationEngine implements AutoCloseable {
                             ScenarioDefinition scenarioDefinition,
                             boolean pseudoClock,
                             Consumer<DrivingDecision> decisionConsumer) {
-        this(config, scenarioDefinition, pseudoClock, decisionConsumer, ExpertBackendType.DROOLS);
+        this(config, scenarioDefinition, pseudoClock, decisionConsumer, ExpertBackendType.DROOLS, snapshot -> { });
     }
 
     public SimulationEngine(SimulationConfig config,
@@ -117,10 +121,20 @@ public class SimulationEngine implements AutoCloseable {
                             boolean pseudoClock,
                             Consumer<DrivingDecision> decisionConsumer,
                             ExpertBackendType backendType) {
+        this(config, scenarioDefinition, pseudoClock, decisionConsumer, backendType, snapshot -> { });
+    }
+
+    public SimulationEngine(SimulationConfig config,
+                            ScenarioDefinition scenarioDefinition,
+                            boolean pseudoClock,
+                            Consumer<DrivingDecision> decisionConsumer,
+                            ExpertBackendType backendType,
+                            Consumer<SessionSnapshot> sessionSnapshotConsumer) {
         this.config = config;
         this.backendType = backendType;
         this.pseudoClock = pseudoClock;
         this.decisionConsumer = decisionConsumer;
+        this.sessionSnapshotConsumer = sessionSnapshotConsumer;
         this.simulationClock = pseudoClock ? new PseudoSimulationClock(0) : new RealtimeSimulationClock();
         this.physicsEngine = new WorldPhysicsEngine(config);
         this.actuator = new DecisionActuator(config);
@@ -162,6 +176,7 @@ public class SimulationEngine implements AutoCloseable {
 
         this.backend = createBackend();
         this.currentDecision = backend.getDrivingDecision();
+        this.lastSessionSnapshot = null;
     }
 
     /**
@@ -252,6 +267,7 @@ public class SimulationEngine implements AutoCloseable {
         backend = createBackend();
         currentDecision = backend.getDrivingDecision();
         currentDecision.reset(0);
+        lastSessionSnapshot = null;
     }
 
     /**
@@ -325,16 +341,83 @@ public class SimulationEngine implements AutoCloseable {
         if (decisionChanged) {
             backend.getTrace().addDecision(currentDecision);
         }
+        SessionSnapshot contextSnapshot = buildSessionSnapshot("not yet applied");
         LaneChangeState stateBefore = worldState.getEgo().getLaneChangeState();
         actuator.applyDecision(worldState, currentDecision);
         recordManeuverStart(stateBefore);
         recordActuatorChange();
         settleManeuver();
+        List<com.one2drive.projeto1.api.model.ApiTimelineEntry> cycleTimeline = backend.getTrace().snapshot().stream()
+            .filter(entry -> entry.getTimestamp() == simTimeMillis)
+            .map(entry -> new com.one2drive.projeto1.api.model.ApiTimelineEntry(
+                entry.getTimestamp(), entry.getType().name(), entry.getMessage())).toList();
+        List<com.one2drive.projeto1.api.model.ApiWorkingMemoryRow> cycleFacts = backend.factViews().stream()
+            .map(fact -> new com.one2drive.projeto1.api.model.ApiWorkingMemoryRow(
+                fact.type(), fact.value(), fact.source(), fact.timestamp(), fact.stream())).toList();
+        lastSessionSnapshot = new SessionSnapshot(contextSnapshot.simulationTimeMillis(), contextSnapshot.vehicle(),
+            contextSnapshot.environment(), contextSnapshot.sensors(), contextSnapshot.worldObjects(), cycleFacts, cycleTimeline,
+            contextSnapshot.decision().withActuatorResult(actuatorResult()), contextSnapshot.roadMap());
+        sessionSnapshotConsumer.accept(lastSessionSnapshot);
         consumePassedRoadElements();
         markDemoEvidence(events);
         purgeExpiredDetections();
 
         return snapshot();
+    }
+
+    private String actuatorResult() {
+        EgoVehicleState ego = worldState.getEgo();
+        return "action=" + currentDecision.getAction() + ", acceleration="
+            + String.format("%.2f", ego.getAccelerationMps2()) + " m/s², lane=" + ego.getLane()
+            + (ego.getLaneChangeState().isActive() ? " -> " + ego.getTargetLane() : "")
+            + ", steering=" + ego.getSteeringState() + ", indicator=" + ego.getIndicatorState();
+    }
+
+    private SessionSnapshot buildSessionSnapshot(String actuatorResult) {
+        EgoVehicleState ego = worldState.getEgo();
+        List<com.one2drive.projeto1.api.model.ApiTimelineEntry> timeline = backend.getTrace().snapshot().stream()
+            .filter(entry -> entry.getTimestamp() == simTimeMillis)
+            .map(entry -> new com.one2drive.projeto1.api.model.ApiTimelineEntry(
+                entry.getTimestamp(), entry.getType().name(), entry.getMessage())).toList();
+        List<com.one2drive.projeto1.api.model.ApiRoadElement> objects = getAllRoadItemsRelativeToEgo().stream()
+            .map(item -> new com.one2drive.projeto1.api.model.ApiRoadElement(item.id(), item.type(),
+                item.positionMeters(), item.lane(), item.details(), item.worldPositionMeters())).toList();
+        List<com.one2drive.projeto1.api.model.ApiWorkingMemoryRow> facts = backend.factViews().stream()
+            .map(fact -> new com.one2drive.projeto1.api.model.ApiWorkingMemoryRow(
+                fact.type(), fact.value(), fact.source(), fact.timestamp(), fact.stream())).toList();
+        var egoView = new com.one2drive.projeto1.api.model.ApiSimulationSnapshot.EgoVehicleView(
+            ego.getSpeedKmh(), ego.getPositionMeters(), ego.getLane().name(), ego.getAccelerationMps2(),
+            ego.getLateralPositionMeters(), ego.getTargetLane().name(), ego.getLaneChangeState().name(),
+            ego.getLaneChangeProgress(), ego.getDrivingState().name(), ego.getIndicatorState().name(),
+            ego.getSteeringState().name(), ego.getHeadingDegrees());
+        var environment = new com.one2drive.projeto1.api.model.ApiSimulationSnapshot.EnvironmentView(
+            worldState.getWeatherState().getCondition().name(), worldState.getWeatherState().getVisibilityFactor(),
+            worldState.getWeatherState().getGripFactor());
+        var sensor = sessionSensorView();
+        return new SessionSnapshot(simTimeMillis, egoView, environment, sensor, objects, facts, timeline,
+            SessionSnapshot.DecisionSnapshot.from(currentDecision, actuatorResult), roadMapSnapshot());
+    }
+
+    private com.one2drive.projeto1.api.model.ApiSimulationSnapshot.SensorTelemetryView sessionSensorView() {
+        SensorTelemetry t = sensorTelemetry;
+        return new com.one2drive.projeto1.api.model.ApiSimulationSnapshot.SensorTelemetryView(
+            new com.one2drive.projeto1.api.model.ApiSimulationSnapshot.RadarTelemetryView(
+                t.frontRadar().rangeMeters(), t.frontRadar().targetId(), t.frontRadar().distanceMeters(),
+                t.frontRadar().relativeSpeedKmh(), t.frontRadar().ttcSeconds(), t.frontRadar().status()),
+            new com.one2drive.projeto1.api.model.ApiSimulationSnapshot.CameraTelemetryView(
+                t.frontCamera().rangeMeters(), t.frontCamera().detections().stream()
+                    .map(d -> new com.one2drive.projeto1.api.model.ApiSimulationSnapshot.CameraDetectionView(
+                        d.objectId(), d.label(), d.distanceMeters(), d.lane())).toList(), t.frontCamera().status()),
+            mapBlindSpot(t.blindSpotLeft()), mapBlindSpot(t.blindSpotRight()),
+            new com.one2drive.projeto1.api.model.ApiSimulationSnapshot.EnvironmentTelemetryView(
+                t.environment().condition(), t.environment().effectiveRangeMeters(),
+                t.environment().gripPercent(), t.environment().rain()));
+    }
+
+    private com.one2drive.projeto1.api.model.ApiSimulationSnapshot.BlindSpotTelemetryView mapBlindSpot(
+        SensorTelemetry.BlindSpotView view) {
+        return new com.one2drive.projeto1.api.model.ApiSimulationSnapshot.BlindSpotTelemetryView(
+            view.rangeMeters(), view.occupied(), view.targetId(), view.distanceMeters(), view.status());
     }
 
     /** Retires single-use static objects after passing while retaining their visual as it moves behind the car. */
@@ -646,6 +729,8 @@ public class SimulationEngine implements AutoCloseable {
     }
 
     private void executeTimedAction(ScenarioTimedAction action) {
+        backend.getTrace().add(simTimeMillis, TimelineEntryType.WORLD_CHANGE,
+            "Scenario action " + action.getType() + " at " + simTimeMillis + " ms");
         switch (action.getType()) {
             case SET_RAIN -> setRain(true);
             case CLEAR_WEATHER -> setRain(false);
@@ -732,12 +817,19 @@ public class SimulationEngine implements AutoCloseable {
         }
     }
 
-    private void enqueueWorldMutation(Runnable mutation) {
+    private void enqueueWorldMutation(Runnable mutation, String description) {
+        Runnable recorded = () -> {
+            mutation.run();
+            backend.getTrace().add(simTimeMillis, TimelineEntryType.WORLD_CHANGE, description);
+        };
         if (status == SimulationStatus.RUNNING) {
-            pendingWorldMutations.add(mutation);
+            pendingWorldMutations.add(recorded);
             return;
         }
-        mutation.run();
+        recorded.run();
+        if (lastSessionSnapshot != null) {
+            lastSessionSnapshot = buildSessionSnapshot(actuatorResult());
+        }
     }
 
     public synchronized void addRoadElementAhead(ScenarioRoadElementDefinition definition) {
@@ -766,7 +858,7 @@ public class SimulationEngine implements AutoCloseable {
                 map.clear(replacedId);
             }
             map.set(row, lane, code);
-        });
+        }, "Place " + definition.getType() + " in " + lane + " at " + position + " m (map cell " + RoadMap.cellId(row, lane) + ")");
         return RoadMap.cellId(row, lane);
     }
 
@@ -774,14 +866,15 @@ public class SimulationEngine implements AutoCloseable {
     public synchronized void setMapCell(int row, Lane lane, int code) {
         RoadMap map = worldState.getRoadMap();
         map.checkCell(row, code);
-        enqueueWorldMutation(() -> map.set(row, lane, code));
+        enqueueWorldMutation(() -> map.set(row, lane, code), "Paint road map row " + row + " lane " + lane + " with code " + code);
     }
 
     public synchronized void addActorAhead(ScenarioActorDefinition definition) {
         double base = worldState.getEgo().getPositionMeters();
         ScenarioActorDefinition d = cloneActor(definition);
         d.setPositionMeters(base + definition.getPositionMeters());
-        enqueueWorldMutation(() -> worldState.addActor(ScenarioFactory.createActor(d)));
+        enqueueWorldMutation(() -> worldState.addActor(ScenarioFactory.createActor(d)),
+            "Place " + d.getType() + " in " + d.getLane() + " at " + d.getPositionMeters() + " m at " + d.getSpeedKmh() + " km/h");
     }
 
     public synchronized String addActorAheadAndGetId(ScenarioActorDefinition definition) {
@@ -789,7 +882,8 @@ public class SimulationEngine implements AutoCloseable {
         ScenarioActorDefinition d = cloneActor(definition);
         d.setPositionMeters(base + definition.getPositionMeters());
         DynamicActor actor = ScenarioFactory.createActor(d);
-        enqueueWorldMutation(() -> worldState.addActor(actor));
+        enqueueWorldMutation(() -> worldState.addActor(actor),
+            "Place " + d.getType() + " " + actor.getId() + " in " + d.getLane() + " at " + d.getPositionMeters() + " m at " + d.getSpeedKmh() + " km/h");
         return actor.getId();
     }
 
@@ -811,7 +905,8 @@ public class SimulationEngine implements AutoCloseable {
         double position = worldState.getEgo().getPositionMeters() + definition.getPositionMeters();
         int row = worldState.getRoadMap().rowAt(position);
         int code = worldState.getRoadMap().legend().codeFor(update);
-        enqueueWorldMutation(() -> worldState.getRoadMap().updateElement(id, update, position));
+        enqueueWorldMutation(() -> worldState.getRoadMap().updateElement(id, update, position),
+            "Update road object " + id + " to " + update.getType() + " in " + update.getLane() + " at " + position + " m");
         return Optional.of(RoadMap.cellId(row, update.getLane()));
     }
 
@@ -821,7 +916,8 @@ public class SimulationEngine implements AutoCloseable {
             return false;
         }
         DynamicActor actor = maybeActor.get();
-        enqueueWorldMutation(() -> applyActorUpdate(actor, definition));
+        enqueueWorldMutation(() -> applyActorUpdate(actor, definition),
+            "Update actor " + id + " to lane " + definition.getLane() + " speed " + definition.getSpeedKmh() + " km/h");
         return true;
     }
 
@@ -839,7 +935,7 @@ public class SimulationEngine implements AutoCloseable {
             if (actorExists) {
                 worldState.removeActorById(id);
             }
-        });
+        }, "Remove world object " + id);
         return true;
     }
 
@@ -863,7 +959,7 @@ public class SimulationEngine implements AutoCloseable {
                 worldState.getWeatherState().setVisibilityFactor(1.0);
                 worldState.getWeatherState().setGripFactor(1.0);
             }
-        });
+        }, "Set rain " + rain);
     }
 
     public synchronized void setWeatherFactors(double visibilityFactor, double gripFactor) {
@@ -875,7 +971,7 @@ public class SimulationEngine implements AutoCloseable {
             } else {
                 worldState.getWeatherState().setCondition(WeatherCondition.CLEAR);
             }
-        });
+        }, "Set visibility " + visibilityFactor + " and road grip " + gripFactor);
     }
 
     public synchronized void requestLaneChange(LaneChangeDirection direction) {
@@ -999,8 +1095,46 @@ public class SimulationEngine implements AutoCloseable {
         return backend.getTrace();
     }
 
+    public synchronized SessionSnapshot getLastSessionSnapshot() { return lastSessionSnapshot; }
+
+    public synchronized void setSessionSnapshotConsumer(Consumer<SessionSnapshot> consumer) {
+        sessionSnapshotConsumer = consumer == null ? snapshot -> { } : consumer;
+    }
+
+    /** Records a world edit at the exact tick when the queued mutation takes effect. */
+    public synchronized void recordWorldChange(String message) {
+        backend.getTrace().add(simTimeMillis, TimelineEntryType.WORLD_CHANGE, message);
+    }
+
     public synchronized String getScenarioId() {
         return scenarioId;
+    }
+
+    public synchronized List<String> initialWorldDescription() {
+        List<String> result = new ArrayList<>();
+        result.add("roadMap=" + java.util.Arrays.deepToString(worldState.getRoadMap().cellsCopy()));
+        worldState.getRoadElements().forEach(element -> result.add("ROAD " + element));
+        worldState.getActors().forEach(actor -> result.add("ACTOR " + actor));
+        result.add("WEATHER " + worldState.getWeatherState().getCondition()
+            + " visibility=" + worldState.getWeatherState().getVisibilityFactor()
+            + " grip=" + worldState.getWeatherState().getGripFactor());
+        return List.copyOf(result);
+    }
+
+    public synchronized List<String> worldDescription() {
+        List<String> result = new ArrayList<>();
+        result.add("roadMap=" + java.util.Arrays.deepToString(worldState.getRoadMap().cellsCopy()));
+        worldState.getRoadElements().forEach(element -> result.add("ROAD " + element));
+        worldState.getActors().forEach(actor -> result.add("ACTOR " + actor));
+        result.add("WEATHER " + worldState.getWeatherState().getCondition()
+            + " visibility=" + worldState.getWeatherState().getVisibilityFactor()
+            + " grip=" + worldState.getWeatherState().getGripFactor());
+        return List.copyOf(result);
+    }
+
+    public synchronized List<com.one2drive.projeto1.api.model.ApiRoadElement> currentWorldDescription() {
+        return getAllRoadItemsRelativeToEgo().stream().map(item -> new com.one2drive.projeto1.api.model.ApiRoadElement(
+            item.id(), item.type(), item.positionMeters(), item.lane(), item.details(), item.worldPositionMeters())).toList();
     }
 
     public synchronized Set<String> getDemoEvidence() {

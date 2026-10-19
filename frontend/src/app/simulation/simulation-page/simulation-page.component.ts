@@ -22,6 +22,7 @@ import {
 } from '../../core/models/api.models';
 import { WorldStateComponent } from '../world-state/world-state.component';
 import { SituationPanelComponent } from '../../telemetry/situation-panel/situation-panel.component';
+import { TripQuestionsDialogComponent } from '../../expert-system/trip-questions/trip-questions-dialog.component';
 
 @Component({
   selector: 'app-simulation-page',
@@ -41,7 +42,8 @@ import { SituationPanelComponent } from '../../telemetry/situation-panel/situati
     WorkingMemoryComponent,
     ExplanationPanelComponent,
     WorldStateComponent,
-    SituationPanelComponent
+    SituationPanelComponent,
+    TripQuestionsDialogComponent
   ],
   templateUrl: './simulation-page.component.html',
   styleUrl: './simulation-page.component.scss',
@@ -64,6 +66,8 @@ export class SimulationPageComponent implements OnInit, OnDestroy {
     this.engines.find((engine) => engine.id === this.expertBackend()) ?? this.engines[0]);
 
   protected readonly activeTab = signal<'timeline' | 'memory' | 'explanation' | 'world'>('timeline');
+  protected readonly tripDialogSessionId = this.state.stoppedSessionId;
+  protected readonly tripStopError = this.state.stopPersistenceError;
   protected readonly simulationClock = computed(() => {
     const millis = this.snapshot()?.simulationTimeMillis ?? 0;
     const mm = Math.floor(millis / 60_000).toString().padStart(2, '0');
@@ -102,6 +106,11 @@ export class SimulationPageComponent implements OnInit, OnDestroy {
     this.activeTab.set(tab);
   }
 
+  protected inspectTimelineDecision(timestamp: number): void {
+    this.activeTab.set('explanation');
+    this.state.openHistoricalDecision(timestamp);
+  }
+
   protected start(): void {
     if (this.isPaused()) {
       this.resume();
@@ -123,7 +132,17 @@ export class SimulationPageComponent implements OnInit, OnDestroy {
   }
 
   protected reset(): void {
+    this.state.clearStoppedSession();
     this.state.reset();
+  }
+
+  protected closeTripDialog(): void { this.state.clearStoppedSession(); }
+
+  protected openSavedSession(id: string): void {
+    this.state.clearStoppedSession();
+    this.activeTab.set('explanation');
+    // Keep the existing history UI and preload the just-stopped session there.
+    this.state.openHistoricalSession(id);
   }
 
   protected switchBackend(backend: ExpertBackend): void {

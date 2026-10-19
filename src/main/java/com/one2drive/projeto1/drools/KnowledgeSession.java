@@ -88,6 +88,10 @@ public class KnowledgeSession implements AutoCloseable {
         if (kieSession == null) {
             throw new IllegalStateException("Unable to create KieSession from classpath container");
         }
+        // This test harness and production wrapper fire the session without an external
+        // helper assigning the default agenda group. Meta-control belongs to the
+        // explicitly assigned group too, before it pushes perception/decision/fallback.
+        kieSession.getAgenda().getAgendaGroup("MAIN").setFocus();
         kieSession.addEventListener(new RuleRuntimeTraceListener(trace));
         kieSession.addEventListener(new WorkingMemoryTraceListener(trace));
 
@@ -179,6 +183,12 @@ public class KnowledgeSession implements AutoCloseable {
     public void beginDecisionCycle(long timestamp, double currentSpeedKmh) {
         decisionContext.beginCycle(timestamp, currentSpeedKmh);
         kieSession.update(decisionContextHandle, decisionContext);
+        // Explicitly stack each phase for this cycle. Control fires first, and because
+        // it is not in MAIN it cannot re-fire after the fallback group has completed.
+        kieSession.getAgenda().getAgendaGroup("fallback").setFocus();
+        kieSession.getAgenda().getAgendaGroup("decision").setFocus();
+        kieSession.getAgenda().getAgendaGroup("perception").setFocus();
+        kieSession.getAgenda().getAgendaGroup("control").setFocus();
     }
 
     public DrivingDecision getDrivingDecision() {

@@ -46,6 +46,81 @@ export interface ApiTimelineEntry {
   message: string;
 }
 
+export interface ApiSessionSummary {
+  id: string;
+  startedAt: string;
+  stoppedAt: string | null;
+  durationMillis: number;
+  startedAtSimulationMillis: number;
+  scenarioId: string;
+  backend: ExpertBackend;
+  eventCount: number;
+  decisionCount: number;
+}
+
+export interface ApiSessionDetail extends ApiSessionSummary {
+  initialWorld: string[];
+  initialWorldObjects: ApiRoadElement[];
+  events: { sequence: number; simulationTimeMillis: number; recordedAt: string; type: string; message: string }[];
+  vehicleSamples: {
+    simulationTimeMillis: number; speedKmh: number; positionMeters: number; lane: LaneName;
+    accelerationMps2: number; lateralPositionMeters: number; targetLane: LaneName;
+    laneChangeState: LaneChangeStateName; laneChangeProgress: number; drivingState: string;
+    indicatorState: string; steeringState: string; headingDegrees: number; action: string;
+    reason: string; sourceRule: string; recommendedSpeedKmh: number;
+  }[];
+  decisionSnapshots: ApiDecisionSnapshot[];
+  decisionEventSequences: Record<string, number[]>;
+}
+
+export interface ApiDecisionSnapshot {
+  simulationTimeMillis: number;
+  vehicle: ApiSimulationSnapshot['egoVehicle'];
+  environment: ApiSimulationSnapshot['environment'];
+  sensors: ApiSensorTelemetryView;
+  worldObjects: ApiRoadElement[];
+  workingMemory: ApiWorkingMemoryRow[];
+  timeline: ApiTimelineEntry[];
+  decision: {
+    action: string; speedAction: string; laneAction: string; reason: string; sourceRule: string;
+    speedSourceRule: string; laneSourceRule: string; recommendedSpeedKmh: number;
+    evidence: string[]; actuatorResult: string;
+    proposals: { rule: string; action: string; channel: string; priority: number; recommendedSpeedKmh: number | null;
+      outcome: string; detail: string; reason: string; evidence: string[]; conditions: string }[];
+    laneChecks: { side: string; allowed: boolean; explanation: string;
+      subGoals: { goal: string; holds: boolean; detail: string }[] }[];
+  };
+}
+
+export interface ApiWhyAnswer {
+  sessionId: string;
+  timestampMillis: number;
+  question: string;
+  selected: string;
+  why: string[];
+  whyNot: string[];
+  observations: string[];
+  facts: string[];
+  rules: string[];
+  actuator: string[];
+  proposals: ApiDecisionSnapshot['decision']['proposals'];
+  laneSafety: ApiDecisionSnapshot['decision']['laneChecks'];
+  engine: ExpertBackend;
+  candidates: ApiDecisionSnapshot[];
+  how: ApiHowStep[];
+}
+
+export interface ApiHowStep {
+  stage: string;
+  evidence: string[];
+}
+
+export type WhyMode = 'WHY' | 'WHY_NOT' | 'HOW';
+
+export interface StopResponse extends CommandResponse {
+  sessionId: string | null;
+}
+
 export interface ApiDecisionView {
   /** Headline: the lane maneuver while one executes, the speed action otherwise. */
   action: string;

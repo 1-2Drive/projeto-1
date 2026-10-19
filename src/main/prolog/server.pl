@@ -59,8 +59,13 @@ handle_line(Line) :-
 reply(reset, R, _{ok: true}) :-
     reset_state(R.cruiseTargetKmh, R.params, R.priorities).
 
+reply(prepareCycle, _R, _{ok: true}) :-
+    prepare_cycle.
+
 reply(tick, R, _{ok: true, proposals: Proposals, facts: Facts, speedLimitKmh: Limit, laneChecks: Checks,
                  engineStats: _{rematches: Rematches, firings: Firings, ruleMillis: Millis}}) :-
+    optional(R, prepareCycle, false, PrepareCycle),
+    ( PrepareCycle == true -> prepare_cycle ; true ),
     downcase_atom(R.lane, Lane),
     optional(R, laneChangeState, 'IDLE', LaneChange),
     optional(R, leftMarking, 'DASHED', LeftMarking),

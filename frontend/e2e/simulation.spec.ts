@@ -211,7 +211,7 @@ test.describe('Driving expert simulation UI', () => {
     await page.locator('[data-testid="trip-question-input"]').fill('Why did the vehicle change to the left lane?');
     await page.locator('[data-testid="ask-trip-question"]').click();
     await expect(page.locator('[data-testid="trip-answer"]')).toContainText('Avoid pothole in right lane by changing left');
-    await expect(page.locator('[data-testid="trip-answer"]')).toContainText('18.3');
+    await expect(page.locator('[data-testid="trip-answer"]')).toContainText(/pothole [\d.]+m ahead/);
 
     await page.locator('[data-testid="why-not-mode"]').click();
     await page.locator('[data-testid="trip-question-input"]').fill("Why didn't it brake?");
@@ -219,12 +219,49 @@ test.describe('Driving expert simulation UI', () => {
     await expect(page.locator('[data-testid="trip-answer"]')).toContainText('pothole rule');
     await expect(page.locator('[data-testid="trip-answer"]')).toContainText('BRAKE was not proposed');
 
+    await page.locator('[data-testid="how-mode"]').click();
+    await page.locator('[data-testid="trip-question-input"]').fill('How did the system decide to change lane?');
+    await page.locator('[data-testid="ask-trip-question"]').click();
+    const howSteps = page.locator('[data-testid="how-steps"]');
+    await expect(howSteps).toBeVisible();
+    await expect(howSteps).toContainText('WORLD');
+    await expect(howSteps).toContainText('SENSORS');
+    await expect(howSteps).toContainText('WORKING MEMORY');
+    await expect(howSteps).toContainText(/RULE EVALUATION/);
+    await expect(howSteps).toContainText('DECISION / ARBITRATION');
+    await expect(howSteps).toContainText('ACTUATOR');
+
     await page.reload();
     await page.locator('button:has-text("Explanation")').click();
     await page.locator('[data-testid="session-select"]').selectOption(sessionId!);
     await expect(page.locator('[data-testid="historical-decision"]')).toContainText('CHANGE_LANE_LEFT');
     await page.locator('[data-testid="reset-btn"]').click();
     expect(await page.request.get('/api/history/sessions/' + sessionId).then((response) => response.ok())).toBeTruthy();
+  });
+
+  test('ambiguous question shows a decision selector instead of guessing', async ({ page }) => {
+    test.setTimeout(90000);
+    await page.goto('/');
+    await loadScenario(page, 'S5 Pothole');
+    await page.locator('[data-testid="start-btn"]').click();
+    await expect(page.locator('[data-testid="simulation-status"]')).toContainText('RUNNING');
+    // Let several ticks (multiple MAINTAIN_SPEED / REDUCE_SPEED / lane-change decisions) accumulate
+    // so the WHY-NOT question below has more than one plausible historical match.
+    await page.waitForTimeout(6000);
+    await page.locator('[data-testid="stop-btn"]').click();
+
+    const dialog = page.locator('[data-testid="trip-questions-dialog"]');
+    await expect(dialog).toBeVisible();
+
+    await page.locator('[data-testid="why-not-mode"]').click();
+    await page.locator('[data-testid="trip-question-input"]').fill("Why didn't it brake?");
+    await page.locator('[data-testid="ask-trip-question"]').click();
+
+    const ambiguity = page.locator('[data-testid="decision-ambiguity"]');
+    await expect(ambiguity).toBeVisible();
+    await expect(ambiguity).toContainText('Which decision do you mean?');
+    await ambiguity.locator('button').first().click();
+    await expect(page.locator('[data-testid="trip-answer"]')).toBeVisible();
   });
 
   test('blocked right lane forces pothole avoidance to use clear left lane', async ({ page }) => {

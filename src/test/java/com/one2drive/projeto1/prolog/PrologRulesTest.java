@@ -16,6 +16,7 @@ import com.one2drive.projeto1.drools.events.FrontDistanceEvent;
 import com.one2drive.projeto1.drools.events.ObstacleDetectedEvent;
 import com.one2drive.projeto1.drools.events.LaneOccupancyEvent;
 import com.one2drive.projeto1.drools.events.LeftLaneVehicleEvent;
+import com.one2drive.projeto1.drools.events.PotholeDetectedEvent;
 import com.one2drive.projeto1.drools.events.PedestrianDetectedEvent;
 import com.one2drive.projeto1.drools.events.RelativeSpeedEvent;
 import com.one2drive.projeto1.drools.events.SpeedLimitDetectedEvent;
@@ -739,6 +740,24 @@ class PrologRulesTest {
             assertFalse(decision.getLaneAction().isLaneManeuver(), "too close to go round: " + decision.getLaneSourceRule());
             assertEquals(DrivingAction.EMERGENCY_BRAKE, decision.getSpeedAction());
             assertEquals("Stop before closed barrier while still in its lane (emergency)", decision.getSpeedSourceRule());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void severePotholeTooCloseForComfortableSlowingIsBrakedHardFor() {
+        try (PrologTestHarness harness = new PrologTestHarness()) {
+            var vehicle = new PrologKnowledgeSession.VehicleInput(1_000, 90.0, 0.0, Lane.CENTER, LaneChangeState.IDLE,
+                Lane.CENTER, RoadMarkingType.DASHED, RoadMarkingType.DASHED, false, false, false, false);
+            DrivingDecision decision = decide(harness, vehicle,
+                new PotholeDetectedEvent(1_000, "camera", 40.0, "pth-1", HazardSeverity.HIGH, Lane.CENTER));
+            assertEquals(DrivingAction.EMERGENCY_BRAKE, decision.getSpeedAction());
+            assertEquals("Pothole ahead reduce speed (emergency)", decision.getSpeedSourceRule());
+            // The same geometry with a MEDIUM pothole is only slowed for, with the situation explained.
+            DrivingDecision lighter = decide(harness, vehicle,
+                new PotholeDetectedEvent(1_100, "camera", 40.0, "pth-1", HazardSeverity.MEDIUM, Lane.CENTER));
+            assertEquals(DrivingAction.REDUCE_SPEED, lighter.getSpeedAction());
+            assertEquals("Pothole too close to go round; crossing it slowly (Art. 24 CE)", lighter.getReason());
         }
     }
 

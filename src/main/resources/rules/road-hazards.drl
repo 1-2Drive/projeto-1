@@ -4,6 +4,7 @@ import com.one2drive.projeto1.decision.DecisionContext
 import com.one2drive.projeto1.decision.DecisionPriority
 import com.one2drive.projeto1.decision.StoppingPolicy
 import com.one2drive.projeto1.domain.DrivingAction
+import com.one2drive.projeto1.domain.HazardSeverity
 import com.one2drive.projeto1.domain.Lane
 import com.one2drive.projeto1.domain.LaneChangeState
 import com.one2drive.projeto1.domain.RiskLevel
@@ -26,20 +27,32 @@ global DroolsSupport droolsSupport
 // The rule binds from the distance a comfortable slow-down to the crossing speed needs (never
 // less than 40 m): beyond 40 m it brings the speed down along the anticipation curve that
 // reaches the crossing speed at the pothole, and holds it when already under that curve;
-// inside 40 m it asks for the crossing speed, 20 km/h in the last 15 m.
+// inside 40 m it asks for the crossing speed, 20 km/h in the last 15 m. A severe pothole
+// (HazardSeverity.HIGH) is braked hard for when comfortable braking (with 10% to spare)
+// would no longer bring the vehicle down to the crossing speed by the pothole; a lighter
+// one is only slowed for as comfort allows, as the vehicle can take it. The reason given
+// names the situation: a way round not yet decidable, no free lane, or too close to go round.
 rule "Pothole ahead reduce speed"
 agenda-group "decision"
 salience 460
 when
     $ctx : DecisionContext()
     VehicleStateFact($lane : pathLane, $speed : speedKmh)
-    $pothole : PotholeStateFact(potholeId != "none", lane == $lane, $distance : distanceMeters > 0,
+    $pothole : PotholeStateFact(potholeId != "none", lane == $lane, $severity : severity, $distance : distanceMeters > 0,
                      distanceMeters <= Math.max(40.0, StoppingPolicy.slowingDistanceMeters($speed, StoppingPolicy.POTHOLE_CROSSING_SPEED_KMH, StoppingPolicy.COMFORT_DECELERATION_MPS2)))
     not ( SafeLaneSide() and PotholeStateFact(this == $pothole, distanceMeters <= 50.0, StoppingPolicy.roomToLeaveLane($speed, distanceMeters)) )
 then
-    double target = StoppingPolicy.POTHOLE_CROSSING_SPEED_KMH;
+    double crossing = StoppingPolicy.POTHOLE_CROSSING_SPEED_KMH;
+    double target = crossing;
     DrivingAction action = DrivingAction.REDUCE_SPEED;
-    if ($distance < 15) {
+    double speedMps = $speed / 3.6;
+    double crossingMps = crossing / 3.6;
+    boolean hard = $severity == HazardSeverity.HIGH
+        && speedMps > crossingMps
+        && (speedMps * speedMps - crossingMps * crossingMps) / (2.0 * Math.max(0.1, $distance)) > StoppingPolicy.COMFORT_DECELERATION_MPS2 * 1.1;
+    if (hard) {
+        action = DrivingAction.EMERGENCY_BRAKE;
+    } else if ($distance < 15) {
         target = 20.0;
     } else if ($distance > 40.0) {
         target = Math.max(target, StoppingPolicy.curveSpeedKmh(target, StoppingPolicy.ANTICIPATION_DECELERATION_MPS2, $distance));
@@ -48,15 +61,25 @@ then
             target = $speed;
         }
     }
+    String situation = $distance > 50.0 ? "a way round is decided at 50 m"
+        : !StoppingPolicy.roomToLeaveLane($speed, $distance) ? "too close to go round"
+        : "no free lane to go round it";
+    String reason = hard
+        ? "Severe pothole ahead; braking hard to reach its crossing speed (Art. 24 CE)"
+        : $distance > 50.0
+            ? "Pothole ahead; coming down to its crossing speed until a way round is decided (Art. 24 CE)"
+            : !StoppingPolicy.roomToLeaveLane($speed, $distance)
+                ? "Pothole too close to go round; crossing it slowly (Art. 24 CE)"
+                : "No free lane to go round the pothole; crossing it slowly (Art. 24 CE)";
     droolsSupport.proposeDecision(
         $ctx,
         action,
         target,
-        RiskLevel.MODERATE,
+        hard ? RiskLevel.HIGH : RiskLevel.MODERATE,
         DecisionPriority.ROAD_HAZARD,
-        "Pothole ahead requires speed reduction",
+        reason,
         drools.getRule().getName(),
-        "distance=" + $distance + "m"
+        "pothole " + $distance + "m ahead, severity " + $severity + ", " + situation
     );
 end
 

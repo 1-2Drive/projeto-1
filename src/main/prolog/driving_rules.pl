@@ -1008,32 +1008,50 @@ rule('Allow lane change right when lane safe',
 % decided. Binds from the distance a comfortable slow-down to the crossing speed needs (never
 % less than 40 m): beyond 40 m it follows the anticipation curve to the crossing speed and
 % holds when already under it; inside 40 m it asks for the crossing speed, 20 km/h under 15 m.
-rule('Pothole ahead reduce speed',
+% A severe pothole (high) is braked hard for when comfortable braking (10% to spare) no longer
+% reaches the crossing speed by the pothole (pothole_hard_braking/3); a lighter one is only
+% slowed for as comfort allows. The reason names the situation (pothole_reason/3), as in Drools.
+rule('Pothole ahead reduce speed (emergency)',
      460,
      [ ego_path_lane(Lane),
-       pothole(_, D, _, Lane),
+       pothole(_, D, Severity, Lane),
        ego_speed(V),
        test(pothole_slow_window(V, W)),
        test((D > 0, D =< W)),
        not(test(pothole_avoidable_now(V, D))),
+       test(pothole_hard_braking(V, D, Severity)),
+       test(param(potholeCrossingSpeedKmh, Crossing)) ],
+     [ assert(proposal(emergency_brake, Crossing, high, road_hazard,
+                       'Severe pothole ahead; braking hard to reach its crossing speed (Art. 24 CE)')) ]).
+
+rule('Pothole ahead reduce speed',
+     460,
+     [ ego_path_lane(Lane),
+       pothole(_, D, Severity, Lane),
+       ego_speed(V),
+       test(pothole_slow_window(V, W)),
+       test((D > 0, D =< W)),
+       not(test(pothole_avoidable_now(V, D))),
+       not(test(pothole_hard_braking(V, D, Severity))),
        test(pothole_target(D, Target)),
-       test(once((D =< 40.0 ; Target < V))) ],
-     [ assert(proposal(reduce_speed, Target, moderate, road_hazard,
-                       'Pothole ahead requires speed reduction')) ]).
+       test(once((D =< 40.0 ; Target < V))),
+       test(pothole_reason(V, D, Reason)) ],
+     [ assert(proposal(reduce_speed, Target, moderate, road_hazard, Reason)) ]).
 
 rule('Pothole ahead reduce speed (hold)',
      460,
      [ ego_path_lane(Lane),
-       pothole(_, D, _, Lane),
+       pothole(_, D, Severity, Lane),
        ego_speed(V),
        test(pothole_slow_window(V, W)),
        test((D > 0, D =< W)),
        not(test(pothole_avoidable_now(V, D))),
+       not(test(pothole_hard_braking(V, D, Severity))),
        test(pothole_target(D, Target)),
        test(D > 40.0),
-       test(Target >= V) ],
-     [ assert(proposal(maintain_speed, V, moderate, road_hazard,
-                       'Pothole ahead requires speed reduction')) ]).
+       test(Target >= V),
+       test(pothole_reason(V, D, Reason)) ],
+     [ assert(proposal(maintain_speed, V, moderate, road_hazard, Reason)) ]).
 
 % Obstacle in the ego's lane while the vehicle has not started to move out of that lane
 % (no side free, avoidance vetoed by a mandatory stop, or refused by the actuator): stop
@@ -1978,6 +1996,23 @@ pothole_avoidable_now(V, D) :-
     D =< 50.0,
     room_to_leave_lane(V, D),
     once(( safe_to_change_lane(left) ; safe_to_change_lane(right) )).
+
+% A severe pothole, and comfortable braking (10% to spare) no longer brings the vehicle from
+% V km/h down to the crossing speed in the D metres left.
+pothole_hard_braking(V, D, high) :-
+    param(potholeCrossingSpeedKmh, Crossing),
+    deceleration(comfort, A),
+    Vms is max(0.0, V) / 3.6,
+    Cms is Crossing / 3.6,
+    Vms > Cms,
+    (Vms * Vms - Cms * Cms) / (2.0 * max(0.1, D)) > A * 1.1.
+
+% Why the pothole is slowed down for rather than gone round, as Drools words it.
+pothole_reason(_, D, 'Pothole ahead; coming down to its crossing speed until a way round is decided (Art. 24 CE)') :-
+    D > 50.0, !.
+pothole_reason(V, D, 'Pothole too close to go round; crossing it slowly (Art. 24 CE)') :-
+    \+ room_to_leave_lane(V, D), !.
+pothole_reason(_, _, 'No free lane to go round the pothole; crossing it slowly (Art. 24 CE)').
 
 % Comfortable braking would carry the ego more than a vehicle length past the vehicle D metres
 % ahead that it closes in on at Rel m/s (StoppingPolicy.closingDistanceMeters against the gap).

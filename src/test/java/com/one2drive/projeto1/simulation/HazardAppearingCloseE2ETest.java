@@ -160,6 +160,33 @@ class HazardAppearingCloseE2ETest {
     @ParameterizedTest(name = "{0}")
     @EnumSource(ExpertBackendType.class)
     @Timeout(60)
+    @DisplayName("two severe potholes side by side appearing 60 m ahead at 90 km/h are crossed slowly, after hard braking")
+    void severePotholesSideBySideAtSpeedAreCrossedSlowly(ExpertBackendType backend) {
+        // The presentation demo keeps the vehicle in the centre lane (no keep-right); the pothole
+        // on the right leaves the left as the only side, and there is no room to go round at 90.
+        try (SimulationEngine engine = engine(backend, "S12_PRESENTATION_DEMO", Lane.CENTER, 90.0)) {
+            addHazard(engine, ScenarioRoadElementType.POTHOLE, Lane.CENTER, 60.0);
+            addHazard(engine, ScenarioRoadElementType.POTHOLE, Lane.RIGHT, 60.0);
+            EgoVehicleState ego = engine.getWorldState().getEgo();
+            double speedOverIt = Double.NaN;
+            boolean reasonSeen = false;
+            for (int i = 0; i < 150 && Double.isNaN(speedOverIt); i++) {
+                engine.tick();
+                reasonSeen |= engine.getCurrentDecision().getReason() != null
+                    && engine.getCurrentDecision().getReason().contains("Art. 24 CE");
+                if (cellUnder(engine) == POTHOLE_CELL) {
+                    speedOverIt = ego.getSpeedKmh();
+                }
+            }
+            assertFalse(Double.isNaN(speedOverIt), "the pothole was expected under the vehicle");
+            assertTrue(speedOverIt <= 35.0, "crossed the severe pothole at " + speedOverIt + " km/h");
+            assertTrue(reasonSeen, "the decision must explain why the pothole is crossed rather than gone round");
+        }
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
+    @Timeout(60)
     @DisplayName("a closed barrier in the lane being entered is braked for during the lane change")
     void barrierInTheLaneBeingEnteredIsBrakedFor(ExpertBackendType backend) {
         try (SimulationEngine engine = engine(backend, "HAZARD_CLOSE", Lane.RIGHT, 60.0)) {

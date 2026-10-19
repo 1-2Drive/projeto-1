@@ -281,11 +281,12 @@ class DrivingExpertSystemRulesTest {
     @Test
     @Timeout(10)
     void potholeAdjustsSpeed() {
+        // MEDIUM: a severe pothole this close at 75 km/h is braked hard for (see below).
         try (DroolsTestHarness harness = new DroolsTestHarness(75.0)) {
             DrivingDecision decision = harness.cycle(
                 1_000,
                 75.0,
-                new PotholeDetectedEvent(1_000, "camera", 25.0, "pth-1", HazardSeverity.HIGH, Lane.CENTER)
+                new PotholeDetectedEvent(1_000, "camera", 25.0, "pth-1", HazardSeverity.MEDIUM, Lane.CENTER)
             );
             assertEquals(DrivingAction.REDUCE_SPEED, decision.getAction());
             assertTrue(decision.getRecommendedSpeedKmh() <= 30.0);
@@ -365,12 +366,13 @@ class DrivingExpertSystemRulesTest {
     @Timeout(10)
     void potholeTooCloseToGoRoundIsCrossedSlowly() {
         // 60 km/h, pothole 20 m ahead, right side clear: no room to leave the lane before it,
-        // so it is driven over at the crossing speed instead (Art. 24 CE).
+        // so it is driven over at the crossing speed instead (Art. 24 CE). MEDIUM: a severe
+        // pothole this close is braked hard for.
         try (DroolsTestHarness harness = new DroolsTestHarness(60.0)) {
             DrivingDecision decision = harness.cycle(
                 1_000,
                 60.0,
-                new PotholeDetectedEvent(1_000, "camera", 20.0, "pth-1", HazardSeverity.HIGH, Lane.CENTER),
+                new PotholeDetectedEvent(1_000, "camera", 20.0, "pth-1", HazardSeverity.MEDIUM, Lane.CENTER),
                 new LaneOccupancyEvent(1_000, "blind", Lane.RIGHT, false, Double.POSITIVE_INFINITY)
             );
             assertFalse(decision.getLaneAction().isLaneManeuver(), "too close to go round: " + decision.getLaneSourceRule());
@@ -394,6 +396,40 @@ class DrivingExpertSystemRulesTest {
             assertEquals(DrivingAction.REDUCE_SPEED, decision.getSpeedAction());
             assertEquals("Pothole ahead reduce speed", decision.getSpeedSourceRule());
             assertEquals(78.1, decision.getRecommendedSpeedKmh(), 0.5);
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void severePotholeTooCloseForComfortableSlowingIsBrakedHardFor() {
+        // 90 km/h, severe pothole 40 m ahead, no safe side: reaching 30 km/h in 40 m needs
+        // 6.9 m/s2, more than comfort allows, so a HIGH pothole is braked hard for.
+        try (DroolsTestHarness harness = new DroolsTestHarness(90.0)) {
+            DrivingDecision decision = harness.cycle(
+                1_000,
+                90.0,
+                new PotholeDetectedEvent(1_000, "camera", 40.0, "pth-1", HazardSeverity.HIGH, Lane.CENTER)
+            );
+            assertEquals(DrivingAction.EMERGENCY_BRAKE, decision.getSpeedAction());
+            assertEquals("Pothole ahead reduce speed", decision.getSpeedSourceRule());
+            assertTrue(decision.getReason().startsWith("Severe pothole ahead"), decision.getReason());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void lighterPotholeTooCloseForComfortableSlowingIsOnlySlowedFor() {
+        // Same geometry, MEDIUM severity: the vehicle can take it, so comfort braking only,
+        // and the explanation says why it is crossed rather than gone round.
+        try (DroolsTestHarness harness = new DroolsTestHarness(90.0)) {
+            DrivingDecision decision = harness.cycle(
+                1_000,
+                90.0,
+                new PotholeDetectedEvent(1_000, "camera", 40.0, "pth-1", HazardSeverity.MEDIUM, Lane.CENTER)
+            );
+            assertEquals(DrivingAction.REDUCE_SPEED, decision.getSpeedAction());
+            assertEquals(30.0, decision.getRecommendedSpeedKmh(), 0.1);
+            assertEquals("Pothole too close to go round; crossing it slowly (Art. 24 CE)", decision.getReason());
         }
     }
 
@@ -526,7 +562,8 @@ class DrivingExpertSystemRulesTest {
                 1_000,
                 95.0,
                 new SpeedLimitDetectedEvent(1_000, "camera", 90, 30, "sign-90"),
-                new PotholeDetectedEvent(1_000, "camera", 22.0, "pth-1", HazardSeverity.HIGH, Lane.CENTER)
+                // MEDIUM: a severe pothole this close is braked hard for, which is not the point here.
+                new PotholeDetectedEvent(1_000, "camera", 22.0, "pth-1", HazardSeverity.MEDIUM, Lane.CENTER)
             );
             assertEquals(DrivingAction.REDUCE_SPEED, decision.getAction());
             assertTrue(decision.getRecommendedSpeedKmh() <= 30.0);

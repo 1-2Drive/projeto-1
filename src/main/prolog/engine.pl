@@ -96,7 +96,7 @@ store_fact(Fact, Support, true) :-
     ).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Meta-conhecimento: índice de dependências (construído uma vez, a partir das regras e
+% Meta-conhecimento dinâmico: índice de dependências (construído uma vez, a partir das regras e
 % auxiliares carregados)
 %
 % As regras são lidas como dados e analisadas estaticamente. Para cada regra regista-se:

@@ -388,7 +388,14 @@ expire_old_readings(Now) :-
     obstacle_window_ms(ObstacleWindow),
     expire_window(obstacle_reading(T12, _, _, _, _), T12, ObstacleWindow, Now),
     stop_validity_ms(StopValidity),
-    expire_track(stop_track(_, _, T13, _, _), T13, StopValidity, Now).
+    expire_stop_track(StopValidity, Now).
+
+% "Clear stale stop sign perception": a stop still owed past the line (the camera lost the
+% sign driving by it) is kept until it is made.
+expire_stop_track(Validity, Now) :-
+    forall(( stop_track(Id, D, Ms, Start, Done), Now - Ms > Validity,
+             ( Done == true ; D > 4.0 ) ),
+           retract(stop_track(Id, D, Ms, Start, Done))).
 
 % "Expire lane change request".
 expire_lane_request(Now) :-
@@ -498,6 +505,8 @@ load_hazards(Now) :-
 
 load_driver_requests(Now) :-
     (   lane_request(true, Direction, _) -> add_fact(lane_change_request(Direction)) ; true ),
+    lane_request(_, _, RequestedAt),
+    add_fact(lane_request_at(RequestedAt)),
     accel_request(Target, Since),
     Age is Now - Since,
     add_fact(acceleration_request(Target, Age)).

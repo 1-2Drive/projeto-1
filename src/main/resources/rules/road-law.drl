@@ -34,7 +34,10 @@ salience 460
 no-loop true
 when
     $ctx : DecisionContext()
-    VehicleStateFact(lane != Lane.RIGHT, presentationDemo == false, laneChangeState == LaneChangeState.IDLE, rightLaneBlockedAhead == false, timestamp >= 4000, $settled : laneSettledAtMillis)
+    VehicleStateFact(lane != Lane.RIGHT, presentationDemo == false, laneChangeState == LaneChangeState.IDLE, rightLaneBlockedAhead == false, timestamp >= 4000, $settled : laneSettledAtMillis, $now : timestamp)
+    // A lane change the driver asked for is not undone at once: the lane settled within 4.5 s
+    // of the request (1.5 s for it to be granted + a 3 s manoeuvre), so keep right waits 5 s.
+    not LaneChangeRequestState(timestamp >= 0, timestamp <= $settled, timestamp >= $settled - 4500, $now - $settled < 5000)
     noContinuousLine(Lane.RIGHT;)
     LaneOccupancyState(lane == Lane.RIGHT, occupied == false, frontDistanceMeters > 80.0, timestamp > $settled)
     not MoveOffState(active == true)

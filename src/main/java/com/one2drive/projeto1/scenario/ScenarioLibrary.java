@@ -1,7 +1,9 @@
 package com.one2drive.projeto1.scenario;
 
+import com.fasterxml.jackson.core.json.JsonReadFeature;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -16,7 +18,8 @@ public class ScenarioLibrary {
     }
 
     public static ScenarioLibrary loadFromClasspath(String path) {
-        ObjectMapper mapper = new ObjectMapper();
+        // Comments (/* */ and //) are allowed, so a scenario can be set aside by commenting it out.
+        ObjectMapper mapper = JsonMapper.builder().enable(JsonReadFeature.ALLOW_JAVA_COMMENTS).build();
         try (InputStream in = ScenarioLibrary.class.getResourceAsStream(path)) {
             if (in == null) {
                 throw new IllegalStateException("Scenario file not found: " + path);

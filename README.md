@@ -731,7 +731,6 @@ Defined in `src/main/resources/scenarios/scenarios.json`.
 - `S12_PRESENTATION_DEMO` Presentation demo end-to-end
 - `S13_MATRIX_COURSE` Matrix obstacle course: a slalom through obstacles and a pothole that repeats every lap
 - `S14_SLOW_VEHICLE_OVERTAKE` Slow vehicle overtake and return to the right lane
-- `S15_CONTINUOUS_LINE_BLOCKED` Continuous line blocks avoidance to the right
 
 ## Validation focus
 

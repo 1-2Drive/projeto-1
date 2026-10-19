@@ -565,7 +565,9 @@ agenda-group "perception"
 no-loop true
 salience 900
 when
-    $state : StopSignState(signId != "none", $timestamp : detectedTimestamp)
+    // Past the stop line the camera loses the sign once the vehicle drives by it; a stop still
+    // owed there is kept until it is made, so a vehicle that reached the line too fast stops.
+    $state : StopSignState(signId != "none", satisfied == true || distanceMeters > 4.0, $timestamp : detectedTimestamp)
     VehicleStateFact($now : timestamp)
     eval($now - $timestamp > 1500)
 then
@@ -644,4 +646,20 @@ then
     $state.setLane(com.one2drive.projeto1.domain.Lane.CENTER);
     $state.setTimestamp($now);
     update($state);
+end
+
+// The sides the vehicle may change lane to, derived once the readings above are in: each one
+// is the safeToChangeLane query (lane-safety.drl) holding for that side. Inserted logically,
+// so a side stops being safe as soon as any of the query's sub-goals stops holding. Rules that
+// need "no safe side" (a closed barrier, a pothole or an obstacle that cannot be gone round
+// on one side) test for its absence: negating the query itself makes Drools 8.44 fail inside
+// the network (PhreakSubnetworkNotExistsNode) when the query's facts change.
+rule "Derive the sides that are safe to change lane to"
+agenda-group "perception"
+salience 800
+when
+    $side : Lane() from java.util.List.of(Lane.LEFT, Lane.RIGHT)
+    safeToChangeLane($side;)
+then
+    insertLogical(new SafeLaneSide($side));
 end

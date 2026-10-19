@@ -5,6 +5,8 @@ import com.one2drive.projeto1.decision.StoppingPolicy;
 import com.one2drive.projeto1.domain.DynamicActor;
 import com.one2drive.projeto1.domain.EgoVehicleState;
 import com.one2drive.projeto1.domain.LaneChangeState;
+import com.one2drive.projeto1.domain.OtherVehicle;
+import com.one2drive.projeto1.domain.Pedestrian;
 
 /**
  * Advances world physics. Longitudinal motion is velocity integration; lateral
@@ -14,6 +16,12 @@ import com.one2drive.projeto1.domain.LaneChangeState;
 public class WorldPhysicsEngine {
     /** Below this speed the vehicle counts as stopped. */
     private static final double AT_REST_SPEED_KMH = 0.1;
+    /** How far ahead another vehicle looks for a pedestrian to give way to. */
+    private static final double PEDESTRIAN_LOOKAHEAD_METERS = 60.0;
+    /** Where another vehicle comes to rest before a pedestrian it gives way to. */
+    private static final double PEDESTRIAN_STOP_GAP_METERS = 15.0;
+    /** Below this deceleration there is still room: the vehicle keeps its speed for now. */
+    private static final double START_BRAKING_MPS2 = 1.5;
 
     private final SimulationConfig config;
 
@@ -34,6 +42,9 @@ public class WorldPhysicsEngine {
             if (!actor.isActive()) {
                 continue;
             }
+            if (actor instanceof OtherVehicle vehicle) {
+                giveWayToPedestrians(worldState, vehicle, dtSeconds);
+            }
             actor.advance(dtSeconds);
         }
 
@@ -49,6 +60,42 @@ public class WorldPhysicsEngine {
                 return egoAtRest && distance > 0.0
                     && distance <= StoppingPolicy.RED_LIGHT_STOP_LINE_OFFSET_METERS + StoppingPolicy.STOP_LINE_TOLERANCE_METERS;
             });
+    }
+
+    /**
+     * The other vehicles give way to pedestrians as the ego does (Art. 103 CE): a pedestrian
+     * ahead in the vehicle's lane, within 3.5 m of it, or crossing the road is stopped for
+     * {@link #PEDESTRIAN_STOP_GAP_METERS} short of it, braking only as hard as the room left needs
+     * (never past the emergency deceleration). With the way clear the vehicle speeds back up
+     * to its cruise speed. Without this they drove through a pedestrian at constant speed.
+     */
+    private void giveWayToPedestrians(WorldState worldState, OtherVehicle vehicle, double dtSeconds) {
+        double nearest = Double.POSITIVE_INFINITY;
+        for (DynamicActor other : worldState.getActors()) {
+            if (!(other instanceof Pedestrian pedestrian) || !pedestrian.isActive()) {
+                continue;
+            }
+            double ahead = pedestrian.getPositionMeters() - vehicle.getPositionMeters();
+            boolean inConflict = pedestrian.getLane() == vehicle.getLane()
+                || Math.abs(pedestrian.getLateralPositionMeters() - vehicle.getLane().centreMeters()) <= 3.5
+                || pedestrian.isCrossingInProgress();
+            if (inConflict && ahead > 0.0 && ahead <= PEDESTRIAN_LOOKAHEAD_METERS) {
+                nearest = Math.min(nearest, ahead);
+            }
+        }
+        double speed = vehicle.getSpeedMps();
+        if (Double.isFinite(nearest)) {
+            double room = nearest - PEDESTRIAN_STOP_GAP_METERS;
+            double needed = room <= 0.0 ? config.getEmergencyDecelerationMps2() : speed * speed / (2.0 * room);
+            if (needed >= START_BRAKING_MPS2 || room <= 0.0) {
+                double braking = Math.min(needed, config.getEmergencyDecelerationMps2());
+                vehicle.setCurrentSpeedMps(Math.max(0.0, speed - braking * dtSeconds));
+            }
+            return;
+        }
+        if (speed < vehicle.getCruiseSpeedMps()) {
+            vehicle.setCurrentSpeedMps(Math.min(vehicle.getCruiseSpeedMps(), speed + config.getMaxAccelerationMps2() * dtSeconds));
+        }
     }
 
     /**

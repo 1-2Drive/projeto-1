@@ -646,17 +646,17 @@
         "type": "ADD_ACTOR",
         "actor": {
           "type": "FRONT_VEHICLE",
-          "positionMeters": 95,
+          "positionMeters": 150,
           "lane": "CENTER",
           "speedKmh": 35
         }
       },
       {
-        "triggerTimeMillis": 9300,
+        "triggerTimeMillis": 11000,
         "type": "ADD_ACTOR",
         "actor": {
           "type": "PEDESTRIAN",
-          "positionMeters": 70,
+          "positionMeters": 150,
           "lane": "CENTER",
           "speedKmh": 3
         }
@@ -838,7 +838,12 @@
       }
     ],
     "timedActions": []
-  },
+  }
+  /*
+   * S15 set aside: no longer offered in the prebuilt scenarios list. To bring it back, remove
+   * this comment (keep the comma before the opening brace). The situation it shows is still
+   * covered by RoadLawAndOvertakingE2ETest.continuousLineBlocksLaneChangeAndBrakesBeforeObstacle.
+  ,
   {
     "id": "S15_CONTINUOUS_LINE_BLOCKED",
     "name": "Continuous line prohibits avoidance",
@@ -860,4 +865,5 @@
       }
     ]
   }
+  */
 ]

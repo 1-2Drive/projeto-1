@@ -117,14 +117,26 @@ when
     // Until the hold below is satisfied: that rule fires first (salience 635), so once the
     // vehicle has been at rest 1.2 s the stop sign is satisfied before this one is reached.
     $stop : StopSignState( signId != "none", satisfied == false, $distance : distanceMeters <= 4.0 )
+    VehicleStateFact( $speed : speedKmh )
+    $previous : DrivingDecision()
 then
+    // Same test as the approach: when comfortable braking would stop more than 1 m past the
+    // line (a sign first seen with the line already behind, or reached too fast), brake hard
+    // and stop as soon as possible, still owing the full stop (Art. 21 CE, sign B2).
+    double room = Math.max(0.0, $distance - 2.0);
+    double speedMps = $speed / 3.6;
+    double shortfall = speedMps * speedMps / (2.0 * 2.8) - room;
+    boolean wasEmergency = $previous.getAction() == DrivingAction.EMERGENCY_BRAKE
+        && $previous.getSourceRule() != null
+        && $previous.getSourceRule().startsWith("Stop sign");
+    boolean hard = shortfall > 3.0 || (wasEmergency && shortfall > 1.0);
     droolsSupport.proposeDecision(
         $ctx,
-        DrivingAction.STOP,
+        hard ? DrivingAction.EMERGENCY_BRAKE : DrivingAction.STOP,
         0.0,
         RiskLevel.HIGH,
         DecisionPriority.LEGAL_MANDATORY_STOP,
-        "Stop sign reached; full stop required",
+        hard ? "Stop sign passed at speed; stop as soon as possible" : "Stop sign reached; full stop required",
         drools.getRule().getName(),
         "distance=" + $distance + "m"
     );

@@ -138,8 +138,25 @@ class RoadLawAndOvertakingE2ETest {
     @Timeout(15)
     @DisplayName("Continuous line: continuous road marking prohibits lane change; vehicle brakes before obstacle")
     void continuousLineBlocksLaneChangeAndBrakesBeforeObstacle(ExpertBackendType backend) {
-        ScenarioLibrary library = ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json");
-        ScenarioDefinition scenario = library.findById("S15_CONTINUOUS_LINE_BLOCKED").orElseThrow();
+        // The former library scenario S15: a continuous line on the right of the RIGHT lane
+        // and a high-severity obstacle 45 m ahead in it, added 100 ms in.
+        ScenarioDefinition scenario = new ScenarioDefinition();
+        scenario.setId("CONTINUOUS_LINE_BLOCKED");
+        scenario.setName("Continuous line prohibits avoidance");
+        scenario.setInitialSpeedKmh(50);
+        scenario.setInitialLane(Lane.RIGHT);
+        scenario.setRightMarking(com.one2drive.projeto1.domain.RoadMarkingType.CONTINUOUS);
+        scenario.setInitialWeather(WeatherCondition.CLEAR);
+        ScenarioRoadElementDefinition obstacle = new ScenarioRoadElementDefinition();
+        obstacle.setType(ScenarioRoadElementType.STATIC_OBSTACLE);
+        obstacle.setPositionMeters(45);
+        obstacle.setLane(Lane.RIGHT);
+        obstacle.setSeverity(HazardSeverity.HIGH);
+        ScenarioTimedAction addObstacle = new ScenarioTimedAction();
+        addObstacle.setTriggerTimeMillis(100);
+        addObstacle.setType(ScenarioTimedActionType.ADD_ROAD_ELEMENT);
+        addObstacle.setRoadElement(obstacle);
+        scenario.getTimedActions().add(addObstacle);
 
         try (SimulationEngine engine = BackendTestSupport.engine(scenario, backend)) {
             engine.start();

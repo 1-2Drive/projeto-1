@@ -49,9 +49,10 @@ class RealtimeWebSocketE2ETest {
 
     @BeforeAll
     static void startServer() {
+        // Arguments, not builder properties: those are defaults, and application.properties'
+        // server.port=8080 would win over them and clash with a running server.
         server = new SpringApplicationBuilder(DrivingExpertSystemServerApplication.class)
-            .properties("server.port=0", "expert.backend=drools", "spring.main.banner-mode=off")
-            .run();
+            .run("--server.port=0", "--expert.backend=drools", "--spring.main.banner-mode=off");
         port = ((WebServerApplicationContext) server).getWebServer().getPort();
         http = HttpClient.newHttpClient();
     }

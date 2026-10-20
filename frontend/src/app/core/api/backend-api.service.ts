@@ -10,7 +10,6 @@ import {
   ApiWorkingMemoryRow,
   ApiWhyAnswer,
   StopResponse,
-  WhyMode,
   CommandResponse,
   CreateActorRequest,
   CreateRoadElementRequest,
@@ -110,8 +109,9 @@ export class BackendApiService {
     return this.http.get<ApiSessionDetail>(`${this.baseUrl}/history/sessions/${encodeURIComponent(id)}`);
   }
 
-  askWhy(id: string, question: string, timestampMillis?: number, mode: WhyMode = 'WHY'): Observable<ApiWhyAnswer> {
+  /** Why / why not / how for the recorded decision at (or last before) the timestamp. */
+  explainDecision(id: string, timestampMillis?: number): Observable<ApiWhyAnswer> {
     return this.http.post<ApiWhyAnswer>(`${this.baseUrl}/history/sessions/${encodeURIComponent(id)}/why`,
-      { question, timestampMillis, mode });
+      { timestampMillis });
   }
 }

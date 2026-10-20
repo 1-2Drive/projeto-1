@@ -41,7 +41,7 @@ public class SessionHistoryController {
 
     @PostMapping("/{id}/why")
     public ResponseEntity<ApiWhyAnswer> why(@PathVariable String id, @Valid @RequestBody ApiWhyRequest request) {
-        return ResponseEntity.ok(explanations.answer(runtime.session(id), request.question(), request.timestampMillis(), request.mode()));
+        return ResponseEntity.ok(explanations.answer(runtime.session(id), request.timestampMillis()));
     }
 
     private ApiSessionSummary summary(SimulationSession session) {

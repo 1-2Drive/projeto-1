@@ -138,14 +138,14 @@ public class DecisionContext {
      * going around an obstacle 30 m away, and the speed channel keeps governing the speed.
      */
     private static boolean vetoes(DecisionProposal speed, DecisionProposal lane) {
-        return speed.getPriority() >= DecisionPriority.LEGAL_MANDATORY_STOP
+        return DecisionPriority.isOverride(speed.getPriority())
             && lane.getPriority() < speed.getPriority()
             && speed.getAction().isBraking();
     }
 
     /** The lowest ceiling that binds below a mandatory-stop or emergency decision, if any. */
     private DecisionProposal ceilingBelow(DecisionProposal winner) {
-        if (winner.getPriority() < DecisionPriority.LEGAL_MANDATORY_STOP) {
+        if (!DecisionPriority.isOverride(winner.getPriority())) {
             return null;
         }
         return proposals.stream()
@@ -164,7 +164,7 @@ public class DecisionContext {
             return null;
         }
         List<DecisionProposal> overrides = mine.stream()
-            .filter(p -> p.getPriority() >= DecisionPriority.LEGAL_MANDATORY_STOP).toList();
+            .filter(p -> DecisionPriority.isOverride(p.getPriority())).toList();
         DecisionProposal winner;
         if (!overrides.isEmpty()) {
             winner = overrides.stream()
@@ -223,9 +223,7 @@ public class DecisionContext {
 
     /** Speed ceilings: every one that holds binds, so the lowest decides. */
     private static boolean isCeiling(DecisionProposal p) {
-        return p.getPriority() == DecisionPriority.COLLISION_AVOIDANCE
-            || p.getPriority() == DecisionPriority.ROAD_HAZARD
-            || p.getPriority() == DecisionPriority.SPEED_COMPLIANCE;
+        return DecisionPriority.isSpeedCeiling(p.getPriority());
     }
 
     private static int lateralRank(DrivingAction action) {

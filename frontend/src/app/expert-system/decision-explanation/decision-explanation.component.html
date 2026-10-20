@@ -1,0 +1,162 @@
+@if (mode() === 'WHY') {
+  <div class="explain" data-testid="why-channels">
+    @for (channel of answer().why; track channel.channel) {
+      @if (channel.relevant) {
+        <article class="channel" data-testid="why-channel" [attr.data-channel]="channel.channel">
+          <header class="channel__head">
+            <span class="channel__title">{{ channel.title }}</span>
+            <code class="channel__action">{{ channel.action }}</code>
+          </header>
+          <p class="channel__summary">{{ channel.summary }}</p>
+          <dl class="channel__facts">
+            <dt>Deciding rule</dt>
+            <dd><code>{{ channel.decidingRule.rule }}</code> · {{ channel.decidingRule.rung }} (priority {{ channel.decidingRule.priority }})</dd>
+            @if (channel.conditions.length) {
+              <dt>Conditions it found</dt>
+              <dd><ul>@for (condition of channel.conditions; track $index) { <li>{{ condition }}</li> }</ul></dd>
+            }
+            <dt>Why it prevailed</dt>
+            <dd>{{ channel.arbitration }}</dd>
+          </dl>
+          @if (channel.alsoConsidered.length) {
+            <h4>Also considered in this channel</h4>
+            <ul class="rules">
+              @for (rule of channel.alsoConsidered; track $index) {
+                <li><code>{{ rule.rule }}</code> → {{ proposed(rule) }} · {{ rule.rung }} ({{ rule.priority }}) · <span class="outcome">{{ outcomeLabel(rule) }}</span></li>
+              }
+            </ul>
+          }
+        </article>
+      } @else {
+        <p class="channel channel--quiet" data-testid="why-channel" [attr.data-channel]="channel.channel">
+          <span class="channel__title">{{ channel.title }}</span> {{ channel.summary }}
+        </p>
+      }
+    }
+  </div>
+} @else if (mode() === 'WHY_NOT') {
+  <div class="explain">
+    @if (answer().whyNot.length) {
+      <label class="explain__label" for="why-not-select">Alternative that was not taken</label>
+      <select id="why-not-select" data-testid="why-not-select" (change)="pick($any($event.target).value)">
+        @if (speedAlternatives().length) {
+          <optgroup label="Speed · longitudinal">
+            @for (alternative of speedAlternatives(); track key(alternative)) {
+              <option [value]="key(alternative)" [selected]="key(alternative) === selectedKey()">{{ optionLabel(alternative) }}</option>
+            }
+          </optgroup>
+        }
+        @if (laneAlternatives().length) {
+          <optgroup label="Lane · lateral">
+            @for (alternative of laneAlternatives(); track key(alternative)) {
+              <option [value]="key(alternative)" [selected]="key(alternative) === selectedKey()">{{ optionLabel(alternative) }}</option>
+            }
+          </optgroup>
+        }
+      </select>
+      @if (alternative(); as alt) {
+        <article class="alternative" data-testid="why-not-answer" [attr.data-status]="alt.status" [attr.data-option]="alt.option">
+          <span class="status {{ statusClass(alt.status) }}" data-testid="why-not-status">{{ statusLabel(alt.status) }}</span>
+          <h4>Why not “{{ alt.label }}”?</h4>
+          <p class="alternative__summary">{{ alt.summary }}</p>
+          @if (alt.requiredConditions.length) {
+            <h5>What it needed</h5>
+            <ul class="conditions" data-testid="why-not-conditions">
+              @for (condition of alt.requiredConditions; track $index) {
+                <li class="{{ conditionClass(condition) }}">
+                  <span class="conditions__mark" aria-hidden="true">{{ mark(condition) }}</span>
+                  <span class="sr-only">{{ holdsText(condition) }}:</span>
+                  {{ condition.text }}
+                </li>
+              }
+            </ul>
+          }
+          @if (alt.blockingRules.length) {
+            <h5>Rules involved</h5>
+            <ul class="rules">
+              @for (rule of alt.blockingRules; track $index) {
+                <li><code>{{ rule.rule }}</code> → {{ proposed(rule) }} · {{ rule.rung }} (priority {{ rule.priority }}) · <span class="outcome">{{ outcomeLabel(rule) }}</span></li>
+              }
+            </ul>
+          }
+          <h5>Why the actual decision prevailed</h5>
+          <p>{{ alt.prevailing }}</p>
+        </article>
+      }
+    } @else {
+      <p class="explain__empty">No alternative was recorded for this decision.</p>
+    }
+  </div>
+} @else {
+  <div class="explain" data-testid="how-steps">
+    @for (flow of answer().how; track flow.channel) {
+      <section class="flow" data-testid="how-flow" [attr.data-channel]="flow.channel">
+        <header class="channel__head">
+          <span class="channel__title">{{ flow.title }}</span>
+          <code class="channel__action">{{ flow.decision }}</code>
+        </header>
+        <ol class="flow__rail">
+          @for (step of onPath(flow); track step.nodeId) {
+            <li class="flow__step" data-testid="how-step" [attr.data-node]="step.nodeId" [attr.data-branch]="step.branch"
+                [class.flow__step--yes]="step.branch === 'YES'" [class.flow__step--no]="step.branch === 'NO'"
+                [class.flow__step--decisive]="step.decisive">
+              <p class="flow__question"><span class="flow__id">{{ step.nodeId }}</span>{{ step.question }}</p>
+              @if (step.yesLabel && step.noLabel) {
+                <div class="flow__branches">
+                  <span class="branch" [class.branch--taken]="step.branch === 'YES'">Yes · {{ step.yesLabel }}</span>
+                  <span class="branch" [class.branch--taken]="step.branch === 'NO'">No · {{ step.noLabel }}</span>
+                </div>
+              }
+              <p class="flow__taken">{{ step.takenLabel }}</p>
+              @if (step.rules.length) {
+                <ul class="rules">
+                  @for (rule of step.rules; track $index) {
+                    <li><code>{{ rule.rule }}</code> → {{ proposed(rule) }} · {{ rule.rung }} ({{ rule.priority }}) · <span class="outcome">{{ outcomeLabel(rule) }}</span></li>
+                  }
+                </ul>
+              }
+              @if (step.conditions.length) {
+                <ul class="conditions">
+                  @for (condition of step.conditions; track $index) {
+                    <li class="{{ conditionClass(condition) }}">
+                      <span class="conditions__mark" aria-hidden="true">{{ mark(condition) }}</span>
+                      <span class="sr-only">{{ holdsText(condition) }}:</span>
+                      {{ condition.text }}
+                    </li>
+                  }
+                </ul>
+              }
+              @if (step.supportingRules.length) {
+                <p class="flow__meta">State rules that fired: {{ step.supportingRules.join(', ') }}</p>
+              }
+              @if (step.observed.length) {
+                <p class="flow__meta">Recorded perception: {{ step.observed.join(' · ') }}</p>
+              }
+            </li>
+          }
+        </ol>
+        @if (offPath(flow).length) {
+          <details class="flow__off">
+            <summary>{{ offPath(flow).length }} question(s) not on the decision path</summary>
+            <ol class="flow__rail">
+              @for (step of offPath(flow); track step.nodeId) {
+                <li class="flow__step flow__step--off" data-testid="how-step" [attr.data-node]="step.nodeId" [attr.data-branch]="step.branch">
+                  <p class="flow__question"><span class="flow__id">{{ step.nodeId }}</span>{{ step.question }}</p>
+                  <p class="flow__taken">{{ step.takenLabel }}</p>
+                  @if (step.rules.length) {
+                    <ul class="rules">
+                      @for (rule of step.rules; track $index) {
+                        <li><code>{{ rule.rule }}</code> → {{ proposed(rule) }} · <span class="outcome">{{ outcomeLabel(rule) }}</span></li>
+                      }
+                    </ul>
+                  }
+                </li>
+              }
+            </ol>
+          </details>
+        }
+        <p class="flow__outcome">{{ flow.outcome }}</p>
+      </section>
+    }
+  </div>
+}

@@ -5,18 +5,21 @@
       <div>
         <p class="trip-dialog__eyebrow">SESSION SAVED · {{ session()?.backend ?? 'RULE ENGINE' }}</p>
         <h2 id="trip-dialog-title">ASK ABOUT THIS TRIP</h2>
-        <p class="trip-dialog__subtitle">The simulation has been stopped and saved. Ask why a decision was made, or why an alternative was not selected.</p>
+        <p class="trip-dialog__subtitle">The simulation has been stopped and saved. Pick a decision to see why it was made, why the alternatives were not, and how the rules reached it, for the speed and for the lane.</p>
       </div>
       <button type="button" class="trip-dialog__close" aria-label="Close" data-testid="close-trip-dialog" (click)="dismiss()">×</button>
     </header>
 
     @if (error()) { <p class="trip-dialog__error" role="alert" data-testid="trip-dialog-error">{{ error() }}</p> }
 
-    <label class="trip-dialog__label" for="trip-question">Your question</label>
-    <textarea #questionInput id="trip-question" data-testid="trip-question-input" rows="3"
-              [value]="question()" (input)="setQuestion($any($event.target).value)"
-              placeholder="Why did the vehicle change lane?" aria-describedby="trip-question-hint"></textarea>
-    <p id="trip-question-hint" class="trip-dialog__hint">Press Ctrl+Enter / ⌘+Enter to ask · Esc to close</p>
+    <label class="trip-dialog__label" for="trip-decision">Decision context</label>
+    <select #decisionSelect id="trip-decision" data-testid="trip-decision-select" [disabled]="!decisions().length"
+            (change)="chooseTimestamp($any($event.target).value)">
+      @if (!session()) { <option value="">Loading the saved decisions…</option> }
+      @for (item of decisions(); track $index) {
+        <option [value]="item.simulationTimeMillis" [selected]="item.simulationTimeMillis === selectedTimestamp()">{{ decisionLabel(item) }}</option>
+      }
+    </select>
 
     <div class="trip-dialog__modes" role="group" aria-label="Explanation mode">
       <button type="button" data-testid="why-mode" [class.is-selected]="mode() === 'WHY'"
@@ -27,78 +30,19 @@
               [attr.aria-pressed]="mode() === 'HOW'" (click)="setMode('HOW')">HOW</button>
     </div>
 
-    @if (session(); as saved) {
-      @if (saved.decisionSnapshots.length > 1) {
-        <label class="trip-dialog__label" for="trip-decision">Decision context</label>
-        <select id="trip-decision" data-testid="trip-decision-select" [value]="selectedTimestamp() ?? ''"
-                (change)="chooseTimestamp($any($event.target).value)">
-          <option value="">Auto-select the latest relevant decision</option>
-          @for (item of saved.decisionSnapshots; track $index) {
-            <option [value]="item.simulationTimeMillis">{{ decisionLabel(item) }}</option>
-          }
-        </select>
-      }
-    }
-
     <div class="trip-dialog__actions">
-      <button type="button" class="trip-dialog__primary" data-testid="ask-trip-question"
-              [disabled]="loading()" (click)="ask()">{{ loading() ? 'ASKING…' : 'ASK' }}</button>
       <button type="button" class="trip-dialog__secondary" data-testid="open-session-history" (click)="showHistory()">OPEN SESSION HISTORY</button>
+      @if (loading()) { <span class="trip-dialog__hint" role="status" data-testid="trip-loading">Explaining the decision…</span> }
     </div>
 
     @if (answer(); as result) {
-      @if (result.candidates.length > 1) {
-        <section class="trip-answer" data-testid="decision-ambiguity">
-          <h3>Which decision do you mean?</h3>
-          @for (item of result.candidates; track item.simulationTimeMillis) {
-            <button type="button" [attr.data-timestamp]="item.simulationTimeMillis"
-                    (click)="chooseTimestamp('' + item.simulationTimeMillis); ask()">{{ decisionLabel(item) }}</button>
-          }
-        </section>
-      } @else {
-        <section class="trip-answer" data-testid="trip-answer">
-          <p class="trip-answer__eyebrow">{{ mode() === 'WHY' ? 'WHY' : mode() === 'WHY_NOT' ? 'WHY NOT' : 'HOW' }} · {{ formatTime(result.timestampMillis) }}</p>
-          <h3>{{ result.selected }}</h3>
-          @if (mode() === 'WHY') {
-            <ul>@for (item of result.why; track $index) { <li>{{ item }}</li> }</ul>
-          } @else if (mode() === 'WHY_NOT') {
-            <ul>@for (item of result.whyNot; track $index) { <li>{{ item }}</li> }</ul>
-          } @else {
-            <ol class="trip-answer__how" data-testid="how-steps">
-              @for (step of result.how; track step.stage) {
-                <li>
-                  <strong>{{ step.stage }}</strong>
-                  <ul>@for (item of step.evidence; track $index) { <li>{{ item }}</li> }</ul>
-                </li>
-              }
-            </ol>
-          }
-          <p class="trip-answer__summary">{{ mode() === 'WHY'
-            ? 'The recorded rule proposal, sensor observations and Working Memory above explain this action.'
-            : mode() === 'WHY_NOT'
-              ? (result.whyNot.length ? 'These recorded conditions explain why this alternative was not selected.' : 'The session has no recorded antecedent trace for this alternative.')
-              : 'This is the recorded inference pipeline: WORLD → SENSORS → WORKING MEMORY → RULES → DECISION → ACTUATOR.' }}</p>
-          <button type="button" class="trip-answer__technical-toggle" [attr.aria-expanded]="showTechnical()"
-                  data-testid="toggle-technical-evidence" (click)="toggleTechnical()">{{ showTechnical() ? 'HIDE TECHNICAL EVIDENCE' : 'SHOW TECHNICAL EVIDENCE' }}</button>
-          @if (showTechnical()) {
-            <div class="trip-answer__technical" data-testid="trip-technical-evidence">
-              <h4>Observations</h4><ul>@for (item of result.observations; track $index) { <li>{{ item }}</li> }</ul>
-              <h4>Working Memory / world facts</h4><ul>@for (item of result.facts; track $index) { <li><code>{{ item }}</code></li> }</ul>
-              <h4>Rule trace</h4><ul>@for (item of result.rules; track $index) { <li><code>{{ item }}</code></li> }</ul>
-              <h4>Proposals and outcomes</h4>
-              <ul>@for (proposal of result.proposals; track $index) {
-                <li><code>{{ proposal.rule }}</code> → {{ proposal.action }} · {{ proposal.outcome }} · priority {{ proposal.priority }}{{ proposal.detail ? ' · ' + proposal.detail : '' }}</li>
-              }</ul>
-              <h4>Lane safety</h4>
-              <ul>@for (check of result.laneSafety; track check.side) {
-                <li>{{ check.side }} · {{ check.allowed ? 'SAFE' : 'BLOCKED' }} · {{ check.explanation }}</li>
-              }</ul>
-              <h4>Actuator result</h4><ul>@for (item of result.actuator; track $index) { <li>{{ item }}</li> }</ul>
-              <p>Engine: {{ result.engine }} · timestamp {{ result.timestampMillis }} ms</p>
-            </div>
-          }
-        </section>
-      }
+      <section class="trip-answer" data-testid="trip-answer" aria-live="polite">
+        <p class="trip-answer__eyebrow">{{ modeLabel() }} · {{ formatTime(result.timestampMillis) }} · {{ result.engine }}</p>
+        @if (result.situation; as situation) {
+          <p class="trip-answer__situation">Vehicle at {{ situation.speedKmh | number:'1.0-0' }} km/h in the {{ situation.lane }} lane · lane change {{ situation.laneChangeState }}</p>
+        }
+        <app-decision-explanation [answer]="result" [mode]="mode()" />
+      </section>
     }
   </section>
 </div>

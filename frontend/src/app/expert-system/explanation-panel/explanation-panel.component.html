@@ -104,24 +104,20 @@
           </article>
         }
 
-        <form class="history__ask" (submit)="$event.preventDefault(); askWhy()">
-          <label class="history__label" for="why-question">Ask WHY / WHY-NOT</label>
-          <div class="history__query">
-            <input id="why-question" data-testid="why-question" [value]="question()" (input)="updateQuestion($any($event.target).value)" placeholder="Why did you move left? Why didn't you brake?">
-            <button type="submit" data-testid="ask-why-btn">Ask</button>
+        @if (decisions().length) {
+          <div class="history__modes" role="group" aria-label="Explanation mode">
+            <button type="button" data-testid="history-why-mode" [class.is-selected]="mode() === 'WHY'"
+                    [attr.aria-pressed]="mode() === 'WHY'" (click)="setMode('WHY')">WHY</button>
+            <button type="button" data-testid="history-why-not-mode" [class.is-selected]="mode() === 'WHY_NOT'"
+                    [attr.aria-pressed]="mode() === 'WHY_NOT'" (click)="setMode('WHY_NOT')">WHY NOT</button>
+            <button type="button" data-testid="history-how-mode" [class.is-selected]="mode() === 'HOW'"
+                    [attr.aria-pressed]="mode() === 'HOW'" (click)="setMode('HOW')">HOW</button>
           </div>
-        </form>
+        }
         @if (answer(); as result) {
           <article class="history__answer" data-testid="why-answer">
-            <h4>{{ formatTime(result.timestampMillis) }} · {{ result.selected }}</h4>
-            <h4>WHY — recorded decision evidence</h4>
-            <ul>@for (line of result.why; track $index) { <li>{{ line }}</li> }</ul>
-            @if (result.whyNot.length) {
-              <h4>WHY NOT — rejected alternatives / failed checks</h4>
-              <ul>@for (line of result.whyNot; track $index) { <li>{{ line }}</li> }</ul>
-            }
-            <h4>Rule trace</h4>
-            <ul>@for (line of result.rules; track $index) { <li>{{ line }}</li> }</ul>
+            <h4>{{ formatTime(result.timestampMillis) }} · {{ result.engine }}</h4>
+            <app-decision-explanation [answer]="result" [mode]="mode()" />
           </article>
         }
       }

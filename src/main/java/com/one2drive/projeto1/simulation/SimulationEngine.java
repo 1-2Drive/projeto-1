@@ -354,9 +354,11 @@ public class SimulationEngine implements AutoCloseable {
         List<com.one2drive.projeto1.api.model.ApiWorkingMemoryRow> cycleFacts = backend.factViews().stream()
             .map(fact -> new com.one2drive.projeto1.api.model.ApiWorkingMemoryRow(
                 fact.type(), fact.value(), fact.source(), fact.timestamp(), fact.stream())).toList();
+        // The world, sensors and vehicle are those the rules decided on; the decision is the
+        // one the actuator left, so a lane change it refused is recorded as refused.
         lastSessionSnapshot = new SessionSnapshot(contextSnapshot.simulationTimeMillis(), contextSnapshot.vehicle(),
             contextSnapshot.environment(), contextSnapshot.sensors(), contextSnapshot.worldObjects(), cycleFacts, cycleTimeline,
-            contextSnapshot.decision().withActuatorResult(actuatorResult()), contextSnapshot.roadMap());
+            SessionSnapshot.DecisionSnapshot.from(currentDecision, actuatorResult()), contextSnapshot.roadMap());
         sessionSnapshotConsumer.accept(lastSessionSnapshot);
         consumePassedRoadElements();
         markDemoEvidence(events);

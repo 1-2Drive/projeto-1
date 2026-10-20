@@ -205,14 +205,21 @@
 
 .history__facts { max-height: 12rem; overflow: auto; }
 
-.history__ask { display: grid; gap: 0.3rem; }
+.history__answer app-decision-explanation { font-size: 0.66rem; }
 
-.history__query {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.35rem;
+.history__modes {
+  display: flex;
+  gap: 0.3rem;
 
-  button,
-  + button { cursor: pointer; }
-  button { border: 1px solid var(--ds-border-strong); border-radius: var(--ds-radius-sm); padding: 0.4rem 0.65rem; background: #174960; color: white; }
+  button {
+    border: 1px solid var(--ds-border-strong);
+    border-radius: 999px;
+    padding: 0.3rem 0.7rem;
+    background: var(--ds-bg-muted);
+    color: var(--ds-text-secondary);
+    font: 650 0.6rem var(--ds-font-mono);
+    cursor: pointer;
+  }
+
+  button.is-selected { border-color: var(--ds-accent); color: var(--ds-text-primary); background: var(--ds-accent-soft); }
 }

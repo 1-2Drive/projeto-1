@@ -12,8 +12,7 @@ import {
   MapCellRequest,
   ScenarioSummary,
   UiModel,
-  UiStatus,
-  WhyMode
+  UiStatus
 } from '../models/api.models';
 import { finalize, forkJoin, Observable, Subscription } from 'rxjs';
 
@@ -131,8 +130,8 @@ export class SimulationStateService {
     });
   }
 
-  askAboutSession(sessionId: string, question: string, timestampMillis: number | undefined, mode: WhyMode) {
-    return this.api.askWhy(sessionId, question, timestampMillis, mode);
+  explainSessionDecision(sessionId: string, timestampMillis: number | undefined) {
+    return this.api.explainDecision(sessionId, timestampMillis);
   }
 
   clearStoppedSession(): void {

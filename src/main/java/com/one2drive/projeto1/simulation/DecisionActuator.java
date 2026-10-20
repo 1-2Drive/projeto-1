@@ -2,6 +2,7 @@ package com.one2drive.projeto1.simulation;
 
 import com.one2drive.projeto1.config.SimulationConfig;
 import com.one2drive.projeto1.decision.DrivingDecision;
+import com.one2drive.projeto1.decision.SpeedIntent;
 import com.one2drive.projeto1.domain.DrivingAction;
 import com.one2drive.projeto1.domain.DrivingState;
 import com.one2drive.projeto1.domain.EgoVehicleState;
@@ -24,7 +25,7 @@ public class DecisionActuator {
     private final SimulationConfig config;
 
     /** Half-width of the band around the recommended speed in which the car just holds it. */
-    private static final double SPEED_DEAD_BAND_KMH = 0.5;
+    private static final double SPEED_DEAD_BAND_KMH = SpeedIntent.DEAD_BAND_KMH;
 
     public DecisionActuator(SimulationConfig config) {
         this.config = config;
@@ -55,7 +56,7 @@ public class DecisionActuator {
         boolean mandatoryStop = decision.getPriority() >= com.one2drive.projeto1.decision.DecisionPriority.LEGAL_MANDATORY_STOP;
         if (mandatoryStop) {
             if (action == DrivingAction.STOP || action == DrivingAction.WAIT || action == DrivingAction.REDUCE_SPEED) {
-                ego.setAccelerationMps2(ego.getSpeedKmh() < 0.6 ? 0.0 : -config.getComfortableDecelerationMps2());
+                ego.setAccelerationMps2(ego.getSpeedKmh() < SpeedIntent.STANDSTILL_KMH ? 0.0 : -config.getComfortableDecelerationMps2());
             } else if (action == DrivingAction.EMERGENCY_BRAKE) {
                 ego.setAccelerationMps2(-config.getEmergencyDecelerationMps2());
             } else if (!Double.isNaN(recommendedSpeed) && ego.getSpeedKmh() > recommendedSpeed + SPEED_DEAD_BAND_KMH) {
@@ -65,7 +66,7 @@ public class DecisionActuator {
                     ? -config.getComfortableDecelerationMps2()
                     : -Math.max(1.0, (ego.getSpeedKmh() - recommendedSpeed) * 1.5));
             }
-            if ((action == DrivingAction.STOP || action == DrivingAction.WAIT) && ego.getSpeedKmh() < 0.6) {
+            if ((action == DrivingAction.STOP || action == DrivingAction.WAIT) && ego.getSpeedKmh() < SpeedIntent.STANDSTILL_KMH) {
                 ego.setSpeedKmh(0.0);
                 ego.setAccelerationMps2(0.0);
             }

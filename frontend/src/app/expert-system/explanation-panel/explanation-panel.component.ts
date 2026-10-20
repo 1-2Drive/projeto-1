@@ -2,7 +2,8 @@ import { ChangeDetectionStrategy, Component, computed, effect, inject, input, si
 import { DecimalPipe } from '@angular/common';
 import { BackendApiService } from '../../core/api/backend-api.service';
 import { SimulationStateService } from '../../core/state/simulation-state.service';
-import { ApiDecisionSnapshot, ApiSessionDetail, ApiSessionSummary, ApiSimulationSnapshot, ApiWhyAnswer } from '../../core/models/api.models';
+import { ApiSessionDetail, ApiSessionSummary, ApiSimulationSnapshot, ApiWhyAnswer, WhyMode } from '../../core/models/api.models';
+import { DecisionExplanationComponent } from '../decision-explanation/decision-explanation.component';
 
 /**
  * Presents the audit chain the engine publishes for the current decision:
@@ -11,7 +12,7 @@ import { ApiDecisionSnapshot, ApiSessionDetail, ApiSessionSummary, ApiSimulation
 @Component({
   selector: 'app-explanation-panel',
   standalone: true,
-  imports: [DecimalPipe],
+  imports: [DecimalPipe, DecisionExplanationComponent],
   templateUrl: './explanation-panel.component.html',
   styleUrl: './explanation-panel.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -27,8 +28,10 @@ export class ExplanationPanelComponent {
   protected readonly sessions = signal<ApiSessionSummary[]>([]);
   protected readonly selectedSession = signal<ApiSessionDetail | null>(null);
   protected readonly selectedTimestamp = signal<number | null>(null);
-  protected readonly question = signal('Why did you move left?');
+  protected readonly mode = signal<WhyMode>('WHY');
   protected readonly answer = signal<ApiWhyAnswer | null>(null);
+  /** Only the latest explanation request may set the answer. */
+  private request = 0;
   protected readonly loadingHistory = signal(false);
   protected readonly requestedTimestamp = this.state.selectedHistoricalTimestamp;
   private readonly historyVersion = this.state.historyVersion;
@@ -53,7 +56,7 @@ export class ExplanationPanelComponent {
   protected openHistoricalDecision(timestamp: number): void {
     this.state.openHistoricalDecision(timestamp);
     const open = this.selectedSession();
-    if (open) this.selectedTimestamp.set(timestamp);
+    if (open) this.chooseDecision(timestamp);
     else if (this.sessions().length > 0) this.openSession(this.sessions()[0].id);
   }
 
@@ -71,6 +74,7 @@ export class ExplanationPanelComponent {
     if (!id) {
       this.selectedSession.set(null);
       this.selectedTimestamp.set(null);
+      this.answer.set(null);
       return;
     }
     this.api.getSession(id).subscribe({
@@ -79,26 +83,28 @@ export class ExplanationPanelComponent {
         const requested = this.requestedTimestamp();
         const matching = session.decisionSnapshots.filter((item) =>
           item.simulationTimeMillis <= (requested ?? Number.MAX_SAFE_INTEGER));
-        this.selectedTimestamp.set(matching.at(-1)?.simulationTimeMillis
-          ?? session.decisionSnapshots.at(-1)?.simulationTimeMillis ?? null);
+        const timestamp = matching.at(-1)?.simulationTimeMillis
+          ?? session.decisionSnapshots.at(-1)?.simulationTimeMillis ?? null;
         this.answer.set(null);
+        if (timestamp === null) this.selectedTimestamp.set(null);
+        else this.chooseDecision(timestamp);
       }
     });
   }
 
+  /** Selects a recorded decision and loads its why / why not / how explanation. */
   protected chooseDecision(timestamp: number): void {
     this.selectedTimestamp.set(timestamp);
-    this.answer.set(null);
-  }
-
-  protected updateQuestion(value: string): void { this.question.set(value); }
-
-  protected askWhy(): void {
     const session = this.selectedSession();
-    if (!session || !this.question().trim()) return;
-    this.api.askWhy(session.id, this.question(), this.selectedTimestamp() ?? undefined)
-      .subscribe({ next: (answer) => this.answer.set(answer) });
+    if (!session) return;
+    const request = ++this.request;
+    this.api.explainDecision(session.id, timestamp).subscribe({
+      next: (answer) => { if (request === this.request) this.answer.set(answer); },
+      error: () => { if (request === this.request) this.answer.set(null); }
+    });
   }
+
+  protected setMode(mode: WhyMode): void { this.mode.set(mode); }
 
   protected formatTime(millis: number): string {
     const mm = Math.floor(millis / 60_000).toString().padStart(2, '0');

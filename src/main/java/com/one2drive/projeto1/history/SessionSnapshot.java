@@ -19,11 +19,28 @@ public record SessionSnapshot(long simulationTimeMillis,
                               List<ApiTimelineEntry> timeline,
                               DecisionSnapshot decision,
                               RoadMapSnapshot roadMap) {
+    /**
+     * The decision of one cycle as the actuator left it: the headline fields, and each channel
+     * on its own (reason, priority, evidence), so the explanation can answer for the speed and
+     * the lane separately. Sessions saved before the per-channel fields existed load them as
+     * null; they are normalised to empty values and the explanation falls back to proposals.
+     */
     public record DecisionSnapshot(String action, String speedAction, String laneAction,
                                    String reason, String sourceRule, String speedSourceRule,
                                    String laneSourceRule, double recommendedSpeedKmh,
                                    List<String> evidence, List<ProposalSnapshot> proposals,
-                                   List<LaneCheckSnapshot> laneChecks, String actuatorResult) {
+                                   List<LaneCheckSnapshot> laneChecks, String actuatorResult,
+                                   String speedReason, String laneReason,
+                                   Integer speedPriority, Integer lanePriority,
+                                   List<String> speedEvidence, List<String> laneEvidence) {
+        public DecisionSnapshot {
+            evidence = evidence == null ? List.of() : evidence;
+            proposals = proposals == null ? List.of() : proposals;
+            laneChecks = laneChecks == null ? List.of() : laneChecks;
+            speedEvidence = speedEvidence == null ? List.of() : speedEvidence;
+            laneEvidence = laneEvidence == null ? List.of() : laneEvidence;
+        }
+
         public static DecisionSnapshot from(DrivingDecision decision, String actuatorResult) {
             return new DecisionSnapshot(
                 decision.getAction().name(), decision.getSpeedAction().name(), decision.getLaneAction().name(),
@@ -38,12 +55,10 @@ public record SessionSnapshot(long simulationTimeMillis,
                 decision.getLaneChecks().stream().map(c -> new LaneCheckSnapshot(
                     c.side().name(), c.allowed(), c.explanation(),
                     c.subGoals().stream().map(g -> new SubGoalSnapshot(g.goal(), g.holds(), g.detail())).toList())).toList(),
-                actuatorResult);
-        }
-
-        public DecisionSnapshot withActuatorResult(String result) {
-            return new DecisionSnapshot(action, speedAction, laneAction, reason, sourceRule, speedSourceRule,
-                laneSourceRule, recommendedSpeedKmh, evidence, proposals, laneChecks, result);
+                actuatorResult,
+                decision.getSpeedReason(), decision.getLaneReason(),
+                decision.getPriority(), decision.getLanePriority(),
+                List.copyOf(decision.getSpeedEvidence()), List.copyOf(decision.getLaneEvidence()));
         }
 
         private static String conditions(String rule, DrivingDecision decision) {
@@ -61,10 +76,18 @@ public record SessionSnapshot(long simulationTimeMillis,
 
     public record ProposalSnapshot(String rule, String action, String channel, int priority,
                                    Double recommendedSpeedKmh, String outcome, String detail,
-                                   String reason, List<String> evidence, String conditions) { }
+                                   String reason, List<String> evidence, String conditions) {
+        public ProposalSnapshot {
+            evidence = evidence == null ? List.of() : evidence;
+        }
+    }
 
     public record LaneCheckSnapshot(String side, boolean allowed, String explanation,
-                                    List<SubGoalSnapshot> subGoals) { }
+                                    List<SubGoalSnapshot> subGoals) {
+        public LaneCheckSnapshot {
+            subGoals = subGoals == null ? List.of() : subGoals;
+        }
+    }
 
     public record SubGoalSnapshot(String goal, boolean holds, String detail) { }
 }

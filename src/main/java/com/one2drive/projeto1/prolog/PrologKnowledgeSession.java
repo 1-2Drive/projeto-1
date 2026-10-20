@@ -139,6 +139,7 @@ public class PrologKnowledgeSession implements AutoCloseable {
      *                 see as the DrivingDecision fact; null before the first cycle
      */
     public PrologCycleResult cycle(VehicleInput vehicle, List<?> events, DrivingDecision previous) {
+        process.request(Map.of("cmd", "prepareCycle"));
         Map<String, Object> request = new LinkedHashMap<>();
         request.put("cmd", "tick");
         request.put("timestamp", vehicle.timestampMillis());
@@ -155,6 +156,7 @@ public class PrologKnowledgeSession implements AutoCloseable {
         request.put("presentationDemo", vehicle.presentationDemo());
         request.put("laneSettledAtMillis", vehicle.laneSettledAtMillis());
         request.put("physicalLane", vehicle.physicalLane().name());
+        request.put("prepareCycle", true);
         request.put("events", events.stream().map(PrologKnowledgeSession::toJson).toList());
         if (previous != null) {
             request.put("previousDecision", Map.of(

@@ -278,6 +278,12 @@ on_event('WeatherEvent', E) :-
     ;   true
     ).
 
+% Keep the current environmental reading as the antecedent context for the same fuzzy
+% speed rules as Drools. The legacy reduced-* event types are intentionally ignored; the
+% sensor emits WeatherEvent in the same cycle and the DRL no longer has crisp rules for them.
+on_event('ReducedVisibilityEvent', _E).
+on_event('ReducedGripEvent', _E).
+
 % "Update lane change request": only a newer request (or another direction at the same
 % instant) activates the state; reactivating an expired request would fight the expiry.
 on_event('LaneChangeRequestEvent', E) :-
@@ -456,6 +462,18 @@ store_conclusions :-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Estado -> memória de trabalho (os factos iniciais do ciclo)
 
+% Clear derived weather facts between cycles. Drools completes perception before the
+% decision agenda; reusing fuzzy memberships from the preceding cycle can cause stale
+% fuzzy proposals that were already retracted by current weather state in Drools.
+prepare_cycle :-
+    findall(Id, (wm_fact(Id, Fact), cycle_fuzzy_fact(Fact)), Ids),
+    forall(member(Id, Ids),
+           ( retractall(wm_support(Id, _, _)), retractall(wm_fact(Id, _)) )).
+
+cycle_fuzzy_fact(fuzzy_membership(_, _, _)).
+cycle_fuzzy_fact(fuzzy_conclusion(_, _)).
+cycle_fuzzy_fact(composed_fuzzy_conclusion(_, _)).
+
 load_cycle_facts :-
     reset_working_memory,
     ego_state(Speed, Lane, Now),
@@ -513,7 +531,17 @@ load_driver_requests(Now) :-
 
 load_weather :-
     weather_state(Condition, Visibility, Grip, _),
-    add_fact(weather(Condition, Visibility, Grip)).
+    add_fact(weather(Condition, Visibility, Grip)),
+    fuzzy_input_degrees(Visibility, VisibilityPoor, VisibilityReduced, VisibilityFair, VisibilityGood),
+    fuzzy_input_degrees(Grip, GripPoor, GripReduced, GripFair, GripGood),
+    add_fact(fuzzy_membership(visibility, poor, VisibilityPoor)),
+    add_fact(fuzzy_membership(visibility, reduced, VisibilityReduced)),
+    add_fact(fuzzy_membership(visibility, fair, VisibilityFair)),
+    add_fact(fuzzy_membership(visibility, good, VisibilityGood)),
+    add_fact(fuzzy_membership(grip, poor, GripPoor)),
+    add_fact(fuzzy_membership(grip, reduced, GripReduced)),
+    add_fact(fuzzy_membership(grip, fair, GripFair)),
+    add_fact(fuzzy_membership(grip, good, GripGood)).
 
 load_road :-
     markings(Left, Right),

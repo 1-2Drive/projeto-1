@@ -901,10 +901,7 @@
 }
 
 /* Lit and dark halves of each period, as a real flasher (about 85 flashes a minute). */
-.ego--indicator-left .car__indicator--left .indicator-light,
-.ego--indicator-right .car__indicator--right .indicator-light,
-.ego--indicator-hazard .car__indicator--left .indicator-light,
-.ego--indicator-hazard .car__indicator--right .indicator-light {
+.indicator-light--on {
   animation: indicator-blink 700ms steps(1, end) infinite;
 }
 
@@ -981,16 +978,6 @@
       background: rgba(255, 194, 51, 0.25);
       color: #ffc233;
     }
-  }
-}
-
-@keyframes indicator-blink {
-  0% {
-    opacity: 1;
-  }
-
-  50% {
-    opacity: 0;
   }
 }
 

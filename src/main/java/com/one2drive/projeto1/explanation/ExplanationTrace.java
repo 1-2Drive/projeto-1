@@ -18,7 +18,7 @@ public class ExplanationTrace {
 
     public synchronized void add(long timestamp, TimelineEntryType type, String message) {
         timeline.add(new TimelineEntry(timestamp, type, message));
-        while (timeline.size() > maxEntries) {
+        while (maxEntries > 0 && timeline.size() > maxEntries) {
             timeline.removeFirst();
         }
     }

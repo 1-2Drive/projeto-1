@@ -54,11 +54,14 @@ class AgendaPhasesTest {
                     new TrafficLightEvent(t, "camera", TrafficLightState.RED, 80, "light-1"),
                     new TTCEvent(t, "radar", 4.0, "front-1"));
 
-                assertEquals("MAIN", groups.get(0), "the control rule fires first: " + groups);
-                List<String> order = List.of("MAIN", "perception", "decision", "fallback");
-                for (int i = 1; i < groups.size(); i++) {
-                    assertTrue(order.indexOf(groups.get(i - 1)) <= order.indexOf(groups.get(i)),
-                        "phases out of order at firing " + i + ": " + groups);
+                assertEquals("control", groups.get(0), "the control rule fires first: " + groups);
+                List<String> order = List.of("control", "perception", "decision", "fallback");
+                int lastPhase = -1;
+                for (int i = 0; i < groups.size(); i++) {
+                    int phase = order.indexOf(groups.get(i));
+                    if (phase < 0) continue; // MAIN hosts KIE's query listener bookkeeping rules.
+                    assertTrue(lastPhase <= phase, "phases out of order at firing " + i + ": " + groups);
+                    lastPhase = phase;
                 }
                 assertTrue(groups.contains("perception") && groups.contains("decision"),
                     "perception and decision both fire: " + groups);

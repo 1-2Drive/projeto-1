@@ -107,6 +107,14 @@
       <button type="button" (click)="clearError()">Dismiss</button>
     </aside>
   }
+  @if (tripStopError()) {
+    <aside class="error" role="alert" data-testid="stop-persistence-error">{{ tripStopError() }}</aside>
+  }
+
+  @if (tripDialogSessionId(); as stoppedSessionId) {
+    <app-trip-questions-dialog [sessionId]="stoppedSessionId"
+      (close)="closeTripDialog()" (openHistory)="openSavedSession($event)" />
+  }
 
   <!-- Only rendered while the scripted demo scenario is loaded. -->
   @if (demoPhases().length > 0) {
@@ -184,7 +192,7 @@
     <div class="tabs__body">
       @switch (activeTab()) {
         @case ('timeline') {
-          <app-rule-timeline [snapshot]="snapshot()" />
+          <app-rule-timeline [snapshot]="snapshot()" (inspectDecision)="inspectTimelineDecision($event)" />
         }
         @case ('memory') {
           <app-working-memory [snapshot]="snapshot()" />

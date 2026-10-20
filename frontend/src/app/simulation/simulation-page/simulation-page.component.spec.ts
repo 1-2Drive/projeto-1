@@ -2,6 +2,8 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { SimulationPageComponent } from './simulation-page.component';
 import { SimulationStateService } from '../../core/state/simulation-state.service';
+import { BackendApiService } from '../../core/api/backend-api.service';
+import { of } from 'rxjs';
 
 class SimulationStateServiceStub {
   vm = signal({
@@ -53,6 +55,14 @@ class SimulationStateServiceStub {
       demoPhases: []
   });
 
+  expertBackend = signal('DROOLS');
+  expertBackendError = signal(null);
+  stoppedSessionId = signal<string | null>(null);
+  stopPersistenceError = signal<string | null>(null);
+  selectedHistoricalTimestamp = signal<number | null>(null);
+  selectedHistoricalSessionId = signal<string | null>(null);
+  historyVersion = signal(0);
+
   scenarios = signal([]);
 
   initialize = jasmine.createSpy('initialize');
@@ -61,6 +71,8 @@ class SimulationStateServiceStub {
   pause = jasmine.createSpy('pause');
   resume = jasmine.createSpy('resume');
   stop = jasmine.createSpy('stop');
+  clearStoppedSession = jasmine.createSpy('clearStoppedSession');
+  openHistoricalSession = jasmine.createSpy('openHistoricalSession');
   reset = jasmine.createSpy('reset');
   loadScenario = jasmine.createSpy('loadScenario');
   addRoadElement = jasmine.createSpy('addRoadElement');
@@ -77,7 +89,10 @@ describe('SimulationPageComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [SimulationPageComponent],
-      providers: [{ provide: SimulationStateService, useClass: SimulationStateServiceStub }]
+      providers: [
+        { provide: SimulationStateService, useClass: SimulationStateServiceStub },
+        { provide: BackendApiService, useValue: { getSessions: () => of([]), getSession: () => of({ decisionSnapshots: [] }) } }
+      ]
     }).compileComponents();
 
     fixture = TestBed.createComponent(SimulationPageComponent);
@@ -100,5 +115,24 @@ describe('SimulationPageComponent', () => {
     demo.click();
 
     expect(state.runPresentationDemo).toHaveBeenCalled();
+  });
+
+  it('renders the STOP-time question dialog only for the persisted stopped session and closes it cleanly', () => {
+    state.stoppedSessionId.set('saved-trip-1');
+    fixture.detectChanges();
+    const dialog = fixture.nativeElement.querySelector('[data-testid="trip-questions-dialog"]') as HTMLElement;
+    expect(dialog).toBeTruthy();
+    expect(dialog.getAttribute('data-session-id')).toBe('saved-trip-1');
+    const close = fixture.nativeElement.querySelector('[data-testid="close-trip-dialog"]') as HTMLButtonElement;
+    close.click();
+    expect(state.clearStoppedSession).toHaveBeenCalled();
+  });
+
+  it('opens historical session UI without deleting it when RESET is requested', () => {
+    state.stoppedSessionId.set('saved-trip-1');
+    fixture.detectChanges();
+    (fixture.nativeElement.querySelector('[data-testid="open-session-history"]') as HTMLButtonElement).click();
+    expect(state.clearStoppedSession).toHaveBeenCalled();
+    expect(state.openHistoricalSession).toHaveBeenCalledWith('saved-trip-1');
   });
 });

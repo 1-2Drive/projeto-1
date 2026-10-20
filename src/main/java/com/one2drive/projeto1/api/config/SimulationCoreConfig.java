@@ -2,15 +2,22 @@ package com.one2drive.projeto1.api.config;
 
 import com.one2drive.projeto1.config.SimulationConfig;
 import com.one2drive.projeto1.inference.ExpertBackendType;
+import com.one2drive.projeto1.history.SessionHistoryStore;
 import com.one2drive.projeto1.scenario.ScenarioDefinition;
 import com.one2drive.projeto1.scenario.ScenarioLibrary;
 import com.one2drive.projeto1.simulation.SimulationEngine;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Bean;
 
 @Configuration
 public class SimulationCoreConfig {
+    @Bean
+    public SessionHistoryStore sessionHistoryStore(@Value("${history.directory:${user.home}/.projeto-1/sessions}") String directory) {
+        return new SessionHistoryStore(directory);
+    }
+
     @Bean
     public SimulationConfig simulationConfig() {
         return SimulationConfig.defaultConfig();

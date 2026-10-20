@@ -46,6 +46,159 @@ export interface ApiTimelineEntry {
   message: string;
 }
 
+export interface ApiSessionSummary {
+  id: string;
+  startedAt: string;
+  stoppedAt: string | null;
+  durationMillis: number;
+  startedAtSimulationMillis: number;
+  scenarioId: string;
+  backend: ExpertBackend;
+  eventCount: number;
+  decisionCount: number;
+}
+
+export interface ApiSessionDetail extends ApiSessionSummary {
+  initialWorld: string[];
+  initialWorldObjects: ApiRoadElement[];
+  events: { sequence: number; simulationTimeMillis: number; recordedAt: string; type: string; message: string }[];
+  vehicleSamples: {
+    simulationTimeMillis: number; speedKmh: number; positionMeters: number; lane: LaneName;
+    accelerationMps2: number; lateralPositionMeters: number; targetLane: LaneName;
+    laneChangeState: LaneChangeStateName; laneChangeProgress: number; drivingState: string;
+    indicatorState: string; steeringState: string; headingDegrees: number; action: string;
+    reason: string; sourceRule: string; recommendedSpeedKmh: number;
+  }[];
+  decisionSnapshots: ApiDecisionSnapshot[];
+  decisionEventSequences: Record<string, number[]>;
+}
+
+export interface ApiDecisionSnapshot {
+  simulationTimeMillis: number;
+  vehicle: ApiSimulationSnapshot['egoVehicle'];
+  environment: ApiSimulationSnapshot['environment'];
+  sensors: ApiSensorTelemetryView;
+  worldObjects: ApiRoadElement[];
+  workingMemory: ApiWorkingMemoryRow[];
+  timeline: ApiTimelineEntry[];
+  decision: {
+    action: string; speedAction: string; laneAction: string; reason: string; sourceRule: string;
+    speedSourceRule: string; laneSourceRule: string; recommendedSpeedKmh: number;
+    evidence: string[]; actuatorResult: string;
+    /** Per-channel fields; absent (null) in sessions saved before they were recorded. */
+    speedReason?: string | null; laneReason?: string | null;
+    speedPriority?: number | null; lanePriority?: number | null;
+    speedEvidence?: string[]; laneEvidence?: string[];
+    proposals: { rule: string; action: string; channel: string; priority: number; recommendedSpeedKmh: number | null;
+      outcome: string; detail: string; reason: string; evidence: string[]; conditions: string }[];
+    laneChecks: { side: string; allowed: boolean; explanation: string;
+      subGoals: { goal: string; holds: boolean; detail: string }[] }[];
+  };
+}
+
+export type DecisionChannelName = 'LONGITUDINAL' | 'LATERAL';
+
+/**
+ * The explanation of one recorded decision, per channel: why the speed (longitudinal) and the
+ * lane (lateral) decisions were made, why each alternative was not, and the path through the
+ * decision flowchart. Built by the backend from the saved cycle; the UI only presents it.
+ */
+export interface ApiWhyAnswer {
+  sessionId: string;
+  timestampMillis: number;
+  engine: ExpertBackend;
+  situation: ApiWhySituation | null;
+  why: ApiChannelWhy[];
+  whyNot: ApiAlternative[];
+  how: ApiChannelFlow[];
+}
+
+export interface ApiWhySituation {
+  speedKmh: number;
+  lane: LaneName;
+  laneChangeState: string;
+  recommendedSpeedKmh: number;
+  actuatorResult: string;
+}
+
+/** One rule's proposal in the cycle and what the arbitration did with it. */
+export interface ApiRuleRef {
+  rule: string;
+  action: string;
+  channel: DecisionChannelName;
+  recommendedSpeedKmh: number | null;
+  priority: number;
+  rung: string;
+  outcome: string;
+  detail: string;
+  reason: string;
+  evidence: string[];
+}
+
+/** A condition an explanation rests on; holds is null when the cycle does not record it. */
+export interface ApiCondition {
+  text: string;
+  holds: boolean | null;
+}
+
+export interface ApiChannelWhy {
+  channel: DecisionChannelName;
+  title: string;
+  action: string;
+  effect: string;
+  /** False for an untouched default decision: shown as one line. */
+  relevant: boolean;
+  summary: string;
+  decidingRule: ApiRuleRef;
+  conditions: string[];
+  arbitration: string;
+  alsoConsidered: ApiRuleRef[];
+}
+
+export type AlternativeStatus = 'CONDITION_NOT_MET' | 'OVERRIDDEN_BY_PRIORITY' | 'NOT_APPLICABLE' | 'INSUFFICIENT_DATA';
+
+export interface ApiAlternative {
+  channel: DecisionChannelName;
+  option: string;
+  label: string;
+  status: AlternativeStatus;
+  summary: string;
+  requiredConditions: ApiCondition[];
+  blockingRules: ApiRuleRef[];
+  prevailing: string;
+}
+
+export type FlowBranch = 'YES' | 'NO' | 'NOT_REACHED';
+
+export interface ApiFlowStep {
+  nodeId: string;
+  docRef: string;
+  question: string;
+  branch: FlowBranch;
+  yesLabel: string;
+  noLabel: string;
+  takenLabel: string;
+  decisive: boolean;
+  rules: ApiRuleRef[];
+  supportingRules: string[];
+  conditions: ApiCondition[];
+  observed: string[];
+}
+
+export interface ApiChannelFlow {
+  channel: DecisionChannelName;
+  title: string;
+  decision: string;
+  steps: ApiFlowStep[];
+  outcome: string;
+}
+
+export type WhyMode = 'WHY' | 'WHY_NOT' | 'HOW';
+
+export interface StopResponse extends CommandResponse {
+  sessionId: string | null;
+}
+
 export interface ApiDecisionView {
   /** Headline: the lane maneuver while one executes, the speed action otherwise. */
   action: string;

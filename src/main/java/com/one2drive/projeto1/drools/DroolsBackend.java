@@ -45,7 +45,7 @@ public class DroolsBackend implements ExpertSystemBackend {
                          long timestampMillis,
                          double cruiseTargetKmh) {
         this.config = config;
-        ExplanationTrace trace = new ExplanationTrace(500);
+        ExplanationTrace trace = new ExplanationTrace(0);
         this.knowledgeSession = pseudoClock
             ? KnowledgeSession.createPseudoClock(trace, decisionConsumer)
             : KnowledgeSession.createRealtime(trace, decisionConsumer);

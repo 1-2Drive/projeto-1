@@ -3,6 +3,8 @@ import { BackendApiService } from '../api/backend-api.service';
 import { RealtimeStreamService } from '../websocket/realtime-stream.service';
 import {
   ApiSimulationSnapshot,
+  ApiSessionSummary,
+  ApiWhyAnswer,
   CreateActorRequest,
   CreateRoadElementRequest,
   EnvironmentUpdateRequest,
@@ -50,6 +52,18 @@ export class SimulationStateService {
   readonly loading = computed(() => this.state().loading);
   readonly expertBackend = computed<ExpertBackend>(() => this.state().snapshot?.expertBackend ?? 'DROOLS');
   readonly expertBackendError = computed(() => this.state().snapshot?.expertBackendError ?? null);
+  private readonly historyRefresh = signal(0);
+  readonly historyVersion = computed(() => this.historyRefresh());
+  private readonly historicalTimestamp = signal<number | null>(null);
+  readonly selectedHistoricalTimestamp = computed(() => this.historicalTimestamp());
+  private readonly historicalSessionId = signal<string | null>(null);
+  readonly selectedHistoricalSessionId = computed(() => this.historicalSessionId());
+  private readonly stoppedSession = signal<string | null>(null);
+  readonly stoppedSessionId = computed(() => this.stoppedSession());
+  private readonly stopError = signal<string | null>(null);
+  readonly stopPersistenceError = computed(() => this.stopError());
+  private readonly stopRefresh = signal(0);
+  readonly stopVersion = computed(() => this.stopRefresh());
 
   initialize(): void {
     this.destroyed = false;
@@ -95,7 +109,34 @@ export class SimulationStateService {
   }
 
   stop(): void {
-    this.runCommand(this.api.stopSimulation(), 'Unable to stop simulation.', 'STOPPED');
+    this.stopError.set(null);
+    this.stoppedSession.set(null);
+    this.api.stopSimulation().subscribe({
+      next: (response) => {
+        this.patch({ connection: { ...this.state().connection, simulationStatus: 'STOPPED' } });
+        this.historyRefresh.update((v) => v + 1);
+        if (response.success && response.sessionId) {
+          this.stoppedSession.set(response.sessionId);
+          this.stopRefresh.update((v) => v + 1);
+        } else if (!response.success) {
+          this.stopError.set(response.message || 'Simulation stopped, but the session could not be saved. Historical WHY/WHY-NOT is unavailable for this trip.');
+        }
+      },
+      error: (error) => {
+        // The endpoint reports persistence failure after stopping; keep controls stopped.
+        this.patch({ connection: { ...this.state().connection, simulationStatus: 'STOPPED' } });
+        this.stopError.set(this.errorMessage(error, 'Simulation stopped, but the session could not be saved. Historical WHY/WHY-NOT is unavailable for this trip.'));
+      }
+    });
+  }
+
+  explainSessionDecision(sessionId: string, timestampMillis: number | undefined) {
+    return this.api.explainDecision(sessionId, timestampMillis);
+  }
+
+  clearStoppedSession(): void {
+    this.stoppedSession.set(null);
+    this.stopError.set(null);
   }
 
   reset(): void {
@@ -182,6 +223,17 @@ export class SimulationStateService {
     this.patch({ error: null });
   }
 
+  openHistoricalDecision(timestamp: number): void {
+    this.historicalTimestamp.set(timestamp);
+    this.historyRefresh.update((v) => v + 1);
+  }
+
+  openHistoricalSession(id: string): void {
+    this.historicalSessionId.set(id);
+    this.historicalTimestamp.set(null);
+    this.historyRefresh.update((v) => v + 1);
+  }
+
   private connectRealtime(): void {
     if (this.destroyed) {
       return;
@@ -230,7 +282,8 @@ export class SimulationStateService {
     });
   }
 
-  private runCommand(command$: Observable<unknown>, fallbackMessage: string, status?: 'RUNNING' | 'PAUSED' | 'STOPPED'): void {
+  private runCommand(command$: Observable<unknown>, fallbackMessage: string,
+                     status?: 'RUNNING' | 'PAUSED' | 'STOPPED', afterSuccess?: () => void): void {
     command$.subscribe({
       next: (response: unknown) => {
         const command = response as { success?: boolean; message?: string };
@@ -241,6 +294,7 @@ export class SimulationStateService {
         if (status) {
           this.patch({ connection: { ...this.state().connection, simulationStatus: status } });
         }
+        afterSuccess?.();
       },
       error: (err: unknown) => this.patch({ error: this.errorMessage(err, fallbackMessage) })
     });

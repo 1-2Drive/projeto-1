@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, input, signal, untracked } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { ApiSimulationSnapshot, ApiTimelineEntry } from '../../core/models/api.models';
+import { output } from '@angular/core';
 
 /** Snapshots arrive every engine tick; the panel only repaints at this cadence so it stays readable. */
 const REFRESH_INTERVAL_MS = 1000;
@@ -22,6 +23,8 @@ type TimelineFilter = 'IMPORTANT' | 'ALL' | TimelineTag;
 })
 export class RuleTimelineComponent {
   readonly snapshot = input<ApiSimulationSnapshot | null>(null);
+  readonly inspectDecision = output<number>();
+  readonly historySession = input<string | null>(null);
 
   protected readonly eventTypes: TimelineFilter[] = ['IMPORTANT', 'ALL', 'PERCEPTION', 'RULE', 'DECISION', 'MANEUVER', 'ACTUATOR', 'FACT'];
   protected readonly selectedType = signal<TimelineFilter>('IMPORTANT');
@@ -114,5 +117,11 @@ export class RuleTimelineComponent {
 
   protected isImportant(type: string): boolean {
     return ['PERCEPTION_CHANGE', 'RULE_FIRED', 'DECISION', 'ACTUATOR', 'MANEUVER'].includes(type.toUpperCase());
+  }
+
+  protected selectEntry(entry: ApiTimelineEntry): void {
+    if (entry.type === 'DECISION' || entry.type === 'MANEUVER' || entry.type === 'PERCEPTION_CHANGE') {
+      this.inspectDecision.emit(entry.timestamp);
+    }
   }
 }

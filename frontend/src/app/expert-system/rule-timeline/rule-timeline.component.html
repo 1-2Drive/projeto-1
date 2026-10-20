@@ -24,7 +24,7 @@
 
   <div class="stream" [class.stream--frozen]="frozen()">
     @for (entry of filteredEntries(); track $index) {
-      <article class="entry" [class]="'entry entry--' + tagFor(entry.type).toLowerCase()">
+      <article class="entry" [class]="'entry entry--' + tagFor(entry.type).toLowerCase()" [class.entry--inspectable]="entry.type === 'DECISION' || entry.type === 'MANEUVER' || entry.type === 'PERCEPTION_CHANGE'" [attr.role]="entry.type === 'DECISION' || entry.type === 'MANEUVER' || entry.type === 'PERCEPTION_CHANGE' ? 'button' : null" [attr.tabindex]="entry.type === 'DECISION' || entry.type === 'MANEUVER' || entry.type === 'PERCEPTION_CHANGE' ? 0 : null" (click)="selectEntry(entry)" (keydown.enter)="selectEntry(entry)">
         <div class="entry__rail">
           <span class="entry__dot"></span>
         </div>

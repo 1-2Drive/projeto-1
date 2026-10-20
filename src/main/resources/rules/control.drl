@@ -8,17 +8,14 @@ import com.one2drive.projeto1.decision.DecisionContext
 //   decision    the driving rules (fuzzy weather and the move-off state included), which
 //               propose decisions;
 //   fallback    the two baseline proposals of defaults.drl, once every other rule has had
-//               its say.
-// This meta-rule runs first in every cycle (the DecisionContext is updated when a cycle
-// begins) and stacks the phases so they run in that order: the agenda fires the group on top
-// of the focus stack until it is empty, then the next one. Within a phase, salience still
-// orders the rules as before.
+//               its say. The API wrapper sets these agenda groups once per cycle; this rule
+//               is the explicit control phase and is kept out of MAIN to avoid a late repeat.
 rule "Control: perceive, then decide, then fall back"
+agenda-group "control"
 salience 10000
+no-loop true
 when
-    DecisionContext()
+    $ctx : DecisionContext(controlDispatched == false)
 then
-    drools.setFocus("fallback");
-    drools.setFocus("decision");
-    drools.setFocus("perception");
+    modify($ctx) { setControlDispatched(true) }
 end

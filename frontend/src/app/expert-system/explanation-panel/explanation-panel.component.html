@@ -43,6 +43,85 @@
     } @else {
       <p class="empty">No evidence recorded for this decision yet.</p>
     }
+
+    <section class="history" data-testid="session-history">
+      <header class="why__head">
+        <h3>Session history</h3>
+        <button type="button" (click)="refreshSessions()">Refresh</button>
+      </header>
+      @if (sessions().length) {
+        <label class="history__label">Completed trip
+          <select data-testid="session-select" #session [value]="selectedSession()?.id ?? ''" (change)="openSession(session.value)">
+            <option value="">Select a saved session</option>
+            @for (item of sessions(); track item.id) {
+              <option [value]="item.id">{{ sessionLabel(item) }}</option>
+            }
+          </select>
+        </label>
+      } @else {
+        <p class="empty">{{ loadingHistory() ? 'Loading saved sessions…' : 'No completed sessions yet. Press STOP to save a trip.' }}</p>
+      }
+
+      @if (selectedSession(); as sessionDetail) {
+        <p class="history__meta">{{ sessionDetail.vehicleSamples.length }} vehicle samples · {{ sessionDetail.events.length }} events · {{ sessionDetail.decisionSnapshots.length }} explanation snapshots · {{ sessionDetail.durationMillis / 1000 | number:'1.1-1' }}s</p>
+        @if (decisions().length) {
+          <label class="history__label">Decision / event
+            <select data-testid="decision-select" #decision (change)="chooseDecision(+$any(decision.value))">
+              @for (item of decisions(); track item.simulationTimeMillis) {
+                <option [value]="item.simulationTimeMillis">{{ formatTime(item.simulationTimeMillis) }} · {{ item.decision.action }} · {{ item.decision.reason }}</option>
+              }
+            </select>
+          </label>
+        }
+
+        @if (selectedDecision(); as item) {
+          <article class="history__decision" data-testid="historical-decision">
+            <h4>{{ formatSessionTime(item.simulationTimeMillis) }} · {{ item.decision.action }} (simulation clock {{ formatTime(item.simulationTimeMillis) }})</h4>
+            <p>{{ item.vehicle.speedKmh | number:'1.0-1' }} km/h · {{ item.vehicle.lane }} lane · {{ item.vehicle.positionMeters | number:'1.1-1' }} m</p>
+            <p><strong>Selected rule:</strong> <code>{{ item.decision.sourceRule }}</code></p>
+            <p><strong>Actuator:</strong> {{ item.decision.actuatorResult }}</p>
+            <p><strong>OBSERVATION:</strong> {{ item.sensors.frontCamera.detections.length ? item.sensors.frontCamera.detections[0].label + ' at ' + (item.sensors.frontCamera.detections[0].distanceMeters | number:'1.1-1') + ' m' : 'See recorded sensor facts below' }}</p>
+            <p><strong>ALTERNATIVES:</strong> {{ item.decision.proposals.length }} rule proposal(s) and {{ item.decision.laneChecks.length }} recorded lane checks</p>
+            <h4>Observations</h4>
+            <ul>
+              @for (event of item.timeline; track $index) {
+                @if (event.type === 'PERCEPTION_CHANGE' || event.type === 'FACT_INSERTED') { <li>{{ event.type }} · {{ event.message }}</li> }
+              }
+            </ul>
+            <h4>Working Memory at this decision</h4>
+            <ul class="history__facts">
+              @for (fact of item.workingMemory; track $index) { <li><code>{{ fact.type }}</code> · {{ fact.value }}</li> }
+            </ul>
+            <h4>Rule evaluation and alternatives</h4>
+            <ul>
+              @for (proposal of item.decision.proposals; track $index) {
+                <li><code>{{ proposal.rule }}</code> proposed {{ proposal.action }} — {{ proposal.outcome }}{{ proposal.detail ? ': ' + proposal.detail : '' }}. {{ proposal.conditions }}</li>
+              }
+              @for (check of item.decision.laneChecks; track check.side) {
+                <li>{{ check.side }} lane safety — {{ check.allowed ? 'available' : check.explanation }}</li>
+              }
+            </ul>
+          </article>
+        }
+
+        @if (decisions().length) {
+          <div class="history__modes" role="group" aria-label="Explanation mode">
+            <button type="button" data-testid="history-why-mode" [class.is-selected]="mode() === 'WHY'"
+                    [attr.aria-pressed]="mode() === 'WHY'" (click)="setMode('WHY')">WHY</button>
+            <button type="button" data-testid="history-why-not-mode" [class.is-selected]="mode() === 'WHY_NOT'"
+                    [attr.aria-pressed]="mode() === 'WHY_NOT'" (click)="setMode('WHY_NOT')">WHY NOT</button>
+            <button type="button" data-testid="history-how-mode" [class.is-selected]="mode() === 'HOW'"
+                    [attr.aria-pressed]="mode() === 'HOW'" (click)="setMode('HOW')">HOW</button>
+          </div>
+        }
+        @if (answer(); as result) {
+          <article class="history__answer" data-testid="why-answer">
+            <h4>{{ formatTime(result.timestampMillis) }} · {{ result.engine }}</h4>
+            <app-decision-explanation [answer]="result" [mode]="mode()" />
+          </article>
+        }
+      }
+    </section>
   </section>
 } @else {
   <section class="why">

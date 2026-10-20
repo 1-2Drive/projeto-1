@@ -2,7 +2,7 @@ import { fakeAsync, TestBed, tick } from '@angular/core/testing';
 import { SimulationStateService } from './simulation-state.service';
 import { BackendApiService } from '../api/backend-api.service';
 import { RealtimeStreamService } from '../websocket/realtime-stream.service';
-import { Observable, of, Subject } from 'rxjs';
+import { Observable, of, Subject, throwError } from 'rxjs';
 
 class BackendApiServiceMock {
   getState() {
@@ -64,7 +64,7 @@ class BackendApiServiceMock {
   }
 
   stopSimulation() {
-    return of({ success: true, message: 'ok' });
+    return of({ success: true, message: 'ok', sessionId: 'saved-session' as string | null });
   }
 
   resetSimulation() {
@@ -229,5 +229,49 @@ describe('SimulationStateService', () => {
 
     service.switchBackend('PROLOG');
     expect(service.error()).toBe('swipl not found');
+  });
+
+  it('opens the just-stopped persisted session after STOP succeeds', () => {
+    service.initialize();
+    service.stop();
+
+    expect(service.stoppedSessionId()).toBe('saved-session');
+    expect(service.connection().simulationStatus).toBe('STOPPED');
+    expect(service.stopPersistenceError()).toBeNull();
+  });
+
+  it('does not open a query popup when session persistence fails', () => {
+    const api = TestBed.inject(BackendApiService) as unknown as BackendApiServiceMock;
+    spyOn(api, 'stopSimulation').and.returnValue(of({
+      success: false,
+      message: 'Simulation stopped, but the session could not be saved. Historical WHY/WHY-NOT is unavailable for this trip.',
+      sessionId: null
+    }));
+    service.initialize();
+    service.stop();
+
+    expect(service.stoppedSessionId()).toBeNull();
+    expect(service.stopPersistenceError()).toContain('could not be saved');
+  });
+
+  it('does not delete completed session history when RESET is requested', () => {
+    service.initialize();
+    service.stop();
+    service.reset();
+
+    expect(service.stoppedSessionId()).toBe('saved-session');
+  });
+
+  it('reports persistence failure returned as an HTTP error while leaving simulation stopped', () => {
+    const api = TestBed.inject(BackendApiService) as unknown as BackendApiServiceMock;
+    spyOn(api, 'stopSimulation').and.returnValue(throwError(() => ({
+      error: { message: 'Simulation stopped, but the session could not be saved.' }
+    })));
+    service.initialize();
+    service.stop();
+
+    expect(service.stoppedSessionId()).toBeNull();
+    expect(service.connection().simulationStatus).toBe('STOPPED');
+    expect(service.stopPersistenceError()).toContain('could not be saved');
   });
 });

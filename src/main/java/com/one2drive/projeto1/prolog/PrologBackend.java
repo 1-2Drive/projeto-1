@@ -27,7 +27,7 @@ import java.util.function.Consumer;
 public class PrologBackend implements ExpertSystemBackend {
     private final SimulationConfig config;
     private final PrologKnowledgeSession session;
-    private final ExplanationTrace trace = new ExplanationTrace(500);
+    private final ExplanationTrace trace = new ExplanationTrace(0);
     private final DecisionContext context = new DecisionContext();
     private final DrivingDecision decision = new DrivingDecision();
     private final Consumer<DrivingDecision> decisionConsumer;

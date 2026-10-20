@@ -28,6 +28,15 @@ public class SessionExplanationService {
             .toList();
         List<SessionSnapshot> timeCandidates = matching;
         matching = matching.stream().filter(s -> relevant(s, q)).toList();
+        if (matching.isEmpty() && asksWhyNot(q) && (q.contains("left") || q.contains("right"))) {
+            // No decision ever chose the asked-about direction: fall back to the decision where the
+            // ACTUAL opposite-direction lane change happened, which is the most relevant real context
+            // for "why not X instead" rather than an arbitrary chronologically-last snapshot.
+            String opposite = q.contains("left") ? "right" : "left";
+            matching = timeCandidates.stream()
+                .filter(s -> s.decision().action().toLowerCase(Locale.ROOT).contains(opposite))
+                .toList();
+        }
         if (matching.isEmpty() && requestedTime != null) {
             matching = timeCandidates;
         }
@@ -161,16 +170,22 @@ public class SessionExplanationService {
 
     private boolean relevant(SessionSnapshot snapshot, String question) {
         String action = snapshot.decision().action().toLowerCase(Locale.ROOT);
+        String reason = snapshot.decision().reason().toLowerCase(Locale.ROOT);
+        boolean genericLaneChange = question.contains("lane") && !question.contains("left") && !question.contains("right")
+            && (question.contains("chang") || question.contains("mov") || question.contains("avoid") || question.contains("overtak"));
+        boolean asksOvertake = question.contains("overtak");
         boolean asksAction = question.contains("left") || question.contains("right") || question.contains("lane")
             || question.contains("brake") || question.contains("stop") || question.contains("accelerat")
-            || question.contains("speed") || question.contains("reduce");
+            || question.contains("speed") || question.contains("reduce") || asksOvertake;
         boolean actionMatches = (!question.contains("left") || action.contains("left"))
             && (!question.contains("right") || action.contains("right"))
             && (asksWhyNot(question) || !question.contains("brake") || action.contains("brake"))
             && (!question.contains("stop") || action.contains("stop"))
             && (!question.contains("accelerat") || action.contains("accelerat"))
             && (!question.contains("reduce") || action.contains("reduce"))
-            && (!(question.contains("speed") && !question.contains("reduce")) || action.contains("speed") || action.contains("accelerat"));
+            && (!(question.contains("speed") && !question.contains("reduce")) || action.contains("speed") || action.contains("accelerat"))
+            && (!genericLaneChange || action.contains("change_lane"))
+            && (!asksOvertake || (action.contains("change_lane_left") && reason.contains("overtak")));
         if (asksAction && !actionMatches && !asksWhyNot(question)) return false;
         if (question.contains("left") && !action.contains("left")) return false;
         if (question.contains("right") && !action.contains("right")) return false;
@@ -179,8 +194,7 @@ public class SessionExplanationService {
         }
         if (question.contains("pothole")) {
             return snapshot.decision().reason().toLowerCase(Locale.ROOT).contains("pothole")
-                || snapshot.decision().evidence().stream().anyMatch(e -> e.toLowerCase(Locale.ROOT).contains("pothole"))
-                || snapshot.workingMemory().stream().anyMatch(f -> f.value().toLowerCase(Locale.ROOT).contains("pothole"));
+                || snapshot.decision().evidence().stream().anyMatch(e -> e.toLowerCase(Locale.ROOT).contains("pothole"));
         }
         return true;
     }

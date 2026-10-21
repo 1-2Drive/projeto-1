@@ -134,8 +134,10 @@ public final class DecisionFlowchart {
         speed("L10", "10", "Is it raining, with 2 or more TTC readings below 3 s in the last 2 s?",
             "Brake to 15 km/h", "No persistent low TTC in the rain", Perception.WEATHER, false,
             List.of("Persistent low TTC in rain increases conservatism"), List.of()),
-        speed("L12", "12", "Is a pothole in the vehicle's lane 40 m or less ahead, with no safe side to avoid it?",
-            "Slow to 30 km/h (20 km/h over the last 15 m)", "No unavoidable pothole ahead",
+        speed("L12", "12", "Is a pothole in the vehicle's path close enough to need slowing down (at least 40 m), "
+                + "with no safe side to go around it yet?",
+            "Slow to 30 km/h by the pothole (20 km/h over the last 15 m; hard if it is severe and comfort no longer gets there)",
+            "No pothole ahead to slow down for",
             Perception.POTHOLE, false, List.of("Pothole ahead reduce speed"), List.of()),
         speed("L14", "14", "Is an open barrier 35 m or less ahead?",
             "Pass it at up to 35 km/h", "No open barrier ahead", Perception.NONE, true,

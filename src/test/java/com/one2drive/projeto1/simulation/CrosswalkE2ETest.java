@@ -78,6 +78,26 @@ class CrosswalkE2ETest {
     }
 
     @Test
+    @DisplayName("the road view gets the pedestrian's lateral position, so it is drawn walking across the lanes")
+    void roadItemsCarryThePedestrianLateralPosition() {
+        SimulationEngine engine = runningEngine();
+        String pedestrianId = addPedestrian(engine, 60.0);
+        for (int i = 0; i < 5; i++) {
+            engine.tick();
+        }
+
+        double lateral = ((com.one2drive.projeto1.domain.Pedestrian) engine.getWorldState()
+            .findActorById(pedestrianId).orElseThrow()).getLateralPositionMeters();
+        RoadRenderItem item = engine.getAllRoadItemsRelativeToEgo().stream()
+            .filter(candidate -> candidate.id().equals(pedestrianId)).findFirst().orElseThrow();
+        assertEquals(lateral, item.lateralPositionMeters(), 1e-9);
+        assertTrue(lateral > Lane.LEFT.centreMeters(), "it has left the left lane centre: " + lateral);
+        assertTrue(crosswalks(engine).stream().allMatch(crosswalk -> engine.getAllRoadItemsRelativeToEgo().stream()
+            .filter(candidate -> candidate.id().equals(crosswalk.getId()))
+            .allMatch(candidate -> candidate.lateralPositionMeters() == null)), "road elements carry none");
+    }
+
+    @Test
     @Timeout(60)
     @DisplayName("the crosswalk outlives the pedestrian and only leaves once far behind the car")
     void crosswalkStaysAfterThePedestrianHasCrossed() {

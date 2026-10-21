@@ -583,5 +583,29 @@ describe('RoadCanvasComponent', () => {
       expect(crosswalkLeft()).not.toBeNull();
       expect(crosswalkLeft()!).toBeLessThan(atCrossing!);
     });
+
+    it('draws a pedestrian where it is across the road, not at its lane centre', () => {
+      const host = fixture.nativeElement as HTMLElement;
+      const topAt = (lateralPositionMeters: number) => {
+        fixture.componentRef.setInput('snapshot', pedestrianSnapshot(1000, 90,
+          [crosswalk(90), { ...pedestrian(90), lateralPositionMeters }]));
+        fixture.detectChanges();
+        return parseFloat((host.querySelector('[data-testid="road-pedestrian"]') as HTMLElement).style.top);
+      };
+      // 25% of the road per 3.5 m lane, centre line at 50%.
+      expect(topAt(-3.5)).toBeCloseTo(25, 1);
+      expect(topAt(-1.0)).toBeCloseTo(50 - 1.0 / 3.5 * 25, 1);
+      expect(topAt(2.0)).toBeCloseTo(50 + 2.0 / 3.5 * 25, 1);
+    });
+
+    it('draws a pedestrian on the middle of its crosswalk, not where it stands in the map block', () => {
+      const host = fixture.nativeElement as HTMLElement;
+      // The crosswalk is at the start of its 5 m block, the pedestrian 3 m into it.
+      fixture.componentRef.setInput('snapshot', pedestrianSnapshot(1000, 90,
+        [crosswalk(90), { ...pedestrian(90), positionMeters: 13, worldPositionMeters: 103 }]));
+      fixture.detectChanges();
+      const left = parseFloat((host.querySelector('[data-testid="road-pedestrian"]') as HTMLElement).style.left);
+      expect(left).toBeCloseTo(crosswalkLeft()!, 3);
+    });
   });
 });

@@ -383,7 +383,8 @@ public class SimulationEngine implements AutoCloseable {
                 entry.getTimestamp(), entry.getType().name(), entry.getMessage())).toList();
         List<com.one2drive.projeto1.api.model.ApiRoadElement> objects = getAllRoadItemsRelativeToEgo().stream()
             .map(item -> new com.one2drive.projeto1.api.model.ApiRoadElement(item.id(), item.type(),
-                item.positionMeters(), item.lane(), item.details(), item.worldPositionMeters())).toList();
+                item.positionMeters(), item.lane(), item.details(), item.worldPositionMeters(),
+                item.lateralPositionMeters())).toList();
         List<com.one2drive.projeto1.api.model.ApiWorkingMemoryRow> facts = backend.factViews().stream()
             .map(fact -> new com.one2drive.projeto1.api.model.ApiWorkingMemoryRow(
                 fact.type(), fact.value(), fact.source(), fact.timestamp(), fact.stream())).toList();
@@ -1136,7 +1137,8 @@ public class SimulationEngine implements AutoCloseable {
 
     public synchronized List<com.one2drive.projeto1.api.model.ApiRoadElement> currentWorldDescription() {
         return getAllRoadItemsRelativeToEgo().stream().map(item -> new com.one2drive.projeto1.api.model.ApiRoadElement(
-            item.id(), item.type(), item.positionMeters(), item.lane(), item.details(), item.worldPositionMeters())).toList();
+            item.id(), item.type(), item.positionMeters(), item.lane(), item.details(), item.worldPositionMeters(),
+            item.lateralPositionMeters())).toList();
     }
 
     public synchronized Set<String> getDemoEvidence() {
@@ -1163,7 +1165,7 @@ public class SimulationEngine implements AutoCloseable {
         List<RoadRenderItem> items = new ArrayList<>();
         worldState.getRoadElements().forEach(element -> addRoadItem(items, element.getClass().getSimpleName(),
             element.getId(), element.getPositionMeters(), element.getLane(), element.toString(),
-            length, behindWindow, forwardMeters));
+            null, length, behindWindow, forwardMeters));
         worldState.getActors().forEach(actor -> {
             if (actor instanceof com.one2drive.projeto1.domain.OtherVehicle) {
                 // Vehicles are positioned by metres travelled, not around the loop.
@@ -1174,20 +1176,24 @@ public class SimulationEngine implements AutoCloseable {
                 }
                 return;
             }
+            // A pedestrian walks across the lanes, so the view draws it where it is.
+            Double lateral = actor instanceof com.one2drive.projeto1.domain.Pedestrian pedestrian
+                ? pedestrian.getLateralPositionMeters() : null;
             addRoadItem(items, actor.getClass().getSimpleName(),
                 actor.getId(), actor.getPositionMeters(), actor.getLane(), actor.toString(),
-                length, behindWindow, forwardMeters);
+                lateral, length, behindWindow, forwardMeters);
         });
         return items;
     }
 
     private void addRoadItem(List<RoadRenderItem> items, String type, String id, double positionMeters, Lane lane,
-                             String details, double length, double behindWindow, double forwardMeters) {
+                             String details, Double lateralMeters, double length, double behindWindow,
+                             double forwardMeters) {
         double ahead = worldState.distanceAhead(positionMeters);
         double relative = ahead >= length - behindWindow ? ahead - length : ahead;
         if (relative >= -behindWindow && relative <= forwardMeters) {
             double worldPositionMeters = worldState.getEgo().getPositionMeters() + relative;
-            items.add(new RoadRenderItem(type, id, relative, lane.name(), details, worldPositionMeters));
+            items.add(new RoadRenderItem(type, id, relative, lane.name(), details, worldPositionMeters, lateralMeters));
         }
     }
 

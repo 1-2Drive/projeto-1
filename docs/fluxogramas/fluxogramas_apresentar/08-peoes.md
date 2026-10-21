@@ -13,7 +13,7 @@ flowchart TD
     Q1 -- "Não" --> Q2{"Está a atravessar a estrada?"}
     Q2 -- "Não" --> A0["Apenas o vigia"]
     Q2 -- "Sim" --> Q3{"Distância ao peão"}
-    Q3 -- "≤ 6 m" --> A3["Travagem de emergência"]
+    Q3 -- "≤ 6 m, ou a travagem confortável<br/>(2,8 m/s²) já não pára 6 m antes" --> A3["Travagem de emergência"]
     Q3 -- "6 m a 32 m" --> A2["Pára antes do peão"]
     Q3 -- "> 32 m" --> Q4{"O carro está parado (menos de 1 km/h)<br/>e o peão a atravessar a 45 m ou menos?"}
     Q4 -- "Sim" --> A4["Fica parado à espera"]
@@ -47,6 +47,7 @@ O carro lembra-se de que já começou a travar por um peão: trava até ficar ab
 | Peão que saiu da faixa do carro mas ainda está a atravessar | Continua parado até ele chegar ao passeio |
 | Peão parado no passeio ou noutra faixa, sem atravessar | Apenas o vigia |
 | Peão a 6 m ou menos | Travagem de emergência |
+| Peão visto tarde: a 90 km/h, a 90 m (travar com conforto precisaria de 110 m) | Travagem de emergência logo, sem esperar pelos 6 m |
 | Peão a atravessar à frente de outro carro | O outro carro também pára e espera; depois retoma (comportamento dos outros veículos na simulação) |
 
 O peão tem prioridade sobre o semáforo verde e sobre a aproximação a um semáforo ou STOP.

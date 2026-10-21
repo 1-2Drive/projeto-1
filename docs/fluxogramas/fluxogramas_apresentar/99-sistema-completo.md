@@ -19,7 +19,7 @@ flowchart TD
         V08A -- "Sim" --> V08D
         V08A -- "Não" --> V08B{"Há um peão a atravessar a estrada?"}
         V08B -- "Sim" --> V08D{"Distância ao peão"}
-        V08D -- "≤ 6 m" --> EMERG
+        V08D -- "≤ 6 m, ou a travagem confortável<br/>já não pára 6 m antes" --> EMERG
         V08D -- "6 m a 32 m" --> V08P["Pára antes do peão e espera<br/>que ele termine a travessia"]
         V08D -- "> 32 m" --> V08L["Abranda a tempo para parar 18 m antes,<br/>sem voltar a acelerar"]
         V08B -- "Não" --> V13G{"13 · Obstáculo grave a 8 m ou menos,<br/>na faixa onde o carro está mesmo agora?"}
@@ -42,10 +42,10 @@ flowchart TD
         V07 -- "Sim" --> V07Q{"Há quanto tempo está parado na linha?"}
         V07Q -- "< 1,2 s, ou ainda não parou" --> V07S["Abranda e pára na linha;<br/>trava a fundo se a travagem confortável<br/>passasse mais de 3 m (mesmo com a linha já para trás)"]
         V07Q -- "≥ 1,2 s" --> V14
-        V07 -- "Não" --> V14{"14 · Barreira fechada na faixa, dentro da distância<br/>de paragem confortável (mín. 55 m)?"}
+        V07 -- "Não" --> V14{"14 · Barreira fechada no caminho do carro, dentro<br/>da distância de paragem confortável (mín. 55 m)?"}
         V14 -- "Sim" --> V14B{"Posso mudar para algum lado? (00)"}
         V14B -- "Não" --> V14S["Pára antes da barreira<br/>(a fundo se precisar de mais de 3,1 m/s²)"]
-        V14B -- "Sim: contorna" --> V13
+        V14B -- "Sim: contorna" --> V14T["Trava para conseguir parar 10 m antes<br/>até a mudança de faixa a tirar do caminho<br/>(a fundo se precisar de mais de 3,1 m/s²)"]
         V14 -- "Não" --> V13{"13 · Obstáculo na faixa, dentro da distância<br/>de paragem confortável (mín. 60 m)?"}
         V13 -- "Sim" --> V13B{"Já começou a sair da faixa?"}
         V13B -- "Não" --> V13S["Trava para conseguir parar 10 m antes<br/>(a fundo se precisar de mais de 3,1 m/s²)"]
@@ -109,6 +109,7 @@ flowchart TD
         VRF --> DV
         V07S --> DV
         V14S --> DV
+        V14T --> DV
         V13S --> DV
         VMIN --> DV
         DV(["Decisão de velocidade<br/>(uma paragem obrigatória decide a ação;<br/>um limite mais baixo pode reduzir a velocidade)"])
@@ -184,7 +185,7 @@ flowchart TD
     class OBS,PER passo
     class V10,V10B,V08A,V08B,V08D,V13G,VS,VR,VR3,VA,V07,V07Q,V14,V14B,V13,V13B,L01,L01B,L09,L09Q,L10,L10B,L12,L12B,L14,L18,R04,R04B,R03,R03B,R03C dec
     class FE,F16,F13,F13Q,F14,F14Q,F12,F12Q,F11,F11Q,F11B,F15,F15Q,F17,F17Q,G1,G2,G2B dec
-    class V08P,V08L,VRM,VRS,VAP,V07S,V14S,V13S,L01A,L01C,L09P,L09A,L09B,L09C,L10A,L12A,L14A,L18A,R04A,R03A,R03D,R00,VMIN acao
+    class V08P,V08L,VRM,VRS,VAP,V07S,V14S,V14T,V13S,L01A,L01C,L09P,L09A,L09B,L09C,L10A,L12A,L14A,L18A,R04A,R03A,R03D,R00,VMIN acao
     class FK,F16A,F13A,F14A,F12A,F11A,F11C,F15A,F17A,G4,G5 acao
     class EMERG,VRF,G3 forte
     class INI,V0,F0,DV,DF,NEXT fim

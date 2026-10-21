@@ -230,7 +230,8 @@ public class ApiModelMapper {
     }
 
     private ApiRoadElement mapRoadItem(RoadRenderItem item) {
-        return new ApiRoadElement(item.id(), item.type(), item.positionMeters(), item.lane(), item.details(), item.worldPositionMeters());
+        return new ApiRoadElement(item.id(), item.type(), item.positionMeters(), item.lane(), item.details(),
+            item.worldPositionMeters(), item.lateralPositionMeters());
     }
 
     private ApiWorkingMemoryRow mapWorkingMemory(WorkingMemoryFactView view) {

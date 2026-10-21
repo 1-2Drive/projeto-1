@@ -30,6 +30,8 @@ export interface ApiRoadElement {
   lane: 'LEFT' | 'CENTER' | 'RIGHT';
   details: string;
   worldPositionMeters?: number;
+  /** Metres from the centre line for a pedestrian, which walks across the lanes; null otherwise. */
+  lateralPositionMeters?: number | null;
 }
 
 export interface ApiWorkingMemoryRow {

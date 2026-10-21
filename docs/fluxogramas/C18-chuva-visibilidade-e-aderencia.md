@@ -136,7 +136,7 @@ O sensor de ambiente lê a cada 400 ms e publica um `WeatherEvent` (condição, 
 | Elemento | Local |
 |---|---|
 | Regras Drools | `src/main/resources/rules/fuzzy-weather.drl` |
-| Regras Prolog (mesmos nomes) | `src/main/prolog/driving_rules.pl:1342-1421` (secção "Condições meteorológicas"); funções de pertença e centróide em "Lógica difusa" (`driving_rules.pl:2186`, `fuzzy_input_degrees/5`, `fuzzy_speed_ceiling/2`) |
+| Regras Prolog (mesmos nomes) | `src/main/prolog/driving_rules.pl:1353-1433` (secção "Condições meteorológicas"); funções de pertença e centróide em "Lógica difusa" (`driving_rules.pl:2213`, `fuzzy_input_degrees/5`, `fuzzy_speed_ceiling/2`) |
 | Conjuntos e centróide | `drools/FuzzySupport.java` |
 | Factos | `drools/facts/FuzzyMembership.java`, `drools/facts/FuzzyConclusion.java`, `drools/facts/WeatherStateFact.java` |
 | Endpoint | `EnvironmentController.java` |

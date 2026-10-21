@@ -37,7 +37,7 @@ main :-
         fail
     ).
 
-% Every request gets a reply, also when it fails: Java is waiting for it.
+% Todos os pedidos recebem resposta, mesmo quando falham: o Java está à espera dela.
 handle_line(Line) :-
     (   catch(( atom_json_dict(Line, Request, [value_string_as(atom)]),
                 reply(Request.cmd, Request, Reply0)
@@ -119,12 +119,12 @@ proposal_json(Id, _{rule: Rule, action: Action, speedKmh: Speed, risk: Risk, pri
     wm_support(Id, Rule, Support),
     upcase_atom(A, Action),
     upcase_atom(R, Risk),
-    (   Speed0 == no_target -> Speed = null ; Speed is float(Speed0) ),   % null: NaN in Java
+    (   Speed0 == no_target -> Speed = null ; Speed is float(Speed0) ),   % null: NaN em Java
     priority_value(Priority, Value),
     maplist(evidence_text, Support, Evidence).
 
-% The evidence of a proposal: the facts it rests on, each with the rule that concluded it when
-% it does not come from perception, and the negated patterns that held.
+% A evidência de uma proposta: os factos em que assenta, cada um com a regra que o concluiu
+% quando não vem da perceção, e os padrões negados que se verificaram.
 evidence_text(not(Pattern), Text) :- !,
     format(atom(Text), 'not ~w', [Pattern]).
 evidence_text(Id, Text) :-
@@ -134,7 +134,8 @@ evidence_text(Id, Text) :-
     ;   format(atom(Text), '~w', [Fact])
     ).
 
-% "Why not change lane?": each sub-goal of safe_to_change_lane/1, proved on its own.
+% "Porque não mudar de faixa?": cada subobjetivo de safe_to_change_lane/1, provado
+% isoladamente.
 lane_check_json(Side, _{side: Side, subGoals: Goals}) :-
     subgoal_results(safe_to_change_lane(Side), Results),
     findall(_{goal: Name, holds: Holds}, ( member(Goal-Holds, Results), functor(Goal, Name, _) ), Goals).

@@ -75,8 +75,9 @@ rule('Emergency stop for pedestrian extremely close',
      [ assert(proposal(emergency_brake, 0.0, critical, emergency_safety,
                        'Pedestrian critical distance in current path')) ]).
 
-% The approach curve and the mandatory stop brake comfortably; a pedestrian first seen when
-% only hard braking still stops 6 m short of it needs the hard braking now, not at 6 m.
+% A curva de aproximação e a paragem obrigatória travam com conforto; um peão visto pela primeira
+% vez quando só uma travagem forte ainda para 6 m antes dele precisa dessa travagem forte já, e
+% não aos 6 m.
 rule('Emergency brake for pedestrian when comfortable braking no longer stops in time',
      879,
      [ pedestrian_conflict(P),
@@ -87,9 +88,9 @@ rule('Emergency brake for pedestrian when comfortable braking no longer stops in
      [ assert(proposal(emergency_brake, 0.0, critical, emergency_safety,
                        'Pedestrian ahead; comfortable braking no longer stops short of it')) ]).
 
-% Only a reading from the last 300 ms counts, and only in the lane the vehicle is physically
-% in: steering out of the obstacle's lane, it is past the obstacle once its lateral position
-% has left that lane, even while the committed lane (settled after the actuator) is the old one.
+% Só conta uma leitura dos últimos 300 ms, e só na faixa em que o veículo está fisicamente: ao
+% desviar-se da faixa do obstáculo, fica para lá dele assim que a sua posição lateral sai dessa
+% faixa, mesmo enquanto a faixa assumida (fixada depois do atuador) ainda é a antiga.
 rule('Emergency braking for high severity obstacle at critical distance',
      870,
      [ obstacle_sample(_, D, high, Lane, Age),
@@ -101,9 +102,10 @@ rule('Emergency braking for high severity obstacle at critical distance',
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Peões
 
-% Intermediate knowledge: Drools writes "inPath == true || crossingState == CROSSING" in each
-% rule; here the disjunction is a conclusion of its own, with one rule per branch. Precedence
-% above every reader, so rules that require no conflict never fire before it is known.
+% Conhecimento intermédio: o Drools escreve "inPath == true || crossingState == CROSSING" em cada
+% regra; aqui a disjunção é uma conclusão própria, com uma regra por ramo. Precedência acima de
+% todos os leitores, para que as regras que exigem a ausência de conflito nunca disparem antes de
+% ele ser conhecido.
 rule('Pedestrian conflicts with trajectory (in path)',
      1000,
      [ pedestrian_in_path(P) ],
@@ -122,11 +124,11 @@ rule('Stop for pedestrian in crossing zone',
      [ assert(proposal(stop, 0.0, high, legal_mandatory_stop,
                        'Pedestrian detected in trajectory')) ]).
 
-% The approach phase (pedestrian_braking/2, Drools' PedestrianBrakingState: none, braking,
-% holding) is settled before the proposal of the cycle: braking starts above the 2.0 m/s2
-% curve that ends 18 m before the pedestrian and only ends below the 1.4 m/s2 curve, where
-% the vehicle holds its speed until the upper curve catches it again; the approach is over
-% once no pedestrian is approached any more (gone, no conflict, or within the 32 m stop zone).
+% A fase de aproximação (pedestrian_braking/2, o PedestrianBrakingState do Drools: none, braking,
+% holding) fica decidida antes da proposta do ciclo: a travagem começa acima da curva de 2,0 m/s2
+% que termina 18 m antes do peão e só termina abaixo da curva de 1,4 m/s2, onde o veículo mantém
+% a velocidade até a curva superior o voltar a apanhar; a aproximação acaba quando já não há
+% nenhum peão de que se aproxime (desapareceu, sem conflito, ou dentro da zona de paragem de 32 m).
 rule('Start braking for pedestrian above the braking curve',
      607,
      [ pedestrian_braking_state(Phase, _),
@@ -156,7 +158,7 @@ rule('End the pedestrian approach once no pedestrian is approached',
        not(test(pedestrian_approached(32.0))) ],
      [ assert(pedestrian_approach_over) ]).
 
-% Braking phase: brake.
+% Fase de travagem: travar.
 rule('Brake for pedestrian proximity (brake)',
      605,
      [ pedestrian_conflict(P),
@@ -167,8 +169,8 @@ rule('Brake for pedestrian proximity (brake)',
        test(pedestrian_reason(P, Reason)) ],
      [ assert(proposal(brake, 20.0, high, legal_mandatory_stop, Reason)) ]).
 
-% Holding phase, or between the curves before any braking: hold the speed, never speed up
-% towards the pedestrian.
+% Fase de manutenção, ou entre as curvas antes de qualquer travagem: manter a velocidade, nunca
+% acelerar em direção ao peão.
 rule('Brake for pedestrian proximity (hold speed)',
      605,
      [ pedestrian_conflict(P),
@@ -176,9 +178,9 @@ rule('Brake for pedestrian proximity (hold speed)',
        ego_speed(V),
        test(D > 32.0),
        not(test(pedestrian_phase(braking))),
-       % once/1: a disjunction that holds both ways is one match, not two. The engine keeps
-       % every solution of the conditions as an activation of its own, and with the
-       % dependency index on, a duplicate left in the agenda would fire a second time.
+       % once/1: uma disjunção que se verifica pelos dois ramos é uma correspondência, não duas. O
+       % motor guarda cada solução das condições como uma ativação própria e, com o índice de
+       % dependências ativo, um duplicado deixado na agenda dispararia uma segunda vez.
        test(once(( pedestrian_phase(holding) ; above_pedestrian_curve(V, D, 1.4) ))),
        test(pedestrian_reason(P, Reason)) ],
      [ assert(proposal(maintain_speed, V, moderate, legal_mandatory_stop, Reason)) ]).
@@ -196,8 +198,8 @@ rule('Hold for pedestrian still crossing',
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Semáforos
 
-% The commitment to stop or to proceed is taken once per light and phase, and kept in the
-% state until the light turns green or another light replaces it.
+% O compromisso de parar ou de avançar é tomado uma vez por semáforo e fase, e mantido no
+% estado até o semáforo ficar verde ou outro semáforo o substituir.
 rule('Commit to stop or to proceed at traffic light (red)',
      700,
      [ traffic_light(L, red, _),
@@ -222,7 +224,7 @@ rule('Commit to stop or to proceed at traffic light (yellow, too close)',
        test(D < Needed) ],
      [ assert(light_commitment(L, proceed)) ]).
 
-% Approaching red, decided by the distance needed from the current speed.
+% Aproximação ao vermelho, decidida pela distância necessária a partir da velocidade atual.
 rule('Red traffic light progressive approach (emergency)',
      620,
      [ light_commitment(L, stop),
@@ -292,8 +294,8 @@ rule('Red traffic light requires full stop and hold',
      [ assert(proposal(stop, 0.0, high, legal_mandatory_stop,
                        'Red traffic light; vehicle must remain stopped before the line')) ]).
 
-% Yellow with a commitment to stop: like red, but never an emergency brake, because the
-% commitment was only taken with room for a comfortable stop.
+% Amarelo com compromisso de parar: como o vermelho, mas nunca uma travagem de emergência, porque
+% o compromisso só foi tomado com espaço para uma paragem confortável.
 rule('Yellow traffic light: stop before the line (stop)',
      625,
      [ light_commitment(L, stop),
@@ -354,8 +356,8 @@ rule('Green traffic light releases red-light hold',
 % propostas de velocidade, por isso a ultrapassagem pode começar no mesmo ciclo em que o
 % veículo continua a abrandar atrás do da frente, e isso mantém-se até ter saído da faixa.
 
-% Too close and still closing: brake to 3 km/h below the front vehicle's speed, so the gap
-% reopens instead of merely holding the closing speed.
+% Demasiado perto e ainda a aproximar-se: travar até 3 km/h abaixo da velocidade do veículo da
+% frente, para que a distância volte a abrir em vez de apenas manter a velocidade de aproximação.
 rule('Brake when front vehicle distance low',
      520,
      [ front_vehicle(_, D, Rel),
@@ -365,12 +367,13 @@ rule('Brake when front vehicle distance low',
      [ assert(proposal(brake, Target, high, collision_avoidance,
                        'Front vehicle too close')) ]).
 
-% Art. 18 and 24 CE: the speed from which 2.0 m/s2 still matches the front vehicle's speed
-% 12 m behind it. Only proposes above that speed, because a recommendation above the current
-% speed would make the actuator accelerate. Behind a stopped vehicle, keeps the stop until
-% 2 m past the stopping point, so radar noise does not release it. Inside the 12 m gap behind
-% a moving vehicle, and not opening the gap fast, the curve says nothing (no room left): the
-% vehicle then drives 3 km/h slower than the vehicle ahead until the gap has reopened.
+% Arts. 18.º e 24.º do CE: a velocidade a partir da qual 2,0 m/s2 ainda iguala a velocidade do
+% veículo da frente 12 m atrás dele. Só propõe acima dessa velocidade, porque uma recomendação
+% acima da velocidade atual faria o atuador acelerar. Atrás de um veículo parado, mantém a paragem
+% até 2 m para lá do ponto de paragem, para que o ruído do radar não a liberte. Dentro da distância
+% de 12 m atrás de um veículo em movimento, e sem a distância a abrir depressa, a curva nada diz
+% (já não há espaço): o veículo segue então 3 km/h mais devagar do que o da frente até a distância
+% voltar a abrir.
 rule('Keep safe following distance behind front vehicle (stop)',
      510,
      [ front_vehicle(_, D, Rel),
@@ -413,8 +416,8 @@ rule('Reduce speed when closing front vehicle',
      [ assert(proposal(reduce_speed, Target, moderate, collision_avoidance,
                        'Closing to front vehicle')) ]).
 
-% Trend over the 2 s window, only with the distances of the vehicle followed now: when the
-% radar switches to another vehicle, the jump in distance between the two is no approach.
+% Tendência na janela de 2 s, só com as distâncias do veículo seguido agora: quando o radar muda
+% para outro veículo, o salto de distância entre os dois não é uma aproximação.
 rule('Approaching trend from sliding distance window',
      505,
      [ front_vehicle(Target, D, _),
@@ -426,11 +429,12 @@ rule('Approaching trend from sliding distance window',
      [ assert(proposal(reduce_speed, 35.0, moderate, collision_avoidance,
                        'Front distance trend decreasing quickly')) ]).
 
-% Following a moving vehicle at its speed, just outside the 12 m gap, where no rule above
-% holds unless the ego is closing in: the cruise speed would otherwise drive it at the
-% vehicle ahead and the brake (below 14 m) would take over again, in a loop. Closer than
-% 16 m, 1 km/h less, so the gap settles clear of the brake's 14 m, beyond radar noise. The
-% window reaches 20 m, divided by the grip on low grip (at most twice).
+% Seguir um veículo em movimento à velocidade dele, logo fora da distância de 12 m, onde nenhuma
+% regra acima se aplica a não ser que o ego se esteja a aproximar: de outro modo, a velocidade de
+% cruzeiro levá-lo-ia contra o veículo da frente e a travagem (abaixo de 14 m) voltaria a assumir
+% o controlo, em ciclo. A menos de 16 m, 1 km/h a menos, para que a distância estabilize longe dos
+% 14 m da travagem, para lá do ruído do radar. A janela vai até 20 m, dividida pela aderência
+% quando esta é baixa (no máximo o dobro).
 rule('Follow the front vehicle speed outside the following gap',
      508,
      [ front_vehicle(_, D, Rel),
@@ -445,8 +449,8 @@ rule('Follow the front vehicle speed outside the following gap',
      [ assert(proposal(reduce_speed, Target, moderate, collision_avoidance,
                        'Following the front vehicle at its speed (Art. 18 CE)')) ]).
 
-% Below the 35 km/h the trend rule asks for, that request would make the actuator
-% accelerate towards the vehicle being approached: while really closing in, hold the speed.
+% Abaixo dos 35 km/h que a regra da tendência pede, esse pedido faria o atuador acelerar em direção
+% ao veículo de que se aproxima: enquanto se aproxima de facto, manter a velocidade.
 rule('Hold speed on an approaching trend below its target',
      504,
      [ front_vehicle(Target, D, Rel),
@@ -468,8 +472,8 @@ rule('Hold speed on an approaching trend below its target',
 % overtake_finished), current_overtaking/5 deriva o estado resultante e driving_state.pl
 % guarda-o no fim do ciclo.
 
-% A proposed overtake that never left its lane (another rule won the cycle, or the actuator
-% refused) would stay active for ever. One second is enough for a manoeuvre to begin.
+% Uma ultrapassagem proposta que nunca saiu da sua faixa (outra regra ganhou o ciclo, ou o atuador
+% recusou) ficaria ativa para sempre. Um segundo chega para uma manobra começar.
 rule('Cancel overtaking that never left its original lane',
      540,
      [ overtaking(true, Origin, false, Start, _),
@@ -479,8 +483,8 @@ rule('Cancel overtaking that never left its original lane',
        test(Now - Start > 1000) ],
      [ assert(overtake_cancelled) ]).
 
-% Passed once the ego has left the origin lane, the right lane is clear 80 m ahead (the
-% passed vehicle is no longer there) and the radar no longer has it ahead.
+% Ultrapassado assim que o ego saiu da faixa de origem, a faixa da direita está livre 80 m à frente
+% (o veículo ultrapassado já lá não está) e o radar já não o tem à frente.
 rule('Mark front vehicle passed once it is behind or cleared',
      480,
      [ overtaking(true, Origin, false, _, Target),
@@ -500,18 +504,18 @@ rule('Deactivate overtaking state once return right completes',
        lane_change_state(idle) ],
      [ assert(overtake_finished) ]).
 
-% Art. 35/36 CE: overtake on the left, with the left lane clear. The window to start grows
-% with the closing speed (5.5 s of TTC plus 10 m). A stopped vehicle is only overtaken on
-% the move with that whole margin. Moving left, from CENTER or from RIGHT, is only worth it
-% if the next vehicle in that lane is clearly further away. Art. 41 CE: never with a pedestrian in
-% the way or a red or yellow light ahead.
+% Arts. 35.º e 36.º do CE: ultrapassar pela esquerda, com a faixa da esquerda livre. A janela para
+% começar cresce com a velocidade de aproximação (5,5 s de TTC mais 10 m). Um veículo parado só é
+% ultrapassado em andamento com essa margem toda. Passar para a esquerda, a partir de CENTER ou de
+% RIGHT, só compensa se o veículo seguinte nessa faixa estiver claramente mais longe. Art. 41.º do
+% CE: nunca com um peão no caminho nem com um semáforo vermelho ou amarelo à frente.
 rule('Overtake slow front vehicle via left lane',
      525,
      [ ego_lane(Lane),
        test(memberchk(Lane, [right, center])),
        lane_change_state(idle),
        prove(no_continuous_line(left)),
-       % the vehicle ahead in the left lane, if any, can still be followed after the move
+       % o veículo da frente na faixa da esquerda, se houver, ainda pode ser seguido depois da mudança
        prove(room_to_follow(left)),
        ego_speed(V),
        time_ms(Now),
@@ -529,12 +533,13 @@ rule('Overtake slow front vehicle via left lane',
        assert(proposal(change_lane_left, no_target, low, maneuver_safety,
                        'Overtaking slower vehicle via clear left lane (Art. 35/36 CE)')) ]).
 
-% The overtake above needs the ego to be closing in, which never holds once the following
-% rule has matched it to the front vehicle's speed. This is the exit from following: at the
-% front vehicle's speed (within 0.5 m/s either way), in the following window (6-30 m) and
-% with that vehicle at least 10 km/h below the speed the ego aims for (the posted limit, or
-% the scenario cruise speed), it moves left when the left lane is clear. Same lane, line,
-% lane-ahead and legal (Art. 41 CE) conditions as the overtake.
+% A ultrapassagem acima exige que o ego se esteja a aproximar, o que nunca acontece depois de a
+% regra de seguimento o ter acertado pela velocidade do veículo da frente. Esta é a saída do
+% seguimento: à velocidade do veículo da frente (com 0,5 m/s de tolerância para cada lado), na
+% janela de seguimento (6-30 m) e com esse veículo pelo menos 10 km/h abaixo da velocidade que o
+% ego pretende (o limite sinalizado, ou a velocidade de cruzeiro do cenário), passa para a esquerda
+% quando a faixa da esquerda está livre. As mesmas condições de faixa, linha, faixa à frente e
+% legais (art. 41.º do CE) que a ultrapassagem.
 rule('Overtake the vehicle being followed',
      524,
      [ ego_lane(Lane),
@@ -557,11 +562,11 @@ rule('Overtake the vehicle being followed',
        assert(proposal(change_lane_left, no_target, low, maneuver_safety,
                        'Overtaking the slower vehicle being followed via clear left lane (Art. 35/36 CE)')) ]).
 
-% Art. 36 CE: a slower vehicle in the left lane is not passed on its right. From the right
-% lane, the ego first moves in behind it (RIGHT -> CENTER) and that vehicle becomes the
-% target; once behind it, the previous rule continues CENTER -> LEFT. Art. 38 CE: only with
-% LEFT clear well beyond that vehicle (+20 m, as the overtake asks); otherwise the ego stays
-% in RIGHT behind it.
+% Art. 36.º do CE: um veículo mais lento na faixa da esquerda não é ultrapassado pela sua direita.
+% A partir da faixa da direita, o ego primeiro coloca-se atrás dele (RIGHT -> CENTER) e esse
+% veículo passa a ser o alvo; já atrás dele, a regra anterior continua CENTER -> LEFT. Art. 38.º
+% do CE: só com LEFT livre bem para lá desse veículo (+20 m, como a ultrapassagem exige); caso
+% contrário, o ego fica em RIGHT atrás dele.
 rule('Move left behind slower left lane vehicle to overtake it on the left',
      525,
      [ ego_lane(right),
@@ -584,8 +589,8 @@ rule('Move left behind slower left lane vehicle to overtake it on the left',
        assert(proposal(change_lane_left, no_target, low, maneuver_safety,
                        'Moving left behind a slower vehicle to overtake it on the left (Art. 36 CE)')) ]).
 
-% Stopped behind a stopped vehicle (left occupied, or too close to go around it on the move):
-% go around it once the left lane clears, within the same legal limits.
+% Parado atrás de um veículo parado (esquerda ocupada, ou demasiado perto para o contornar em
+% andamento): contorná-lo assim que a faixa da esquerda ficar livre, dentro dos mesmos limites legais.
 rule('Go around stationary front vehicle from standstill',
      525,
      [ ego_lane(Lane),
@@ -606,8 +611,8 @@ rule('Go around stationary front vehicle from standstill',
        assert(proposal(change_lane_left, no_target, low, maneuver_safety,
                        'Going around a stationary vehicle via clear left lane (Art. 35/38 CE)')) ]).
 
-% Art. 38 CE: after overtaking, go back right one lane at a time, with that lane clear
-% alongside and 80 m ahead, and no lane change requested by the driver.
+% Art. 38.º do CE: depois de ultrapassar, voltar para a direita uma faixa de cada vez, com essa
+% faixa livre ao lado e 80 m à frente, e sem nenhuma mudança de faixa pedida pelo condutor.
 rule('Return to right lane after overtaking slow vehicle',
      480,
      [ test(current_overtaking(true, _, true, _, _)),
@@ -622,16 +627,16 @@ rule('Return to right lane after overtaking slow vehicle',
      [ assert(proposal(return_right, no_target, low, maneuver_safety,
                        'Portuguese Highway Code Art. 38: return to rightmost lane after overtaking')) ]).
 
-% Slow traffic in every lane the ego could use to overtake (front-vehicle.drl, the same
-% rules). boxed_in(Lane, Since) comes from the previous cycle (driving_state.pl); the rules
-% conclude boxed_in_started/2 or boxed_in_cleared and current_boxed_in/1 reads the result.
-% Boxed in: behind a vehicle at least 10 km/h below the speed the ego is aiming for, and
-% unable to move left (road edge, continuous line, occupied, or no clearer than its own
-% lane by 20 m). After 3 s the ego falls back, returns right with the right lane clear
-% alongside and ahead (2-second rule, 3 s in rain or on low grip, at least 30 m) but with
-% traffic there within 80 m (into an empty right lane it would pass the slow vehicle on its
-% right, Art. 36 CE), and does not start the same overtake again until the way ahead or to
-% the left opens.
+% Trânsito lento em todas as faixas que o ego poderia usar para ultrapassar (front-vehicle.drl, as
+% mesmas regras). boxed_in(Lane, Since) vem do ciclo anterior (driving_state.pl); as regras
+% concluem boxed_in_started/2 ou boxed_in_cleared e current_boxed_in/1 lê o resultado.
+% Encurralado: atrás de um veículo pelo menos 10 km/h abaixo da velocidade que o ego pretende, e
+% sem poder passar para a esquerda (limite da estrada, linha contínua, faixa ocupada, ou não mais
+% livre do que a sua própria faixa por 20 m). Ao fim de 3 s o ego deixa-se ficar para trás, volta
+% para a direita com a faixa da direita livre ao lado e à frente (regra dos 2 segundos, 3 s com
+% chuva ou pouca aderência, pelo menos 30 m) mas com trânsito nela a menos de 80 m (numa faixa da
+% direita vazia ultrapassaria o veículo lento pela direita, art. 36.º do CE), e não volta a
+% iniciar a mesma ultrapassagem até o caminho à frente ou à esquerda abrir.
 rule('Note the vehicle is boxed in behind slow traffic',
      536,
      [ ego_lane(Lane),
@@ -722,13 +727,13 @@ rule('Keep the right lane while the lanes ahead stay blocked',
      [ assert(proposal(keep_lane, no_target, low, collision_avoidance,
                        'Slow traffic in every lane ahead: no overtake (Art. 13/35 CE)')) ]).
 
-% Art. 13 CE (keep right): drive in the rightmost available safe lane. CENTER and LEFT are
-% manoeuvre lanes: once an overtake or an avoidance is over, with the right lane clear
-% alongside and 80 m ahead, go back right one lane at a time. Nothing may need attention:
-% moving off, obstacle, pothole, closed barrier, pedestrian in conflict, a vehicle within
-% 80 m, an overtake, a lane change requested by the driver. It sees overtakes that start in
-% this cycle (lower precedence). Moving off is as at the start of the cycle, as in Drools,
-% where this rule fires before the moving-off rules.
+% Art. 13.º do CE (circular pela direita): circular na faixa disponível e segura mais à direita.
+% CENTER e LEFT são faixas de manobra: terminada uma ultrapassagem ou um desvio, com a faixa da
+% direita livre ao lado e 80 m à frente, voltar para a direita uma faixa de cada vez. Nada pode
+% exigir atenção: arranque, obstáculo, buraco, barreira fechada, peão em conflito, um veículo a
+% menos de 80 m, uma ultrapassagem, uma mudança de faixa pedida pelo condutor. Vê as
+% ultrapassagens que começam neste ciclo (precedência mais baixa). O arranque é o do início do
+% ciclo, como no Drools, onde esta regra dispara antes das regras de arranque.
 rule('Enforce keep right road law when right lane is safe',
      460,
      [ ego_lane(Lane),
@@ -754,11 +759,12 @@ rule('Enforce keep right road law when right lane is safe',
      [ assert(proposal(return_right, no_target, low, maneuver_safety,
                        'Portuguese Highway Code Art. 13: Drive on the rightmost available safe lane')) ]).
 
-% Art. 36 CE: while not yet behind a slower vehicle in the left lane, the ego must not draw
-% level with it. It follows the curve that matches that vehicle's speed 35 m behind it (just
-% beyond the blind-spot range, so the lane reads clear and the ego can move in).
-% Comfortable braking would carry the ego past the vehicle (cannot_stay_behind/2): brake hard,
-% as in Drools, since drawing level and passing on the right is what Art. 36 forbids.
+% Art. 36.º do CE: enquanto ainda não está atrás de um veículo mais lento na faixa da esquerda, o
+% ego não pode ficar a par dele. Segue a curva que iguala a velocidade desse veículo 35 m atrás
+% dele (logo para lá do alcance do ângulo morto, para que a faixa seja lida como livre e o ego
+% possa entrar). Se uma travagem confortável levasse o ego para lá do veículo
+% (cannot_stay_behind/2): travar a fundo, como no Drools, já que ficar a par e ultrapassar pela
+% direita é o que o art. 36.º proíbe.
 rule('Do not pass a slower left lane vehicle on its right (emergency)',
      508,
      [ ego_speed(V),
@@ -810,9 +816,10 @@ rule('Do not pass a slower left lane vehicle on its right (hold)',
      [ assert(proposal(maintain_speed, Target, moderate, speed_compliance,
                        'Slower vehicle in the left lane must not be passed on its right (Art. 36 CE)')) ]).
 
-% The same for a slower vehicle two lanes to the left (LEFT, seen from RIGHT), as in Drools:
-% after going round a hazard in the centre on the right, it is not passed on its right
-% (Art. 36 CE). No falling back: there is no lane to move into behind it from here.
+% O mesmo para um veículo mais lento duas faixas à esquerda (LEFT, visto de RIGHT), como no
+% Drools: depois de contornar pela direita um perigo no centro, esse veículo não é ultrapassado
+% pela sua direita (art. 36.º do CE). Sem ficar para trás: daqui não há faixa para onde passar
+% atrás dele.
 rule('Do not pass a slower far left lane vehicle on its right (emergency)',
      508,
      [ ego_speed(V),
@@ -856,8 +863,8 @@ rule('Do not pass a slower far left lane vehicle on its right (hold)',
 % que uma faixa adjacente está livre. As regras só disparam com o perigo na faixa do ego,
 % por isso, depois de mudar de faixa, deixam de corresponder e a manobra não oscila.
 
-% While the lane change is executing, keep it as the decision. They also hold for an
-% overtake or a driver request, so they propose at manoeuvre priority.
+% Enquanto a mudança de faixa está em execução, mantê-la como decisão. Valem também para uma
+% ultrapassagem ou para um pedido do condutor, por isso propõem com prioridade de manobra.
 rule('Maintain ongoing lane change left avoidance',
      475,
      [ lane_change_state(State),
@@ -878,8 +885,8 @@ rule('Maintain ongoing lane change right avoidance',
      [ assert(proposal(change_lane_right, no_target, low, maneuver_safety,
                        'Executing ongoing lane change right')) ]).
 
-% Pothole: from the centre, prefer the right (the rightmost clear lane); left only with the
-% right occupied.
+% Buraco: a partir do centro, preferir a direita (a faixa livre mais à direita); a esquerda só com
+% a direita ocupada.
 rule('Avoid pothole in centre lane by changing right when right is clear',
      475,
      [ ego_lane(center),
@@ -903,9 +910,9 @@ rule('Avoid pothole in centre lane by changing left when right is occupied',
      [ assert(proposal(change_lane_left, no_target, low, road_hazard,
                        'Avoiding pothole by moving into the clear left lane')) ]).
 
-% Every lane change checks the line it crosses: between RIGHT and CENTER the right marking,
-% between CENTER and LEFT the left marking; a continuous line is never crossed. The avoidance
-% rules prove it, with the idle maneuver and the clear side, through safe_to_change_lane/1.
+% Cada mudança de faixa verifica a linha que atravessa: entre RIGHT e CENTER a marcação da direita,
+% entre CENTER e LEFT a marcação da esquerda; uma linha contínua nunca é atravessada. As regras de
+% desvio provam-no, com a manobra inativa e o lado livre, através de safe_to_change_lane/1.
 rule('Avoid pothole in left lane by changing right',
      470,
      [ ego_lane(left),
@@ -928,11 +935,11 @@ rule('Avoid pothole in right lane by changing left',
      [ assert(proposal(change_lane_left, no_target, low, road_hazard,
                        'Avoiding pothole by moving into the clear left lane')) ]).
 
-% Obstacle: from the centre, prefer the left; right only with the left occupied. An obstacle
-% blocks the lane, so going around it is collision avoidance. Decided at 50 m, inside the
-% 60 m over which the blind-spot sensor reports hazards in the side lanes, so a side found
-% clear is clear for the whole manoeuvre; until then the obstacle stop rule keeps the speed
-% on the comfortable braking curve.
+% Obstáculo: a partir do centro, preferir a esquerda; a direita só com a esquerda ocupada. Um
+% obstáculo bloqueia a faixa, por isso contorná-lo é evitar uma colisão. Decidido aos 50 m, dentro
+% dos 60 m em que o sensor de ângulo morto reporta perigos nas faixas laterais, para que um lado
+% considerado livre esteja livre durante toda a manobra; até lá, a regra de paragem no obstáculo
+% mantém a velocidade na curva de travagem confortável.
 rule('Avoid obstacle in centre lane by changing left',
      470,
      [ ego_lane(center),
@@ -1015,16 +1022,17 @@ rule('Allow lane change right when lane safe',
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Perigos que não se podem contornar
 
-% A pothole in the vehicle's path (its lane, or the lane it is moving into) that is not being
-% gone round is driven over slowly (Art. 24 CE). It is not gone round while no side is a safe
-% way past, while it is too close for a lane change to leave the lane before it
-% (room_to_leave_lane/2), or while it is still beyond the 50 m at which the avoidance is
-% decided. Binds from the distance a comfortable slow-down to the crossing speed needs (never
-% less than 40 m): beyond 40 m it follows the anticipation curve to the crossing speed and
-% holds when already under it; inside 40 m it asks for the crossing speed, 20 km/h under 15 m.
-% A severe pothole (high) is braked hard for when comfortable braking (10% to spare) no longer
-% reaches the crossing speed by the pothole (pothole_hard_braking/3); a lighter one is only
-% slowed for as comfort allows. The reason names the situation (pothole_reason/3), as in Drools.
+% Um buraco na trajetória do veículo (a sua faixa, ou a faixa para onde está a mudar) que não
+% está a ser contornado é passado devagar (art. 24.º do CE). Não está a ser contornado enquanto
+% nenhum lado for uma passagem segura, enquanto estiver demasiado perto para uma mudança de
+% faixa sair da faixa antes dele (room_to_leave_lane/2), ou enquanto ainda estiver para lá dos
+% 50 m a que o desvio é decidido. Aplica-se a partir da distância de que precisa um abrandamento
+% confortável até à velocidade de passagem (nunca menos de 40 m): para lá dos 40 m segue a curva
+% de antecipação até à velocidade de passagem e mantém a velocidade quando já está abaixo dela;
+% dentro dos 40 m pede a velocidade de passagem, 20 km/h a menos de 15 m. Num buraco grave
+% (high) trava-se a fundo quando a travagem confortável (com 10% de folga) já não chega à
+% velocidade de passagem até ao buraco (pothole_hard_braking/3); num mais ligeiro só se abranda
+% tanto quanto o conforto permite. A razão descreve a situação (pothole_reason/3), como no Drools.
 rule('Pothole ahead reduce speed (emergency)',
      460,
      [ ego_path_lane(Lane),
@@ -1067,12 +1075,12 @@ rule('Pothole ahead reduce speed (hold)',
        test(pothole_reason(V, D, Reason)) ],
      [ assert(proposal(maintain_speed, V, moderate, road_hazard, Reason)) ]).
 
-% Obstacle in the ego's lane while the vehicle has not started to move out of that lane
-% (no side free, avoidance vetoed by a mandatory stop, or refused by the actuator): stop
-% 10 m before it (outside the 8 m emergency zone). The curve only binds when the vehicle
-% is too fast to stop there, so an avoidance that starts in time is not slowed down. It follows the
-% comfortable braking curve; if the deceleration needed exceeds the comfortable one by 10%,
-% it brakes hard.
+% Obstáculo na faixa do ego enquanto o veículo ainda não começou a sair dessa faixa (nenhum
+% lado livre, desvio vetado por uma paragem obrigatória, ou recusado pelo atuador): parar
+% 10 m antes dele (fora da zona de emergência de 8 m). A curva só se aplica quando o veículo
+% vai depressa demais para parar aí, para que um desvio que comece a tempo não seja abrandado.
+% Segue a curva de travagem confortável; se a desaceleração necessária exceder a confortável
+% em 10%, trava a fundo.
 rule('Stop before obstacle ahead while still in its lane (stop)',
      465,
      [ ego_path_lane(Lane),
@@ -1113,8 +1121,9 @@ rule('Stop before obstacle ahead while still in its lane (brake)',
      [ assert(proposal(brake, Target, high, collision_avoidance,
                        'Obstacle ahead in own lane; stopping unless a lane change takes the vehicle out of its way')) ]).
 
-% Inside the stopping window but still above the comfortable braking curve: hold the speed
-% while the avoidance is decided, so the vehicle does not gain speed towards the obstacle.
+% Dentro da janela de paragem mas ainda acima da curva de travagem confortável: manter a
+% velocidade enquanto o desvio é decidido, para o veículo não ganhar velocidade em direção
+% ao obstáculo.
 rule('Stop before obstacle ahead while still in its lane (hold)',
      465,
      [ ego_path_lane(Lane),
@@ -1130,10 +1139,10 @@ rule('Stop before obstacle ahead while still in its lane (hold)',
      [ assert(proposal(maintain_speed, V, moderate, collision_avoidance,
                        'Obstacle ahead in own lane; stopping unless a lane change takes the vehicle out of its way')) ]).
 
-% Neither side is safe to enter (the blind-spot occupancy already reports a side as not safe
-% when the line towards it is continuous, WorldState.sideLaneOccupancy) and the ego's lane
-% is closed by a continuous line (the left marking lies between LEFT and CENTER, the right
-% marking between CENTER and RIGHT): there is nowhere to go legally.
+% Nenhum dos lados é seguro para entrar (a ocupação do ângulo morto já dá um lado como não
+% seguro quando a linha desse lado é contínua, WorldState.sideLaneOccupancy) e a faixa do ego
+% está fechada por uma linha contínua (a marcação esquerda fica entre LEFT e CENTER, a direita
+% entre CENTER e RIGHT): não há para onde ir legalmente.
 rule('Stop before obstacle when lane change prohibited by continuous line (stop)',
      466,
      [ ego_lane(Lane),
@@ -1186,12 +1195,13 @@ rule('Stop before obstacle when lane change prohibited by continuous line (hold)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Barreiras
 
-% Closed barrier in the ego's lane: move to a lane the blind-spot sensor reports clear,
-% proved by safe_to_change_lane/1 (Art. 35 and 38 CE). The barrier blocks the lane, so going
-% around it is collision avoidance. No maneuver moving and no continuous line on the line it
-% crosses (RIGHT-CENTER: the right marking; CENTER-LEFT: the left marking); otherwise the
-% vehicle stops. A lane change is only a way past when it leaves the lane before the barrier
-% (room_to_leave_lane/2); closer than that the approach rule below brakes for it.
+% Barreira fechada na faixa do ego: passar para uma faixa que o sensor de ângulo morto dá como
+% livre, provado por safe_to_change_lane/1 (arts. 35.º e 38.º do CE). A barreira bloqueia a
+% faixa, por isso contorná-la é evitar uma colisão. Nenhuma manobra em curso e nenhuma linha
+% contínua na linha que atravessa (RIGHT-CENTER: a marcação direita; CENTER-LEFT: a marcação
+% esquerda); caso contrário, o veículo para. Uma mudança de faixa só é passagem quando sai da
+% faixa antes da barreira (room_to_leave_lane/2); mais perto do que isso, trava a regra de
+% aproximação abaixo.
 rule('Avoid closed barrier by changing left when safe',
      650,
      [ ego_lane(right),
@@ -1237,11 +1247,12 @@ rule('Avoid closed barrier by changing right when safe',
      [ assert(proposal(change_lane_right, no_target, high, collision_avoidance,
                        'Closed barrier ahead; changing right to a verified clear lane')) ]).
 
-% A closed barrier in the vehicle's path (ego_path_lane/1: its lane, or the lane it is moving
-% into) is approached as an obstacle is: from the comfortable stopping distance (never less
-% than 55 m), holding above the braking curve, braking to the anticipation curve on it, hard
-% when comfortable braking no longer stops 10 m before it. A ceiling: it vetoes nothing, and
-% stops holding once the lane change moves the path out of the barrier's lane.
+% Uma barreira fechada na trajetória do veículo (ego_path_lane/1: a sua faixa, ou a faixa para
+% onde está a mudar) é abordada como um obstáculo: a partir da distância de paragem confortável
+% (nunca menos de 55 m), mantendo a velocidade acima da curva de travagem, travando para a curva
+% de antecipação quando está nela, a fundo quando a travagem confortável já não para 10 m antes
+% dela. É um teto: não veta nada, e deixa de reter quando a mudança de faixa tira a trajetória
+% da faixa da barreira.
 rule('Stop before closed barrier while still in its lane (stop)',
      645,
      [ ego_path_lane(Lane),
@@ -1297,10 +1308,10 @@ rule('Stop before closed barrier while still in its lane (hold)',
      [ assert(proposal(maintain_speed, V, moderate, collision_avoidance,
                        'Closed barrier ahead in the path; stopping unless a lane change takes the vehicle out of its way')) ]).
 
-% Stop whenever the barrier cannot be gone around safely, for whatever reason
-% safe_to_change_lane/1 fails on both sides, so the vehicle always avoids or stops. Only while
-% it has not started to move out of the lane; from the comfortable stopping distance (never
-% less than 55 m); braking hard when comfortable braking no longer stops before the barrier.
+% Parar sempre que a barreira não possa ser contornada em segurança, seja qual for o motivo por
+% que safe_to_change_lane/1 falha dos dois lados, para que o veículo desvie ou pare sempre. Só
+% enquanto não começou a sair da faixa; a partir da distância de paragem confortável (nunca
+% menos de 55 m); a travar a fundo quando a travagem confortável já não para antes da barreira.
 rule('Closed barrier requires stop (emergency)',
      640,
      [ ego_lane(Lane),
@@ -1329,8 +1340,8 @@ rule('Closed barrier requires stop',
      [ assert(proposal(stop, 0.0, high, legal_mandatory_stop,
                        'Closed barrier ahead and no adjacent lane is safe')) ]).
 
-% Comfort proposal: it loses to any speed ceiling, hold or manoeuvre speed in the cycle, so
-% it needs no guard on what else was proposed.
+% Proposta de conforto: perde para qualquer teto de velocidade, retenção ou velocidade de
+% manobra do ciclo, por isso não precisa de condição sobre o que mais foi proposto.
 rule('Open barrier allows continue if no higher priority',
      170,
      [ barrier(_, D, true, _),
@@ -1341,16 +1352,17 @@ rule('Open barrier allows continue if no higher priority',
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Condições meteorológicas: lógica difusa (fuzzy-weather.drl) e temporal.drl
 
-% Fuzzy weather controller (Mamdani), the same as fuzzy-weather.drl. Visibility and grip are
-% vague, so each reading belongs, to some degree, to the terms poor / reduced / fair / good:
-%   1. fuzzification   (360): weather/3 -> fuzzy_membership(Variable, Term, Degree)
-%   2. inference       (355): one rule per fuzzy rule, AND = min, OR = max
+% Controlador difuso da meteorologia (Mamdani), igual ao de fuzzy-weather.drl. A visibilidade e
+% a aderência são vagas, por isso cada leitura pertence, com algum grau, aos termos poor /
+% reduced / fair / good:
+%   1. fuzificação     (360): weather/3 -> fuzzy_membership(Variable, Term, Degree)
+%   2. inferência      (355): uma regra por regra difusa, AND = min, OR = max
 %                             -> fuzzy_conclusion(Term, Degree)
-%   3. composition and 4. defuzzification (350): the conclusions are joined (max) and their
-%                             centroid is the recommended speed.
-% The result is one speed ceiling at road_hazard, proposed only when a restrictive term
-% holds. The sets and the centroid sampling are those of FuzzySupport.java, so both engines
-% compute the same speed.
+%   3. composição e 4. desfuzificação (350): as conclusões são agregadas (max) e o seu
+%                             centroide é a velocidade recomendada.
+% O resultado é um único teto de velocidade em road_hazard, proposto só quando se verifica um
+% termo restritivo. Os conjuntos e a amostragem do centroide são os de FuzzySupport.java, para
+% que os dois motores calculem a mesma velocidade.
 
 rule('Fuzzify visibility',
      360,
@@ -1391,7 +1403,7 @@ rule('Fuzzy: fair visibility or fair grip -> moderate',
        test(( D is max(V, G), D > 0.0 )) ],
      [ assert(fuzzy_conclusion(moderate, D)) ]).
 
-% Rain is crisp (rain or clear): it enters the rule with degree 1 or 0.
+% A chuva é um valor nítido, não difuso (rain ou clear): entra na regra com grau 1 ou 0.
 rule('Fuzzy: rain with good visibility and good grip -> prudent',
      355,
      [ weather(rain, _, _),
@@ -1400,7 +1412,7 @@ rule('Fuzzy: rain with good visibility and good grip -> prudent',
        test(( D is min(V, G), D > 0.0 )) ],
      [ assert(fuzzy_conclusion(prudent, D)) ]).
 
-% light only refines a ceiling another term already set: alone it proposes nothing.
+% light só afina um teto que outro termo já fixou: sozinho não propõe nada.
 rule('Fuzzy: no rain with good visibility and good grip -> light',
      355,
      [ weather(Condition, _, _),
@@ -1410,7 +1422,7 @@ rule('Fuzzy: no rain with good visibility and good grip -> light',
        test(( D is min(V, G), D > 0.0 )) ],
      [ assert(fuzzy_conclusion(light, D)) ]).
 
-% Rain alone (prudent) is a moderate risk; reduced visibility or grip is a high one.
+% Só a chuva (prudent) é um risco moderado; visibilidade ou aderência reduzidas, um risco alto.
 rule('Defuzzify weather speed ceiling',
      350,
      [ weather(_, _, _),
@@ -1418,8 +1430,8 @@ rule('Defuzzify weather speed ceiling',
      [ assert(proposal(reduce_speed, Target, Risk, road_hazard,
                        'Weather conditions (fuzzy) require a reduced speed')) ]).
 
-% In rain, two TTC readings below 3 s within 2 s are enough to brake. A reading counts only
-% when it was measured in the rain: a rain reading within 400 ms of it (coincides[400ms]).
+% Com chuva, duas leituras de TTC abaixo de 3 s em 2 s bastam para travar. Uma leitura só conta
+% quando foi medida à chuva: uma leitura de chuva até 400 ms dela (coincides[400ms]).
 rule('Persistent low TTC in rain increases conservatism',
      560,
      [ weather(rain, _, _),
@@ -1431,12 +1443,12 @@ rule('Persistent low TTC in rain increases conservatism',
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Sinal STOP
 
-% The approach only starts above the 2.0 m/s2 curve that ends 2 m before the sign (the
-% actuator's weakest deceleration), and holds until the line: so the rule does not switch
-% off every time braking takes the vehicle below the curve. The action follows the
-% comfortable stopping distance (2.8 m/s2): when it no longer stops before the line, brake
-% hard, until there is 1 m to spare again. The recommended speed is the current one (within
-% the limit), not the curve, which the actuator could not follow.
+% A aproximação só começa acima da curva de 2.0 m/s2 que termina 2 m antes do sinal (a
+% desaceleração mais fraca do atuador), e mantém-se até à linha: assim a regra não se desliga
+% sempre que a travagem põe o veículo abaixo da curva. A ação segue a distância de paragem
+% confortável (2.8 m/s2): quando esta já não para antes da linha, travar a fundo, até voltar a
+% haver 1 m de folga. A velocidade recomendada é a atual (dentro do limite), não a da curva,
+% que o atuador não conseguiria seguir.
 rule('Stop sign requires progressive deceleration (emergency)',
      610,
      [ stop_sign(S, D),
@@ -1478,8 +1490,8 @@ rule('Stop sign requires progressive deceleration (hold speed)',
      [ assert(proposal(maintain_speed, Target, low, legal_mandatory_stop,
                        'Approaching stop sign; hold speed until the stop line')) ]).
 
-% At the line the vehicle stops and stays stopped for 1.2 s. The count starts when the speed
-% drops below 0.6 km/h; the start time is kept in the state between cycles.
+% Na linha o veículo para e fica parado durante 1,2 s. A contagem começa quando a velocidade
+% desce abaixo de 0,6 km/h; o instante de início fica guardado no estado entre ciclos.
 rule('Start stop timer once vehicle is stopped',
      630,
      [ stop_sign(S, D),
@@ -1499,10 +1511,10 @@ rule('Stop sign condition satisfied after full stop hold',
        test(allen_after(Now, Start, 1200)) ],
      [ assert(stop_completed(S)) ]).
 
-% While the stop has not lasted 1.2 s. The condition reads the time, not only
-% stop_completed, so it does not depend on which of the two rules fires first. Reached too
-% fast (a sign first seen with the line already behind), the same test as the approach
-% brakes hard and stops as soon as possible, still owing the full stop (Art. 21 CE, sign B2).
+% Enquanto a paragem não tiver durado 1,2 s. A condição lê o tempo, não só stop_completed, para
+% não depender de qual das duas regras dispara primeiro. Se o sinal for atingido depressa demais
+% (visto pela primeira vez já com a linha para trás), o mesmo teste da aproximação trava a fundo
+% e para o mais cedo possível, continuando a dever a paragem completa (art. 21.º do CE, sinal B2).
 rule('Stop sign requires full stop near line (emergency)',
      620,
      [ stop_sign(S, D),
@@ -1538,9 +1550,10 @@ rule('Proceed after stop sign condition satisfied',
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Velocidade
 
-% A lower limit ahead is not in force yet, but the vehicle has to be down to it at the sign.
-% Far from the sign the approach speed is above any speed and the rule stays out; from
-% there the target follows the approach speed down to the new limit.
+% Um limite mais baixo à frente ainda não está em vigor, mas o veículo tem de chegar ao sinal já
+% a essa velocidade. Longe do sinal, a velocidade de aproximação está acima de qualquer
+% velocidade e a regra não se aplica; a partir daí, o alvo segue a velocidade de aproximação até
+% ao novo limite.
 rule('Slow down in time for the speed limit ahead (slow)',
      310,
      [ pending_speed_limit(Next, SignPosition),
@@ -1563,8 +1576,8 @@ rule('Slow down in time for the speed limit ahead (hold)',
        test(limit_ahead_reason(Next, Reason)) ],
      [ assert(proposal(maintain_speed, Target, low, speed_compliance, Reason)) ]).
 
-% 0.1 km/h deadband, the same as the actuator's: "exceeds" and "complies" are exact
-% complements.
+% Margem morta de 0,1 km/h, a mesma do atuador: "excede" e "cumpre" são complementos
+% exatos.
 rule('Reduce speed when exceeding detected limit',
      300,
      [ ego_speed(V),
@@ -1573,8 +1586,8 @@ rule('Reduce speed when exceeding detected limit',
      [ assert(proposal(reduce_speed, Limit, moderate, speed_compliance,
                        'Vehicle exceeds current legal speed limit')) ]).
 
-% A signed limit above the current speed is a target the vehicle may rise to. The default
-% limit is not a sign and is never a target.
+% Um limite sinalizado acima da velocidade atual é um alvo até ao qual o veículo pode subir. O
+% limite por omissão não é um sinal e nunca é um alvo.
 rule('Maintain speed when compliant with detected limit',
      210,
      [ signed_speed_limit(Limit),
@@ -1595,9 +1608,9 @@ rule('Build back up to the scenario cruise speed when no sign governs the road',
      [ assert(proposal(maintain_speed, Target, low, speed_compliance,
                        'Road is clear; building back up to the scenario cruise speed')) ]).
 
-% Driver acceleration request: accepted for 1.5 s. A comfort proposal only applies when no
-% ceiling, hold or manoeuvre speed holds in the cycle, which the arbitration settles, so the
-% rule needs no guard.
+% Pedido de aceleração do condutor: aceite durante 1,5 s. Uma proposta de conforto só se aplica
+% quando nenhum teto, retenção ou velocidade de manobra vigora no ciclo, o que a arbitragem
+% resolve, por isso a regra não precisa de condição.
 rule('Allow acceleration request when safe context',
      205,
      [ acceleration_request(Target, Age),
@@ -1634,10 +1647,10 @@ rule('Stop moving off once held or at speed',
        test(( V >= min(30.0, Limit) - 1.0 ; \+ previous_priority_at_most(maneuver_safety) )) ],
      [ assert(move_off_ended) ]).
 
-% At manoeuvre priority: any rule that still requires the stop wins; the slower "proceed"
-% of a STOP wins the tie. It steps aside during a driver lane change request: the driver's
-% request is answered first. A vehicle going around a stationary vehicle needs no such
-% step: the lane change is arbitrated in its own channel and moves off at the same time.
+% Com prioridade de manobra: qualquer regra que ainda exija a paragem ganha; o "avançar" mais
+% lento de um STOP ganha o empate. Cede durante um pedido de mudança de faixa do condutor: o
+% pedido do condutor é atendido primeiro. Um veículo a contornar um veículo parado não precisa
+% de ceder: a mudança de faixa é arbitrada no seu próprio canal e arranca ao mesmo tempo.
 rule('Move off when stopped and nothing holds the vehicle',
      -90,
      [ test(moving_off),
@@ -1647,8 +1660,9 @@ rule('Move off when stopped and nothing holds the vehicle',
      [ assert(proposal(continue, Target, low, maneuver_safety,
                        'Vehicle was stopped and no rule holds it any more')) ]).
 
-% Only when no speed (longitudinal) proposal was made: a lane proposal alone does not
-% count, as in Drools, where the context priority only follows speed proposals.
+% Só quando não foi feita nenhuma proposta de velocidade (longitudinal): uma proposta de faixa,
+% sozinha, não conta, como no Drools, onde a prioridade do contexto só segue as propostas de
+% velocidade.
 rule('Default maintain speed baseline',
      -100,
      [ ego_speed(V),
@@ -1674,8 +1688,8 @@ safe_to_change_lane(Side) :-
 maneuver_idle :-
     known(lane_change_state(idle)).
 
-% A linha a cruzar não é contínua: entre RIGHT e CENTER a right marking, entre CENTER e LEFT
-% a left marking.
+% A linha a cruzar não é contínua: entre RIGHT e CENTER, a marcação direita (right_marking);
+% entre CENTER e LEFT, a marcação esquerda (left_marking).
 no_continuous_line(left) :-
     known(ego_lane(right)),
     known(right_marking(Marking)),
@@ -1727,17 +1741,18 @@ room_to_follow_behind(D, Rel) :-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Predicados auxiliares (chamados a partir de test/1)
 
-% The lane two to the left (LEFT, seen from RIGHT) is clear more than 20 m beyond a vehicle D
-% metres ahead in the lane to the left: no vehicle there within radar range, or it is
-% further. Drools: FarLeftLaneVehicleState($farLeft) with $farLeft > $distance + 20.0.
+% A faixa duas para a esquerda (LEFT, vista de RIGHT) está livre mais de 20 m para lá de um
+% veículo D metros à frente na faixa da esquerda: nenhum veículo lá ao alcance do radar, ou
+% está mais longe. Drools: FarLeftLaneVehicleState($farLeft) com $farLeft > $distance + 20.0.
 far_left_clear_beyond(D) :-
     (   known(far_left_lane_vehicle(_, Far, _))
     ->  Far > D + 20.0
     ;   true
     ).
 
-% A lane change the driver asked for is not undone at once: the lane settled within 4.5 s of
-% the request (1.5 s for it to be granted + a 3 s manoeuvre), so keep right waits 5 s.
+% Uma mudança de faixa pedida pelo condutor não é desfeita logo: a faixa estabilizou até 4,5 s
+% depois do pedido (1,5 s para ser concedido + 3 s de manobra), por isso o manter-se à direita
+% espera 5 s.
 driver_lane_change_hold(Now) :-
     known(lane_request_at(Requested)),
     known(lane_settled_at(Settled)),
@@ -1746,16 +1761,17 @@ driver_lane_change_hold(Now) :-
     Requested >= Settled - 4500,
     Now - Settled < 5000.
 
-% The side was read after the last lane change settled: for a tick or two after it settles,
-% the blind-spot sensor (every 200 ms) still describes the sides of the lane it came from.
-% Drools: LaneOccupancyState(timestamp > $settled) with $settled the laneSettledAtMillis.
+% O lado foi lido depois de a última mudança de faixa estabilizar: durante um ou dois ticks
+% depois de estabilizar, o sensor de ângulo morto (a cada 200 ms) ainda descreve os lados da
+% faixa de onde veio. Drools: LaneOccupancyState(timestamp > $settled), com $settled o
+% laneSettledAtMillis.
 fresh_side_reading(Side) :-
     known(lane_occupancy_read(Side, Read)),
     known(lane_settled_at(Settled)),
     Read > Settled.
 
-% Distance needed to stop from V km/h (StoppingPolicy.requiredDistanceMeters): reaction time
-% + braking + stop line offset.
+% Distância necessária para parar a partir de V km/h (StoppingPolicy.requiredDistanceMeters):
+% tempo de reação + travagem + afastamento da linha de paragem.
 stopping_distance(V, Kind, D) :-
     deceleration(Kind, A),
     param(reactionTimeSeconds, Reaction),
@@ -1771,8 +1787,8 @@ braking_distance(V, Kind, D) :-
 deceleration(comfort, A) :- param(comfortDecelerationMps2, A).
 deceleration(anticipation, A) :- param(anticipationDecelerationMps2, A).
 
-% Still before the line (with tolerance), within 125 m, and already inside the distance the
-% anticipation deceleration needs.
+% Ainda antes da linha (com tolerância), a 125 m ou menos, e já dentro da distância de que
+% precisa a desaceleração de antecipação.
 red_light_approach(D, V) :-
     D =< 125.0,
     \+ at_stop_line(D),
@@ -1784,14 +1800,14 @@ at_stop_line(D) :-
     param(stopLineToleranceMeters, Tolerance),
     D =< Offset + Tolerance.
 
-% Metres a comfortable stop lacks to stop at the line.
+% Metros que faltam a uma paragem confortável para parar na linha.
 braking_shortfall(V, D, Shortfall) :-
     param(redLightStopLineOffsetMeters, Offset),
     braking_distance(V, comfort, Braking),
     Shortfall is Braking - (D - Offset).
 
-% Before the line: a comfortable stop lacks more than 2 m. Past the line: a comfortable stop
-% does not fit before the light (less the tolerance).
+% Antes da linha: faltam mais de 2 m a uma paragem confortável. Depois da linha: uma paragem
+% confortável não cabe antes do semáforo (descontada a tolerância).
 critical_stop_at_light(V, D) :-
     param(redLightStopLineOffsetMeters, Offset),
     param(stopLineToleranceMeters, Tolerance),
@@ -1802,11 +1818,11 @@ critical_stop_at_light(V, D) :-
     ;   Braking > max(0.0, D - Tolerance)
     ).
 
-% The braking curve at Deceleration m/s2 that ends 18 m before the pedestrian.
+% A curva de travagem a Deceleration m/s2 que termina 18 m antes do peão.
 above_pedestrian_curve(V, D, Deceleration) :-
     V / 3.6 > sqrt(2.0 * Deceleration * max(0.0, D - 18.0)).
 
-% The front vehicle's speed (m/s), from the ego's and the relative one.
+% A velocidade (m/s) do veículo da frente, a partir da do ego e da relativa.
 front_vehicle_speed(V, Rel, Front) :-
     Front is max(0.0, V / 3.6 - Rel).
 
@@ -1814,14 +1830,15 @@ front_vehicle_stopped(V, Rel) :-
     front_vehicle_speed(V, Rel, Front),
     Front < 0.5.
 
-% Speed (km/h) from which 2.0 m/s2 matches the front vehicle's speed 12 m behind it.
+% Velocidade (km/h) a partir da qual 2.0 m/s2 iguala a velocidade do veículo da frente 12 m
+% atrás dele.
 following_speed(V, D, Rel, Target) :-
     deceleration(anticipation, A),
     front_vehicle_speed(V, Rel, Front),
     Target is sqrt(Front * Front + 2.0 * A * max(0.0, D - 12.0)) * 3.6.
 
-% Closing in above the following speed, or stopped (or nearly) behind a stopped vehicle
-% within 14 m.
+% A aproximar-se acima da velocidade de seguimento, ou parado (ou quase) atrás de um veículo
+% parado a 14 m ou menos.
 unsafe_following(V, D, Rel) :-
     (   Rel > 0.3,
         following_speed(V, D, Rel, Target),
@@ -1832,7 +1849,8 @@ unsafe_following(V, D, Rel) :-
         front_vehicle_stopped(V, Rel)
     ).
 
-% Inside the 12 m gap behind a moving front vehicle, not opening the gap fast.
+% Dentro do intervalo de 12 m atrás de um veículo da frente em movimento, sem que o intervalo
+% esteja a abrir depressa.
 reopening_gap(V, D, Rel) :-
     D =< 12.0,
     Rel > -0.3,
@@ -1846,14 +1864,15 @@ front_distance_window(Target, Count, Minimum, Maximum) :-
     min_list(Ds, Minimum),
     max_list(Ds, Maximum).
 
-% The overtaking state after the changes concluded in this cycle. An overtake that starts
-% now prevails; otherwise cancelled or finished deactivates; passed marks the target.
+% O estado da ultrapassagem depois das alterações concluídas neste ciclo. Uma ultrapassagem que
+% começa agora prevalece; senão, cancelada ou terminada desativa-a; passed marca o alvo como
+% ultrapassado.
 current_overtaking(Active, Origin, Passed, Start, Target) :-
     effective_overtaking(Active0, Origin0, Passed0, Start0, Target0),
     Active = Active0, Origin = Origin0, Passed = Passed0, Start = Start0, Target = Target0.
 
-% When two overtake rules start in the same cycle, the one that fired last prevails, as in
-% Drools, where the later modify of the state fact wins.
+% Quando duas regras de ultrapassagem começam no mesmo ciclo, prevalece a que disparou em
+% último lugar, como no Drools, onde ganha o último modify do facto de estado.
 effective_overtaking(true, Origin, false, Start, Target) :-
     known(overtake_started(_, _, _)),
     findall(Id-overtake_started(T, O, S), wm_fact(Id, overtake_started(T, O, S)), Started),
@@ -1868,8 +1887,8 @@ effective_overtaking(Active, Origin, true, Start, Target) :-
 effective_overtaking(Active, Origin, Passed, Start, Target) :-
     known(overtaking(Active, Origin, Passed, Start, Target)).
 
-% May start overtaking Target from Lane: no overtake active, or another target, or (only for
-% the front vehicle) another origin lane.
+% Pode começar a ultrapassar Target a partir de Lane: nenhuma ultrapassagem ativa, ou outro
+% alvo, ou (só para o veículo da frente) outra faixa de origem.
 may_start_overtaking(Target, Lane) :-
     current_overtaking(Active, Origin, _, _, Followed),
     (   Active == false -> true ; Target \== Followed -> true ; Lane \== Origin ).
@@ -1887,7 +1906,7 @@ front_vehicle_within(Distance) :-
     known(front_vehicle(_, D, _)),
     D =< Distance, !.
 
-% The speed the ego wants: the signed limit, or with no sign the cruise speed.
+% A velocidade que o ego pretende: o limite sinalizado ou, sem sinal, a velocidade de cruzeiro.
 desired_speed(Desired) :-
     known(speed_limit(Limit)),
     (   known(no_speed_sign),
@@ -1897,8 +1916,8 @@ desired_speed(Desired) :-
     ;   Desired = Limit
     ).
 
-% The left-lane vehicle is moving (1.4 m/s or more) and the ego is close to it or above
-% the curve.
+% O veículo da faixa da esquerda está em movimento (1,4 m/s ou mais) e o ego está perto dele
+% ou acima da curva.
 must_not_pass_on_right(V, D, Rel) :-
     Left is V / 3.6 - Rel,
     Left >= 1.4,
@@ -1908,14 +1927,15 @@ must_not_pass_on_right(V, D, Rel) :-
         V > Curve
     ).
 
-% Speed (km/h) that matches the left-lane vehicle's speed 35 m behind it, at 2.0 m/s2.
+% Velocidade (km/h) que iguala a velocidade do veículo da faixa da esquerda 35 m atrás dele,
+% a 2.0 m/s2.
 left_vehicle_curve(V, D, Rel, Curve) :-
     deceleration(anticipation, A),
     Left is V / 3.6 - Rel,
     Curve is sqrt(Left * Left + 2.0 * A * max(0.0, D - 35.0)) * 3.6.
 
-% A continuous line on a side of the ego's lane: the right marking lies between CENTER and
-% RIGHT, the left marking between LEFT and CENTER (WorldState.getMarkingBetween).
+% Uma linha contínua num lado da faixa do ego: a marcação direita fica entre CENTER e RIGHT,
+% a esquerda entre LEFT e CENTER (WorldState.getMarkingBetween).
 continuous_line_closes_lane(center) :-
     (   known(left_marking(continuous))
     ;   known(right_marking(continuous))
@@ -1925,34 +1945,35 @@ continuous_line_closes_lane(right) :-
 continuous_line_closes_lane(left) :-
     known(left_marking(continuous)).
 
-% Metres to the stopping point, StoppingPolicy.OBSTACLE_STOP_OFFSET_METERS before the obstacle.
+% Metros até ao ponto de paragem, StoppingPolicy.OBSTACLE_STOP_OFFSET_METERS antes do
+% obstáculo.
 obstacle_margin(D, Margin) :-
     param(obstacleStopOffsetMeters, Offset),
     Margin is max(0.0, D - Offset).
 
-% Distance from which a closed barrier in the ego's lane is stopped for: the comfortable
-% stopping distance at V km/h (reaction + braking), never less than 55 m.
+% Distância a partir da qual se para por uma barreira fechada na faixa do ego: a distância de
+% paragem confortável a V km/h (reação + travagem), nunca menos de 55 m.
 barrier_stop_window(V, W) :-
     deceleration(comfort, A),
     param(reactionTimeSeconds, Reaction),
     Vms is max(0.0, V) / 3.6,
     W is max(55.0, Vms * Reaction + Vms * Vms / (2.0 * A)).
 
-% Comfortable braking (with 10% to spare) no longer stops the vehicle before the barrier.
+% A travagem confortável (com 10% de folga) já não para o veículo antes da barreira.
 barrier_hard_braking(V, D) :-
     deceleration(comfort, A),
     Vms is max(0.0, V) / 3.6,
     Vms * Vms / (2.0 * max(0.1, D)) > A * 1.1.
 
-% Comfortable braking (with a margin) no longer stops the vehicle 6 m short of a pedestrian
-% D m ahead: the emergency distance of the pedestrian rules.
+% A travagem confortável (com margem) já não para o veículo 6 m antes de um peão D m à frente:
+% a distância de emergência das regras de peões.
 pedestrian_hard_braking(V, D) :-
     deceleration(comfort, A),
     Vms is max(0.0, V) / 3.6,
     Vms * Vms / (2.0 * max(0.5, D - 6.0)) > A * 1.1.
 
-% Distance from which an obstacle in the ego's lane is stopped for: the comfortable stopping
-% distance at V km/h (reaction + braking + the offset), never less than 60 m.
+% Distância a partir da qual se para por um obstáculo na faixa do ego: a distância de paragem
+% confortável a V km/h (reação + travagem + o afastamento), nunca menos de 60 m.
 obstacle_stop_window(V, W) :-
     obstacle_stopping_distance(V, D),
     W is max(60.0, D).
@@ -1964,9 +1985,9 @@ obstacle_stopping_distance(V, D) :-
     Vms is max(0.0, V) / 3.6,
     D is Vms * Reaction + Vms * Vms / (2.0 * A) + Offset.
 
-% A lane change started now leaves the lane before a hazard D metres ahead: the ground covered
-% while reacting and until the vehicle is clear of its lane, plus the hazard's own length
-% (StoppingPolicy.roomToLeaveLane).
+% Uma mudança de faixa iniciada agora sai da faixa antes de um perigo D metros à frente: o
+% espaço percorrido durante a reação e até o veículo sair da sua faixa, mais o comprimento do
+% próprio perigo (StoppingPolicy.roomToLeaveLane).
 room_to_leave_lane(V, D) :-
     param(reactionTimeSeconds, Reaction),
     param(laneExitSeconds, Exit),
@@ -1974,8 +1995,8 @@ room_to_leave_lane(V, D) :-
     Vms is max(0.0, V) / 3.6,
     D >= Vms * (Reaction + Exit) + Length.
 
-% Distance from which a closed barrier in the path is approached: the comfortable stopping
-% distance at V km/h plus the 10 m offset, never less than 55 m.
+% Distância a partir da qual se aborda uma barreira fechada na trajetória: a distância de
+% paragem confortável a V km/h mais o afastamento de 10 m, nunca menos de 55 m.
 barrier_approach_window(V, W) :-
     deceleration(comfort, A),
     param(reactionTimeSeconds, Reaction),
@@ -1983,13 +2004,15 @@ barrier_approach_window(V, W) :-
     Vms is max(0.0, V) / 3.6,
     W is max(55.0, Vms * Reaction + Vms * Vms / (2.0 * A) + Offset).
 
-% Metres to the stopping point, StoppingPolicy.BARRIER_STOP_OFFSET_METERS before the barrier.
+% Metros até ao ponto de paragem, StoppingPolicy.BARRIER_STOP_OFFSET_METERS antes da
+% barreira.
 barrier_margin(D, Margin) :-
     param(barrierStopOffsetMeters, Offset),
     Margin is max(0.0, D - Offset).
 
-% Distance from which a pothole in the path is slowed down for: the comfortable slow-down to
-% the crossing speed (reaction + braking), never less than 40 m (StoppingPolicy.slowingDistanceMeters).
+% Distância a partir da qual se abranda por um buraco na trajetória: o abrandamento confortável
+% até à velocidade de passagem (reação + travagem), nunca menos de 40 m
+% (StoppingPolicy.slowingDistanceMeters).
 pothole_slow_window(V, W) :-
     param(potholeCrossingSpeedKmh, Crossing),
     deceleration(comfort, A),
@@ -1998,8 +2021,9 @@ pothole_slow_window(V, W) :-
     Cms is min(Vms, Crossing / 3.6),
     W is max(40.0, Vms * Reaction + (Vms * Vms - Cms * Cms) / (2.0 * A)).
 
-% Speed asked for D metres before a pothole: 20 km/h in the last 15 m, the crossing speed inside
-% 40 m, and beyond that the anticipation curve that reaches the crossing speed at the pothole.
+% Velocidade pedida D metros antes de um buraco: 20 km/h nos últimos 15 m, a velocidade de
+% passagem dentro dos 40 m e, para lá disso, a curva de antecipação que chega à velocidade de
+% passagem no buraco.
 pothole_target(D, Target) :-
     param(potholeCrossingSpeedKmh, Crossing),
     (   D < 15.0
@@ -2011,15 +2035,16 @@ pothole_target(D, Target) :-
     ;   Target = Crossing
     ).
 
-% The pothole is being gone round now: inside the 50 m the avoidance decides at, with room to
-% leave the lane before it, and a side that is a safe way past (once: one solution, as in Drools).
+% O buraco está a ser contornado agora: dentro dos 50 m a que o desvio é decidido, com espaço
+% para sair da faixa antes dele e um lado que é uma passagem segura (once: uma só solução, como
+% no Drools).
 pothole_avoidable_now(V, D) :-
     D =< 50.0,
     room_to_leave_lane(V, D),
     once(( safe_to_change_lane(left) ; safe_to_change_lane(right) )).
 
-% A severe pothole, and comfortable braking (10% to spare) no longer brings the vehicle from
-% V km/h down to the crossing speed in the D metres left.
+% Um buraco grave, e a travagem confortável (com 10% de folga) já não leva o veículo de V km/h
+% à velocidade de passagem nos D metros que faltam.
 pothole_hard_braking(V, D, high) :-
     param(potholeCrossingSpeedKmh, Crossing),
     deceleration(comfort, A),
@@ -2028,15 +2053,16 @@ pothole_hard_braking(V, D, high) :-
     Vms > Cms,
     (Vms * Vms - Cms * Cms) / (2.0 * max(0.1, D)) > A * 1.1.
 
-% Why the pothole is slowed down for rather than gone round, as Drools words it.
+% Porque é que se abranda pelo buraco em vez de o contornar, tal como o Drools o formula.
 pothole_reason(_, D, 'Pothole ahead; coming down to its crossing speed until a way round is decided (Art. 24 CE)') :-
     D > 50.0, !.
 pothole_reason(V, D, 'Pothole too close to go round; crossing it slowly (Art. 24 CE)') :-
     \+ room_to_leave_lane(V, D), !.
 pothole_reason(_, _, 'No free lane to go round the pothole; crossing it slowly (Art. 24 CE)').
 
-% Comfortable braking would carry the ego more than a vehicle length past the vehicle D metres
-% ahead that it closes in on at Rel m/s (StoppingPolicy.closingDistanceMeters against the gap).
+% A travagem confortável levaria o ego mais de um comprimento de veículo para lá do veículo D
+% metros à frente, de que se aproxima a Rel m/s (StoppingPolicy.closingDistanceMeters face ao
+% intervalo).
 cannot_stay_behind(D, Rel) :-
     deceleration(comfort, A),
     param(reactionTimeSeconds, Reaction),
@@ -2044,21 +2070,21 @@ cannot_stay_behind(D, Rel) :-
     Closing is max(0.0, Rel),
     Closing * Reaction + Closing * Closing / (2.0 * A) > D + Length.
 
-% The deceleration needed to stop within the margin exceeds comfortable braking by 10%.
+% A desaceleração necessária para parar dentro da margem excede a travagem confortável em 10%.
 obstacle_braking_excessive(V, Margin) :-
     deceleration(comfort, A),
     Vms is V / 3.6,
     Vms * Vms / (2.0 * Margin) > A * 1.1.
 
-% Speed (km/h) on the anticipation braking curve (2.0 m/s2) that stops within the margin:
-% braking at the comfortable rate towards it keeps the vehicle under the comfortable curve.
+% Velocidade (km/h) na curva de travagem de antecipação (2.0 m/s2) que para dentro da margem:
+% travar à taxa confortável em direção a ela mantém o veículo abaixo da curva confortável.
 obstacle_curve(Margin, Target) :-
     deceleration(anticipation, A),
     Target is sqrt(2.0 * A * Margin) * 3.6.
 
-% StoppingPolicy.approachSpeedKmh: the fastest the vehicle may still be going D metres
-% before a sign posting Limit, so that slowing gently brings it to the limit a buffer before
-% the sign.
+% StoppingPolicy.approachSpeedKmh: a velocidade máxima a que o veículo ainda pode ir D metros
+% antes de um sinal que indica Limit, para que um abrandamento suave o leve ao limite com uma
+% distância de reserva antes do sinal.
 approach_speed(Limit, D, Speed) :-
     deceleration(anticipation, A),
     param(speedLimitApproachBufferMeters, Buffer),
@@ -2066,8 +2092,8 @@ approach_speed(Limit, D, Speed) :-
     Room is max(0.0, D - Buffer),
     Speed is sqrt(LimitMps * LimitMps + 2.0 * A * Room) * 3.6.
 
-% The rule applies once the approach speed is within 1 km/h of the current speed; the target
-% is that approach speed, never above the limit in force.
+% A regra aplica-se assim que a velocidade de aproximação fica a 1 km/h ou menos da velocidade
+% atual; o alvo é essa velocidade de aproximação, nunca acima do limite em vigor.
 limit_ahead_target(Next, SignPosition, Position, V, Limit, Target) :-
     D is SignPosition - Position,
     approach_speed(Next, D, Approach),
@@ -2077,23 +2103,23 @@ limit_ahead_target(Next, SignPosition, Position, V, Limit, Target) :-
 limit_ahead_reason(Next, Reason) :-
     format(atom(Reason), 'Speed limit ~w km/h ahead; slowing to reach it at the sign', [Next]).
 
-% STOP: braking curves that end 2 m before the sign.
+% STOP: curvas de travagem que terminam 2 m antes do sinal.
 above_stop_curve(V, D) :-
     deceleration(anticipation, A),
     V / 3.6 > sqrt(2.0 * A * max(0.0, D - 2.0)).
 
-% Speed (km/h) on the comfortable braking curve D metres from the sign.
+% Velocidade (km/h) na curva de travagem confortável a D metros do sinal.
 stop_comfort_curve(D, Curve) :-
     deceleration(comfort, A),
     Curve is sqrt(2.0 * A * max(0.0, D - 2.0)) * 3.6.
 
-% Metres a comfortable stop would still leave to do past the 2 m margin.
+% Metros que uma paragem confortável ainda deixaria por fazer para lá da margem de 2 m.
 stop_shortfall(V, D, Shortfall) :-
     braking_distance(V, comfort, Braking),
     Shortfall is Braking - max(0.0, D - 2.0).
 
-% Brake hard: a comfortable stop ends more than 1 m past the line, or hard braking for a
-% STOP was already under way and there is not yet 1 m to spare.
+% Travar a fundo: uma paragem confortável termina mais de 1 m depois da linha, ou já estava em
+% curso uma travagem a fundo por um STOP e ainda não há 1 m de folga.
 hard_braking_for_stop(V, D) :-
     stop_shortfall(V, D, Shortfall),
     (   Shortfall > 3.0
@@ -2111,7 +2137,7 @@ pedestrian_reason(P, 'Pedestrian ahead in path; prepare stop') :-
     known(pedestrian_in_path(P)), !.
 pedestrian_reason(_, 'Pedestrian still crossing the road ahead; giving way').
 
-% Aggregation over the 2 s window (Drools accumulate).
+% Agregação sobre a janela de 2 s (accumulate do Drools).
 persistent_critical_ttc(Count, Minimum) :-
     ttc_window_ms(Window),
     findall(T, ( known(ttc_sample(_, T, Age)), T > 0.0, T < 2.5, Age < Window ), Ts),
@@ -2119,14 +2145,14 @@ persistent_critical_ttc(Count, Minimum) :-
     Count > 0,
     min_list(Ts, Minimum).
 
-% TTC readings between 0 and Threshold s in the 2 s window.
+% Leituras de TTC entre 0 e Threshold s na janela de 2 s.
 persistent_low_ttc(Threshold, Count) :-
     ttc_window_ms(Window),
     aggregate_all(count,
                   ( known(ttc_sample(_, T, Age)), T > 0.0, T < Threshold, Age < Window ),
                   Count).
 
-% The same count, of the readings a rain reading coincides with.
+% A mesma contagem, das leituras com que coincide uma leitura de chuva.
 persistent_low_ttc_in_rain(Threshold, Count) :-
     ttc_window_ms(Window),
     rain_coincidence_ms(Coincidence),
@@ -2135,30 +2161,31 @@ persistent_low_ttc_in_rain(Threshold, Count) :-
                     once(( known(rain_sample(RainAge)), allen_coincides(Age, RainAge, Coincidence) )) ),
                   Count).
 
-% Allen's relations between point events (Drools CEP), on their times in ms:
-% after[Min]: Later comes at least Min ms after Earlier; coincides[Max]: at most Max ms apart.
+% Relações de Allen entre eventos pontuais (CEP do Drools), sobre os seus instantes em ms:
+% after[Min]: Later ocorre pelo menos Min ms depois de Earlier; coincides[Max]: no máximo Max ms
+% de diferença.
 allen_after(Later, Earlier, Min) :-
     Later - Earlier >= Min.
 allen_coincides(T1, T2, Max) :-
     abs(T1 - T2) =< Max.
 
-% The previous cycle's decision had at most the priority Name.
+% A decisão do ciclo anterior tinha, no máximo, a prioridade Name.
 previous_priority_at_most(Name) :-
     priority_value(Name, Threshold),
     known(previous_priority(P)),
     P =< Threshold.
 
-% Moving off is active after this cycle's state rules.
+% O arranque está ativo depois das regras de estado deste ciclo.
 moving_off :-
     known(move_off_started(_)), !.
 moving_off :-
     \+ known(move_off_ended),
     known(move_off_state(true, _)).
 
-% The pedestrian approach phase after this cycle's state rules. The phase is computed with
-% an unbound argument first, so that the cuts settle it before it is compared with the one
-% asked for (pedestrian_phase(braking) must fail, not fall through to the stored state,
-% once this cycle ended the braking).
+% A fase de aproximação ao peão depois das regras de estado deste ciclo. A fase é calculada
+% primeiro com um argumento não instanciado, para que os cortes a fixem antes de ser comparada
+% com a pedida (pedestrian_phase(braking) tem de falhar, e não cair no estado guardado, quando
+% este ciclo terminou a travagem).
 pedestrian_phase(Phase) :-
     settled_pedestrian_phase(Settled),
     Phase = Settled.
@@ -2172,20 +2199,21 @@ settled_pedestrian_phase(holding) :-
 settled_pedestrian_phase(Phase) :-
     known(pedestrian_braking_state(Phase, _)).
 
-% A pedestrian in conflict is being approached beyond Min metres.
+% Um peão em conflito está a ser abordado a mais de Min metros.
 pedestrian_approached(Min) :-
     known(pedestrian_conflict(P)),
     known(pedestrian(P, D)),
     D > Min.
 
-% A proposal in the longitudinal (speed) channel: anything but a lane action.
+% Uma proposta no canal longitudinal (velocidade): tudo menos uma ação de faixa.
 speed_proposal :-
     known(proposal(Action, _, _, _, _)),
     \+ memberchk(Action, [keep_lane, change_lane_left, change_lane_right, return_right]), !.
 
-% Lógica difusa: the membership functions and the centroid of FuzzySupport.java.
+% Lógica difusa: as funções de pertença e o centroide de FuzzySupport.java.
 
-% The degrees of a visibility or grip reading (clamped to 0..1) in the four input terms.
+% Os graus de uma leitura de visibilidade ou de aderência (limitada a 0..1) nos quatro termos
+% de entrada.
 fuzzy_input_degrees(Value, Poor, Reduced, Fair, Good) :-
     X is max(0.0, min(1.0, float(Value))),
     fuzzy_trapezoid(X, 0.0, 0.0, 0.35, 0.5, Poor),
@@ -2199,7 +2227,8 @@ fuzzy_output_set(moderate, 45.0, 55.0, 65.0).
 fuzzy_output_set(prudent, 55.0, 65.0, 75.0).
 fuzzy_output_set(light, 65.0, 75.0, 85.0).
 
-% Output terms, most restrictive first (ties in the strongest term go to the first).
+% Termos de saída, do mais restritivo para o menos restritivo (os empates no termo mais forte
+% ficam para o primeiro).
 fuzzy_output_terms([very_slow, slow, moderate, prudent, light]).
 
 fuzzy_triangle(X, A, B, C, D) :-
@@ -2215,8 +2244,8 @@ fuzzy_trapezoid(X, A, B, C, Dd, D) :-
     ;   D is (Dd - X) / (Dd - C)
     ).
 
-% The ceiling, when a restrictive term (any but light) holds: the centroid of the
-% aggregated output, sampled every 0.5 km/h from 0 to 130 km/h.
+% O teto, quando se verifica um termo restritivo (qualquer um exceto light): o centroide da
+% saída agregada, amostrado a cada 0,5 km/h de 0 a 130 km/h.
 fuzzy_speed_ceiling(Target, Risk) :-
     findall(T-D, known(fuzzy_conclusion(T, D)), Conclusions),
     once(( member(T0-D0, Conclusions), T0 \== light, D0 > 0.0 )),
@@ -2256,8 +2285,8 @@ fuzzy_stronger(Conclusions, Term, Best0-Degree0, Best-Degree) :-
     ;   Best = Best0, Degree = Degree0
     ).
 
-% Boxed in behind slow traffic, as the cycle leaves it: started in an earlier cycle and not
-% cleared in this one.
+% Retido atrás de tráfego lento, tal como o ciclo o deixa: começou num ciclo anterior e não foi
+% desbloqueado neste.
 current_boxed_in(Since) :-
     \+ known(boxed_in_cleared),
     known(boxed_in(_, Since)).

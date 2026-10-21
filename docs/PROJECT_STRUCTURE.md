@@ -159,12 +159,12 @@ All in [`src/main/prolog/`](../src/main/prolog); Maven copies them to the classp
 
 | File | Lines | Content |
 |---|---|---|
-| [`engine.pl`](../src/main/prolog/engine.pl) | 392 | Production-rule interpreter: working memory, dependency index, agenda, refraction, `prove/1` backward chaining, `explain/2`, `why_not/2`, `subgoal_results/2`; the meta-knowledge parts are labelled "Meta-conhecimento" |
+| [`engine.pl`](../src/main/prolog/engine.pl) | 396 | Production-rule interpreter: working memory, dependency index, agenda, refraction, `prove/1` backward chaining, `explain/2`, `why_not/2`, `subgoal_results/2`; the meta-knowledge parts are labelled "Meta-conhecimento" |
 | [`driving_state.pl`](../src/main/prolog/driving_state.pl) | 642 | State kept between cycles (the role of `01-state-updates.drl`); turns it into the facts of each cycle; `prepare_cycle/0` |
-| [`driving_rules.pl`](../src/main/prolog/driving_rules.pl) | 2 263 | 120 rules mirroring the Drools decision rules (the Drools name, with an outcome suffix in parentheses where one Drools rule has several outcomes; precedence = salience); helper predicates; fuzzy sets |
-| [`server.pl`](../src/main/prolog/server.pl) | 147 | JSON-lines protocol: `reset`, `prepareCycle`, `tick`, `whynot`, `dependencyIndex` |
+| [`driving_rules.pl`](../src/main/prolog/driving_rules.pl) | 2 292 | 120 rules mirroring the Drools decision rules (the Drools name, with an outcome suffix in parentheses where one Drools rule has several outcomes; precedence = salience); helper predicates; fuzzy sets |
+| [`server.pl`](../src/main/prolog/server.pl) | 148 | JSON-lines protocol: `reset`, `prepareCycle`, `tick`, `whynot`, `dependencyIndex` |
 
-File headers and section texts of the Prolog files are in European Portuguese; identifiers, rule ids and the comments above single rules or predicates are in English.
+All comments in the Prolog files are in European Portuguese; identifiers, rule ids (the Drools rule names) and the reason texts in `proposal(...)` are in English.
 
 ### 4.3 Facts and events
 

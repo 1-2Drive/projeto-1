@@ -295,6 +295,10 @@ when
     $state : OvertakingStateFact($active : active, $tracked : targetId, $origin : originalLane)
     VehicleStateFact(lane == Lane.RIGHT || lane == Lane.CENTER, $currentLane : lane, laneChangeState == LaneChangeState.IDLE, $speed : speedKmh, $now : timestamp)
     noContinuousLine(Lane.LEFT;)
+    // The vehicle ahead in the left lane, if any, can still be followed after the move
+    // (lane-safety.drl): without it the ego moved out behind a stopped vehicle 100 m ahead
+    // in the left lane and had to brake hard behind it.
+    roomToFollow(Lane.LEFT;)
     FrontVehicleState($target : targetId != "none", $distance : distanceMeters > 15.0, $relative : relativeSpeedMps > 0.5, timestamp == $now)
     LaneOccupancyState(lane == Lane.LEFT, occupied == false, $leftFront : frontDistanceMeters)
     not PedestrianStateFact(pedestrianId != "none", inPath == true || crossingState == PedestrianCrossingState.CROSSING)

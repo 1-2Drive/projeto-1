@@ -75,6 +75,18 @@ rule('Emergency stop for pedestrian extremely close',
      [ assert(proposal(emergency_brake, 0.0, critical, emergency_safety,
                        'Pedestrian critical distance in current path')) ]).
 
+% The approach curve and the mandatory stop brake comfortably; a pedestrian first seen when
+% only hard braking still stops 6 m short of it needs the hard braking now, not at 6 m.
+rule('Emergency brake for pedestrian when comfortable braking no longer stops in time',
+     879,
+     [ pedestrian_conflict(P),
+       pedestrian(P, D),
+       ego_speed(V),
+       test(D > 6.0),
+       test(pedestrian_hard_braking(V, D)) ],
+     [ assert(proposal(emergency_brake, 0.0, critical, emergency_safety,
+                       'Pedestrian ahead; comfortable braking no longer stops short of it')) ]).
+
 % Only a reading from the last 300 ms counts, and only in the lane the vehicle is physically
 % in: steering out of the obstacle's lane, it is past the obstacle once its lateral position
 % has left that lane, even while the committed lane (settled after the actuator) is the old one.
@@ -499,6 +511,8 @@ rule('Overtake slow front vehicle via left lane',
        test(memberchk(Lane, [right, center])),
        lane_change_state(idle),
        prove(no_continuous_line(left)),
+       % the vehicle ahead in the left lane, if any, can still be followed after the move
+       prove(room_to_follow(left)),
        ego_speed(V),
        time_ms(Now),
        front_vehicle(Target, D, Rel),
@@ -1929,6 +1943,13 @@ barrier_hard_braking(V, D) :-
     deceleration(comfort, A),
     Vms is max(0.0, V) / 3.6,
     Vms * Vms / (2.0 * max(0.1, D)) > A * 1.1.
+
+% Comfortable braking (with a margin) no longer stops the vehicle 6 m short of a pedestrian
+% D m ahead: the emergency distance of the pedestrian rules.
+pedestrian_hard_braking(V, D) :-
+    deceleration(comfort, A),
+    Vms is max(0.0, V) / 3.6,
+    Vms * Vms / (2.0 * max(0.5, D - 6.0)) > A * 1.1.
 
 % Distance from which an obstacle in the ego's lane is stopped for: the comfortable stopping
 % distance at V km/h (reaction + braking + the offset), never less than 60 m.

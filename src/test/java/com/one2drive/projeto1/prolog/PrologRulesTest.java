@@ -190,7 +190,29 @@ class PrologRulesTest {
         try (PrologTestHarness harness = new PrologTestHarness()) {
             DrivingDecision decision = harness.cycle(1_000, 50.0,
                 new PedestrianDetectedEvent(1_000, "camera", 18.0, "ped-1", true));
-            assertTrue(decision.getAction() == DrivingAction.BRAKE || decision.getAction() == DrivingAction.STOP);
+            // 18 m at 50 km/h cannot be stopped comfortably: the hard braking is the braking.
+            assertEquals(DrivingAction.EMERGENCY_BRAKE, decision.getAction());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void pedestrianFarAheadAtHighSpeedIsBrakedForHard() {
+        try (PrologTestHarness harness = new PrologTestHarness()) {
+            DrivingDecision decision = harness.cycle(1_000, 90.0,
+                new PedestrianDetectedEvent(1_000, "camera", 80.0, "ped-1", true));
+            assertEquals(DrivingAction.EMERGENCY_BRAKE, decision.getAction());
+            assertEquals("Emergency brake for pedestrian when comfortable braking no longer stops in time", decision.getSourceRule());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void pedestrianFarAheadAtModerateSpeedIsBrakedForAlongTheCurve() {
+        try (PrologTestHarness harness = new PrologTestHarness()) {
+            DrivingDecision decision = harness.cycle(1_000, 60.0,
+                new PedestrianDetectedEvent(1_000, "camera", 80.0, "ped-1", true));
+            assertEquals(DrivingAction.BRAKE, decision.getAction());
         }
     }
 
@@ -277,7 +299,9 @@ class PrologRulesTest {
             DrivingDecision decision = harness.cycle(1_000, 50.0,
                 new TrafficLightEvent(1_000, "camera", TrafficLightState.GREEN, 20.0, "light-1"),
                 new PedestrianDetectedEvent(1_000, "camera", 14.0, "ped-1", true));
-            assertTrue(decision.getAction() == DrivingAction.STOP || decision.getAction() == DrivingAction.BRAKE);
+            assertTrue(decision.getAction() == DrivingAction.STOP || decision.getAction() == DrivingAction.BRAKE
+                || decision.getAction() == DrivingAction.EMERGENCY_BRAKE, decision.getAction().name());
+            assertTrue(decision.getSourceRule().contains("pedestrian"), decision.getSourceRule());
         }
     }
 

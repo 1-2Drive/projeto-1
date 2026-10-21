@@ -305,9 +305,15 @@ public class WorldState {
             .or(() -> ahead.stream().min(nearestFirst));
     }
 
-    /** A stop sign only binds the lane it stands in: one in another lane is not the vehicle's to obey. */
+    /**
+     * A stop sign only binds the lane it stands in: one in another lane is not the vehicle's
+     * to obey. The lane is the one the vehicle is heading for ({@link EgoVehicleState#getPathLane()}):
+     * while a lane change runs the sign in the lane being entered is already the vehicle's,
+     * and the one in the lane being left no longer is. Read from the committed lane, a
+     * vehicle moving into a lane drove through its stop sign at speed.
+     */
     public Optional<StopSign> nearestStopSign(double maxDistance) {
-        return nearestByType(StopSign.class, maxDistance).filter(sign -> sign.getLane() == ego.getLane());
+        return nearestByType(StopSign.class, maxDistance).filter(sign -> sign.getLane() == ego.getPathLane());
     }
 
     public Optional<Pothole> nearestPothole(double maxDistance) {

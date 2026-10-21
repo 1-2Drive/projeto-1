@@ -203,7 +203,8 @@ class DrivingExpertSystemRulesTest {
                 50.0,
                 new PedestrianDetectedEvent(1_000, "camera", 18.0, "ped-1", true)
             );
-            assertTrue(decision.getAction() == DrivingAction.BRAKE || decision.getAction() == DrivingAction.STOP);
+            // 18 m at 50 km/h cannot be stopped comfortably: the hard braking is the braking.
+            assertEquals(DrivingAction.EMERGENCY_BRAKE, decision.getAction());
         }
     }
 
@@ -550,7 +551,9 @@ class DrivingExpertSystemRulesTest {
                 new TrafficLightEvent(1_000, "camera", TrafficLightState.GREEN, 20.0, "light-1"),
                 new PedestrianDetectedEvent(1_000, "camera", 14.0, "ped-1", true)
             );
-            assertTrue(decision.getAction() == DrivingAction.STOP || decision.getAction() == DrivingAction.BRAKE);
+            assertTrue(decision.getAction() == DrivingAction.STOP || decision.getAction() == DrivingAction.BRAKE
+                || decision.getAction() == DrivingAction.EMERGENCY_BRAKE, decision.getAction().name());
+            assertTrue(decision.getSourceRule().contains("pedestrian"), decision.getSourceRule());
         }
     }
 
@@ -817,11 +820,13 @@ class DrivingExpertSystemRulesTest {
     @Test
     @Timeout(10)
     void pedestrianAt35MetersPrevailsOverRedLightApproach() {
-        try (DroolsTestHarness harness = new DroolsTestHarness(60.0)) {
-            // At 70 m and 60 km/h the red light approach still allows the current speed.
+        // 40 km/h: comfortable braking still stops short of the pedestrian (at 60 km/h it no
+        // longer does and the pedestrian is braked for hard instead).
+        try (DroolsTestHarness harness = new DroolsTestHarness(40.0)) {
+            // At 70 m and 40 km/h the red light approach still allows the current speed.
             DrivingDecision decision = harness.cycle(
                 1_000,
-                60.0,
+                40.0,
                 new TrafficLightEvent(1_000, "camera", TrafficLightState.RED, 70.0, "light-1"),
                 new PedestrianDetectedEvent(1_000, "camera", 35.0, "ped-1", true)
             );
@@ -833,12 +838,13 @@ class DrivingExpertSystemRulesTest {
     @Test
     @Timeout(10)
     void pedestrianBetween10And20MetersStopsTheVehicleBeforeARedLight() {
-        try (DroolsTestHarness harness = new DroolsTestHarness(60.0)) {
+        // 15 km/h: slow enough for the mandatory stop to be a comfortable one this close.
+        try (DroolsTestHarness harness = new DroolsTestHarness(15.0)) {
             for (double distance : new double[]{10.0, 15.0, 20.0}) {
                 long now = 1_000 + (long) distance * 100;
                 DrivingDecision decision = harness.cycle(
                     now,
-                    60.0,
+                    15.0,
                     new TrafficLightEvent(now, "camera", TrafficLightState.RED, 70.0, "light-1"),
                     new PedestrianDetectedEvent(now, "camera", distance, "ped-1", true)
                 );
@@ -859,6 +865,36 @@ class DrivingExpertSystemRulesTest {
             );
             assertEquals(DrivingAction.EMERGENCY_BRAKE, decision.getAction());
             assertEquals("Emergency stop for pedestrian extremely close", decision.getSourceRule());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void pedestrianFarAheadAtHighSpeedIsBrakedForHardWhenComfortableBrakingCannotStop() {
+        // 90 km/h, 80 m: stopping 6 m short needs 4.2 m/s2, above the comfortable 2.8 (x1.1).
+        try (DroolsTestHarness harness = new DroolsTestHarness(90.0)) {
+            DrivingDecision decision = harness.cycle(
+                1_000,
+                90.0,
+                new PedestrianDetectedEvent(1_000, "camera", 80.0, "ped-1", true)
+            );
+            assertEquals(DrivingAction.EMERGENCY_BRAKE, decision.getAction());
+            assertEquals("Emergency brake for pedestrian when comfortable braking no longer stops in time", decision.getSourceRule());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void pedestrianFarAheadAtModerateSpeedIsBrakedForAlongTheCurve() {
+        // 60 km/h, 80 m: 1.9 m/s2 stops 6 m short, so the approach curve is enough.
+        try (DroolsTestHarness harness = new DroolsTestHarness(60.0)) {
+            DrivingDecision decision = harness.cycle(
+                1_000,
+                60.0,
+                new PedestrianDetectedEvent(1_000, "camera", 80.0, "ped-1", true)
+            );
+            assertEquals(DrivingAction.BRAKE, decision.getAction());
+            assertEquals("Brake for pedestrian proximity", decision.getSourceRule());
         }
     }
 
@@ -1060,8 +1096,9 @@ class DrivingExpertSystemRulesTest {
                 new TrafficLightEvent(1_200, "camera", TrafficLightState.YELLOW, 46.0, "light-1"),
                 new PedestrianDetectedEvent(1_200, "camera", 15.0, "ped-1", true)
             );
-            assertEquals(DrivingAction.STOP, pedestrian.getAction());
-            assertEquals("Stop for pedestrian in crossing zone", pedestrian.getSourceRule());
+            // 15 m at 60 km/h: the stop is a hard one, and it still beats the commitment to proceed.
+            assertEquals(DrivingAction.EMERGENCY_BRAKE, pedestrian.getAction());
+            assertEquals("Emergency brake for pedestrian when comfortable braking no longer stops in time", pedestrian.getSourceRule());
         }
     }
 

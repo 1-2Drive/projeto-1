@@ -18,7 +18,7 @@ The project has two inference engines: **Drools** (Java, the default) and **SWI-
 
 **Agenda** — The list of activations waiting to fire. In Drools it is ordered by agenda group and salience; in the Prolog engine by precedence, then rule order, then match order.
 
-**Agenda group (phase)** — A Drools mechanism that groups rules so that only the group with the focus can fire. This project uses three, run in order every cycle: `perception`, `decision`, `fallback`. The order is set by the rule "Control: perceive, then decide, then fall back".
+**Agenda group (phase)** — A Drools mechanism that groups rules so that only the group with the focus can fire. This project uses four, run in order every cycle: `control` (the rule "Control: perceive, then decide, then fall back"), `perception`, `decision`, `fallback`. `KnowledgeSession.beginDecisionCycle` sets the order by pushing the focus at the start of each cycle.
 
 **Allen's interval relations (temporal operators)** — Relations between events in time, such as *after*, *before*, *coincides*. Drools CEP provides them as operators. *Examples:* the stop sign is satisfied when a speed reading comes `after[1200ms]` the moment the car stopped; a low TTC counts in rain only if a rain reading `coincides[400ms]` with it.
 
@@ -36,8 +36,8 @@ See [ARCHITECTURE.md §5](ARCHITECTURE.md#5-action-selection-and-priority-resolu
 - *Drools:* nothing is undone or retried; every rule whose conditions hold is activated.
 
 **Backward chaining** — Goal-driven inference: to prove a goal, prove the sub-goals it depends on, down to known facts. Used here for one goal, "is it safe to change lane to this side?":
-- in Drools, the query `safeToChangeLane` and its sub-goal queries (`lane-safety.drl`);
-- in Prolog, `safe_to_change_lane/1` proved by `prove/1` (`engine.pl`).
+- in Drools, the query `safeToChangeLane` and its sub-goal queries (`lane-safety.drl`); the same sub-goals also derive the `SafeLaneSide` facts (see *safe lane side*);
+- in Prolog, `safe_to_change_lane/1` proved through `prove(Goal)` conditions (`prove_goal/2` in `engine.pl`).
 
 Both are called from forward-chaining rules.
 
@@ -49,7 +49,7 @@ Both are called from forward-chaining rules.
 
 **Boxed in** — The situation where the car follows a slow vehicle outside the right lane and cannot overtake (every lane slow, or the left side closed). Recorded as `BoxedInFact`; after 3 s the car gives up and returns right.
 
-**Braking curve** — The highest speed from which the car can still stop, or match another speed, within a given distance at a given deceleration: v = √(v₀² + 2·a·d). Used by the following-distance, pedestrian, stop-sign, obstacle and speed-limit rules (a = 2.0 m/s² "anticipation" or 2.8 m/s² "comfortable").
+**Braking curve** — The highest speed from which the car can still stop, or match another speed, within a given distance at a given deceleration: v = √(v₀² + 2·a·d) (`StoppingPolicy.curveSpeedKmh`). Used by the following-distance, pedestrian, stop-sign, obstacle, barrier, pothole and speed-limit rules (a = 2.0 m/s² "anticipation" or 2.8 m/s² "comfortable").
 
 **CEP (Complex Event Processing)** — Reasoning over time-stamped events and their temporal relations, such as "three readings within two seconds". Drools CEP is enabled by `eventProcessingMode="stream"` in `kmodule.xml`. Seven rules use sliding windows or Allen operators.
 
@@ -101,7 +101,7 @@ Both are called from forward-chaining rules.
 
 **Expert system** — A program that solves problems in a specialised domain by applying explicitly represented expert knowledge, typically as rules, with an inference engine and an explanation facility. Here the domain is driving decisions for a simulated car.
 
-**Explanation trace / timeline** — The chronological record of perception changes, rule activations and firings, fact changes, decisions, actuator changes and maneuvers (`ExplanationTrace`, at most 500 entries), shown in the user interface.
+**Explanation trace / timeline** — The chronological record of perception changes, rule activations and firings, fact changes, decisions, actuator changes and maneuvers (`ExplanationTrace`), shown in the user interface. Both backends create it with no entry limit (`new ExplanationTrace(0)`).
 
 **Fact** — An object in working memory that rules can match.
 - *Drools examples:* `VehicleStateFact` (current speed, lane …), `CurrentSpeedLimit` (50 km/h from sign `r28-CENTER`), `DrivingDecision`.
@@ -126,8 +126,8 @@ Both are called from forward-chaining rules.
 **KieSession (knowledge session)** — A Drools session holding the working memory and evaluating the rules. This project uses one stateful session per simulation, rebuilt on every reset and backend switch (`KnowledgeSession`).
 
 **Knowledge base** — The body of expert knowledge:
-- Drools: 119 rules and 6 queries in `src/main/resources/rules/`, compiled into `drivingKbase`;
-- Prolog: 107 rules in `src/main/prolog/driving_rules.pl`, plus the perception state code in `driving_state.pl`.
+- Drools: 123 rules and 6 queries in `src/main/resources/rules/`, compiled into `drivingKbase`;
+- Prolog: 120 rules in `src/main/prolog/driving_rules.pl` (one or more per Drools driving rule, under the same name, plus two intermediate rules), plus the perception state code in `driving_state.pl`.
 
 **Lane / lane change / maneuver** — The road has three lanes (LEFT −3.5 m, CENTER 0 m, RIGHT +3.5 m from the centre line). A lane change (maneuver) moves the car sideways at 1.2 m/s (about 2.9 s per lane) through the states `IDLE` → `REQUESTED` → `CHANGING` → `COMPLETED` → `IDLE`. It cannot be cancelled.
 
@@ -141,11 +141,11 @@ Both are called from forward-chaining rules.
 - the dependency index (which rules read which facts);
 - the control knowledge (rule precedence, rule order, refraction).
 
-In Drools, the control rule that orders the agenda groups plays a similar role.
+In Drools, the agenda groups and the control rule that opens each cycle play a similar role.
 
 **Move-off** — Restarting a stopped car once nothing holds it, handled by `MoveOffState` and "Move off when stopped and nothing holds the vehicle".
 
-**no-loop** — A Drools rule attribute that stops a rule from re-activating itself through its own fact update. Used by all perception rules.
+**no-loop** — A Drools rule attribute that stops a rule from re-activating itself through its own fact update. Used by every perception rule except "Derive the sides that are safe to change lane to", which only inserts logically.
 
 **Outcome (proposal outcome)** — What the arbitration did with a proposal (`DecisionProposal.Outcome`):
 
@@ -156,6 +156,8 @@ In Drools, the control rule that orders the agenda groups plays a similar role.
 | `VETOED_BY` | A lane change cancelled by braking for a stop |
 | `CAPPED` | A ceiling that set the speed of a stop decision |
 | `REJECTED_BY` | The actuator refused the lane change |
+
+**Path lane / physical lane** — Two views of the car's lane besides the committed lane (`VehicleStateFact`, `EgoVehicleState`). The **path lane** is the lane the car's path runs along: the target lane while a lane change is moving, the committed lane otherwise. The rules that approach a hazard (pothole, obstacle, closed barrier) and the camera's choice of stop sign use it, so a hazard in the lane being entered counts and one in the lane being left does not. The **physical lane** is the lane of the car's lateral position; the high-severity obstacle emergency rule uses it. Prolog: `ego_path_lane/1`, `ego_physical_lane/1`.
 
 **Pattern matching** — How rule conditions are evaluated against facts:
 - In Drools, each pattern (e.g. `PedestrianStateFact(distanceMeters <= 6.0)`) is matched against objects by field constraints, and variables (`$distance`) are bound to field values.
@@ -200,11 +202,15 @@ The Prolog backend has no session clock: each request carries the simulation tim
 
 **Room to follow** — The lane-change sub-goal `roomToFollow`: after a 3 s lane change, the car must still be able to slow to the speed of the vehicle ahead in the new lane and stay 12 m behind it, braking at 2.0 m/s² (`StoppingPolicy.roomToFollow`).
 
+**Room to leave the lane** — `StoppingPolicy.roomToLeaveLane`: a lane change counts as a way past a hazard only if the hazard is at least speed × (0.5 s reaction + 2.0 s to clear the lane) + 5 m ahead. Closer than that the avoidance rules do not fire and the approach rules brake for the hazard.
+
 **Rule** — A unit of knowledge in the form "when these conditions hold, then do this".
 - *Drools:* written in DRL. Example: "Stop for pedestrian in crossing zone" — when a pedestrian in the path or crossing is 6–32 m away, propose `STOP`.
 - *Prolog:* a `rule(Id, Precedence, Conditions, Actions)` term.
 
 **Rule conflict** — A situation where several rules propose incompatible actions at the same time, e.g. "continue on green" versus "stop for pedestrian". Resolved by *arbitration*. Some conflicts are resolved incorrectly; see [BUSINESS_RULES.md §17](BUSINESS_RULES.md#17-consistency-audit).
+
+**Safe lane side** — A `SafeLaneSide(side)` fact, inserted logically by the perception rule "Derive the sides that are safe to change lane to" for each side where the four sub-goals of `safeToChangeLane` hold. Rules that need "no safe side" (a barrier stop, the avoidance on the less preferred side) test its absence. The Prolog engine has no such fact; it proves `safe_to_change_lane/1` directly.
 
 **Safety action** — An action whose purpose is to reduce risk: `EMERGENCY_BRAKE`, `BRAKE`, `STOP`, `REDUCE_SPEED`, `KEEP_LANE`, or a lane change that avoids a hazard.
 
@@ -218,7 +224,7 @@ The Prolog backend has no session clock: each request carries the simulation tim
 
 **Snapshot / WebSocket** — A snapshot is the full state sent to the user interface (`ApiSimulationSnapshot`). The WebSocket at `/api/ws/simulation` pushes one as a JSON frame on connect, every 100 ms tick and after each command; it is one way, backend to frontend.
 
-**Stale perception** — A belief that is no longer confirmed by the sensors. Beliefs are reset after 250 ms (vehicles), 400 ms (traffic lights), 1 s (pedestrians, hazards, pending signs) or 1.5 s (stop signs) without a report. The speed limit in force is never reset.
+**Stale perception** — A belief that is no longer confirmed by the sensors. Beliefs are reset after 250 ms (vehicles), 400 ms (traffic lights), 1 s (pedestrians, hazards, pending signs) or 1.5 s (stop signs) without a report; a stop sign whose stop is still owed at or past the line is kept until the stop is made. The speed limit in force is never reset.
 
 **State fact** — A long-lived, mutable fact holding the current belief about one topic (e.g. `PedestrianStateFact`, `FrontVehicleState`), updated by the perception rules in `01-state-updates.drl`.
 
@@ -226,9 +232,9 @@ The Prolog backend has no session clock: each request carries the simulation tim
 
 **Sub-goal** — A condition that must be proved to prove a goal. `safeToChangeLane` has four: `maneuverIdle`, `noContinuousLine`, `sideClear`, `roomToFollow`. The why-not answer names the sub-goals that fail.
 
-**SWI-Prolog** — A free Prolog system. This project runs it as an external process (`swipl`, version 9.x) for the Prolog backend; it must be installed separately and was not installed during this analysis.
+**SWI-Prolog** — A free Prolog system. This project runs it as an external process (`swipl`, version 9.x) for the Prolog backend; it must be installed separately. It was not installed in the documentation analysis that measured the tests, so the Prolog tests were skipped there.
 
-**Test coverage** — The extent to which tests exercise the code or rules. No line or branch coverage tool is configured. In this analysis, rule-firing coverage was measured for the Drools rules; see [TESTING.md §6](TESTING.md#6-rules-and-behaviours-covered).
+**Test coverage** — The extent to which tests exercise the code or rules. No line or branch coverage tool is configured. In a previous documentation analysis, rule-firing coverage was measured for the Drools rules (not re-measured for the rules added since); see [TESTING.md §6](TESTING.md#6-rules-and-behaviours-covered).
 
 **Tick** — One step of the simulation loop: 100 ms of simulation time, in which physics, sensing, inference and actuation run once (`SimulationEngine.tick()`).
 
@@ -240,7 +246,7 @@ The Prolog backend has no session clock: each request carries the simulation tim
 
 **Traceability** — The ability to link a requirement or scenario to the rules that implement it and the tests that check it. See [TRACEABILITY_MATRIX.md](TRACEABILITY_MATRIX.md).
 
-**Truth maintenance (logical insertion)** — A Drools feature (`insertLogical`): a fact inserted this way is retracted automatically when the conditions that justified it no longer hold. Used for the fuzzy memberships and conclusions.
+**Truth maintenance (logical insertion)** — A Drools feature (`insertLogical`): a fact inserted this way is retracted automatically when the conditions that justified it no longer hold. Used for the fuzzy memberships and conclusions, and for `SafeLaneSide`.
 
 **Unification** — In Prolog, the operation that makes two terms identical by binding variables.
 - *Prolog engine:* it matches rule patterns against working-memory facts by unification.

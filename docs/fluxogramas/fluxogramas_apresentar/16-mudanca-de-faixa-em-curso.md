@@ -7,7 +7,7 @@ flowchart TD
     S(["As regras decidiram mudar de faixa"]) --> Q1{"Já há uma mudança de faixa em curso?"}
     Q1 -- "Sim" --> A9["Ignora a nova decisão:<br/>termina primeiro a atual"]
     Q1 -- "Não" --> Q2{"Verificação final com o que está na estrada:<br/>a faixa de destino está livre?<br/>(nada ao lado a 30 m nem perigo a 60 m)"}
-    Q2 -- "Não" --> A0["Cancela antes de começar<br/>e abranda 10 km/h por precaução"]
+    Q2 -- "Não" --> A0["Cancela antes de começar e,<br/>se ainda não estiver a travar,<br/>abranda 10 km/h por precaução"]
     Q2 -- "Sim" --> Q3{"Há linha contínua entre as faixas?"}
     Q3 -- "Sim" --> A0
     Q3 -- "Não" --> A1["Liga o pisca e começa a mudar"]

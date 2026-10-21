@@ -2,8 +2,8 @@
 
 TTC (tempo até colisão) = distância medida ÷ velocidade relativa, quando a velocidade relativa é superior a 0,05 m/s; caso contrário é infinito (`FrontRadarSensor`).
 
-- **Branch / commit:** `teste_ana` @ `70082b4` + alterações de 18/10 por commitar (working tree)
-- **Estado da informação:** confirmado pelo código e por testes.
+- **Branch / commit:** working tree a 21/10/2026
+- **Estado da informação:** confirmado pelo código e por testes (as três regras existem no Drools e no Prolog, com os mesmos nomes).
 
 ## Fluxograma
 
@@ -73,11 +73,11 @@ R1 = `Emergency brake when persistent TTC is critical`; R2 = `Emergency brake wh
 
 | Regra | Ficheiro:linha | Salience | Ação | Prioridade |
 |---|---|---|---|---|
-| R1 `Emergency brake when persistent TTC is critical` | `emergency.drl:18` | 900 | `EMERGENCY_BRAKE` | 70 |
-| R2 `Emergency brake when TTC is immediately critical` | `emergency.drl:42` | 890 | `EMERGENCY_BRAKE` | 70 |
+| R1 `Emergency brake when persistent TTC is critical` | `emergency.drl:19` | 900 | `EMERGENCY_BRAKE` | 70 |
+| R2 `Emergency brake when TTC is immediately critical` | `emergency.drl:43` | 890 | `EMERGENCY_BRAKE` | 70 |
 | R3 `Persistent low TTC in rain increases conservatism` | `temporal.drl:17` | 560 | `BRAKE` | 50 |
 
-Estas regras leem os eventos diretamente do stream, com janelas deslizantes; não dependem de `FrontVehicleState`. O comentário em `emergency.drl:15-17` explica a opção.
+Estas regras leem os eventos diretamente do stream, com janelas deslizantes; não dependem de `FrontVehicleState`. O comentário em `emergency.drl:16-18` explica a opção. No Prolog (`driving_rules.pl`, secção "Emergência" e `Persistent low TTC in rain increases conservatism`), as amostras de TTC chegam ao ciclo como `ttc_sample(Alvo, TTC, Idade)`, guardadas por `driving_state.pl` durante a janela de 2 s (`ttc_window_ms(2000)`); R1 conta-as em `persistent_critical_ttc/2`, R2 exige idade inferior a 200 ms.
 
 **Rastreabilidade**
 
@@ -86,12 +86,12 @@ Estas regras leem os eventos diretamente do stream, com janelas deslizantes; nã
 | Sensor | `FrontRadarSensor` (100 ms, 130 m) |
 | Declaração do evento | `00-declarations.drl` (`TTCEvent`, `@expires(10s)`) |
 | Cenário de demonstração | `S8` (Critical TTC) — `scenarios.json:578`: começa em CENTER a 95 km/h, com um veículo a 30 km/h 40 m à frente (TTC ≈ 2,2 s) |
-| Testes | `DrivingExpertSystemRulesTest`: `ttcCriticalTriggersEmergency` (212), `isolatedTtcSampleDoesNotTriggerPersistentRule` (227), `repeatedTtcInsideWindowTriggersPersistentEmergency` (240), `conflictAccelerationAndCriticalTtcEmergencyWins` (446), `conflictRainAndTtcRiskConservativeAction` (462), `lowTtcCountsInRainOnlyWhenARainReadingCoincidesWithIt` (477); `PrologDroolsEquivalenceTest`: "low TTC that no rain reading coincides with"; `SimulationEngineE2ETest`: `ttcFlowProducesEmergencyBrakeAndRecoversRisk` (459), `emergencyDecisionAppliesEmergencyDecelerationToWorldState` (666) |
+| Testes | `DrivingExpertSystemRulesTest`: `ttcCriticalTriggersEmergency` (213), `isolatedTtcSampleDoesNotTriggerPersistentRule` (228), `repeatedTtcInsideWindowTriggersPersistentEmergency` (241), `conflictAccelerationAndCriticalTtcEmergencyWins` (578), `conflictRainAndTtcRiskConservativeAction` (594), `lowTtcCountsInRainOnlyWhenARainReadingCoincidesWithIt` (609); `PrologRulesTest`: `ttcCriticalTriggersEmergency` (243), `isolatedTtcSampleDoesNotTriggerPersistentRule` (256), `repeatedTtcInsideWindowTriggersPersistentEmergency` (265), `ttcSamplesOutsideTheWindowDoNotCount` (276), `immediateTtcTriggersEmergency` (287), `rainAndPersistentLowTtcBrake` (889); `PrologDroolsEquivalenceTest`: "persistent TTC", "immediate TTC", "rain and persistent low TTC", "low TTC without rain", "low TTC that no rain reading coincides with"; `SimulationEngineE2ETest` (só Drools): `ttcFlowProducesEmergencyBrakeAndRecoversRisk` (459), `emergencyDecisionAppliesEmergencyDecelerationToWorldState` (666) |
 
 **Relações**
 
 - Usa os mesmos eventos do radar que C09; R3 depende do estado meteorológico de C18.
-- Conflitos: R1 e R2 (70) ganham a todas as outras propostas, incluindo semáforo vermelho e STOP (60). R3 (50, 15 km/h) empata com as regras de C09 e ganha por ter a velocidade mais baixa; ganha ao teto difuso do tempo de C18 (40), que nunca desce abaixo de cerca de 25 km/h. Os conflitos com aceleração e com chuva estão confirmados por teste.
+- Conflitos: R1 e R2 (70) ganham a todas as outras propostas de velocidade, incluindo semáforo vermelho e STOP (60), e, enquanto travam, vetam qualquer manobra lateral de prioridade inferior (`DecisionContext.vetoes`), por exemplo um desvio a 50. R3 (50, 15 km/h) é um teto de velocidade: entre os tetos (50, 40 e 20) ganha o mais baixo, seja qual for o degrau, por isso R3 ganha às regras de C09 que recomendam mais de 15 km/h e ao teto difuso do tempo de C18 (40), que nunca desce abaixo de 25 km/h. Os conflitos com aceleração e com chuva estão confirmados por teste.
 
 **Limitações**
 

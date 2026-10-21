@@ -1,9 +1,9 @@
 # C18 — Chuva, visibilidade e aderência (lógica difusa)
 
-- **Branch / commit:** `teste_ana` @ `70082b4` + alterações de 18/10 por commitar (working tree) (lógica difusa)
-- **Estado da informação:** confirmado pelo código e por testes.
+- **Branch / commit:** working tree a 21/10/2026
+- **Estado da informação:** confirmado pelo código e por testes (as mesmas regras, com os mesmos nomes, no Drools e no Prolog).
 
-A visibilidade e a aderência são termos vagos ("visibilidade reduzida", "piso escorregadio"). Em vez de limiares rígidos, um controlador difuso de Mamdani (PDF 07) transforma cada leitura em graus de pertença, combina-os com regras difusas e devolve uma única velocidade recomendada pelo centróide.
+A visibilidade e a aderência são termos vagos ("visibilidade reduzida", "piso escorregadio"). Em vez de limiares rígidos, um controlador difuso de Mamdani (PDF 07) transforma cada leitura em graus de pertença, combina-os com regras difusas e devolve uma única velocidade recomendada pelo centróide. `fuzzy-weather.drl` substituiu o antigo `weather.drl` e as suas três regras nítidas.
 
 ## Fluxograma
 
@@ -113,46 +113,50 @@ A chuva é nítida (o sensor só dá `RAIN` ou `CLEAR`) e entra nas regras com g
 | R4 `Fuzzy: rain with good visibility and good grip -> prudent` | `fuzzy-weather.drl:89` | 355 | — (factos lógicos) | — |
 | R5 `Fuzzy: no rain with good visibility and good grip -> light` | `fuzzy-weather.drl:102` | 355 | — (factos lógicos) | — |
 | `Defuzzify weather speed ceiling` | `fuzzy-weather.drl:114` | 350 | `REDUCE_SPEED` | 40 |
-| `Update weather state` | `01-state-updates.drl` | 1000 | — | — |
+| `Update weather state` | `01-state-updates.drl:131` | 1000 | — | — |
 
 A `salience` só define a ordem de disparo dentro do ciclo (fuzzificação → inferência → defuzzificação). A arbitragem não depende dela.
 
 **Truth maintenance:** os graus (`FuzzyMembership`) e as conclusões (`FuzzyConclusion`) são inseridos com `insertLogical`. Quando chega uma leitura nova, os graus antigos perdem a justificação e o Drools retira-os, e com eles as conclusões que deles dependiam. Não há código de limpeza.
 
-**De onde vêm os valores** (`SimulationEngine.java:855-877`, `EnvironmentSensor.java`)
+**De onde vêm os valores** (`SimulationEngine.java:954-978`, `ScenarioFactory.toWeatherState`, `EnvironmentSensor.java`)
 
 | Origem | Condição | Visibilidade | Aderência |
 |---|---|---|---|
-| `setRain(true)` (ação `SET_RAIN`) | `RAIN` | 0,70 | 0,65 |
-| `setRain(false)` (ação `CLEAR_WEATHER`) | `CLEAR` | 1,00 | 1,00 |
+| `setRain(true)` (ação `SET_RAIN`) ou `initialWeather: RAIN` | `RAIN` | 0,70 | 0,65 |
+| `setRain(false)` (ação `CLEAR_WEATHER`) ou `initialWeather: CLEAR` | `CLEAR` | 1,00 | 1,00 |
 | `setWeatherFactors(v, g)` (`POST /api/environment`, cursores da interface) | `RAIN` se algum fator < 0,95; senão `CLEAR` | limitado a [0,2; 1,0] | limitado a [0,2; 1,0] |
 
 Pela interface, qualquer redução de um cursor abaixo de 0,95 põe a condição em `RAIN`. Por isso o termo `ligeira` (R5, sem chuva) só aparece com eventos meteorológicos diretos, como nos testes.
+
+O sensor de ambiente lê a cada 400 ms e publica um `WeatherEvent` (condição, visibilidade, aderência); publica também `VisibilityEvent`, `RoadGripEvent` e, abaixo de 0,85, `ReducedVisibilityEvent`/`ReducedGripEvent`, que nenhuma regra lê (só estão declarados em `00-declarations.drl`; o Prolog ignora os dois primeiros em `record_event/1` e aceita os outros sem efeito). As regras leem o estado persistente `WeatherStateFact` (Prolog: `weather/3`), por isso o teto não cai entre leituras.
 
 **Rastreabilidade**
 
 | Elemento | Local |
 |---|---|
 | Regras Drools | `src/main/resources/rules/fuzzy-weather.drl` |
-| Regras Prolog (mesmos nomes) | `src/main/prolog/driving_rules.pl:1054-1118`; funções de pertença e centróide no fim do ficheiro (`fuzzy_input_degrees/5`, `fuzzy_speed_ceiling/2`) |
+| Regras Prolog (mesmos nomes) | `src/main/prolog/driving_rules.pl:1342-1421` (secção "Condições meteorológicas"); funções de pertença e centróide em "Lógica difusa" (`driving_rules.pl:2186`, `fuzzy_input_degrees/5`, `fuzzy_speed_ceiling/2`) |
 | Conjuntos e centróide | `drools/FuzzySupport.java` |
 | Factos | `drools/facts/FuzzyMembership.java`, `drools/facts/FuzzyConclusion.java`, `drools/facts/WeatherStateFact.java` |
 | Endpoint | `EnvironmentController.java` |
-| Testes | `FuzzySupportTest` (pertença, centróide, termo dominante); `DrivingExpertSystemRulesTest`: `rainAdjustsSafeSpeed` (326), `reducedVisibilityAndGripTriggerConservativeReduction` (340), `rainAloneIsAModerateFuzzyCeilingOf65` (366), `goodClearWeatherProposesNoFuzzyCeiling` (379), `fuzzyFactsAreRetractedWhenTheWeatherClears` (391); `PrologRulesTest`: `rainAdjustsSafeSpeed`, `reducedVisibilityAndGripTriggerConservativeReduction`; `PrologDroolsEquivalenceTest`: casos "fuzzy: …" |
+| Cenários | `S10` (Rain low grip, `scenarios.json:615`): começa com chuva (0,70/0,65) a 85 km/h; `S11` (`SET_RAIN` aos 3,5 s); `S12_PRESENTATION_DEMO` (`SET_RAIN` aos 14 s, `CLEAR_WEATHER` aos 65 s) |
+| Testes | `FuzzySupportTest` (pertença, centróide, termo dominante); `DrivingExpertSystemRulesTest`: `rainAdjustsSafeSpeed` (455), `reducedVisibilityAndGripTriggerConservativeReduction` (469), `rainAloneIsAModerateFuzzyCeilingOf65` (495), `goodClearWeatherProposesNoFuzzyCeiling` (508), `fuzzyFactsAreRetractedWhenTheWeatherClears` (520); `PrologRulesTest`: `rainAdjustsSafeSpeed` (854, chuva com 0,74/0,90), `reducedVisibilityAndGripTriggerConservativeReduction` (869); `PrologDroolsEquivalenceTest`: "rain", "rain with low visibility and grip" e os casos "fuzzy: …"; `SimulationEngineE2ETest`: `weatherMutationDuringRunChangesRecommendationsAndVehicleBehavior` (638, Drools e Prolog), `rainSpeedSettlesOnTheRecommendedSpeedWithoutHunting` (1134, só Drools, cenário S10) |
 
 **Relações**
 
 - Fornece a condição `RAIN` a `Persistent low TTC in rain increases conservatism` (C10). Essa regra lê também as leituras de chuva (`WeatherEvent`) para só contar as amostras de TTC medidas com chuva (`coincides[400ms]`, ver C10).
 - A proposta é um **teto de velocidade** no canal longitudinal: entre `COLLISION_AVOIDANCE`, `ROAD_HAZARD` e `SPEED_COMPLIANCE` ganha o teto mais baixo (M02). Por isso nunca sobe acima do limite legal de C01.
 - Os desvios de buraco e obstáculo (C12, C13) são do canal lateral, que é arbitrado à parte. A proposta de C18 não concorre com eles.
+- A visibilidade também encurta o alcance da câmara (`CameraSensor.effectiveRangeMeters`: 120 m × visibilidade, 84 m com `SET_RAIN`): sinais, semáforos, peões e perigos na via são vistos mais tarde. Isto é perceção em Java, não uma regra.
 
 **Código da Estrada:** velocidade adequada às condições meteorológicas, de visibilidade e de aderência (art. 24.º; art. 25.º, velocidade moderada com piso molhado ou com pouca aderência). Os artigos estão citados de memória e devem ser conferidos no texto oficial.
 
 **Limitações**
 
-- A regra de defuzzificação não verifica a velocidade atual: propõe `REDUCE_SPEED` mesmo com o veículo abaixo do teto (comportamento igual ao das regras nítidas anteriores; ver M03).
+- A regra de defuzzificação não verifica a velocidade atual: propõe `REDUCE_SPEED` mesmo com o veículo abaixo do teto (comportamento igual ao das regras nítidas anteriores). A arbitragem só a escolhe quando fica abaixo da base de velocidade, e o atuador segue a velocidade recomendada (ver M03).
 - Os conjuntos difusos são conhecimento de perito e foram calibrados para ficar perto das regras nítidas anteriores. Podem ser afinados em `FuzzySupport.java` e em `driving_rules.pl`, sempre com os mesmos valores nos dois.
-- Ao passar de 0,85 para menos, o teto aparece por volta de 73 km/h (com chuva, 65 km/h). Acima disso não há proposta, como antes.
+- Ao passar de 0,85 para menos, o teto aparece por volta de 75 km/h (73 km/h a 0,84; com chuva, 65 km/h). Acima disso não há proposta, como antes.
 
 ## Exemplos de entradas
 

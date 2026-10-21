@@ -1,6 +1,6 @@
 # C04 — Arranque após paragem
 
-- **Branch / commit:** `teste_ana` @ `70082b4` + alterações de 18/10 por commitar (working tree)
+- **Branch / commit:** working tree a 21/10/2026
 - **Estado da informação:** confirmado pelo código e por testes de integração.
 
 O arranque usa um facto de intenção, `MoveOffState`, que é ligado e desligado por duas regras sem proposta e lido por uma terceira que propõe.
@@ -92,9 +92,10 @@ A decisão lida por R1 e R2 é a do tick anterior (ver M01).
 
 | Elemento | Local |
 |---|---|
-| Facto | `drools/facts/MoveOffState.java`; valor inicial em `KnowledgeSession.java:126` |
-| Justificação de desenho | Comentários em `defaults.drl:46-59` e `81-85` |
-| Testes | `RoadLawAndOvertakingE2ETest.movingOffAndContinuousEgoMovementIncreasesWorldPosition` (39); `LaneChangeManeuverE2ETest.driverRequestedLaneChangeWhileMovingOff` (264); `RoadMapE2ETest.wallOfObstaclesStopsTheCarUntilALaneOpens` (76); `SimulationEngineE2ETest.stopSignFlowBringsVehicleToFullStopThenProceeds` (316), `redTrafficLightStopsAndHoldsThenGreenResumesAndResetClearsFact` (804); `RoadLawAndOvertakingE2ETest.pedestrianCrossingBrakesThenResumesAfterCrossingClears` (179); `PrologSimulationE2ETest.stopSignFlowBringsVehicleToFullStopThenProceeds` (139) |
+| Facto | `drools/facts/MoveOffState.java`; valor inicial em `KnowledgeSession.java:130` |
+| Justificação de desenho | Comentários em `defaults.drl:46-59` e `84-88` |
+| Testes | `RoadLawAndOvertakingE2ETest.movingOffAndContinuousEgoMovementIncreasesWorldPosition` (39); `LaneChangeManeuverE2ETest.driverRequestedLaneChangeWhileMovingOff` (264); `RoadMapE2ETest.wallOfObstaclesStopsTheCarUntilALaneOpens` (76); `SimulationEngineE2ETest.stopSignFlowBringsVehicleToFullStopThenProceeds` (316), `redTrafficLightStopsAndHoldsThenGreenResumesAndResetClearsFact` (804); `RoadLawAndOvertakingE2ETest.pedestrianCrossingBrakesThenResumesAfterCrossingClears` (196); `PrologSimulationE2ETest.stopSignFlowBringsVehicleToFullStopThenProceeds` (139); `PrologRulesTest.moveOffIntentSurvivesBetweenCyclesUntilAtSpeed` (903); `PrologDroolsEquivalenceTest`, sequências "move off from a standstill until close to the target", "a vehicle that only slowed down is not sped up", "held for a pedestrian, moves off once nothing holds it", "move off under a 20 km/h limit" e "a pending driver request holds back moving off" |
+| Prolog | As três regras com os mesmos nomes em `driving_rules.pl`; a intenção persiste entre ciclos no estado `move_off/2` de `driving_state.pl` (conclusões `move_off_started/1` e `move_off_ended`, gravadas por `store_conclusions/0`) |
 
 **Relações**
 
@@ -106,7 +107,7 @@ A decisão lida por R1 e R2 é a do tick anterior (ver M01).
 
 - R3 cede a um pedido de mudança de faixa do condutor (C04_D6), para o pedido ser atendido primeiro.
 - O alvo de 30 km/h está fixo na regra; acima dele a aceleração depende de C01 ou C03.
-- Não há teste unitário de regras para C04; a cobertura é só de integração.
+- Não há teste de regras em `DrivingExpertSystemRulesTest` para C04; do lado Drools a cobertura é de integração e da equivalência com Prolog.
 
 ## Exemplos de entradas
 

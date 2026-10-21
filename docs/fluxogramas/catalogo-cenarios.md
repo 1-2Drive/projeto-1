@@ -1,8 +1,8 @@
 # Catálogo de cenários
 
-- **Branch / commit:** `teste_ana` @ `70082b4` + alterações de 18/10 por commitar (working tree)
-- Detalhe completo de cada cenário no respetivo ficheiro. Regras, linhas e testes em `matriz-regras-cenarios.md`.
-- Todas as regras existem nos dois motores (Drools e Prolog), com os mesmos nomes.
+- **Branch / commit:** working tree a 21/10/2026
+- Detalhe completo de cada cenário no respetivo ficheiro (C01 a C18), incluindo regras, linhas e testes na ficha técnica de cada um.
+- Todas as regras de decisão existem nos dois motores (Drools e Prolog), com os mesmos nomes; no Prolog, quando a regra Drools escolhe entre ações, há uma regra por resultado com o nome seguido da variante entre parênteses (por exemplo `Hold at red traffic light (emergency)`). As regras de estado de `01-state-updates.drl` são, no Prolog, o tratamento de eventos de `driving_state.pl`.
 
 ## Fichas resumidas
 
@@ -83,9 +83,9 @@
 | Campo | Valor |
 |---|---|
 | Objetivo | Travar, parar ou travar de emergência consoante a distância a um peão que está, ou vai estar, na trajetória |
-| Ativação | Peão na trajetória, ou ainda a atravessar a via em qualquer faixa, com a velocidade acima da curva de travagem que termina 18 m antes dele (87 m a 60 km/h) |
+| Ativação | Peão na trajetória, ou ainda a atravessar a via em qualquer faixa: a 32 m ou menos sempre; mais longe, com a velocidade acima da curva de travagem que termina 18 m antes dele (87 m a 60 km/h), ou quando a travagem confortável já não pára 6 m antes dele |
 | Entradas | Distância ao peão, indicadores de trajetória e de travessia, velocidade do veículo, fase da aproximação (`PedestrianBrakingState`) |
-| Regras | 4 de decisão + 3 da fase da aproximação + 2 de estado |
+| Regras | 5 de decisão + 3 da fase da aproximação + 2 de estado |
 | Resultados | `BRAKE`, `MAINTAIN_SPEED`, `STOP`, `EMERGENCY_BRAKE` |
 | Relações | Sai para C04; bloqueia C11 e C17 |
 | Origem | `pedestrian.drl`, `emergency.drl` |
@@ -95,7 +95,7 @@
 | Campo | Valor |
 |---|---|
 | Objetivo | Manter distância segura do veículo da frente, reduzir ao aproximar-se, segui-lo à velocidade dele sem pára-arranca e parar atrás dele se estiver parado |
-| Ativação | Veículo na mesma faixa a menos de 50 m |
+| Ativação | Veículo na mesma faixa detetado pelo radar frontal (até 130 m); a tendência (janela de distâncias) só a menos de 50 m |
 | Entradas | Distância, velocidade relativa, amostras de distância dos últimos 2 s, estado da manobra, aderência |
 | Regras | 6 de decisão + 4 de estado |
 | Resultados | `BRAKE`, `REDUCE_SPEED`, `STOP` |
@@ -131,10 +131,10 @@
 | Campo | Valor |
 |---|---|
 | Objetivo | Contornar o buraco na própria faixa se houver um lado seguro; senão reduzir a velocidade. Um buraco noutra faixa não faz reduzir |
-| Ativação | Buraco na faixa do veículo a 50 m ou menos |
+| Ativação | Buraco na trajetória do veículo: desvio a 50 m ou menos; redução a máx(40 m; distância para abrandar até 30 km/h) ou menos |
 | Entradas | Distância e faixa do buraco, faixa do veículo, marcações, ocupação lateral e veículos à frente nas faixas laterais (lados seguros) |
 | Regras | 5 de decisão + 2 de estado |
-| Resultados | `CHANGE_LANE_LEFT`, `CHANGE_LANE_RIGHT`, `REDUCE_SPEED` |
+| Resultados | `CHANGE_LANE_LEFT`, `CHANGE_LANE_RIGHT`, `REDUCE_SPEED`, `MAINTAIN_SPEED`, `EMERGENCY_BRAKE` (buraco grave sem espaço para abrandar com conforto) |
 | Relações | Inicia C16; bloqueia C17 |
 | Origem | `avoidance.drl`, `road-hazards.drl` |
 
@@ -157,8 +157,8 @@
 | Objetivo | Contornar a barreira fechada se houver um lado seguro; senão parar antes dela (a fundo, se vista tarde); avançar se aberta |
 | Ativação | Barreira fechada na faixa: desvio a 55 m ou menos, paragem a máx(55 m; distância de paragem confortável) ou menos; 35 m se aberta |
 | Entradas | Distância, estado e faixa da barreira, faixa e velocidade do veículo, marcações, ocupação lateral e veículos à frente nas faixas laterais (através de `safeToChangeLane`) |
-| Regras | 6 de decisão + 2 de estado |
-| Resultados | `CHANGE_LANE_LEFT`, `CHANGE_LANE_RIGHT`, `STOP`, `EMERGENCY_BRAKE`, `CONTINUE` |
+| Regras | 7 de decisão + 2 de estado |
+| Resultados | `CHANGE_LANE_LEFT`, `CHANGE_LANE_RIGHT`, `MAINTAIN_SPEED`, `BRAKE`, `STOP`, `EMERGENCY_BRAKE`, `CONTINUE` |
 | Relações | Inicia C16; sai para C04; bloqueia C17 |
 | Origem | `barrier.drl` |
 
@@ -255,10 +255,10 @@ A arbitragem é feita por canal (M02).
 
 | Prioridade | Papel | Cenários e ações |
 |---|---|---|
-| 70 | Sobrepõe-se a tudo (um teto mais baixo limita só a velocidade, `CAPPED`) | C08 `EMERGENCY_BRAKE`; C10 `EMERGENCY_BRAKE`; C13 `EMERGENCY_BRAKE` (obstáculo a 8 m ou menos) |
+| 70 | Sobrepõe-se a tudo (um teto mais baixo limita só a velocidade, `CAPPED`) | C08 `EMERGENCY_BRAKE` (peão a 6 m ou menos, ou já sem espaço para a travagem confortável); C10 `EMERGENCY_BRAKE`; C13 `EMERGENCY_BRAKE` (obstáculo a 8 m ou menos) |
 | 60 | Sobrepõe-se a tudo abaixo de 70 (um teto mais baixo limita só a velocidade, `CAPPED`) | C05 todas as ações; C06 amarelo (`STOP`, `REDUCE_SPEED`, `MAINTAIN_SPEED`); C07 aproximação, `STOP` e `EMERGENCY_BRAKE` (linha já para trás); C08 `STOP`, `BRAKE`, `MAINTAIN_SPEED`; C14 `STOP`, `EMERGENCY_BRAKE` (barreira fechada sem lado seguro) |
-| 50 | Teto | C09 `BRAKE`, `REDUCE_SPEED`, `STOP`; C10 `BRAKE` (chuva); C11-D recuar; C13 `MAINTAIN_SPEED`, `BRAKE`, `STOP`, `EMERGENCY_BRAKE` (paragem 10 m antes, enquanto não sai da faixa); guarda do atuador (M03) |
-| 40 | Teto | C12 `REDUCE_SPEED`; C18 teto difuso |
+| 50 | Teto | C09 `BRAKE`, `REDUCE_SPEED`, `STOP`; C10 `BRAKE` (chuva); C11-D recuar; C13 `MAINTAIN_SPEED`, `BRAKE`, `STOP`, `EMERGENCY_BRAKE` (paragem 10 m antes, enquanto não sai da faixa); C14 `MAINTAIN_SPEED`, `BRAKE`, `STOP`, `EMERGENCY_BRAKE` (paragem 10 m antes da barreira, enquanto não sai da faixa); guarda do atuador (M03) |
+| 40 | Teto | C12 `REDUCE_SPEED`, `MAINTAIN_SPEED`, `EMERGENCY_BRAKE`; C18 teto difuso |
 | 30 | Libertação (base) | C04 `CONTINUE`; C06 `RESUME`; C07 `CONTINUE` |
 | 20 | Teto | C01 `REDUCE_SPEED`, `MAINTAIN_SPEED` (aproximação a um limite); C03 cruzeiro; C11 não passar pela direita (veículo na faixa ao lado ou duas faixas ao lado) |
 | 10 | Conforto (base) | C01 `MAINTAIN_SPEED`; C03 base e aceleração; C06 `CONTINUE` (verde); C14 `CONTINUE` (barreira aberta) |
@@ -273,4 +273,4 @@ A arbitragem é feita por canal (M02).
 
 ## Ações definidas e não utilizadas
 
-`DrivingAction.java` define 13 ações. `WAIT` não é proposta por nenhuma regra; o atuador trata-a como `STOP` (`DecisionActuator.java:44`, `57`, `67`, `103`).
+`DrivingAction.java` define 13 ações. `WAIT` não é proposta por nenhuma regra; o atuador trata-a como `STOP` (`DecisionActuator.java:45`, `58`, `69`, `104`).

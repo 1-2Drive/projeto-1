@@ -1,6 +1,6 @@
 # C05 — Semáforo vermelho
 
-- **Branch / commit:** `teste_ana` @ `70082b4` + alterações de 18/10 por commitar (working tree)
+- **Branch / commit:** working tree a 21/10/2026
 - **Estado da informação:** confirmado pelo código, por testes e em execução.
 
 ## Fluxograma
@@ -66,6 +66,8 @@ flowchart TD
 
 R1 = `Red traffic light progressive approach`; R2 = `Hold at red traffic light`; R3 = `Red traffic light requires full stop and hold`.
 
+No Prolog (`driving_rules.pl`) as mesmas regras têm uma variante por resultado: R1 `(emergency)`, `(brake)` e `(hold speed)`; R2 `(emergency)` e `(stop)`; R3 sem sufixo. O compromisso é `Commit to stop or to proceed at traffic light (red)` e persiste entre ciclos em `light_track/5` (`driving_state.pl`).
+
 ## Situações a resolver
 
 Os nós a **vermelho** nos fluxogramas acima assinalam passos onde há um problema por resolver.
@@ -75,9 +77,9 @@ Os nós a **vermelho** nos fluxogramas acima assinalam passos onde há um proble
 | C05_P3 | ~~`MAINTAIN_SPEED` com prioridade 60 ganha à travagem por veículo à frente (50).~~ **Resolvido** (commit `3814b81`): a arbitragem limita a velocidade de uma proposta ≥ 60 ao teto mais baixo do ciclo (`CAPPED`, M02), e o atuador abranda até ela (M03). Para o peão já estava resolvido: as regras de C08 propõem com prioridade 60 e ganham por terem velocidade mais baixa. | Peão: confirmado por teste e em execução. Veículo à frente: confirmado por teste (`DecisionContextTest.mandatoryStopIsCappedByALowerCeiling`) | Peão: caso A17 e `PedestrianConflictE2ETest` |
 
 
-Resolvido: o `EMERGENCY_BRAKE` isolado na aproximação normal (antigo C05_P1, caso A03) e a paragem em cima do semáforo (`relatorio-validacao.md`, secção 13); o carro que passava o semáforo e ficava parado para sempre depois dele (antigo C05_P4, caso A20: secção 14).
+Resolvido: o `EMERGENCY_BRAKE` isolado na aproximação normal (antigo C05_P1, caso A03) e a paragem em cima do semáforo (`relatorio-validacao.md`, secção 13; este relatório não está no repositório); o carro que passava o semáforo e ficava parado para sempre depois dele (antigo C05_P4, caso A20: secção 14).
 
-Os casos (A01 a A22, B01 a B08) estão descritos em `relatorio-validacao.md`, secção 8.
+Os casos (A01 a A22, B01 a B08) estão descritos em `relatorio-validacao.md`, secção 8, que não está no repositório.
 
 ## Tabela de decisões
 
@@ -137,14 +139,14 @@ Um `STOP` não é instantâneo e a distância que as regras conhecem tem uma lei
 | Elemento | Local |
 |---|---|
 | Sensor | `CameraSensor.observe()`: semáforo à frente, em qualquer faixa, a até 120 m × visibilidade: o mais próximo que manda parar (vermelho ou amarelo), ou o mais próximo se nenhum manda parar (`WorldState.nearestTrafficLight`). Assim um verde perto não esconde um vermelho logo a seguir, cuja linha de paragem pode até ficar antes do verde (teste `TwoTrafficLightsE2ETest`, dois vermelhos a 10 m) |
-| Facto | `drools/facts/TrafficLightStateFact.java`; valor inicial em `KnowledgeSession.java:123` |
+| Facto | `drools/facts/TrafficLightStateFact.java`; valor inicial em `KnowledgeSession.java:127` |
 | Cenário de demonstração | `S3` (Red traffic light) — `scenarios.json:121` |
-| Testes | `DrivingExpertSystemRulesTest.redLightTriggersStop` (143); `SimulationEngineE2ETest.redTrafficLightStopsAndHoldsThenGreenResumesAndResetClearsFact` (803); `RedTrafficLightStopE2ETest`: `at70KmhBrakesEarlyAndRestsBeforeTheStopLine` (86), `neverPassesTheStopLineAtAnySpeed` (146), `staysAtRestWhileTheLightIsRed` (168), `drivesOnWhenTheLightTurnsGreen` (197); `PedestrianConflictE2ETest.afterThePedestrianHasCrossedTheRedLightIsStillRespected` (248) |
+| Testes | `DrivingExpertSystemRulesTest`: `redLightTriggersStop` (145), `redLightAheadAndPastTheStopLineAtSpeedIsNeverLeftToTheBaseline` (1107), `redLightPastTheStopLineIsStoppedForComfortablyWhenThatStillFitsBeforeTheLight` (1131); `PrologRulesTest.redLightTriggersStop` (126); `PrologDroolsEquivalenceTest`, casos "red light ..."; `SimulationEngineE2ETest.redTrafficLightStopsAndHoldsThenGreenResumesAndResetClearsFact` (804); `PrologSimulationE2ETest.redLightStopsBeforeTheLine` (91); `RedTrafficLightStopE2ETest` (parametrizado nos dois motores): `at70KmhBrakesEarlyAndRestsBeforeTheStopLine` (86), `oneLightStopsTheEgoInEveryLane` (108), `neverPassesTheStopLineAtAnySpeed` (146), `staysAtRestWhileTheLightIsRed` (168), `drivesOnWhenTheLightTurnsGreen` (197); `PedestrianConflictE2ETest.afterThePedestrianHasCrossedTheRedLightIsStillRespected` (250); `TrafficLightCycleE2ETest`: `redLightFirstSeenPastTheStopLineIsBrakedForHard` (306), `redLightFirstSeenPastTheStopLineAtLowSpeedStopsComfortablyBeforeTheLightAndHolds` (354), `redLightAtANormalDistanceIsStillApproachedProgressively` (403), `redLightBehindTheEgoDoesNotBrakeIt` (429); `TwoTrafficLightsE2ETest.theSecondRedLightHoldsTheVehicleAtItsLine` (46) |
 
 **Relações**
 
 - Lê o limite de C01. Sai para C06 quando o semáforo muda, e C04 retoma o andamento.
-- Conflitos (M02): com prioridade 60 sobrepõe-se a todos os tetos de velocidade (≤ 50), incluindo o veículo à frente; só as emergências de C08, C10 e C13 (70) lhe ganham. Empata a 60 com C07, com a paragem de C14 e com as regras de peão de C08; ganha a velocidade mais baixa. Uma mudança de faixa com prioridade inferior a 60 é vetada enquanto esta decisão estiver ativa.
+- Conflitos (M02): com prioridade 60 sobrepõe-se a todos os tetos de velocidade (≤ 50), incluindo o veículo à frente; só as emergências de C08, C10 e C13 (70) lhe ganham. Empata a 60 com C07, com a paragem de C14 e com as regras de peão de C08; ganha a velocidade mais baixa. Uma mudança de faixa com prioridade inferior a 60 é vetada enquanto esta decisão for uma travagem para parar (`STOP` ou `EMERGENCY_BRAKE`; `DecisionContext.vetoes`); com `REDUCE_SPEED` ou `MAINTAIN_SPEED` na aproximação a manobra pode seguir.
 - Sobreposição interna: entre 0 e 4,0 m R2 e R3 propõem o mesmo `STOP`; fica a de R2, que dispara primeiro. Não altera o resultado.
 
 **Limitações**

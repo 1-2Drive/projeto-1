@@ -40,12 +40,14 @@
         <label class="field">
           <span>Speed</span>
           <div class="field__control">
-            <input data-testid="actor-speed-input" type="number" min="0" [max]="selectedAction() === 'PEDESTRIAN' ? 6 : 180" step="0.5"
+            <input data-testid="actor-speed-input" type="number" [min]="minActorSpeedKmh()" [max]="selectedAction() === 'PEDESTRIAN' ? 6 : 180" step="0.5"
                    [ngModel]="actorSpeedKmh()" (ngModelChange)="setActorSpeed($event)" />
             <em>km/h</em>
           </div>
           @if (selectedAction() === 'PEDESTRIAN') {
             <small class="field__note">Walking pace: 4.5 km/h by default, capped at 6 km/h.</small>
+          } @else {
+            <small class="field__note">From {{ minActorSpeedKmh() }} to 180 km/h.</small>
           }
         </label>
       }

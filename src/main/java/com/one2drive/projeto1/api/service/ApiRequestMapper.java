@@ -13,6 +13,12 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class ApiRequestMapper {
+    /**
+     * The slowest vehicle the API places; the UI's "Add vehicle" form asks for the same.
+     * Scenarios and tests still create slower or stopped vehicles. Pedestrians keep 0 to 6 km/h.
+     */
+    public static final double MIN_VEHICLE_SPEED_KMH = 6.0;
+
     public ScenarioRoadElementDefinition toRoadElement(ApiCreateRoadElementRequest request) {
         ScenarioRoadElementDefinition definition = new ScenarioRoadElementDefinition();
         definition.setType(ScenarioRoadElementType.valueOf(request.getType().trim().toUpperCase()));
@@ -33,6 +39,9 @@ public class ApiRequestMapper {
     public ScenarioActorDefinition toActor(ApiCreateActorRequest request) {
         ScenarioActorDefinition definition = new ScenarioActorDefinition();
         definition.setType(ScenarioActorType.valueOf(request.getType().trim().toUpperCase()));
+        if (definition.getType() != ScenarioActorType.PEDESTRIAN && request.getSpeedKmh() < MIN_VEHICLE_SPEED_KMH) {
+            throw new IllegalArgumentException("A vehicle needs a speed of at least " + MIN_VEHICLE_SPEED_KMH + " km/h");
+        }
         definition.setLane(Lane.valueOf(request.getLane().trim().toUpperCase()));
         definition.setPositionMeters(request.getDistanceAheadMeters());
         definition.setSpeedKmh(request.getSpeedKmh());

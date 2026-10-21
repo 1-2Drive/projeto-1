@@ -151,6 +151,17 @@ public class VehicleStateFact {
         return Lane.fromLateralPosition(lateralPositionMeters);
     }
 
+    /**
+     * The lane the vehicle's path runs along: the target lane while a lane change is moving
+     * (and on the tick it completes), the committed lane otherwise. A hazard in this lane is
+     * in the vehicle's way whether it is already there or about to arrive, so the rules that
+     * approach a hazard read this one; the committed lane only follows the manoeuvre once it
+     * settles, and a hazard in the lane being left is no longer in the way.
+     */
+    public Lane getPathLane() {
+        return laneChangeState == LaneChangeState.IDLE ? lane : targetLane;
+    }
+
     public void setLateralPositionMeters(double lateralPositionMeters) {
         this.lateralPositionMeters = lateralPositionMeters;
     }

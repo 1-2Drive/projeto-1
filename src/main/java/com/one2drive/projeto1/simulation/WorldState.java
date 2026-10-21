@@ -305,9 +305,15 @@ public class WorldState {
             .or(() -> ahead.stream().min(nearestFirst));
     }
 
-    /** A stop sign only binds the lane it stands in: one in another lane is not the vehicle's to obey. */
+    /**
+     * A stop sign only binds the lane it stands in: one in another lane is not the vehicle's
+     * to obey. The lane is the one the vehicle is heading for ({@link EgoVehicleState#getPathLane()}):
+     * while a lane change runs the sign in the lane being entered is already the vehicle's,
+     * and the one in the lane being left no longer is. Read from the committed lane, a
+     * vehicle moving into a lane drove through its stop sign at speed.
+     */
     public Optional<StopSign> nearestStopSign(double maxDistance) {
-        return nearestByType(StopSign.class, maxDistance).filter(sign -> sign.getLane() == ego.getLane());
+        return nearestByType(StopSign.class, maxDistance).filter(sign -> sign.getLane() == ego.getPathLane());
     }
 
     public Optional<Pothole> nearestPothole(double maxDistance) {
@@ -332,7 +338,7 @@ public class WorldState {
 
     @SuppressWarnings("unchecked")
     private <T extends RoadElement> Optional<T> nearestByType(Class<T> type, double maxDistance) {
-        Lane egoLane = ego.getLane();
+        Lane egoLane = ego.getPathLane();
         T nearestOwnLane = null;
         T nearestAnyLane = null;
         double bestOwnLane = Double.MAX_VALUE;
@@ -358,12 +364,15 @@ public class WorldState {
     }
 
     /**
-     * Nearest hazard of the given type ahead, preferring the vehicle's own lane. A
-     * forward camera sees every lane and reports the lane with the hazard, but with a
-     * map full of hazards the one in the vehicle's path is the one the rules must see.
+     * Nearest hazard of the given type ahead, preferring the lane the vehicle's path runs
+     * along: its own lane, or the lane it is moving into while a lane change is under way
+     * ({@link EgoVehicleState#getPathLane()}). A forward camera sees every lane and reports
+     * the lane with the hazard, but with a map full of hazards the one in the vehicle's path
+     * is the one the rules must see.
      */
     @SuppressWarnings("unchecked")
     private <T extends RoadElement> Optional<T> nearestHazardAhead(Class<T> type, double maxDistance) {
+        Lane pathLane = ego.getPathLane();
         T nearestOwnLane = null;
         T nearestAnyLane = null;
         double bestOwnLane = Double.MAX_VALUE;
@@ -380,7 +389,7 @@ public class WorldState {
                 bestAnyLane = d;
                 nearestAnyLane = (T) element;
             }
-            if (element.getLane() == ego.getLane() && d < bestOwnLane) {
+            if (element.getLane() == pathLane && d < bestOwnLane) {
                 bestOwnLane = d;
                 nearestOwnLane = (T) element;
             }

@@ -16,6 +16,7 @@
 %
 % Factos da perceção, carregados em cada ciclo por driving_state.pl:
 %   time_ms(Ms)  ego_speed(Kmh)  ego_lane(Lane)  target_lane(Lane)  lane_change_state(State)
+%   ego_path_lane(Lane)   a faixa do percurso: a de destino durante uma mudança de faixa, senão a do ego
 %   ego_position(M)   a posição do ego na estrada, em metros percorridos
 %   speed_limit(Kmh)  signed_speed_limit(Kmh) | no_speed_sign  cruise_speed(Kmh)
 %   pending_speed_limit(Kmh, SignPositionM)   sinal lido à frente, ainda não alcançado
@@ -73,6 +74,18 @@ rule('Emergency stop for pedestrian extremely close',
        test(D =< 6.0) ],
      [ assert(proposal(emergency_brake, 0.0, critical, emergency_safety,
                        'Pedestrian critical distance in current path')) ]).
+
+% The approach curve and the mandatory stop brake comfortably; a pedestrian first seen when
+% only hard braking still stops 6 m short of it needs the hard braking now, not at 6 m.
+rule('Emergency brake for pedestrian when comfortable braking no longer stops in time',
+     879,
+     [ pedestrian_conflict(P),
+       pedestrian(P, D),
+       ego_speed(V),
+       test(D > 6.0),
+       test(pedestrian_hard_braking(V, D)) ],
+     [ assert(proposal(emergency_brake, 0.0, critical, emergency_safety,
+                       'Pedestrian ahead; comfortable braking no longer stops short of it')) ]).
 
 % Only a reading from the last 300 ms counts, and only in the lane the vehicle is physically
 % in: steering out of the obstacle's lane, it is past the obstacle once its lateral position
@@ -498,6 +511,8 @@ rule('Overtake slow front vehicle via left lane',
        test(memberchk(Lane, [right, center])),
        lane_change_state(idle),
        prove(no_continuous_line(left)),
+       % the vehicle ahead in the left lane, if any, can still be followed after the move
+       prove(room_to_follow(left)),
        ego_speed(V),
        time_ms(Now),
        front_vehicle(Target, D, Rel),
@@ -550,16 +565,13 @@ rule('Overtake the vehicle being followed',
 rule('Move left behind slower left lane vehicle to overtake it on the left',
      525,
      [ ego_lane(right),
-       lane_change_state(idle),
-       right_marking(RightMarking),
-       test(RightMarking \== continuous),
+       prove(safe_to_change_lane(left)),
        ego_speed(V),
        time_ms(Now),
        left_lane_vehicle(Target, D, Rel),
        left_read_now(Target),
        test((D > 15.0, Rel > -0.5)),
        not(test(front_vehicle_within(D))),
-       lane_occupancy(left, false, _),
        not(pedestrian_conflict(_)),
        not(test(light_forbids_overtaking)),
        test(may_start_overtaking(Target)),
@@ -745,12 +757,26 @@ rule('Enforce keep right road law when right lane is safe',
 % Art. 36 CE: while not yet behind a slower vehicle in the left lane, the ego must not draw
 % level with it. It follows the curve that matches that vehicle's speed 35 m behind it (just
 % beyond the blind-spot range, so the lane reads clear and the ego can move in).
+% Comfortable braking would carry the ego past the vehicle (cannot_stay_behind/2): brake hard,
+% as in Drools, since drawing level and passing on the right is what Art. 36 forbids.
+rule('Do not pass a slower left lane vehicle on its right (emergency)',
+     508,
+     [ ego_speed(V),
+       left_lane_vehicle(_, D, Rel),
+       test((D > 0, Rel > -2.5)),
+       test(must_not_pass_on_right(V, D, Rel)),
+       test(cannot_stay_behind(D, Rel)),
+       test(left_vehicle_curve(V, D, Rel, Curve)) ],
+     [ assert(proposal(emergency_brake, Curve, high, speed_compliance,
+                       'Slower vehicle in the left lane must not be passed on its right (Art. 36 CE)')) ]).
+
 rule('Do not pass a slower left lane vehicle on its right (closing in)',
      508,
      [ ego_speed(V),
        left_lane_vehicle(_, D, Rel),
        test((D > 0, Rel > -2.5)),
        test(must_not_pass_on_right(V, D, Rel)),
+       not(test(cannot_stay_behind(D, Rel))),
        test(left_vehicle_curve(V, D, Rel, Curve)),
        test(V > Curve) ],
      [ assert(proposal(reduce_speed, Curve, moderate, speed_compliance,
@@ -762,9 +788,10 @@ rule('Do not pass a slower left lane vehicle on its right (fall back)',
        left_lane_vehicle(_, D, Rel),
        test((D > 0, Rel > -2.5)),
        test(must_not_pass_on_right(V, D, Rel)),
+       not(test(cannot_stay_behind(D, Rel))),
        test(left_vehicle_curve(V, D, Rel, Curve)),
        test(V =< Curve),
-       test((D < 33.0, Rel > -0.3)),
+       test(D < 33.0),
        test(Target is max(0.0, V / 3.6 - Rel - 1.5) * 3.6) ],
      [ assert(proposal(reduce_speed, Target, moderate, speed_compliance,
                        'Slower vehicle in the left lane must not be passed on its right (Art. 36 CE)')) ]).
@@ -775,22 +802,35 @@ rule('Do not pass a slower left lane vehicle on its right (hold)',
        left_lane_vehicle(_, D, Rel),
        test((D > 0, Rel > -2.5)),
        test(must_not_pass_on_right(V, D, Rel)),
+       not(test(cannot_stay_behind(D, Rel))),
        test(left_vehicle_curve(V, D, Rel, Curve)),
        test(V =< Curve),
-       not(test((D < 33.0, Rel > -0.3))),
-       test(Target is min(V, (V / 3.6 - Rel) * 3.6)) ],
+       test(D >= 33.0),
+       test(Target is (V / 3.6 - Rel) * 3.6) ],
      [ assert(proposal(maintain_speed, Target, moderate, speed_compliance,
                        'Slower vehicle in the left lane must not be passed on its right (Art. 36 CE)')) ]).
 
 % The same for a slower vehicle two lanes to the left (LEFT, seen from RIGHT), as in Drools:
 % after going round a hazard in the centre on the right, it is not passed on its right
 % (Art. 36 CE). No falling back: there is no lane to move into behind it from here.
+rule('Do not pass a slower far left lane vehicle on its right (emergency)',
+     508,
+     [ ego_speed(V),
+       far_left_lane_vehicle(_, D, Rel),
+       test((D > 0, Rel > -2.5)),
+       test(must_not_pass_on_right(V, D, Rel)),
+       test(cannot_stay_behind(D, Rel)),
+       test(left_vehicle_curve(V, D, Rel, Curve)) ],
+     [ assert(proposal(emergency_brake, Curve, high, speed_compliance,
+                       'Slower vehicle two lanes to the left must not be passed on its right (Art. 36 CE)')) ]).
+
 rule('Do not pass a slower far left lane vehicle on its right (closing in)',
      508,
      [ ego_speed(V),
        far_left_lane_vehicle(_, D, Rel),
        test((D > 0, Rel > -2.5)),
        test(must_not_pass_on_right(V, D, Rel)),
+       not(test(cannot_stay_behind(D, Rel))),
        test(left_vehicle_curve(V, D, Rel, Curve)),
        test(V > Curve) ],
      [ assert(proposal(reduce_speed, Curve, moderate, speed_compliance,
@@ -802,9 +842,10 @@ rule('Do not pass a slower far left lane vehicle on its right (hold)',
        far_left_lane_vehicle(_, D, Rel),
        test((D > 0, Rel > -2.5)),
        test(must_not_pass_on_right(V, D, Rel)),
+       not(test(cannot_stay_behind(D, Rel))),
        test(left_vehicle_curve(V, D, Rel, Curve)),
        test(V =< Curve),
-       test(Target is min(V, (V / 3.6 - Rel) * 3.6)) ],
+       test(Target is (V / 3.6 - Rel) * 3.6) ],
      [ assert(proposal(maintain_speed, Target, moderate, speed_compliance,
                        'Slower vehicle two lanes to the left must not be passed on its right (Art. 36 CE)')) ]).
 
@@ -844,6 +885,8 @@ rule('Avoid pothole in centre lane by changing right when right is clear',
      [ ego_lane(center),
        pothole(_, D, _, center),
        test((D > 0, D =< 50.0)),
+       ego_speed(V),
+       test(room_to_leave_lane(V, D)),
        prove(safe_to_change_lane(right)) ],
      [ assert(proposal(change_lane_right, no_target, low, road_hazard,
                        'Avoiding pothole by moving into the clear right lane (rightmost safe lane policy)')) ]).
@@ -853,6 +896,8 @@ rule('Avoid pothole in centre lane by changing left when right is occupied',
      [ ego_lane(center),
        pothole(_, D, _, center),
        test((D > 0, D =< 50.0)),
+       ego_speed(V),
+       test(room_to_leave_lane(V, D)),
        not(test(safe_to_change_lane(right))),
        prove(safe_to_change_lane(left)) ],
      [ assert(proposal(change_lane_left, no_target, low, road_hazard,
@@ -866,6 +911,8 @@ rule('Avoid pothole in left lane by changing right',
      [ ego_lane(left),
        pothole(_, D, _, left),
        test((D > 0, D =< 50.0)),
+       ego_speed(V),
+       test(room_to_leave_lane(V, D)),
        prove(safe_to_change_lane(right)) ],
      [ assert(proposal(change_lane_right, no_target, low, road_hazard,
                        'Avoiding pothole by moving into the clear right lane')) ]).
@@ -875,6 +922,8 @@ rule('Avoid pothole in right lane by changing left',
      [ ego_lane(right),
        pothole(_, D, _, right),
        test((D > 0, D =< 50.0)),
+       ego_speed(V),
+       test(room_to_leave_lane(V, D)),
        prove(safe_to_change_lane(left)) ],
      [ assert(proposal(change_lane_left, no_target, low, road_hazard,
                        'Avoiding pothole by moving into the clear left lane')) ]).
@@ -889,6 +938,8 @@ rule('Avoid obstacle in centre lane by changing left',
      [ ego_lane(center),
        obstacle(_, D, _, center),
        test((D > 0, D =< 50.0)),
+       ego_speed(V),
+       test(room_to_leave_lane(V, D)),
        prove(safe_to_change_lane(left)) ],
      [ assert(proposal(change_lane_left, no_target, low, collision_avoidance,
                        'Avoiding obstacle by moving into the clear left lane')) ]).
@@ -898,6 +949,8 @@ rule('Avoid obstacle in centre lane by changing right when left is occupied',
      [ ego_lane(center),
        obstacle(_, D, _, center),
        test((D > 0, D =< 50.0)),
+       ego_speed(V),
+       test(room_to_leave_lane(V, D)),
        not(test(safe_to_change_lane(left))),
        prove(safe_to_change_lane(right)) ],
      [ assert(proposal(change_lane_right, no_target, low, collision_avoidance,
@@ -908,6 +961,8 @@ rule('Avoid obstacle in left lane by changing right',
      [ ego_lane(left),
        obstacle(_, D, _, left),
        test((D > 0, D =< 50.0)),
+       ego_speed(V),
+       test(room_to_leave_lane(V, D)),
        prove(safe_to_change_lane(right)) ],
      [ assert(proposal(change_lane_right, no_target, low, collision_avoidance,
                        'Avoiding obstacle by moving into the clear right lane')) ]).
@@ -917,6 +972,8 @@ rule('Avoid obstacle in right lane by changing left',
      [ ego_lane(right),
        obstacle(_, D, _, right),
        test((D > 0, D =< 50.0)),
+       ego_speed(V),
+       test(room_to_leave_lane(V, D)),
        prove(safe_to_change_lane(left)) ],
      [ assert(proposal(change_lane_left, no_target, low, collision_avoidance,
                        'Avoiding obstacle by moving into the clear left lane')) ]).
@@ -958,20 +1015,57 @@ rule('Allow lane change right when lane safe',
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Perigos que não se podem contornar
 
-% Pothole within 40 m in the ego's lane that cannot be avoided, no side being a safe way past
-% (occupied, the road edge, or clear with no room to follow): slow down. Art. 24 CE: speed is
-% adapted to the hazards of the lane being driven, not of the others.
+% A pothole in the vehicle's path (its lane, or the lane it is moving into) that is not being
+% gone round is driven over slowly (Art. 24 CE). It is not gone round while no side is a safe
+% way past, while it is too close for a lane change to leave the lane before it
+% (room_to_leave_lane/2), or while it is still beyond the 50 m at which the avoidance is
+% decided. Binds from the distance a comfortable slow-down to the crossing speed needs (never
+% less than 40 m): beyond 40 m it follows the anticipation curve to the crossing speed and
+% holds when already under it; inside 40 m it asks for the crossing speed, 20 km/h under 15 m.
+% A severe pothole (high) is braked hard for when comfortable braking (10% to spare) no longer
+% reaches the crossing speed by the pothole (pothole_hard_braking/3); a lighter one is only
+% slowed for as comfort allows. The reason names the situation (pothole_reason/3), as in Drools.
+rule('Pothole ahead reduce speed (emergency)',
+     460,
+     [ ego_path_lane(Lane),
+       pothole(_, D, Severity, Lane),
+       ego_speed(V),
+       test(pothole_slow_window(V, W)),
+       test((D > 0, D =< W)),
+       not(test(pothole_avoidable_now(V, D))),
+       test(pothole_hard_braking(V, D, Severity)),
+       test(param(potholeCrossingSpeedKmh, Crossing)) ],
+     [ assert(proposal(emergency_brake, Crossing, high, road_hazard,
+                       'Severe pothole ahead; braking hard to reach its crossing speed (Art. 24 CE)')) ]).
+
 rule('Pothole ahead reduce speed',
      460,
-     [ lane_change_state(idle),
-       ego_lane(Lane),
-       pothole(_, D, _, Lane),
-       test((D > 0, D =< 40.0)),
-       not(test(safe_to_change_lane(left))),
-       not(test(safe_to_change_lane(right))),
-       test((D < 15 -> Target = 20.0 ; Target = 30.0)) ],
-     [ assert(proposal(reduce_speed, Target, moderate, road_hazard,
-                       'Pothole ahead requires speed reduction')) ]).
+     [ ego_path_lane(Lane),
+       pothole(_, D, Severity, Lane),
+       ego_speed(V),
+       test(pothole_slow_window(V, W)),
+       test((D > 0, D =< W)),
+       not(test(pothole_avoidable_now(V, D))),
+       not(test(pothole_hard_braking(V, D, Severity))),
+       test(pothole_target(D, Target)),
+       test(once((D =< 40.0 ; Target < V))),
+       test(pothole_reason(V, D, Reason)) ],
+     [ assert(proposal(reduce_speed, Target, moderate, road_hazard, Reason)) ]).
+
+rule('Pothole ahead reduce speed (hold)',
+     460,
+     [ ego_path_lane(Lane),
+       pothole(_, D, Severity, Lane),
+       ego_speed(V),
+       test(pothole_slow_window(V, W)),
+       test((D > 0, D =< W)),
+       not(test(pothole_avoidable_now(V, D))),
+       not(test(pothole_hard_braking(V, D, Severity))),
+       test(pothole_target(D, Target)),
+       test(D > 40.0),
+       test(Target >= V),
+       test(pothole_reason(V, D, Reason)) ],
+     [ assert(proposal(maintain_speed, V, moderate, road_hazard, Reason)) ]).
 
 % Obstacle in the ego's lane while the vehicle has not started to move out of that lane
 % (no side free, avoidance vetoed by a mandatory stop, or refused by the actuator): stop
@@ -981,12 +1075,11 @@ rule('Pothole ahead reduce speed',
 % it brakes hard.
 rule('Stop before obstacle ahead while still in its lane (stop)',
      465,
-     [ ego_lane(Lane),
+     [ ego_path_lane(Lane),
        obstacle(_, D, _, Lane),
        ego_speed(V),
        test(obstacle_stop_window(V, W)),
        test((D > 0, D =< W)),
-       lane_change_state(idle),
        test(obstacle_margin(D, Margin)),
        test(Margin =< 0.5) ],
      [ assert(proposal(stop, 0.0, high, collision_avoidance,
@@ -994,12 +1087,11 @@ rule('Stop before obstacle ahead while still in its lane (stop)',
 
 rule('Stop before obstacle ahead while still in its lane (emergency)',
      465,
-     [ ego_lane(Lane),
+     [ ego_path_lane(Lane),
        obstacle(_, D, _, Lane),
        ego_speed(V),
        test(obstacle_stop_window(V, W)),
        test((D > 0, D =< W)),
-       lane_change_state(idle),
        test(obstacle_margin(D, Margin)),
        test(Margin > 0.5),
        test(obstacle_braking_excessive(V, Margin)) ],
@@ -1008,12 +1100,11 @@ rule('Stop before obstacle ahead while still in its lane (emergency)',
 
 rule('Stop before obstacle ahead while still in its lane (brake)',
      465,
-     [ ego_lane(Lane),
+     [ ego_path_lane(Lane),
        obstacle(_, D, _, Lane),
        ego_speed(V),
        test(obstacle_stop_window(V, W)),
        test((D > 0, D =< W)),
-       lane_change_state(idle),
        test(obstacle_margin(D, Margin)),
        test(Margin > 0.5),
        not(test(obstacle_braking_excessive(V, Margin))),
@@ -1026,12 +1117,11 @@ rule('Stop before obstacle ahead while still in its lane (brake)',
 % while the avoidance is decided, so the vehicle does not gain speed towards the obstacle.
 rule('Stop before obstacle ahead while still in its lane (hold)',
      465,
-     [ ego_lane(Lane),
+     [ ego_path_lane(Lane),
        obstacle(_, D, _, Lane),
        ego_speed(V),
        test(obstacle_stop_window(V, W)),
        test((D > 0, D =< W)),
-       lane_change_state(idle),
        test(obstacle_margin(D, Margin)),
        test(Margin > 0.5),
        not(test(obstacle_braking_excessive(V, Margin))),
@@ -1100,13 +1190,16 @@ rule('Stop before obstacle when lane change prohibited by continuous line (hold)
 % proved by safe_to_change_lane/1 (Art. 35 and 38 CE). The barrier blocks the lane, so going
 % around it is collision avoidance. No maneuver moving and no continuous line on the line it
 % crosses (RIGHT-CENTER: the right marking; CENTER-LEFT: the left marking); otherwise the
-% vehicle stops.
+% vehicle stops. A lane change is only a way past when it leaves the lane before the barrier
+% (room_to_leave_lane/2); closer than that the approach rule below brakes for it.
 rule('Avoid closed barrier by changing left when safe',
      650,
      [ ego_lane(right),
        prove(safe_to_change_lane(left)),
        barrier(_, D, false, right),
-       test((D > 0, D =< 55.0)) ],
+       test((D > 0, D =< 55.0)),
+       ego_speed(V),
+       test(room_to_leave_lane(V, D)) ],
      [ assert(proposal(change_lane_left, no_target, high, collision_avoidance,
                        'Closed barrier ahead; changing left to a verified clear lane')) ]).
 
@@ -1115,7 +1208,9 @@ rule('Avoid closed barrier by changing left from centre when safe',
      [ ego_lane(center),
        prove(safe_to_change_lane(left)),
        barrier(_, D, false, center),
-       test((D > 0, D =< 55.0)) ],
+       test((D > 0, D =< 55.0)),
+       ego_speed(V),
+       test(room_to_leave_lane(V, D)) ],
      [ assert(proposal(change_lane_left, no_target, high, collision_avoidance,
                        'Closed barrier ahead; changing left to a verified clear lane')) ]).
 
@@ -1125,7 +1220,9 @@ rule('Avoid closed barrier by changing right from centre when safe',
        not(test(safe_to_change_lane(left))),
        prove(safe_to_change_lane(right)),
        barrier(_, D, false, center),
-       test((D > 0, D =< 55.0)) ],
+       test((D > 0, D =< 55.0)),
+       ego_speed(V),
+       test(room_to_leave_lane(V, D)) ],
      [ assert(proposal(change_lane_right, no_target, high, collision_avoidance,
                        'Closed barrier ahead; changing right to a verified clear lane')) ]).
 
@@ -1134,9 +1231,71 @@ rule('Avoid closed barrier by changing right when safe',
      [ ego_lane(left),
        prove(safe_to_change_lane(right)),
        barrier(_, D, false, left),
-       test((D > 0, D =< 55.0)) ],
+       test((D > 0, D =< 55.0)),
+       ego_speed(V),
+       test(room_to_leave_lane(V, D)) ],
      [ assert(proposal(change_lane_right, no_target, high, collision_avoidance,
                        'Closed barrier ahead; changing right to a verified clear lane')) ]).
+
+% A closed barrier in the vehicle's path (ego_path_lane/1: its lane, or the lane it is moving
+% into) is approached as an obstacle is: from the comfortable stopping distance (never less
+% than 55 m), holding above the braking curve, braking to the anticipation curve on it, hard
+% when comfortable braking no longer stops 10 m before it. A ceiling: it vetoes nothing, and
+% stops holding once the lane change moves the path out of the barrier's lane.
+rule('Stop before closed barrier while still in its lane (stop)',
+     645,
+     [ ego_path_lane(Lane),
+       barrier(_, D, false, Lane),
+       ego_speed(V),
+       test(barrier_approach_window(V, W)),
+       test((D > 0, D =< W)),
+       test(barrier_margin(D, Margin)),
+       test(Margin =< 0.5) ],
+     [ assert(proposal(stop, 0.0, high, collision_avoidance,
+                       'Closed barrier ahead in the path; stopping unless a lane change takes the vehicle out of its way')) ]).
+
+rule('Stop before closed barrier while still in its lane (emergency)',
+     645,
+     [ ego_path_lane(Lane),
+       barrier(_, D, false, Lane),
+       ego_speed(V),
+       test(barrier_approach_window(V, W)),
+       test((D > 0, D =< W)),
+       test(barrier_margin(D, Margin)),
+       test(Margin > 0.5),
+       test(obstacle_braking_excessive(V, Margin)) ],
+     [ assert(proposal(emergency_brake, 0.0, high, collision_avoidance,
+                       'Closed barrier ahead in the path; stopping unless a lane change takes the vehicle out of its way')) ]).
+
+rule('Stop before closed barrier while still in its lane (brake)',
+     645,
+     [ ego_path_lane(Lane),
+       barrier(_, D, false, Lane),
+       ego_speed(V),
+       test(barrier_approach_window(V, W)),
+       test((D > 0, D =< W)),
+       test(barrier_margin(D, Margin)),
+       test(Margin > 0.5),
+       not(test(obstacle_braking_excessive(V, Margin))),
+       test(obstacle_curve(Margin, Target)),
+       test(Target < V) ],
+     [ assert(proposal(brake, Target, high, collision_avoidance,
+                       'Closed barrier ahead in the path; stopping unless a lane change takes the vehicle out of its way')) ]).
+
+rule('Stop before closed barrier while still in its lane (hold)',
+     645,
+     [ ego_path_lane(Lane),
+       barrier(_, D, false, Lane),
+       ego_speed(V),
+       test(barrier_approach_window(V, W)),
+       test((D > 0, D =< W)),
+       test(barrier_margin(D, Margin)),
+       test(Margin > 0.5),
+       not(test(obstacle_braking_excessive(V, Margin))),
+       test(obstacle_curve(Margin, Target)),
+       test(Target >= V) ],
+     [ assert(proposal(maintain_speed, V, moderate, collision_avoidance,
+                       'Closed barrier ahead in the path; stopping unless a lane change takes the vehicle out of its way')) ]).
 
 % Stop whenever the barrier cannot be gone around safely, for whatever reason
 % safe_to_change_lane/1 fails on both sides, so the vehicle always avoids or stops. Only while
@@ -1785,6 +1944,13 @@ barrier_hard_braking(V, D) :-
     Vms is max(0.0, V) / 3.6,
     Vms * Vms / (2.0 * max(0.1, D)) > A * 1.1.
 
+% Comfortable braking (with a margin) no longer stops the vehicle 6 m short of a pedestrian
+% D m ahead: the emergency distance of the pedestrian rules.
+pedestrian_hard_braking(V, D) :-
+    deceleration(comfort, A),
+    Vms is max(0.0, V) / 3.6,
+    Vms * Vms / (2.0 * max(0.5, D - 6.0)) > A * 1.1.
+
 % Distance from which an obstacle in the ego's lane is stopped for: the comfortable stopping
 % distance at V km/h (reaction + braking + the offset), never less than 60 m.
 obstacle_stop_window(V, W) :-
@@ -1797,6 +1963,86 @@ obstacle_stopping_distance(V, D) :-
     param(obstacleStopOffsetMeters, Offset),
     Vms is max(0.0, V) / 3.6,
     D is Vms * Reaction + Vms * Vms / (2.0 * A) + Offset.
+
+% A lane change started now leaves the lane before a hazard D metres ahead: the ground covered
+% while reacting and until the vehicle is clear of its lane, plus the hazard's own length
+% (StoppingPolicy.roomToLeaveLane).
+room_to_leave_lane(V, D) :-
+    param(reactionTimeSeconds, Reaction),
+    param(laneExitSeconds, Exit),
+    param(hazardLengthMeters, Length),
+    Vms is max(0.0, V) / 3.6,
+    D >= Vms * (Reaction + Exit) + Length.
+
+% Distance from which a closed barrier in the path is approached: the comfortable stopping
+% distance at V km/h plus the 10 m offset, never less than 55 m.
+barrier_approach_window(V, W) :-
+    deceleration(comfort, A),
+    param(reactionTimeSeconds, Reaction),
+    param(barrierStopOffsetMeters, Offset),
+    Vms is max(0.0, V) / 3.6,
+    W is max(55.0, Vms * Reaction + Vms * Vms / (2.0 * A) + Offset).
+
+% Metres to the stopping point, StoppingPolicy.BARRIER_STOP_OFFSET_METERS before the barrier.
+barrier_margin(D, Margin) :-
+    param(barrierStopOffsetMeters, Offset),
+    Margin is max(0.0, D - Offset).
+
+% Distance from which a pothole in the path is slowed down for: the comfortable slow-down to
+% the crossing speed (reaction + braking), never less than 40 m (StoppingPolicy.slowingDistanceMeters).
+pothole_slow_window(V, W) :-
+    param(potholeCrossingSpeedKmh, Crossing),
+    deceleration(comfort, A),
+    param(reactionTimeSeconds, Reaction),
+    Vms is max(0.0, V) / 3.6,
+    Cms is min(Vms, Crossing / 3.6),
+    W is max(40.0, Vms * Reaction + (Vms * Vms - Cms * Cms) / (2.0 * A)).
+
+% Speed asked for D metres before a pothole: 20 km/h in the last 15 m, the crossing speed inside
+% 40 m, and beyond that the anticipation curve that reaches the crossing speed at the pothole.
+pothole_target(D, Target) :-
+    param(potholeCrossingSpeedKmh, Crossing),
+    (   D < 15.0
+    ->  Target = 20.0
+    ;   D > 40.0
+    ->  deceleration(anticipation, A),
+        Cms is Crossing / 3.6,
+        Target is max(Crossing, sqrt(Cms * Cms + 2.0 * A * D) * 3.6)
+    ;   Target = Crossing
+    ).
+
+% The pothole is being gone round now: inside the 50 m the avoidance decides at, with room to
+% leave the lane before it, and a side that is a safe way past (once: one solution, as in Drools).
+pothole_avoidable_now(V, D) :-
+    D =< 50.0,
+    room_to_leave_lane(V, D),
+    once(( safe_to_change_lane(left) ; safe_to_change_lane(right) )).
+
+% A severe pothole, and comfortable braking (10% to spare) no longer brings the vehicle from
+% V km/h down to the crossing speed in the D metres left.
+pothole_hard_braking(V, D, high) :-
+    param(potholeCrossingSpeedKmh, Crossing),
+    deceleration(comfort, A),
+    Vms is max(0.0, V) / 3.6,
+    Cms is Crossing / 3.6,
+    Vms > Cms,
+    (Vms * Vms - Cms * Cms) / (2.0 * max(0.1, D)) > A * 1.1.
+
+% Why the pothole is slowed down for rather than gone round, as Drools words it.
+pothole_reason(_, D, 'Pothole ahead; coming down to its crossing speed until a way round is decided (Art. 24 CE)') :-
+    D > 50.0, !.
+pothole_reason(V, D, 'Pothole too close to go round; crossing it slowly (Art. 24 CE)') :-
+    \+ room_to_leave_lane(V, D), !.
+pothole_reason(_, _, 'No free lane to go round the pothole; crossing it slowly (Art. 24 CE)').
+
+% Comfortable braking would carry the ego more than a vehicle length past the vehicle D metres
+% ahead that it closes in on at Rel m/s (StoppingPolicy.closingDistanceMeters against the gap).
+cannot_stay_behind(D, Rel) :-
+    deceleration(comfort, A),
+    param(reactionTimeSeconds, Reaction),
+    param(hazardLengthMeters, Length),
+    Closing is max(0.0, Rel),
+    Closing * Reaction + Closing * Closing / (2.0 * A) > D + Length.
 
 % The deceleration needed to stop within the margin exceeds comfortable braking by 10%.
 obstacle_braking_excessive(V, Margin) :-

@@ -482,6 +482,12 @@ load_cycle_facts :-
     add_fact(ego_lane(Lane)),
     physical_lane(Physical),
     add_fact(ego_physical_lane(Physical)),
+    % ego_path_lane(Lane): the lane the vehicle's path runs along (VehicleStateFact.pathLane):
+    % the target lane while a lane change is moving, the committed lane otherwise.
+    lane_change(ChangeState),
+    target_lane_state(PathTarget),
+    (   ChangeState == idle -> PathLane = Lane ; PathLane = PathTarget ),
+    add_fact(ego_path_lane(PathLane)),
     ego_position(Position),
     add_fact(ego_position(Position)),
     load_vehicle,

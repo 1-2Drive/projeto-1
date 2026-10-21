@@ -650,16 +650,34 @@ end
 
 // The sides the vehicle may change lane to, derived once the readings above are in: each one
 // is the safeToChangeLane query (lane-safety.drl) holding for that side. Inserted logically,
-// so a side stops being safe as soon as any of the query's sub-goals stops holding. Rules that
+// so a side stops being safe as soon as any of the sub-goals stops holding. Rules that
 // need "no safe side" (a closed barrier, a pothole or an obstacle that cannot be gone round
 // on one side) test for its absence: negating the query itself makes Drools 8.44 fail inside
 // the network (PhreakSubnetworkNotExistsNode) when the query's facts change.
+//
+// The four sub-goals are spelled out here instead of calling the query: called from this
+// rule, the query's answer only reached the logical fact one cycle after its facts changed
+// (the fact was still there a tick after the left lane had a vehicle too close to follow,
+// and still missing a tick after a side became free), so "no safe side" rules stopped the
+// vehicle for up to two seconds where the Prolog engine, which proves the goal live, changed
+// lane. The sub-goals are the same as in lane-safety.drl, which stays the explained goal.
 rule "Derive the sides that are safe to change lane to"
 agenda-group "perception"
 salience 800
 when
     $side : Lane() from java.util.List.of(Lane.LEFT, Lane.RIGHT)
-    safeToChangeLane($side;)
+    // maneuverIdle and noContinuousLine
+    VehicleStateFact(laneChangeState == com.one2drive.projeto1.domain.LaneChangeState.IDLE, $lane : lane, $speed : speedKmh,
+                     $left : leftMarking, $right : rightMarking)
+    eval(($side == Lane.LEFT && $lane == Lane.RIGHT && $right != com.one2drive.projeto1.domain.RoadMarkingType.CONTINUOUS)
+        || ($side == Lane.LEFT && $lane == Lane.CENTER && $left != com.one2drive.projeto1.domain.RoadMarkingType.CONTINUOUS)
+        || ($side == Lane.RIGHT && $lane == Lane.CENTER && $right != com.one2drive.projeto1.domain.RoadMarkingType.CONTINUOUS)
+        || ($side == Lane.RIGHT && $lane == Lane.LEFT && $left != com.one2drive.projeto1.domain.RoadMarkingType.CONTINUOUS))
+    // sideClear
+    LaneOccupancyState(lane == $side, occupied == false)
+    // roomToFollow
+    LeftLaneVehicleState($side != Lane.LEFT || StoppingPolicy.roomToFollow($speed, distanceMeters, relativeSpeedMps))
+    RightLaneVehicleState($side != Lane.RIGHT || StoppingPolicy.roomToFollow($speed, distanceMeters, relativeSpeedMps))
 then
     insertLogical(new SafeLaneSide($side));
 end

@@ -16,6 +16,7 @@ import com.one2drive.projeto1.drools.events.FrontDistanceEvent;
 import com.one2drive.projeto1.drools.events.ObstacleDetectedEvent;
 import com.one2drive.projeto1.drools.events.LaneOccupancyEvent;
 import com.one2drive.projeto1.drools.events.LeftLaneVehicleEvent;
+import com.one2drive.projeto1.drools.events.PotholeDetectedEvent;
 import com.one2drive.projeto1.drools.events.PedestrianDetectedEvent;
 import com.one2drive.projeto1.drools.events.RelativeSpeedEvent;
 import com.one2drive.projeto1.drools.events.SpeedLimitDetectedEvent;
@@ -189,7 +190,29 @@ class PrologRulesTest {
         try (PrologTestHarness harness = new PrologTestHarness()) {
             DrivingDecision decision = harness.cycle(1_000, 50.0,
                 new PedestrianDetectedEvent(1_000, "camera", 18.0, "ped-1", true));
-            assertTrue(decision.getAction() == DrivingAction.BRAKE || decision.getAction() == DrivingAction.STOP);
+            // 18 m at 50 km/h cannot be stopped comfortably: the hard braking is the braking.
+            assertEquals(DrivingAction.EMERGENCY_BRAKE, decision.getAction());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void pedestrianFarAheadAtHighSpeedIsBrakedForHard() {
+        try (PrologTestHarness harness = new PrologTestHarness()) {
+            DrivingDecision decision = harness.cycle(1_000, 90.0,
+                new PedestrianDetectedEvent(1_000, "camera", 80.0, "ped-1", true));
+            assertEquals(DrivingAction.EMERGENCY_BRAKE, decision.getAction());
+            assertEquals("Emergency brake for pedestrian when comfortable braking no longer stops in time", decision.getSourceRule());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void pedestrianFarAheadAtModerateSpeedIsBrakedForAlongTheCurve() {
+        try (PrologTestHarness harness = new PrologTestHarness()) {
+            DrivingDecision decision = harness.cycle(1_000, 60.0,
+                new PedestrianDetectedEvent(1_000, "camera", 80.0, "ped-1", true));
+            assertEquals(DrivingAction.BRAKE, decision.getAction());
         }
     }
 
@@ -276,7 +299,9 @@ class PrologRulesTest {
             DrivingDecision decision = harness.cycle(1_000, 50.0,
                 new TrafficLightEvent(1_000, "camera", TrafficLightState.GREEN, 20.0, "light-1"),
                 new PedestrianDetectedEvent(1_000, "camera", 14.0, "ped-1", true));
-            assertTrue(decision.getAction() == DrivingAction.STOP || decision.getAction() == DrivingAction.BRAKE);
+            assertTrue(decision.getAction() == DrivingAction.STOP || decision.getAction() == DrivingAction.BRAKE
+                || decision.getAction() == DrivingAction.EMERGENCY_BRAKE, decision.getAction().name());
+            assertTrue(decision.getSourceRule().contains("pedestrian"), decision.getSourceRule());
         }
     }
 
@@ -705,6 +730,72 @@ class PrologRulesTest {
                 new LaneOccupancyEvent(1_000, "blind-spot", Lane.RIGHT, false, Double.POSITIVE_INFINITY));
             assertEquals(DrivingAction.CHANGE_LANE_RIGHT, decision.getAction());
             assertEquals("Avoid closed barrier by changing right from centre when safe", decision.getSourceRule());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void closedBarrierFarAheadIsApproachedOnTheBrakingCurve() {
+        try (PrologTestHarness harness = new PrologTestHarness()) {
+            var vehicle = new PrologKnowledgeSession.VehicleInput(1_000, 90.0, 0.0, Lane.CENTER, LaneChangeState.IDLE,
+                Lane.CENTER, RoadMarkingType.DASHED, RoadMarkingType.DASHED, true, true, false, false);
+            // Both sides clear: the mandatory stop does not apply, the approach rule brakes to
+            // the anticipation curve (79 km/h with 120 m of room) as in Drools.
+            DrivingDecision decision = decide(harness, vehicle,
+                new BarrierDetectedEvent(1_000, "camera", 130.0, "barrier-1", false, Lane.CENTER),
+                new LaneOccupancyEvent(1_000, "blind-spot", Lane.LEFT, false, Double.POSITIVE_INFINITY),
+                new LaneOccupancyEvent(1_000, "blind-spot", Lane.RIGHT, false, Double.POSITIVE_INFINITY));
+            assertEquals(DrivingAction.BRAKE, decision.getSpeedAction());
+            assertEquals("Stop before closed barrier while still in its lane (brake)", decision.getSpeedSourceRule());
+            assertEquals(78.9, decision.getRecommendedSpeedKmh(), 0.5);
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void closedBarrierTooCloseToGoRoundIsBrakedForInsteadOfAvoided() {
+        try (PrologTestHarness harness = new PrologTestHarness()) {
+            var vehicle = new PrologKnowledgeSession.VehicleInput(1_000, 60.0, 0.0, Lane.CENTER, LaneChangeState.IDLE,
+                Lane.CENTER, RoadMarkingType.DASHED, RoadMarkingType.DASHED, false, true, false, false);
+            // 25 m at 60 km/h: a lane change would not leave the lane before the barrier.
+            DrivingDecision decision = decide(harness, vehicle,
+                new BarrierDetectedEvent(1_000, "camera", 25.0, "barrier-1", false, Lane.CENTER),
+                new LaneOccupancyEvent(1_000, "blind-spot", Lane.RIGHT, false, Double.POSITIVE_INFINITY));
+            assertFalse(decision.getLaneAction().isLaneManeuver(), "too close to go round: " + decision.getLaneSourceRule());
+            assertEquals(DrivingAction.EMERGENCY_BRAKE, decision.getSpeedAction());
+            assertEquals("Stop before closed barrier while still in its lane (emergency)", decision.getSpeedSourceRule());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void severePotholeTooCloseForComfortableSlowingIsBrakedHardFor() {
+        try (PrologTestHarness harness = new PrologTestHarness()) {
+            var vehicle = new PrologKnowledgeSession.VehicleInput(1_000, 90.0, 0.0, Lane.CENTER, LaneChangeState.IDLE,
+                Lane.CENTER, RoadMarkingType.DASHED, RoadMarkingType.DASHED, false, false, false, false);
+            DrivingDecision decision = decide(harness, vehicle,
+                new PotholeDetectedEvent(1_000, "camera", 40.0, "pth-1", HazardSeverity.HIGH, Lane.CENTER));
+            assertEquals(DrivingAction.EMERGENCY_BRAKE, decision.getSpeedAction());
+            assertEquals("Pothole ahead reduce speed (emergency)", decision.getSpeedSourceRule());
+            // The same geometry with a MEDIUM pothole is only slowed for, with the situation explained.
+            DrivingDecision lighter = decide(harness, vehicle,
+                new PotholeDetectedEvent(1_100, "camera", 40.0, "pth-1", HazardSeverity.MEDIUM, Lane.CENTER));
+            assertEquals(DrivingAction.REDUCE_SPEED, lighter.getSpeedAction());
+            assertEquals("Pothole too close to go round; crossing it slowly (Art. 24 CE)", lighter.getReason());
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void fastEgoBrakesHardRatherThanPassASlowerLeftLaneVehicleOnItsRight() {
+        try (PrologTestHarness harness = new PrologTestHarness()) {
+            var vehicle = new PrologKnowledgeSession.VehicleInput(1_000, 90.0, 0.0, Lane.RIGHT, LaneChangeState.IDLE,
+                Lane.RIGHT, RoadMarkingType.DASHED, RoadMarkingType.DASHED, true, false, false, false);
+            // 90 km/h, 30 km/h vehicle 40 m ahead on the left: comfortable braking would gain 58 m.
+            DrivingDecision decision = decide(harness, vehicle,
+                new LeftLaneVehicleEvent(1_000, "front-radar", 40.0, 60.0 / 3.6, "left-1"));
+            assertEquals(DrivingAction.EMERGENCY_BRAKE, decision.getSpeedAction());
+            assertEquals("Do not pass a slower left lane vehicle on its right (emergency)", decision.getSpeedSourceRule());
         }
     }
 

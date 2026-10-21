@@ -90,6 +90,14 @@ public class EgoVehicleState {
         this.targetLane = targetLane;
     }
 
+    /**
+     * The lane the vehicle's path runs along: the target lane while a lane change is moving,
+     * the committed lane otherwise (VehicleStateFact.getPathLane for the rules).
+     */
+    public Lane getPathLane() {
+        return laneChangeState == LaneChangeState.IDLE ? lane : targetLane;
+    }
+
     public LaneChangeState getLaneChangeState() {
         return laneChangeState;
     }

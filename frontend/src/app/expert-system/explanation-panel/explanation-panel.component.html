@@ -80,7 +80,7 @@
             <p>{{ item.vehicle.speedKmh | number:'1.0-1' }} km/h · {{ item.vehicle.lane }} lane · {{ item.vehicle.positionMeters | number:'1.1-1' }} m</p>
             <p><strong>Selected rule:</strong> <code>{{ item.decision.sourceRule }}</code></p>
             <p><strong>Actuator:</strong> {{ item.decision.actuatorResult }}</p>
-            <p><strong>OBSERVATION:</strong> {{ item.sensors.frontCamera.detections.length ? item.sensors.frontCamera.detections[0].label + ' at ' + (item.sensors.frontCamera.detections[0].distanceMeters | number:'1.1-1') + ' m' : 'See recorded sensor facts below' }}</p>
+            <p><strong>OBSERVATION:</strong> {{ item.sensors.frontCamera.detections.length ? item.sensors.frontCamera.detections[0].label + ' at ' + (item.sensors.frontCamera.detections[0].distanceMeters | number:'1.1-1') + ' m' : 'no camera detection recorded in this cycle' }}</p>
             <p><strong>ALTERNATIVES:</strong> {{ item.decision.proposals.length }} rule proposal(s) and {{ item.decision.laneChecks.length }} recorded lane checks</p>
             <h4>Observations</h4>
             <ul>
@@ -95,7 +95,7 @@
             <h4>Rule evaluation and alternatives</h4>
             <ul>
               @for (proposal of item.decision.proposals; track $index) {
-                <li><code>{{ proposal.rule }}</code> proposed {{ proposal.action }} — {{ proposal.outcome }}{{ proposal.detail ? ': ' + proposal.detail : '' }}. {{ proposal.conditions }}</li>
+                <li><code>{{ proposal.rule }}</code> proposed {{ proposal.action }} — {{ proposal.outcome }}{{ proposal.detail ? ': ' + proposal.detail : '' }}.{{ proposal.conditions ? ' Evidence: ' + proposal.conditions + '.' : '' }}</li>
               }
               @for (check of item.decision.laneChecks; track check.side) {
                 <li>{{ check.side }} lane safety — {{ check.allowed ? 'available' : check.explanation }}</li>

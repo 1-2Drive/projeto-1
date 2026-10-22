@@ -109,6 +109,69 @@ describe('SimulationPageComponent', () => {
     expect(pause.disabled).toBeTrue();
   });
 
+  it('lays the control bar out in three zones with the status row below, then the flow stages', () => {
+    const el = fixture.nativeElement as HTMLElement;
+    const bar = el.querySelector('nav.controls') as HTMLElement;
+    const zones = Array.from(bar.children).map((c) => c.className);
+    expect(zones).toEqual(['controls__primary', 'controls__engine', 'controls__demo', 'controls__status']);
+
+    const text = (selector: string) => (bar.querySelector(selector)!.textContent ?? '').replace(/\s+/g, ' ').trim();
+    expect(text('.controls__primary')).toContain('START');
+    expect(text('.controls__primary')).toContain('PAUSE');
+    expect(text('.controls__primary')).toContain('STOP');
+    expect(text('.controls__primary')).toContain('RESET');
+    expect(text('.controls__engine')).toContain('Rule engine');
+    expect(text('.controls__engine')).toContain('Drools');
+    expect(text('.controls__engine')).toContain('Prolog');
+    expect(text('.controls__demo')).toContain('Automated demo');
+    expect(text('.controls__demo')).toContain('RUN DEMO');
+    expect(bar.querySelectorAll('.controls__demo button').length).toBe(3);
+    expect(bar.querySelectorAll('.controls__status app-status-badge').length).toBe(3);
+    expect(bar.querySelector('[data-testid="simulation-status"]')).toBeTruthy();
+    expect(bar.querySelector('[data-testid="simulation-clock"]')).toBeTruthy();
+
+    // The flow stages come right after the control bar.
+    expect(bar.nextElementSibling!.tagName.toLowerCase()).toBe('app-flow-stage');
+  });
+
+  it('lets the speed advisor keep the height of its content instead of the height of the row', () => {
+    const el = fixture.nativeElement as HTMLElement;
+    const advisor = el.querySelector('.telemetry-pair > app-speed-advisor') as HTMLElement;
+    expect(getComputedStyle(advisor).alignSelf).toBe('start');
+    expect(getComputedStyle(advisor).height).not.toBe(getComputedStyle(el.querySelector('.telemetry-pair')!).height);
+  });
+
+  it('keeps the dashboard cells: road, evidence tabs, telemetry and the road map / toolbox tabs', () => {
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('.workspace__center app-road-canvas')).toBeTruthy();
+    const tabs = Array.from(el.querySelectorAll('.evidence .tabs > [role="tab"]')).map((t) => t.textContent!.trim());
+    expect(tabs).toEqual(['Inference Timeline', 'Working Memory', 'Explanation', 'World State', 'Decision', 'Situation']);
+    expect(el.querySelector('app-speed-advisor')).toBeTruthy();
+    expect(el.querySelector('app-sensors-panel')).toBeTruthy();
+
+    // The road map is the default bottom tab; the toolbox and scenario library sit in the other.
+    expect(el.querySelector('app-road-map')).toBeTruthy();
+    expect(el.querySelector('app-toolbox')).toBeNull();
+    (el.querySelectorAll('.bottom-tabs__nav [role="tab"]')[1] as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(el.querySelector('app-toolbox')).toBeTruthy();
+    expect(el.querySelector('app-scenario-library')).toBeTruthy();
+    expect(el.querySelector('app-road-map')).toBeNull();
+  });
+
+  it('shows the situation narration and the decision panel from their evidence tabs', () => {
+    const el = fixture.nativeElement as HTMLElement;
+    const tab = (name: string) => Array.from(el.querySelectorAll('.evidence .tabs > [role="tab"]'))
+      .find((t) => t.textContent!.trim() === name) as HTMLButtonElement;
+    tab('Situation').click();
+    fixture.detectChanges();
+    expect(el.querySelector('app-situation-panel')).toBeTruthy();
+    tab('Decision').click();
+    fixture.detectChanges();
+    expect(el.querySelector('app-decision-panel')).toBeTruthy();
+    expect(el.querySelector('app-situation-panel')).toBeNull();
+  });
+
   it('calls demo action from demo button', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     const demo = compiled.querySelector('[data-testid="run-demo-btn"]') as HTMLButtonElement;

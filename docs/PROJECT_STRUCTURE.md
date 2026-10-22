@@ -356,7 +356,7 @@ Plugins: `maven-compiler-plugin` 3.13.0, `maven-surefire-plugin` 3.2.5, `spring-
 
 | Purpose | Command | Verified during this analysis |
 |---|---|---|
-| Compile and run backend tests | `mvn clean test` | Not in this refresh. The Surefire reports in `target/surefire-reports` (2026-10-21) show 588 runs in 53 classes, 0 failures, 2 skipped (`InvariantSweepProbeTest`, which needs `-Dprobe.sweep`) |
+| Compile and run backend tests | `mvn clean test` | Not in this refresh. The Surefire reports in `target/surefire-reports` (2026-10-22) show 598 runs in 54 classes, 0 failures, 2 skipped (`InvariantSweepProbeTest`, which needs `-Dprobe.sweep`) |
 | Prolog tests only | `mvn test -Dtest='Prolog*Test'` | Not in this refresh (included in the reports above) |
 | Start backend on port 8080 | `mvn spring-boot:run` | No |
 | Start with the Prolog backend | set `expert.backend=prolog` (needs `swipl`) | No |
@@ -402,7 +402,7 @@ World mutations sent while the simulation runs are queued and applied at the sta
 
 | Suite | Location | Command | Count |
 |---|---|---|---|
-| Backend (JUnit 5) | `src/test/java/com/one2drive/projeto1/` | `mvn test` (single class: `mvn test -Dtest=SimulationEngineE2ETest`) | 53 classes (251 `@Test` and 109 `@ParameterizedTest` methods); 588 runs in the Surefire reports of 2026-10-21 |
+| Backend (JUnit 5) | `src/test/java/com/one2drive/projeto1/` | `mvn test` (single class: `mvn test -Dtest=SimulationEngineE2ETest`) | 54 classes; 598 runs in the Surefire reports of 2026-10-22 |
 | Frontend unit (Karma/Jasmine) | `frontend/src/app/**/*.spec.ts` | `cd frontend && npm test` | 83 cases in 13 files |
 | Browser end-to-end (Playwright) | `frontend/e2e/simulation.spec.ts`, `frontend/e2e/realtime.spec.ts` | start backend + frontend, then `cd frontend && npm run e2e` | 22 tests |
 
@@ -439,7 +439,7 @@ Results, coverage and gaps are in [TESTING.md](TESTING.md).
 | Timeline and explanations | `explanation/ExplanationTrace.java`, `drools/listeners/*`, `PrologBackend.traceFiredRules`, `simulation/SensorSignificance.java`, `api/service/InferenceNarrator.java` |
 | Session history and trip questions | `history/*`, `SimulationRuntimeService` (recording), `SimulationEngine.tick` (`SessionSnapshot`), `api/service/SessionExplanationService.java`, `RecordedCycle`, `FlowchartPathBuilder`, `AlternativeExplainer`, `explanation/DecisionFlowchart.java`; frontend `expert-system/trip-questions/` |
 | Decision panel | `frontend/src/app/expert-system/decision-panel/` (channels, proposals and outcomes) |
-| Road view | `frontend/src/app/simulation/road-canvas/` (draws backend coordinates; a pedestrian at its `lateralPositionMeters` and on its crosswalk), `simulation/RoadRenderItem.java`, `api/model/ApiRoadElement.java` |
+| Road view | `frontend/src/app/simulation/road-canvas/` (chase-camera 3D view of backend coordinates: `road-projection.ts` is the pinhole camera, `road-solids.ts` the 3D solid layer and the traffic car/barrier/gantry models, `road-ev-model.ts` the ego (an original electric fastback skinned through cross-sections), `road-scene.ts` the view-model builders, `road-kinematics.ts` the snapshot smoothing; a pedestrian at its `lateralPositionMeters` and on its crosswalk), `simulation/RoadRenderItem.java`, `api/model/ApiRoadElement.java` |
 | Realtime channel | `api/config/WebSocketConfig.java`, `api/controller/RealtimeWebSocketHandler.java`, `api/service/RealtimeSnapshotPublisher.java`; frontend `core/websocket/realtime-stream.service.ts` |
 
 ---
@@ -455,5 +455,5 @@ Details and evidence are in [ARCHITECTURE.md §9](ARCHITECTURE.md#9-architectura
   - no rule reads `VisibilityEvent`, `RoadGripEvent`, `ReducedVisibilityEvent`, `ReducedGripEvent` or `CrosswalkDetectedEvent`;
   - `DrivingAction.WAIT` is never proposed;
   - no rule reads `VehicleStateFact.leftAdjacentLaneSafe` or `rightAdjacentLaneSafe`.
-- **Screenshots in the repository root:** the current Playwright suite writes only `screenshot_viewport_1440x900.png`, `screenshot_viewport_1920x1080.png`, `screenshot_toolbox_objects_road.png` and `screenshot_clean_ego_badge.png`. The other nine are leftovers, four of which are named after the removed speed radar (`screenshot_A_far_from_radar.png` … `screenshot_D_passed_radar.png`).
+- **Screenshots:** the Playwright suite writes its evidence screenshots to `frontend/test-results/evidence/` (git-ignored); the old `screenshot_*.png` files in the repository root were removed.
 - **Outdated statements elsewhere:** some statements in `README.md`, `docs/report-implementation-audit.md` and `diagrams/` no longer match the code (test counts, rule counts, `window:length(5)`, `ABORTED`, Prolog rule names). The list is in [ARCHITECTURE.md §9.4](ARCHITECTURE.md#94-discrepancies-with-existing-documentation).

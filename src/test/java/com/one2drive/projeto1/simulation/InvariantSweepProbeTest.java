@@ -586,7 +586,7 @@ class InvariantSweepProbeTest {
                             out.add(new Violation("info:YELLOW_CROSS", t, String.format("at %.0f km/h", kmh)));
                         }
                     }
-                    if (crossed && el instanceof StopSign && (elLane == physical || elLane == Lane.ALL)) {
+                    if (crossed && el instanceof StopSign) {
                         double sinceRest = Double.isNaN(lastRestPos) ? Double.POSITIVE_INFINITY : pos - lastRestPos;
                         if (sinceRest > 25) {
                             out.add(new Violation("STOP_SIGN_RUN", t, String.format("at %.0f km/h, last rest %.0f m before", kmh, sinceRest)));
@@ -677,7 +677,7 @@ class InvariantSweepProbeTest {
             if (!el.isActive()) continue;
             double dist = world.signedDistance(el.getPositionMeters());
             if (el instanceof TrafficLight l && l.getState() != TrafficLightState.GREEN && dist > -2 && dist <= 30) return "light";
-            if (el instanceof StopSign && (el.getLane() == physical || el.getLane() == Lane.ALL) && dist > -2 && dist <= 25) return "stop sign";
+            if (el instanceof StopSign && dist > -2 && dist <= 25) return "stop sign";
             boolean blocking = el instanceof StaticObstacle || (el instanceof Barrier b && !b.isOpen());
             if (blocking && (el.getLane() == physical || el.getLane() == Lane.ALL) && dist > -2 && dist <= 30) return "hazard";
         }

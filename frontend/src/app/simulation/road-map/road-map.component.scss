@@ -4,6 +4,15 @@
   flex: 0 0 auto;
 }
 
+:host-context(.road-map-tab) {
+  height: 100%;
+  margin-top: 0;
+}
+
+:host-context(.road-map-tab) .road-map {
+  min-height: 100%;
+}
+
 .road-map {
   display: grid;
   gap: 0.5rem;
@@ -37,6 +46,48 @@
   font-family: var(--ds-font-mono);
   font-size: 0.6rem;
   color: var(--ds-text-muted);
+}
+
+/* Lane placement: adds the selected value at the row ahead of the vehicle, in a chosen lane. */
+.lane-placement {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  font-size: 0.66rem;
+  color: var(--ds-text-secondary);
+
+  > span {
+    margin-right: 0.2rem;
+    font-family: var(--ds-font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.04em;
+    color: var(--ds-text-muted);
+  }
+}
+
+.lane-placement__button {
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--ds-border-strong);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-bg-muted);
+  color: var(--ds-text-primary);
+  font-family: var(--ds-font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+
+  &:hover:not(:disabled),
+  &:focus-visible {
+    background: #1b2c3c;
+    border-color: #3f95cf;
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
 }
 
 .infrastructure-hint {

@@ -88,26 +88,35 @@
     }
   </div>
 } @else {
-  <div class="explain" data-testid="how-steps">
+  <div class="explain explain--flows" data-testid="how-steps">
     @for (flow of answer().how; track flow.channel) {
       <section class="flow" data-testid="how-flow" [attr.data-channel]="flow.channel">
-        <header class="channel__head">
-          <span class="channel__title">{{ flow.title }}</span>
-          <code class="channel__action">{{ flow.decision }}</code>
+        <header class="flow__head">
+          <div>
+            <span class="flow__kicker">Decision path</span>
+            <h4 class="flow__title">{{ flow.title }}</h4>
+          </div>
+          <code class="flow__decision">{{ flow.decision }}</code>
         </header>
         <ol class="flow__rail">
-          @for (step of onPath(flow); track step.nodeId) {
+          @for (step of onPath(flow); track step.nodeId; let stepIndex = $index) {
             <li class="flow__step" data-testid="how-step" [attr.data-node]="step.nodeId" [attr.data-branch]="step.branch"
                 [class.flow__step--yes]="step.branch === 'YES'" [class.flow__step--no]="step.branch === 'NO'"
                 [class.flow__step--decisive]="step.decisive">
-              <p class="flow__question"><span class="flow__id">{{ step.nodeId }}</span>{{ step.question }}</p>
+              <div class="flow__step-head">
+                <span class="flow__number" aria-hidden="true">{{ stepIndex + 1 }}</span>
+                <p class="flow__question">{{ step.question }}</p>
+                @if (step.branch === 'YES' || step.branch === 'NO') {
+                  <span class="flow__answer" [class.flow__answer--yes]="step.branch === 'YES'">{{ step.branch === 'YES' ? 'Yes' : 'No' }}</span>
+                }
+              </div>
               @if (step.yesLabel && step.noLabel) {
                 <div class="flow__branches">
-                  <span class="branch" [class.branch--taken]="step.branch === 'YES'">Yes · {{ step.yesLabel }}</span>
-                  <span class="branch" [class.branch--taken]="step.branch === 'NO'">No · {{ step.noLabel }}</span>
+                  <span class="branch" [class.branch--taken]="step.branch === 'YES'"><strong>Yes</strong>{{ step.yesLabel }}</span>
+                  <span class="branch" [class.branch--taken]="step.branch === 'NO'"><strong>No</strong>{{ step.noLabel }}</span>
                 </div>
               }
-              <p class="flow__taken">{{ step.takenLabel }}</p>
+              <p class="flow__taken"><span>Result</span>{{ step.takenLabel }}</p>
               @if (step.rules.length) {
                 <ul class="rules">
                   @for (rule of step.rules; track $index) {
@@ -137,7 +146,7 @@
         </ol>
         @if (offPath(flow).length) {
           <details class="flow__off">
-            <summary>{{ offPath(flow).length }} question(s) not on the decision path</summary>
+            <summary><span aria-hidden="true">＋</span>{{ offPath(flow).length }} question(s) not reached</summary>
             <ol class="flow__rail">
               @for (step of offPath(flow); track step.nodeId) {
                 <li class="flow__step flow__step--off" data-testid="how-step" [attr.data-node]="step.nodeId" [attr.data-branch]="step.branch">
@@ -155,7 +164,10 @@
             </ol>
           </details>
         }
-        <p class="flow__outcome">{{ flow.outcome }}</p>
+        <footer class="flow__outcome">
+          <span>Final decision</span>
+          <p>{{ flow.outcome }}</p>
+        </footer>
       </section>
     }
   </div>

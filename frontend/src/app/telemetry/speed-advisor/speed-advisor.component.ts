@@ -72,6 +72,15 @@ export class SpeedAdvisorComponent {
     return Math.min(this.recommendedKmh() / MAX_SCALE_KMH, 1) * ARC_LENGTH;
   }
 
+  /** Point on a circle around the arc's centre (90, 90), at an angle from -90 (zero) to +90 (full scale). */
+  protected pinX(angleDegrees: number, radius: number): number {
+    return Math.round((90 + radius * Math.sin((angleDegrees * Math.PI) / 180)) * 10) / 10;
+  }
+
+  protected pinY(angleDegrees: number, radius: number): number {
+    return Math.round((90 - radius * Math.cos((angleDegrees * Math.PI) / 180)) * 10) / 10;
+  }
+
   protected limitAngle(): number {
     return -90 + (this.limitDash() / ARC_LENGTH) * 180;
   }

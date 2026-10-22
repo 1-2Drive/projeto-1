@@ -46,7 +46,7 @@ Not present: Spring MVC test support (MockMvc, controller tests), JaCoCo or any 
 
 ## 3. Test Organisation (Existing Tests)
 
-### 3.1 Backend (JUnit 5): 588 test runs in 53 classes
+### 3.1 Backend (JUnit 5): 598 test runs in 54 classes
 
 All classes are under `src/test/java/com/one2drive/projeto1/`. "E2E" in a Java class name means an **engine-level integration test**: it runs the real `SimulationEngine` with sensors, rules and actuator, but without HTTP or a browser (except `RealtimeWebSocketE2ETest`, which runs the real server).
 
@@ -61,19 +61,20 @@ All classes are under `src/test/java/com/one2drive/projeto1/`. "E2E" in a Java c
 | `decision/DecisionContextTest` | 5 | 0 | Ceilings by minimum, base capped by ceilings, mandatory stop capped by a lower ceiling, veto only while braking, lane tie-breaks |
 | `decision/SpeedIntentTest` | 15 | 0 | Whether a decision speeds up, holds or slows the vehicle, checked case by case against what `DecisionActuator` does |
 | `domain/EgoVehicleStateTest` | 6 | 0 | Driving state reported for each action |
-| `sensors/CameraSensorTest` | 5 | 0 | Range shortened by visibility; stop signs only in the ego lane |
+| `sensors/CameraSensorTest` | 5 | 0 | Range shortened by visibility; a stop sign is reported from every lane (it is road-wide) |
 | `explanation/DecisionFlowchartTest` | 5 | 0 | Reads the DRL and Prolog sources: every proposing rule answers a flowchart question of its channel, every rule the flowchart names exists, Prolog variants map to their Drools rule, one question per rule |
 | `explanation/ExplanationTraceHistoryTest` | 1 | 0 | A zero-capacity trace keeps the whole session |
 | `history/SessionHistoryStoreTest` | 1 | 0 | A completed session survives a read, with its events in order and its scenario |
 | `history/SessionSnapshotTest` | 2 | 0 | Each channel and a lane change the actuator refused are recorded; a snapshot saved before the per-channel fields still loads |
-| `api/service/SessionExplanationServiceTest` | 14 | 0 | Post-trip WHY / WHY NOT / HOW per channel from a saved cycle: overridden speed-up, vetoed lane change, mandatory stop, ceilings, emergency, refused lane change, stopped vehicle, Prolog variant names, old snapshots, decision chosen by timestamp, empty session |
+| `api/service/ApiRequestMapperTest` | 4 | 0 | A stop sign, speed limit, traffic light or crosswalk needs no lane (stored in the centre cell); an element of one lane still needs one |
+| `api/service/SessionExplanationServiceTest` | 16 | 0 | Post-trip WHY / WHY NOT / HOW per channel from a saved cycle (four different trips give four different answers, none carrying another trip's rule, numbers or objects; the HOW path reads the world recorded in that cycle): overridden speed-up, vetoed lane change, mandatory stop, ceilings, emergency, refused lane change, stopped vehicle, Prolog variant names, old snapshots, decision chosen by timestamp, empty session |
 | `api/service/ApiRequestMapperTest` | 2 | 0 | A vehicle slower than 6 km/h is refused; from 6 km/h, and pedestrians at any pace, accepted |
 | `api/service/RealtimeSnapshotPublisherTest` | 4 | 0 | A stalled WebSocket client does not block the publisher or the other clients; a client whose write fails is dropped and closed; a new client gets the last snapshot at once; a closed client is no longer sent |
 | `api/RealtimeWebSocketE2ETest` | 4 | 0 | The real server on a free port and a real WebSocket client: the current snapshot on connect; S8's Drools `EMERGENCY_BRAKE` (rule, timeline, working memory) arriving in the tick it is inferred; a closed client dropped and a reconnecting one resumed at once; a foreign browser origin refused (403) |
 | `simulation/DecisionActuatorTest` | 8 | 0 | Dead band, gentle acceleration, proportional and comfortable braking, `BRAKE` never raises the speed, lane change started as decided, lane-change duration assumption |
 | `simulation/RoadMapTest` | 5 | 0 | Road matrix: cells, wrap-around, snapping, legend, invalid input |
 | `simulation/CrosswalkE2ETest` | 3 | 0 | A pedestrian gets a crosswalk; road items carry the pedestrian's lateral position; the crosswalk outlives the pedestrian |
-| `simulation/SimulationEngineE2ETest` | 28 | 2 | Full loop: speed signs (in sequence, every lane, higher limit), stop sign (own lane only, steady approach), TTC, pedestrian, pothole, weather, reset, red/green light, actuator guard, cruise recovery, passed objects, overtaken vehicles, rain settling |
+| `simulation/SimulationEngineE2ETest` | 28 | 2 | Full loop: speed signs (in sequence, every lane, higher limit), stop sign (stops from every lane, steady approach), TTC, pedestrian, pothole, weather, reset, red/green light, actuator guard, cruise recovery, passed objects, overtaken vehicles, rain settling |
 | `simulation/RoadLawAndOvertakingE2ETest` | 36 | 18 | Moving off, overtaking (S14), continuous line (former S15, built in the test), pedestrian (S7), keep-right, multi-lane return, blocked return, regression tests `BUG 1…3` |
 | `simulation/LaneChangeManeuverE2ETest` | 16 | 8 | Pothole avoidance choices, no oscillation, driver requests, rain |
 | `simulation/LaneChangeLawE2ETest` | 4 | 2 | Barrier passed through the lane the sensor reports clear; the line crossed from RIGHT |
@@ -90,7 +91,8 @@ All classes are under `src/test/java/com/one2drive/projeto1/`. "E2E" in a Java c
 | `simulation/TrafficLightCycleE2ETest` | 20 | 10 | Yellow commitment (stop or proceed), red first seen close or past the line, light behind the ego |
 | `simulation/TwoTrafficLightsE2ETest` | 2 | 1 | A red light just beyond a green one holds the vehicle at its own stop line |
 | `simulation/StopSignSeenLateE2ETest` | 2 | 1 | Stop line already behind: hard braking and the full stop |
-| `simulation/StopSignInLaneBeingEnteredE2ETest` | 2 | 1 | Moving into CENTER, the vehicle stops at that lane's stop sign without hard braking |
+| `simulation/StopSignInLaneBeingEnteredE2ETest` | 2 | 1 | Changing lane on the approach, the vehicle still stops at the stop sign without hard braking |
+| `simulation/StopSignAllLanesE2ETest` | 6 | 3 | One stop sign written to a single map cell stops a vehicle approaching in the LEFT, the CENTER and the RIGHT lane, on both engines |
 | `simulation/FarStopNearObstacleE2ETest` | 2 | 1 | Avoid an obstacle while slowing for a red light further ahead |
 | `simulation/HazardAppearingCloseE2ETest` | 16 | 8 | Hazards appearing close: barrier and pothole braked for rather than swerved around; severe potholes side by side at 90 km/h; barrier in the lane being entered; a wall of barriers at 90 km/h stopped for without an emergency; at 90 km/h a slower CENTER vehicle not passed on its right |
 | `simulation/CentreAvoidanceNoRoomToFollowE2ETest` | 8 | 4 | From CENTER, a pothole or obstacle gone round on the side that leaves room to follow; no safe side: slow crossing; afterwards a slower vehicle in LEFT not passed on its right |
@@ -107,7 +109,7 @@ All classes are under `src/test/java/com/one2drive/projeto1/`. "E2E" in a Java c
 | `prolog/PrologDroolsEquivalenceTest` | 110 | 110 | Same inputs to both engines, single cycles and sequences: same action, speed, priority and rule (by base name) |
 | `prolog/PrologSimulationE2ETest` | 7 | 6 | Prolog in the full loop (lights, stop sign, working memory, switching); one test checks that a failed switch keeps the previous backend (runs without SWI-Prolog) |
 | `prolog/RuleNameParityTest` | 2 | 0 | Reads the sources: every Drools driving rule name is a Prolog rule id (base name) and vice versa; the listed one-sided exceptions are still current |
-| **Total** | **588** | **286** | |
+| **Total** | **598** | **289** | |
 
 Helpers (not test classes): `DroolsTestHarness`, `PrologTestHarness`, `BackendTestSupport`, `OvertakingProbe`, `TrafficLightProbe`.
 
@@ -119,7 +121,7 @@ Scenarios loaded from `scenarios.json` by tests: S1, S2, S4, S5, S7, S8 (over RE
 - has no sensors, actuator or physics, and leaves the Java-side inputs (adjacent-lane safety, markings) at their defaults;
 - inserts the events the test chooses.
 
-### 3.2 Frontend unit tests (Karma/Jasmine): 86 cases in 13 files
+### 3.2 Frontend unit tests (Karma/Jasmine): 169 cases in 16 files
 
 | Spec file (under `frontend/src/app/`) | Declared `it(…)` | Topics |
 |---|---|---|
@@ -127,49 +129,54 @@ Scenarios loaded from `scenarios.json` by tests: S1, S2, S4, S5, S7, S8 (over RE
 | `core/api/backend-api.service.spec.ts` | 2 | state request, start command |
 | `core/state/simulation-state.service.spec.ts` | 9 | snapshot handling; active rule engine; backend switch and its failure; realtime reconnection with back-off; STOP opens the saved session; persistence failure; RESET keeps the history |
 | `core/websocket/realtime-stream.service.spec.ts` | 5 | WebSocket URL and snapshot frames; error on close and on a non-JSON frame; close on unsubscribe; silent-socket watchdog |
-| `expert-system/decision-explanation/decision-explanation.component.spec.ts` | 6 | WHY per channel, untouched default channel, WHY NOT alternatives by channel, picked alternative, nothing recorded, HOW branch by branch |
+| `expert-system/decision-explanation/decision-explanation.component.spec.ts` | 7 | WHY per channel, nothing of a previous trip left when another answer is shown, untouched default channel, WHY NOT alternatives by channel, picked alternative, nothing recorded, HOW branch by branch |
 | `expert-system/decision-panel/decision-panel.component.spec.ts` | 7 | why-not per side, speed and lane channel lines, fallback to headline fields, proposal outcome badges, collapse, emergency highlighting, empty state |
-| `expert-system/trip-questions/trip-questions-dialog.component.spec.ts` | 6 | latest decision explained on open, decision list with both channels, WHY / WHY NOT / HOW switching without a new request, history and Escape, unavailable explanation, trip without decisions |
+| `expert-system/trip-questions/trip-questions-dialog.component.spec.ts` | 7 | closing before the trip loads, latest decision explained on open, decision list with both channels, WHY / WHY NOT / HOW switching without a new request, history and Escape, unavailable explanation, trip without decisions |
 | `scenario/element-properties/element-properties.component.spec.ts` | 4 | vehicle below 6 km/h refused, 6 km/h accepted, pedestrian may stand still, vehicle default speed after a pedestrian |
-| `scenario/toolbox/toolbox.component.spec.ts` | 10 | control grouping, rain toggles, visibility slider, configuration drawer, road-wide elements without a lane, stop-sign lane, distance validation |
-| `simulation/road-canvas/road-canvas.component.spec.ts` | 25 | world items, road-wide signs and lights, sensor fields (camera cone shortened by rain, radar corridor, blind-spot pads), lane-change motion, badges, passed objects, crosswalk and pedestrian position across the road, turn-signal lamps |
+| `scenario/toolbox/toolbox.component.spec.ts` | 11 | control grouping and the tools under each section, rain toggles, visibility slider, configuration drawer, road-wide elements without a lane (speed limit, traffic light, stop sign), distance validation |
+| `simulation/road-canvas/road-canvas.component.spec.ts` | 56 | 3D driving view: perspective road, lane order and depth scaling, each object kind in its lane (pothole, barrier, pedestrian, stop sign, gantry traffic light, crosswalk, vehicles, radar as roadside infrastructure), road-wide signs and lights (one stop sign with a stop line across the road, on the right verge), no visible EGO label, sensor fields on the road (camera cone shortened by rain, radar corridor, blind-spot pads), lane-change motion and yaw, snapshot smoothing, detection badges, passed objects, rain, turn-signal lamps, responsive canvas sizes |
+| `simulation/road-canvas/road-projection.spec.ts` | 13 | camera model: vanishing point, lane order, linear lateral mapping, inverse-depth scaling, near clip, ground quads, paint matrices, billboard floor, camera fit for the five page sizes |
+| `simulation/road-canvas/road-solids.spec.ts` | 15 | 3D solids: back-face culling, car wheels, indicator lamps, depth scaling, lane placement, yaw revealing the flank, stable lamp slots; the ego as one smooth shaded body (black glass roof, aero wheels) unlike the traffic, wheels staying under the body at every yaw, tyres on the road |
+| `simulation/road-canvas/road-kinematics.spec.ts` | 5 | numbers drawn from a snapshot, blending between snapshots, resets shown at once |
 | `simulation/road-map/road-map.component.spec.ts` | 3 | matrix drawing, car position, painting |
-| `simulation/simulation-page/simulation-page.component.spec.ts` | 4 | button states, demo button, STOP-time question dialog, historical session kept on RESET |
-| `telemetry/speed-advisor/speed-advisor.component.spec.ts` | 1 | above-recommendation styling |
+| `simulation/simulation-page/simulation-page.component.spec.ts` | 8 | speed advisor sized by its content, control-bar zones (run controls, rule engine, automated demo, status row), button states, demo button, STOP-time question dialog, historical session kept on RESET; dashboard cells, evidence tabs and the road map / toolbox tabs |
+| `telemetry/speed-advisor/speed-advisor.component.spec.ts` | 3 | above-recommendation styling; legal limit, recommended and delta as three non-overlapping columns, label above value; the card keeps the height of its content with the speed inside the gauge, in a much taller grid row |
 
-The turn-signal case is generated in a loop (one per indicator state), so Karma would execute 86 cases from 83 declarations. These tests check presentation and HTTP/WebSocket plumbing with mocked data; they do not test driving rules.
+The turn-signal case (one per indicator state) and the responsive-canvas cases (one per page size) are generated in loops, so Karma executes 169 cases from 158 declarations. These tests check presentation and HTTP/WebSocket plumbing with mocked data; they do not test driving rules.
 
-### 3.3 Browser end-to-end tests (Playwright): 22 tests
+### 3.3 Browser end-to-end tests (Playwright): 24 tests
 
-Files `frontend/e2e/simulation.spec.ts` (1–20) and `frontend/e2e/realtime.spec.ts` (21–22). They run against the real stack (Angular + Spring Boot + the active backend) and need both servers running. They share that one simulation, so `playwright.config.ts` runs them one at a time (`workers: 1`). Tests:
+Files `frontend/e2e/simulation.spec.ts` (1–22) and `frontend/e2e/realtime.spec.ts` (23–24). They run against the real stack (Angular + Spring Boot + the active backend) and need both servers running. They share that one simulation, so `playwright.config.ts` runs them one at a time (`workers: 1`). Tests:
 
 1. starts on a clean stopped road and only runs after START;
 2. manual speed limit added at 150 m drives the expert system;
 3. speed limit has no lane selector and is painted on all three lanes;
 4. traffic light has no lane selector and is drawn on all three lanes;
-5. stop sign is placed only in the lane chosen in the drawer;
-6. pedestrian interaction produces a safety decision;
-7. pothole avoidance visibly moves the ego vehicle from RIGHT to CENTER;
-8. STOP saves the trip and opens a session-bound WHY / WHY-NOT dialog;
-9. the decision selector explains each recorded decision of the trip;
-10. blocked right lane forces pothole avoidance to use the clear left lane;
-11. sensor groups show a radar target and a camera sign detection;
-12. presentation demo progresses across its phases;
-13. overtaking a slow vehicle shows turn signals, changes lane, passes, and returns to the right lane;
-14. TEST A: full viewport responsiveness;
-15. TEST B: toolbox object creation appears in road canvas and matrix;
-16. TEST C: painting a matrix cell updates the road canvas;
-17. TEST E: clean EGO badge;
-18. capture evidence screenshots;
-19. world mutation drawer layout stability;
-20. VISUAL E2E: forward motion and approaching objects;
-21. simulation updates arrive over the WebSocket, without HTTP polling;
-22. a dropped channel reconnects on its own and goes live again.
+5. stop sign has no lane field: one road-wide sign on the verge with a stop line across the road;
+6. one stop sign, placed with no lane, stops the vehicle whether it drives in the left, centre or right lane;
+7. pedestrian interaction produces a safety decision;
+8. pothole avoidance visibly moves the ego vehicle from RIGHT to CENTER;
+9. STOP saves the trip and opens a session-bound WHY / WHY-NOT dialog;
+10. the decision selector explains each recorded decision of the trip;
+11. blocked right lane forces pothole avoidance to use the clear left lane;
+12. sensor groups show a radar target and a camera sign detection;
+13. presentation demo progresses across its phases;
+14. overtaking a slow vehicle shows turn signals, changes lane, passes, and returns to the right lane;
+15. TEST A: full viewport responsiveness;
+16. TEST B: toolbox object creation appears in road canvas and matrix;
+17. TEST C: painting a matrix cell updates the road canvas;
+18. TEST E: the ego car carries no visible EGO label;
+19. WHY / WHY NOT / HOW are rebuilt from each trip: a stop sign, a pothole and a red light never share an answer;
+20. capture evidence screenshots;
+21. world mutation drawer layout stability;
+22. VISUAL E2E: forward motion and approaching objects;
+23. simulation updates arrive over the WebSocket, without HTTP polling;
+24. a dropped channel reconnects on its own and goes live again.
 
 Notes:
 
 - `playwright.config.ts` defaults to a macOS Chrome path unless `PLAYWRIGHT_CHROMIUM_EXECUTABLE` is set.
-- Test 18 writes four `screenshot_*.png` files into the repository root.
+- Test 20 writes four evidence screenshots into `frontend/test-results/evidence/` (git-ignored), not into the repository root.
 
 ---
 
@@ -178,6 +185,7 @@ Notes:
 | Suite | Command | Environment | When | Result |
 |---|---|---|---|---|
 | Backend JUnit | `mvn clean test` | Linux, JDK 25.0.4.1 (per the Surefire reports), Maven 3.9.9, SWI-Prolog 9.2.9 on `PATH` | 2026-10-21 (Surefire reports written 21:13–21:18 local time) | **588 run, 0 failures, 0 errors, 2 skipped** |
+| Backend JUnit (final run of PR #70) | `mvn -o test` | macOS, JDK 17 | 2026-10-22 | **598 run, 0 failures, 0 errors, 2 skipped** (54 classes) |
 | Frontend compile | `npx ng build`; `npx tsc -p tsconfig.spec.json --noEmit` | same machine | 2026-10-21 | **Both pass** (compile checks only, no test executed) |
 | Frontend unit | — | — | — | **Not executed**: no Chrome available for Karma on the analysis machine |
 | Browser E2E | — | — | — | **Not executed** |
@@ -214,7 +222,7 @@ Its results are therefore **not verified** here.
 |---|---|---|---|
 | Earlier audit report | 79 | — | — |
 | Analysis at `70082b4` | 473 (218 executed, 255 skipped) | 57 executed, 5 failing | 20 present, not run |
-| This run | 588 (586 executed, 2 skipped) | 86 present, not run | 22 present, not run |
+| This run (re-run 2026-10-22) | 598 (596 executed, 2 skipped) | 86 present, not run | 22 present, not run |
 
 **Running the tests in the repository itself:**
 

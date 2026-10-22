@@ -22,7 +22,7 @@ public class ApiRequestMapper {
     public ScenarioRoadElementDefinition toRoadElement(ApiCreateRoadElementRequest request) {
         ScenarioRoadElementDefinition definition = new ScenarioRoadElementDefinition();
         definition.setType(ScenarioRoadElementType.valueOf(request.getType().trim().toUpperCase()));
-        definition.setLane(Lane.valueOf(request.getLane().trim().toUpperCase()));
+        definition.setLane(laneOf(definition.getType(), request.getLane()));
         definition.setPositionMeters(request.getDistanceAheadMeters());
         definition.setSpeedLimitKmh(request.getSpeedLimitKmh());
 
@@ -34,6 +34,24 @@ public class ApiRequestMapper {
         }
         definition.setBarrierOpen(request.getBarrierOpen());
         return definition;
+    }
+
+    /**
+     * Speed limits, stop signs, traffic lights and crosswalks govern the whole road, so a request
+     * for one needs no lane: the road map stores it in its centre cell, and the lane is only where it
+     * is stored. Every other element stands in the lane it names.
+     */
+    private static Lane laneOf(ScenarioRoadElementType type, String requested) {
+        boolean given = requested != null && !requested.isBlank() && !"ALL".equalsIgnoreCase(requested.trim());
+        boolean roadWide = type == ScenarioRoadElementType.SPEED_LIMIT || type == ScenarioRoadElementType.STOP_SIGN
+            || type == ScenarioRoadElementType.TRAFFIC_LIGHT || type == ScenarioRoadElementType.CROSSWALK;
+        if (!given) {
+            if (roadWide) {
+                return Lane.CENTER;
+            }
+            throw new IllegalArgumentException("A " + type + " needs a lane");
+        }
+        return Lane.valueOf(requested.trim().toUpperCase());
     }
 
     public ScenarioActorDefinition toActor(ApiCreateActorRequest request) {

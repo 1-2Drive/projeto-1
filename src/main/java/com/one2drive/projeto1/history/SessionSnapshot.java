@@ -51,7 +51,7 @@ public record SessionSnapshot(long simulationTimeMillis,
                     p.getSourceRule(), p.getAction().name(), p.getChannel().name(), p.getPriority(),
                     Double.isNaN(p.getRecommendedSpeedKmh()) ? null : p.getRecommendedSpeedKmh(),
                     p.getOutcome().name(), p.getDetail(), p.getReason(), p.getEvidence(),
-                    conditions(p.getSourceRule(), decision))).toList(),
+                    recordedFacts(p.getEvidence()))).toList(),
                 decision.getLaneChecks().stream().map(c -> new LaneCheckSnapshot(
                     c.side().name(), c.allowed(), c.explanation(),
                     c.subGoals().stream().map(g -> new SubGoalSnapshot(g.goal(), g.holds(), g.detail())).toList())).toList(),
@@ -60,18 +60,11 @@ public record SessionSnapshot(long simulationTimeMillis,
                 decision.getPriority(), decision.getLanePriority(),
                 List.copyOf(decision.getSpeedEvidence()), List.copyOf(decision.getLaneEvidence()));
         }
+    }
 
-        private static String conditions(String rule, DrivingDecision decision) {
-            if (rule != null && rule.toLowerCase().contains("pothole")) {
-                String facts = decision.getEvidence().stream().filter(e -> e.toLowerCase().contains("pothole"))
-                    .findFirst().orElse("pothole conditions were satisfied as recorded by the fired rule");
-                return facts + "; lane eligibility from the rule engine's recorded lane-safety checks";
-            }
-            if (rule != null && rule.toLowerCase().contains("obstacle")) {
-                return decision.getEvidence().stream().findFirst().orElse("obstacle conditions were satisfied as recorded by the fired rule");
-            }
-            return "Antecedents are not exposed for this rule; use the stored working-memory facts and fired-rule trace.";
-        }
+    /** The facts the rule itself recorded as its evidence; empty when it recorded none. */
+    private static String recordedFacts(List<String> evidence) {
+        return evidence == null ? "" : String.join("; ", evidence);
     }
 
     public record ProposalSnapshot(String rule, String action, String channel, int priority,

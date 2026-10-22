@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { of, throwError } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 import { BackendApiService } from '../../core/api/backend-api.service';
 import { SimulationStateService } from '../../core/state/simulation-state.service';
 import { POTHOLE_ANSWER } from '../decision-explanation/decision-explanation.fixture';
@@ -131,5 +131,17 @@ describe('TripQuestionsDialogComponent', () => {
     expect(state.explainSessionDecision).not.toHaveBeenCalled();
     expect(element.querySelector('[data-testid="trip-dialog-error"]')!.textContent).toContain('no decision');
     expect(element.querySelector<HTMLSelectElement>('[data-testid="trip-decision-select"]')!.disabled).toBeTrue();
+  });
+
+  it('can be closed before the trip has loaded without touching the destroyed dialog', () => {
+    const pending = new Subject<any>();
+    api.getSession.and.returnValue(pending);
+    fixture = TestBed.createComponent(TripQuestionsDialogComponent);
+    fixture.componentRef.setInput('sessionId', 'just-stopped');
+    fixture.detectChanges();
+
+    fixture.destroy();
+    expect(() => pending.next(session)).not.toThrow();
+    expect(state.explainSessionDecision).not.toHaveBeenCalled();
   });
 });

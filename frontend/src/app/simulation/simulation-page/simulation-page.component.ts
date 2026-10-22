@@ -6,7 +6,7 @@ import { ToolboxComponent } from '../../scenario/toolbox/toolbox.component';
 import { ScenarioLibraryComponent } from '../../scenario/scenario-library/scenario-library.component';
 import { RoadCanvasComponent } from '../road-canvas/road-canvas.component';
 import { RoadMapComponent } from '../road-map/road-map.component';
-import { VehicleStateComponent } from '../../telemetry/vehicle-state/vehicle-state.component';
+import { SituationPanelComponent } from '../../telemetry/situation-panel/situation-panel.component';
 import { SpeedAdvisorComponent } from '../../telemetry/speed-advisor/speed-advisor.component';
 import { SensorsPanelComponent } from '../../telemetry/sensors-panel/sensors-panel.component';
 import { DecisionPanelComponent } from '../../expert-system/decision-panel/decision-panel.component';
@@ -21,8 +21,9 @@ import {
   MapCellRequest
 } from '../../core/models/api.models';
 import { WorldStateComponent } from '../world-state/world-state.component';
-import { SituationPanelComponent } from '../../telemetry/situation-panel/situation-panel.component';
 import { TripQuestionsDialogComponent } from '../../expert-system/trip-questions/trip-questions-dialog.component';
+
+type EvidenceTab = 'timeline' | 'memory' | 'explanation' | 'world' | 'decision' | 'situation';
 
 @Component({
   selector: 'app-simulation-page',
@@ -34,7 +35,7 @@ import { TripQuestionsDialogComponent } from '../../expert-system/trip-questions
     ScenarioLibraryComponent,
     RoadCanvasComponent,
     RoadMapComponent,
-    VehicleStateComponent,
+    SituationPanelComponent,
     SpeedAdvisorComponent,
     SensorsPanelComponent,
     DecisionPanelComponent,
@@ -42,7 +43,6 @@ import { TripQuestionsDialogComponent } from '../../expert-system/trip-questions
     WorkingMemoryComponent,
     ExplanationPanelComponent,
     WorldStateComponent,
-    SituationPanelComponent,
     TripQuestionsDialogComponent
   ],
   templateUrl: './simulation-page.component.html',
@@ -65,7 +65,8 @@ export class SimulationPageComponent implements OnInit, OnDestroy {
   protected readonly engine = computed(() =>
     this.engines.find((engine) => engine.id === this.expertBackend()) ?? this.engines[0]);
 
-  protected readonly activeTab = signal<'timeline' | 'memory' | 'explanation' | 'world'>('timeline');
+  protected readonly activeTab = signal<EvidenceTab>('timeline');
+  protected readonly bottomTab = signal<'road-map' | 'toolbox'>('road-map');
   protected readonly tripDialogSessionId = this.state.stoppedSessionId;
   protected readonly tripStopError = this.state.stopPersistenceError;
   protected readonly simulationClock = computed(() => {
@@ -86,7 +87,6 @@ export class SimulationPageComponent implements OnInit, OnDestroy {
 
   /** Backend only publishes demo phases while the scripted scenario is loaded. */
   protected readonly demoPhases = computed(() => this.snapshot()?.demoPhases ?? []);
-  protected readonly demoRunning = computed(() => this.demoPhases().length > 0);
 
   /** True until the first tick, used to invite the user to press START. */
   protected readonly awaitingStart = computed(() => {
@@ -102,8 +102,12 @@ export class SimulationPageComponent implements OnInit, OnDestroy {
     this.state.destroy();
   }
 
-  protected setTab(tab: 'timeline' | 'memory' | 'explanation' | 'world'): void {
+  protected setTab(tab: EvidenceTab): void {
     this.activeTab.set(tab);
+  }
+
+  protected setBottomTab(tab: 'road-map' | 'toolbox'): void {
+    this.bottomTab.set(tab);
   }
 
   protected inspectTimelineDecision(timestamp: number): void {
@@ -145,10 +149,6 @@ export class SimulationPageComponent implements OnInit, OnDestroy {
     this.state.openHistoricalSession(id);
   }
 
-  protected switchBackend(backend: ExpertBackend): void {
-    this.state.switchBackend(backend);
-  }
-
   protected runPresentationDemo(): void {
     this.state.runPresentationDemo();
   }
@@ -159,6 +159,10 @@ export class SimulationPageComponent implements OnInit, OnDestroy {
 
   protected stopDemo(): void {
     this.state.stop();
+  }
+
+  protected switchBackend(backend: ExpertBackend): void {
+    this.state.switchBackend(backend);
   }
 
   protected loadScenario(id: string): void {

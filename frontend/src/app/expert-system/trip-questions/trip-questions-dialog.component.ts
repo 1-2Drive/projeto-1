@@ -1,7 +1,8 @@
 import {
-  ChangeDetectionStrategy, Component, ElementRef, Injector, OnInit, afterNextRender, computed, inject, input, output,
-  signal, viewChild
+  ChangeDetectionStrategy, Component, DestroyRef, ElementRef, Injector, OnInit, afterNextRender, computed, inject,
+  input, output, signal, viewChild
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DecimalPipe } from '@angular/common';
 import { BackendApiService } from '../../core/api/backend-api.service';
 import { ApiSessionDetail, ApiWhyAnswer, WhyMode } from '../../core/models/api.models';
@@ -32,6 +33,7 @@ export class TripQuestionsDialogComponent implements OnInit {
   private readonly state = inject(SimulationStateService);
   private readonly api = inject(BackendApiService);
   private readonly injector = inject(Injector);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly decisionSelect = viewChild<ElementRef<HTMLSelectElement>>('decisionSelect');
   /** Only the latest request may set the answer, however the responses arrive. */
   private request = 0;
@@ -47,7 +49,8 @@ export class TripQuestionsDialogComponent implements OnInit {
   ngOnInit(): void { this.loadSession(); }
 
   protected loadSession(): void {
-    this.api.getSession(this.sessionId()).subscribe({
+    // Closed before the trip loaded: nothing may touch the destroyed dialog afterwards.
+    this.api.getSession(this.sessionId()).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (session) => {
         this.session.set(session);
         const latest = session.decisionSnapshots.at(-1);
@@ -73,7 +76,7 @@ export class TripQuestionsDialogComponent implements OnInit {
     this.selectedTimestamp.set(timestamp);
     this.loading.set(true);
     this.error.set(null);
-    this.state.explainSessionDecision(this.sessionId(), timestamp).subscribe({
+    this.state.explainSessionDecision(this.sessionId(), timestamp).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (answer) => {
         if (request !== this.request) return;
         this.answer.set(answer);

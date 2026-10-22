@@ -82,6 +82,13 @@ const ROAD_TOP_PERCENT = 0;
 const ROAD_BOTTOM_PERCENT = 100;
 /** Distance between two lane centres in percent of the canvas height. */
 const LANE_PITCH_PERCENT = LANE_CENTER_Y.CENTER - LANE_CENTER_Y.LEFT;
+/** Where a crossing pedestrian starts and ends, in metres from the centre line (Pedestrian.java). */
+const SIDEWALK_METRES = 5.5;
+/**
+ * A crosswalk is painted at the start of its 5 m map block (RoadMap, SimulationConfig), the
+ * pedestrian anywhere in that block: within this distance it is drawn on the crosswalk.
+ */
+const CROSSWALK_SNAP_METERS = 5;
 /** Horizontal distance from the ego centre to its nose, in percent of the canvas width. */
 const EGO_NOSE_OFFSET_PERCENT = 3;
 /** Half the height of the camera cone's narrow end at the car's nose. */
@@ -201,15 +208,20 @@ export class RoadCanvasComponent {
       return [];
     }
     const egoPos = this.egoPosition();
+    const worldPosOf = (item: ApiRoadElement) => item.worldPositionMeters != null && Number.isFinite(item.worldPositionMeters)
+      ? item.worldPositionMeters
+      : (egoPos + item.positionMeters);
+    const crosswalkPositions = snapshot.worldObjects
+      .filter((item) => this.kindOf(item) === 'crosswalk')
+      .map(worldPosOf);
     return snapshot.worldObjects
       .filter((item) => item.positionMeters >= -36)
       .map((item) => {
         const kind = this.kindOf(item);
         const state = this.stateOf(item);
-        const worldPos = item.worldPositionMeters != null && Number.isFinite(item.worldPositionMeters)
-          ? item.worldPositionMeters
-          : (egoPos + item.positionMeters);
-        const xPct = this.worldToPercentX(worldPos);
+        const worldPos = worldPosOf(item);
+        // A pedestrian is drawn walking along the middle of its crosswalk's stripes.
+        const xPct = this.worldToPercentX(kind === 'pedestrian' ? this.onCrosswalk(worldPos, crosswalkPositions) : worldPos);
         return {
           id: item.id,
           kind,
@@ -223,7 +235,9 @@ export class RoadCanvasComponent {
           // the detection badge and the distance is the one in the lane the ego drives in.
           yPercent: kind === 'speedLimit' || kind === 'trafficLight'
             ? LANE_CENTER_Y[this.currentLane()]
-            : this.lateralToY(LANE_CENTRE_METRES[item.lane as LaneName] ?? 0),
+            : kind === 'pedestrian' && item.lateralPositionMeters != null && Number.isFinite(item.lateralPositionMeters)
+              ? this.pedestrianY(item.lateralPositionMeters)
+              : this.lateralToY(LANE_CENTRE_METRES[item.lane as LaneName] ?? 0),
           detectedByCamera: snapshot.cameraDetectedObjectIds?.includes(item.id) ?? false,
           detectedByRadar: snapshot.radarDetectedObjectIds?.includes(item.id) ?? false,
           visible: item.positionMeters >= -36 && item.positionMeters <= this.worldForwardMeters && xPct >= -10 && xPct <= 110
@@ -231,6 +245,29 @@ export class RoadCanvasComponent {
       })
       .filter((item) => item.visible);
   });
+
+  /** The crosswalk the pedestrian at this position crosses at, or its own position with none. */
+  private onCrosswalk(worldPos: number, crosswalkPositions: number[]): number {
+    let best = worldPos;
+    let bestDistance = CROSSWALK_SNAP_METERS;
+    for (const crosswalk of crosswalkPositions) {
+      const distance = Math.abs(crosswalk - worldPos);
+      if (distance <= bestDistance) {
+        best = crosswalk;
+        bestDistance = distance;
+      }
+    }
+    return best;
+  }
+
+  /**
+   * Where a pedestrian is across the road, from sidewalk to sidewalk: unlike lateralToY it is
+   * not held to the lane centres, so it walks smoothly across the lanes.
+   */
+  protected pedestrianY(lateralMeters: number): number {
+    const clamped = Math.max(-SIDEWALK_METRES, Math.min(SIDEWALK_METRES, lateralMeters));
+    return LANE_CENTER_Y.CENTER + (clamped / LANE_CENTRE_METRES.RIGHT) * LANE_PITCH_PERCENT;
+  }
 
   /** Objects drawn as cards above the road; crosswalks are painted on the asphalt instead. */
   protected readonly objects = computed(() => this.items().filter((item) => item.kind !== 'crosswalk'));

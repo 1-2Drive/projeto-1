@@ -666,7 +666,7 @@
   {
     "id": "S12_PRESENTATION_DEMO",
     "name": "Presentation demo end-to-end",
-    "initialLane": "CENTER",
+    "initialLane": "RIGHT",
     "initialSpeedKmh": 90,
     "initialWeather": "CLEAR",
     "actors": [],
@@ -686,11 +686,11 @@
         "type": "SET_RAIN"
       },
       {
-        "triggerTimeMillis": 22000,
+        "triggerTimeMillis": 11000,
         "type": "ADD_ACTOR",
         "actor": {
           "type": "FRONT_VEHICLE",
-          "positionMeters": 60,
+          "positionMeters": 175,
           "lane": "CENTER",
           "speedKmh": 12
         }
@@ -701,8 +701,8 @@
         "actor": {
           "type": "PEDESTRIAN",
           "positionMeters": 120,
-          "lane": "CENTER",
-          "speedKmh": 3
+          "lane": "LEFT",
+          "speedKmh": 2
         }
       },
       {

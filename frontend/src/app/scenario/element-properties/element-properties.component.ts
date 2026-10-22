@@ -13,6 +13,10 @@ export type ToolboxAction =
   | 'FRONT_VEHICLE'
   | 'PEDESTRIAN';
 
+/** The slowest vehicle that can be added (the backend refuses slower ones: ApiRequestMapper). */
+export const MIN_VEHICLE_SPEED_KMH = 6;
+const MAX_VEHICLE_SPEED_KMH = 180;
+
 interface ActionDefinition {
   title: string;
   hint: string;
@@ -129,10 +133,16 @@ export class ElementPropertiesComponent {
     }
     if (definition.needsActorSpeed) {
       const value = this.actorSpeedKmh();
-      return value >= 0 && value <= 180 ? null : 'Speed must be between 0 and 180 km/h.';
+      const min = this.minActorSpeedKmh();
+      return value >= min && value <= MAX_VEHICLE_SPEED_KMH ? null
+        : `Speed must be between ${min} and ${MAX_VEHICLE_SPEED_KMH} km/h.`;
     }
     return null;
   });
+
+  /** A vehicle needs at least MIN_VEHICLE_SPEED_KMH; a pedestrian may stand still. */
+  protected readonly minActorSpeedKmh = computed(() =>
+    this.selectedAction() === 'PEDESTRIAN' ? 0 : MIN_VEHICLE_SPEED_KMH);
 
   protected readonly invalid = computed(() => !!this.distanceError() || !!this.speedError());
 
@@ -143,6 +153,9 @@ export class ElementPropertiesComponent {
     }
     if (action === 'PEDESTRIAN') {
       this.actorSpeedKmh.set(4.5);
+    } else if (action === 'FRONT_VEHICLE' && this.actorSpeedKmh() < MIN_VEHICLE_SPEED_KMH) {
+      // Still at a pedestrian's walking pace from the last time: back to the vehicle default.
+      this.actorSpeedKmh.set(30);
     }
     if (action === 'BARRIER') {
       this.lane.set('RIGHT');

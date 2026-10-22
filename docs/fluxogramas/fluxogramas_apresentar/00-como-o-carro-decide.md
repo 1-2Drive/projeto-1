@@ -18,8 +18,8 @@ flowchart LR
 
 Além das regras de condução, o sistema tem conhecimento sobre as próprias regras (metaconhecimento):
 
-- **Que regras correm primeiro.** Uma regra de controlo põe as regras por fases em cada ciclo: primeiro as que percebem o que os sensores viram, depois as que decidem, por fim a decisão por omissão.
-- **Que regras vale a pena voltar a avaliar.** No motor Prolog, cada regra sabe que tipos de informação lê. Quando aparece uma informação nova, só voltam a ser avaliadas as regras que a leem. Medido nos 14 cenários: 81% menos trabalho, com exatamente as mesmas decisões.
+- **Que regras correm primeiro.** No motor Drools, uma regra de controlo põe as regras por fases em cada ciclo: primeiro as que percebem o que os sensores viram, depois as que decidem, por fim a decisão por omissão. No motor Prolog a mesma ordem vem da precedência de cada regra.
+- **Que regras vale a pena voltar a avaliar.** No motor Prolog, cada regra sabe que tipos de informação lê. Quando aparece uma informação nova, só voltam a ser avaliadas as regras que a leem. Numa medição feita nos 14 cenários que existiam então: 81% menos trabalho, com exatamente as mesmas decisões.
 
 ## A pergunta "posso mudar para este lado?"
 
@@ -67,29 +67,31 @@ flowchart TD
     Q1 -- "Não" --> Q2{"Há alguma paragem obrigatória?"}
     Q2 -- "Sim" --> R2["A paragem decide o que fazer;<br/>se outra regra pedir uma velocidade<br/>ainda mais baixa, vale a mais baixa"]
     Q2 -- "Não" --> Q3{"Há limites de velocidade<br/>a respeitar?"}
-    Q3 -- "Sim" --> R3["Respeita-se o limite mais baixo de todos<br/>(sinal, tempo, carro da frente, perigos)"]
-    Q3 -- "Não" --> R4["O carro segue o seu ritmo normal"]
+    Q3 -- "Sim" --> Q4{"O limite mais baixo de todos fica<br/>abaixo do ritmo normal?"}
+    Q4 -- "Sim" --> R3["Respeita-se esse limite<br/>(sinal, tempo, carro da frente, perigos)"]
+    Q3 -- "Não" --> R4["O carro segue o seu ritmo normal<br/>(arrancar, retomar, acelerar a pedido,<br/>manter a velocidade)"]
+    Q4 -- "Não" --> R4
 
     classDef dec fill:#fff3cd,stroke:#b58900,color:#000
     classDef acao fill:#d4edda,stroke:#2e7d32,color:#000
     classDef forte fill:#f8d7da,stroke:#b02a37,color:#000
-    class Q1,Q2,Q3 dec
+    class Q1,Q2,Q3,Q4 dec
     class R2,R3,R4 acao
     class R1 forte
 ```
 
 | Nível | O que inclui |
 |---|---|
-| Emergência | Risco iminente de colisão, peão a 6 m ou menos, obstáculo grave a 8 m ou menos |
-| Paragem obrigatória | Semáforo vermelho ou amarelo, sinal STOP, peão a atravessar, barreira fechada sem alternativa |
-| Limites de velocidade | Carro da frente, obstáculos e buracos, mau tempo, sinais de limite, velocidade de cruzeiro |
-| Ritmo normal | Manter a velocidade, arrancar, acelerar a pedido do operador |
+| Emergência | Risco iminente de colisão, peão a 6 m ou menos (ou já impossível de evitar travando com conforto), obstáculo grave a 8 m ou menos |
+| Paragem obrigatória | Semáforo vermelho ou amarelo, sinal STOP, peão no caminho ou a atravessar, barreira fechada sem alternativa |
+| Limites de velocidade | Carro da frente, carro mais lento na faixa da esquerda, obstáculos, barreiras e buracos no caminho, mau tempo, sinais de limite, velocidade de cruzeiro |
+| Ritmo normal | Arrancar ou retomar depois de parar, acelerar a pedido do operador, seguir no verde ou numa barreira aberta, manter a velocidade |
 
-Para a faixa ganha sempre a sugestão mais importante: desviar de um obstáculo vale mais do que ultrapassar. Enquanto uma paragem obrigatória ou uma emergência estiver a travar o carro para o parar, ele não muda de faixa; na aproximação, ainda sem travar, pode mudar (por exemplo para contornar um obstáculo antes de um semáforo vermelho).
+Para a faixa ganha sempre a sugestão mais importante: desviar de um obstáculo vale mais do que ultrapassar. Enquanto uma paragem obrigatória ou uma emergência estiver a travar o carro para o parar, ele não começa uma mudança de faixa menos importante do que ela; na aproximação, ainda sem travar, pode mudar (por exemplo para contornar um obstáculo antes de um semáforo vermelho).
 
 ## Segurança antes de executar
 
-Antes de começar a mudar de faixa, o carro confirma mais uma vez, com o que está realmente na estrada, que a faixa de destino está livre e que não há linha contínua. Se não, cancela a manobra e abranda 10 km/h. A velocidade é ajustada de forma suave, sem acelerações e travagens bruscas desnecessárias.
+Antes de começar a mudar de faixa, o carro confirma mais uma vez, com o que está realmente na estrada, que a faixa de destino está livre e que não há linha contínua. Se não, cancela a manobra e, se ainda não estiver a travar, abranda 10 km/h. A velocidade é ajustada de forma suave, sem acelerações e travagens bruscas desnecessárias.
 
 ## Quem pode pedir uma mudança de faixa ou uma aceleração
 

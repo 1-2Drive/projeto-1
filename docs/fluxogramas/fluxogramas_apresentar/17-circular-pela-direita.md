@@ -38,6 +38,8 @@ flowchart TD
     class A0,A1 acao
 ```
 
+No cenário de demonstração da apresentação esta regra está desligada, para o carro poder mostrar as manobras noutras faixas.
+
 ## Em resumo
 
 | Situação | O que o carro faz |

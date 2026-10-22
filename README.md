@@ -224,13 +224,24 @@ The **Road map** panel under the road view shows the whole matrix and the car's 
 Pick a value in the palette and click or drag over cells to paint them, also while the
 simulation runs (`PUT /api/world/map/cells`).
 
-When an obstacle sits in the car's lane, `Stop before obstacle ahead while still in
-its lane` keeps the car able to stop 10 m short of it for as long as no lane change has
-taken it out of that lane: whether no side is free, or the avoidance was vetoed or
+When an obstacle sits in the car's path, `Stop before obstacle ahead while still in
+its lane` keeps the car able to stop 10 m short of it for as long as the path runs
+through that lane: whether no side is free, or the avoidance was vetoed or
 refused. The rule binds from the distance a comfortable stop needs at the current speed
 (at least 60 m): above the braking curve the car holds its speed, on it the car brakes,
 so it reaches the 50 m where the avoidance is decided (inside the 60 m the blind-spot
-sensor sees into the side lanes) at a speed from which it can still stop. Once a lane
+sensor sees into the side lanes) at a speed from which it can still stop. A closed
+barrier is approached the same way (`Stop before closed barrier while still in its
+lane`, at least 55 m), and a pothole that is not being gone round is slowed down for
+along the curve to its 30 km/h crossing speed; a severe pothole is braked hard for when
+comfortable braking would no longer reach that speed, and the decision's reason says why
+it is crossed rather than gone round (no free lane, too close, or a way round not yet
+decidable; Art. 24 CE). The path is the car's lane, or the lane
+it is moving into while a lane change runs (`VehicleStateFact.pathLane`), so a hazard
+in the lane being entered is braked for during the manoeuvre. A lane change only counts
+as a way past a hazard when it leaves the lane before reaching it
+(`StoppingPolicy.roomToLeaveLane`: reaction plus the 2 s it takes to clear the lane);
+closer than that the car brakes and keeps its lane. Once a lane
 opens the car steers through it and `Move off when stopped and nothing holds the vehicle` takes it
 back up to 30 km/h (or the speed limit, if lower). From there
 `Build back up to the scenario cruise speed when no sign governs the road` keeps

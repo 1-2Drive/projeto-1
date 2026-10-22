@@ -1,6 +1,6 @@
 # C09 — Veículo à frente
 
-- **Branch / commit:** `teste_ana` @ `70082b4` + alterações de 18/10 por commitar (working tree)
+- **Branch / commit:** working tree a 21/10/2026
 - **Estado da informação:** confirmado pelo código, por testes unitários e de integração (Drools e Prolog), e em execução.
 
 ## Fluxograma
@@ -83,7 +83,7 @@ Este fluxograma não tem nós a vermelho.
 
 | Nó | Problema | Confirmação | Como reproduzir |
 |---|---|---|---|
-| — | Com um veículo parado a 60 m (60 km/h), o Drools pára a cerca de 13 m e, em 2 de 3 corridas, trava de emergência na aproximação (`Emergency brake when persistent TTC is critical`, C10); o Prolog pára a cerca de 9,5 m e nunca trava de emergência. Os dois contornam o veículo e regressam à direita. Divergência entre motores, por investigar. | Confirmado em execução a 17/10 (3 corridas em cada motor) | Caso A22, secção R2 do relatório |
+| — | Com um veículo parado a 60 m (60 km/h), o Drools pára a cerca de 13 m e, em 2 de 3 corridas, trava de emergência na aproximação (`Emergency brake when persistent TTC is critical`, C10); o Prolog pára a cerca de 9,5 m e nunca trava de emergência. Os dois contornam o veículo e regressam à direita. Divergência entre motores, por investigar. | Confirmado em execução a 17/10 (3 corridas em cada motor) | Caso A22, secção R2 do relatório de validação (não está no repositório) |
 
 ## Tabela de decisões
 
@@ -117,12 +117,12 @@ Todas as propostas são tetos de 50: quando várias disparam fica a de velocidad
 
 | Regra | Ficheiro:linha | Salience | Ação | Prioridade |
 |---|---|---|---|---|
-| R1 `Brake when front vehicle distance low` | `front-vehicle.drl:42` | 520 | `BRAKE` | 50 |
-| R4 `Keep safe following distance behind front vehicle` | `front-vehicle.drl:80` | 510 | `REDUCE_SPEED` ou `STOP` | 50 |
-| R5 `Follow the front vehicle speed outside the following gap` | `front-vehicle.drl:187` | 508 | `REDUCE_SPEED` | 50 |
-| R3 `Approaching trend from sliding distance window` | `front-vehicle.drl:145` | 505 | `REDUCE_SPEED` | 50 |
-| R6 `Hold speed on an approaching trend below its target` | `front-vehicle.drl:216` | 504 | `REDUCE_SPEED` | 50 |
-| R2 `Reduce speed when closing front vehicle` | `front-vehicle.drl:122` | 500 | `REDUCE_SPEED` | 50 |
+| R1 `Brake when front vehicle distance low` | `front-vehicle.drl:43` | 520 | `BRAKE` | 50 |
+| R4 `Keep safe following distance behind front vehicle` | `front-vehicle.drl:81` | 510 | `REDUCE_SPEED` ou `STOP` | 50 |
+| R5 `Follow the front vehicle speed outside the following gap` | `front-vehicle.drl:188` | 508 | `REDUCE_SPEED` | 50 |
+| R3 `Approaching trend from sliding distance window` | `front-vehicle.drl:146` | 505 | `REDUCE_SPEED` | 50 |
+| R6 `Hold speed on an approaching trend below its target` | `front-vehicle.drl:217` | 504 | `REDUCE_SPEED` | 50 |
+| R2 `Reduce speed when closing front vehicle` | `front-vehicle.drl:123` | 500 | `REDUCE_SPEED` | 50 |
 | `Update front vehicle from distance` | `01-state-updates.drl:151` | 1000 | — | — |
 | `Clear stale front vehicle perception` | `01-state-updates.drl:398` | 900 | — | — |
 
@@ -143,12 +143,13 @@ O artigo 24.º está citado de memória e deve ser conferido no texto oficial.
 
 | Elemento | Local |
 |---|---|
-| Sensor | `FrontRadarSensor`: distância real mais ruído gaussiano (desvio-padrão 0,7 m); velocidade relativa positiva quando o carro se aproxima; 100 ms, 130 m |
-| Facto | `drools/facts/FrontVehicleState.java`; valor inicial em `KnowledgeSession.java:111` |
+| Sensor | `FrontRadarSensor`: distância real mais ruído gaussiano (desvio-padrão 0,7 m, `SimulationConfig.distanceNoiseStdMeters`); velocidade relativa positiva quando o carro se aproxima; 100 ms, 130 m |
+| Facto | `drools/facts/FrontVehicleState.java`; valor inicial em `KnowledgeSession.java:115` |
 | Seleção do alvo | `WorldState.nearestFrontVehicleInLane()` |
-| Prolog | As mesmas regras em `driving_rules.pl`, secção "Veículo da frente" (R4 dividida em três variantes: stop, reopen gap, reduce) |
-| Testes unitários | `DrivingExpertSystemRulesTest`: `closingOnStationaryVehicleFollowsTheSafeDistanceCurve` (503), `followingTooCloseBehindAMovingVehicleReopensTheGap` (538), `stoppedBehindStationaryVehicleHoldsTheStop` (581), `distanceSamplesOfDifferentVehiclesAreNotCombinedIntoOneTrend` (631), `distanceSamplesOfTheSameVehicleStillFormATrend` (646); `PrologRulesTest`: as mesmas e `followingRulesKeepSlowingWhileTheOvertakeStarts` (495); `PrologDroolsEquivalenceTest`: "following a slow vehicle at 15 m / 18 m / 13 m", "following at 25 m on low grip", "closing trend at low speed holds the speed" |
-| Testes de integração | `StationaryFrontVehicleE2ETest.stopsBehindStationaryVehicleAndGoesAroundOnceLeftLaneClears` (96); `BoxedInTrafficE2ETest.followsTheSlowVehicleWithoutStopAndGo` |
+| Cenários | `S8` (veículo a 30 km/h 40 m à frente, ego a 95 km/h), `S14_SLOW_VEHICLE_OVERTAKE` (veículo a 18 km/h 45 m à frente na faixa RIGHT, ego a 50 km/h), `S12_PRESENTATION_DEMO` (aos 11 s, veículo a 12 km/h 175 m à frente na faixa CENTER) |
+| Prolog | As mesmas regras, com os mesmos nomes e precedências, em `driving_rules.pl` (R4 dividida em três variantes: `(stop)`, `(reopen gap)`, `(reduce)`); a janela de distâncias e o alvo seguido persistem em `driving_state.pl`, com as leituras dobradas distância primeiro |
+| Testes unitários | `DrivingExpertSystemRulesTest`: `closingOnStationaryVehicleFollowsTheSafeDistanceCurve` (635), `brakingBehindACloseFrontVehicleTargetsBelowItsSpeed` (652, R1), `followingTooCloseBehindAMovingVehicleReopensTheGap` (670), `stoppedBehindStationaryVehicleHoldsTheStop` (713), `distanceSamplesOfDifferentVehiclesAreNotCombinedIntoOneTrend` (763), `distanceSamplesOfTheSameVehicleStillFormATrend` (778); `PrologRulesTest`: `frontVehicleTooCloseTriggersBrake` (370, R1), `closingOnStationaryVehicleFollowsTheSafeDistanceCurve` (382), `stoppedBehindStationaryVehicleHoldsTheStop` (396), `relativeSpeedArrivingBeforeTheDistanceStillCounts` (408), `distanceSamplesOfTheSameVehicleStillFormATrend` (420), `distanceSamplesOfDifferentVehiclesAreNotCombinedIntoOneTrend` (432), `frontVehicleIsForgottenAfterMissedRadarReadings` (444), `noTrendWhileChangingLane` (456), `followingRulesKeepSlowingWhileTheOvertakeStarts` (520); `PrologDroolsEquivalenceTest`: "following a slow vehicle at 15 m / 18 m / 13 m", "following at 25 m on low grip", "closing trend at low speed holds the speed" |
+| Testes de integração | `StationaryFrontVehicleE2ETest` (parametrizado nos dois motores): `goesAroundStationaryVehicleWhenLeftLaneIsClear` (56), `stopsBehindStationaryVehicleAndGoesAroundOnceLeftLaneClears` (96), `passesFarStationaryVehicleOnTheMove` (144); `BoxedInTrafficE2ETest.followsTheSlowVehicleWithoutStopAndGo` (174, dois motores) |
 
 **Relações**
 
@@ -163,8 +164,9 @@ O artigo 24.º está citado de memória e deve ser conferido no texto oficial.
 - A 120 km/h o radar (130 m) não deteta um veículo parado a tempo de uma travagem confortável.
 - A regra de origem mostrada na interface alterna entre R2, R3, R4 e R5 durante a aproximação, porque ganha a de velocidade mais baixa em cada ciclo.
 - A condição de R3 (`mínimo < máximo − 4`) não distingue uma distância a diminuir de uma a aumentar. R6 só corrige o caso em que o carro se aproxima.
-- R1 e R2 continuam sem teste unitário dedicado.
+- R2 continua sem teste unitário dedicado (R1 tem `brakingBehindACloseFrontVehicleTargetsBelowItsSpeed` e `frontVehicleTooCloseTriggersBrake`).
 - O facto do veículo da frente é limpo ao fim de 250 ms sem amostras do radar.
+- Pela API ou pela interface só se coloca um veículo a 6 km/h ou mais (`ApiRequestMapper.MIN_VEHICLE_SPEED_KMH`); um veículo parado (a paragem de R4) só aparece em cenários e testes.
 
 ## Exemplos de entradas
 

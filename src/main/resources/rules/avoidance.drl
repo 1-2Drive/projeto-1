@@ -2,6 +2,7 @@ package rules
 
 import com.one2drive.projeto1.decision.DecisionContext
 import com.one2drive.projeto1.decision.DecisionPriority
+import com.one2drive.projeto1.decision.StoppingPolicy
 import com.one2drive.projeto1.domain.DrivingAction
 import com.one2drive.projeto1.domain.Lane
 import com.one2drive.projeto1.domain.LaneChangeState
@@ -33,6 +34,11 @@ global DroolsSupport droolsSupport
 // query (lane-safety.drl). An obstacle blocks the lane,
 // so going around it is collision avoidance; a pothole is a road hazard the vehicle
 // can also drive over slowly, so avoiding it stays at ROAD_HAZARD.
+//
+// A lane change is only a way past a hazard when it takes the vehicle out of the lane
+// before the hazard (StoppingPolicy.roomToLeaveLane): closer than that the manoeuvre
+// would carry the vehicle over it, and the approach rules (road-hazards.drl, barrier.drl)
+// brake for it instead.
 
 // The maintain rules keep the lane change as the decision while it is moving. They
 // also match a driver-requested lane change, so they propose at MANEUVER_SAFETY: at
@@ -82,9 +88,10 @@ agenda-group "decision"
 salience 475
 when
     $ctx : DecisionContext()
-    VehicleStateFact(lane == Lane.CENTER)
+    VehicleStateFact(lane == Lane.CENTER, $speed : speedKmh)
     PotholeStateFact(potholeId != "none", lane == Lane.CENTER,
-                     $distance : distanceMeters > 0, distanceMeters <= 50.0)
+                     $distance : distanceMeters > 0, distanceMeters <= 50.0,
+                     StoppingPolicy.roomToLeaveLane($speed, distanceMeters))
     safeToChangeLane(Lane.RIGHT;)
 then
     droolsSupport.proposeDecision(
@@ -104,9 +111,10 @@ agenda-group "decision"
 salience 470
 when
     $ctx : DecisionContext()
-    VehicleStateFact(lane == Lane.CENTER)
+    VehicleStateFact(lane == Lane.CENTER, $speed : speedKmh)
     PotholeStateFact(potholeId != "none", lane == Lane.CENTER,
-                     $distance : distanceMeters > 0, distanceMeters <= 50.0)
+                     $distance : distanceMeters > 0, distanceMeters <= 50.0,
+                     StoppingPolicy.roomToLeaveLane($speed, distanceMeters))
     // Left only when right is not a safe way past: occupied, or clear with no room to
     // follow the vehicle ahead in it (Art. 35 and 18 CE).
     not SafeLaneSide(side == Lane.RIGHT)
@@ -129,9 +137,10 @@ agenda-group "decision"
 salience 470
 when
     $ctx : DecisionContext()
-    VehicleStateFact(lane == Lane.LEFT)
+    VehicleStateFact(lane == Lane.LEFT, $speed : speedKmh)
     PotholeStateFact(potholeId != "none", lane == Lane.LEFT,
-                     $distance : distanceMeters > 0, distanceMeters <= 50.0)
+                     $distance : distanceMeters > 0, distanceMeters <= 50.0,
+                     StoppingPolicy.roomToLeaveLane($speed, distanceMeters))
     safeToChangeLane(Lane.RIGHT;)
 then
     droolsSupport.proposeDecision(
@@ -151,9 +160,10 @@ agenda-group "decision"
 salience 470
 when
     $ctx : DecisionContext()
-    VehicleStateFact(lane == Lane.RIGHT)
+    VehicleStateFact(lane == Lane.RIGHT, $speed : speedKmh)
     PotholeStateFact(potholeId != "none", lane == Lane.RIGHT,
-                     $distance : distanceMeters > 0, distanceMeters <= 50.0)
+                     $distance : distanceMeters > 0, distanceMeters <= 50.0,
+                     StoppingPolicy.roomToLeaveLane($speed, distanceMeters))
     safeToChangeLane(Lane.LEFT;)
 then
     droolsSupport.proposeDecision(
@@ -180,9 +190,10 @@ agenda-group "decision"
 salience 470
 when
     $ctx : DecisionContext()
-    VehicleStateFact(lane == Lane.CENTER)
+    VehicleStateFact(lane == Lane.CENTER, $speed : speedKmh)
     ObstacleStateFact(obstacleId != "none", lane == Lane.CENTER,
-                      $distance : distanceMeters > 0, distanceMeters <= 50.0)
+                      $distance : distanceMeters > 0, distanceMeters <= 50.0,
+                      StoppingPolicy.roomToLeaveLane($speed, distanceMeters))
     safeToChangeLane(Lane.LEFT;)
 then
     droolsSupport.proposeDecision(
@@ -202,9 +213,10 @@ agenda-group "decision"
 salience 470
 when
     $ctx : DecisionContext()
-    VehicleStateFact(lane == Lane.CENTER)
+    VehicleStateFact(lane == Lane.CENTER, $speed : speedKmh)
     ObstacleStateFact(obstacleId != "none", lane == Lane.CENTER,
-                      $distance : distanceMeters > 0, distanceMeters <= 50.0)
+                      $distance : distanceMeters > 0, distanceMeters <= 50.0,
+                      StoppingPolicy.roomToLeaveLane($speed, distanceMeters))
     // Right only when left is not a safe way past: occupied, or clear with no room to
     // follow the vehicle ahead in it (Art. 35 and 18 CE).
     not SafeLaneSide(side == Lane.LEFT)
@@ -227,9 +239,10 @@ agenda-group "decision"
 salience 470
 when
     $ctx : DecisionContext()
-    VehicleStateFact(lane == Lane.LEFT)
+    VehicleStateFact(lane == Lane.LEFT, $speed : speedKmh)
     ObstacleStateFact(obstacleId != "none", lane == Lane.LEFT,
-                      $distance : distanceMeters > 0, distanceMeters <= 50.0)
+                      $distance : distanceMeters > 0, distanceMeters <= 50.0,
+                      StoppingPolicy.roomToLeaveLane($speed, distanceMeters))
     safeToChangeLane(Lane.RIGHT;)
 then
     droolsSupport.proposeDecision(
@@ -249,9 +262,10 @@ agenda-group "decision"
 salience 470
 when
     $ctx : DecisionContext()
-    VehicleStateFact(lane == Lane.RIGHT)
+    VehicleStateFact(lane == Lane.RIGHT, $speed : speedKmh)
     ObstacleStateFact(obstacleId != "none", lane == Lane.RIGHT,
-                      $distance : distanceMeters > 0, distanceMeters <= 50.0)
+                      $distance : distanceMeters > 0, distanceMeters <= 50.0,
+                      StoppingPolicy.roomToLeaveLane($speed, distanceMeters))
     safeToChangeLane(Lane.LEFT;)
 then
     droolsSupport.proposeDecision(

@@ -1,6 +1,6 @@
 # C06 — Semáforo amarelo e verde
 
-- **Branch / commit:** `teste_ana` @ `70082b4` + alterações de 18/10 por commitar (working tree)
+- **Branch / commit:** working tree a 21/10/2026
 - **Estado da informação:** confirmado pelo código, por testes e em execução.
 
 ## Fluxograma
@@ -69,6 +69,8 @@ flowchart TD
 
 R0 = `Commit to stop or to proceed at traffic light`; R1 = `Yellow traffic light: stop before the line`; R2 = `Green traffic light allows progression when no higher hazard`; R3 = `Green traffic light releases red-light hold`.
 
+No Prolog (`driving_rules.pl`) R0 tem uma regra por resultado, `(red)`, `(yellow, can stop)` e `(yellow, too close)`, que concluem `light_commitment/2`; o compromisso persiste em `light_track/5` (`driving_state.pl`). R1 tem as variantes `(stop)`, `(brake)` e `(hold speed)`; R2 e R3 têm o mesmo nome.
+
 ## Ciclo do semáforo
 
 O ciclo pertence ao mundo simulado, não às regras (`domain/TrafficLight.java`, avançado em `WorldPhysicsEngine.updateWorld` através de `RoadMap.advanceTrafficLights`).
@@ -99,7 +101,7 @@ O compromisso só é reposto quando o semáforo passa a verde, quando a câmara 
 
 ## Situações a resolver
 
-Não há nós a vermelho neste cenário. Os dois problemas que estavam assinalados (o amarelo que travava até 0,5 km/h e ficava preso, e o `CONTINUE` 50 depois de passar o semáforo) foram corrigidos; ver `relatorio-validacao.md`, secção 14.
+Não há nós a vermelho neste cenário. Os dois problemas que estavam assinalados (o amarelo que travava até 0,5 km/h e ficava preso, e o `CONTINUE` 50 depois de passar o semáforo) foram corrigidos; ver `relatorio-validacao.md`, secção 14 (relatório que não está no repositório).
 
 ## Tabela de decisões
 
@@ -152,8 +154,8 @@ R2 não tem guarda: é uma proposta de conforto (10) e a arbitragem (M02) dá-lh
 | Estados possíveis | `domain/TrafficLightState.java` (`RED`, `YELLOW`, `GREEN`) |
 | Ciclo | `domain/TrafficLight.java`; durações em `config/SimulationConfig.java` |
 | Distâncias | `decision/StoppingPolicy.java` (as mesmas do vermelho, ver C05) |
-| Códigos do mapa | 6 vermelho, 7 verde (README, secção "Road map"). O amarelo só pode ser criado pela caixa de ferramentas (`frontend/src/app/scenario/element-properties/element-properties.component.html:73`) |
-| Testes | `DrivingExpertSystemRulesTest`: `conflictGreenLightAndPedestrianPedestrianWins` (417), `yellowLightWithRoomToStopCommitsToStopAndDoesNotChangeItsMind` (825), `yellowLightTooCloseToStopCommitsToProceedAndDoesNotChangeItsMind` (856), `yellowLightDetectedFarAwayCommitsToStopAtTheFirstDetection` (887), `committedToProceedAtYellowStillStopsForAPedestrian` (919); `TrafficLightCycleE2ETest`: `yellowFarAheadStopsBeforeTheLine` (75), `staysStoppedThroughRedAndDrivesOnAtGreen` (106), `yellowTooCloseIsDrivenThroughWithoutBraking` (153), `keepsDrivingOnWhenTheYellowTurnsRedBeforeItHasPassed` (187), `yellowDetectedFarAwayCommitsToStopFromTheFirstDetectionAndNeverChanges` (222), `commitmentIsClearedOnceTheLightIsBehind` (274); `RedLightHoldTimerE2ETest`: `redTimeStartsWhenTheEgoIsAtRestBeforeTheLine` (95), `redTimeCountsFromTheStopHoweverLongTheApproachTakes` (145), `greenDoesNotMoveTheEgoWhileAPedestrianIsCrossing` (177); `SimulationEngineE2ETest`: `priorityConflictPedestrianOverridesGreenLight` (601), `redTrafficLightStopsAndHoldsThenGreenResumesAndResetClearsFact` (804) |
+| Códigos do mapa | 6 vermelho, 7 verde (README, secção "Road map"). O amarelo só pode ser criado pela caixa de ferramentas (`frontend/src/app/scenario/element-properties/element-properties.component.html:75`) |
+| Testes | `DrivingExpertSystemRulesTest`: `conflictGreenLightAndPedestrianPedestrianWins` (546), `yellowLightWithRoomToStopCommitsToStopAndDoesNotChangeItsMind` (990), `yellowLightTooCloseToStopCommitsToProceedAndDoesNotChangeItsMind` (1021), `yellowLightDetectedFarAwayCommitsToStopAtTheFirstDetection` (1052), `committedToProceedAtYellowStillStopsForAPedestrian` (1084); `PrologRulesTest`: `yellowFarAwayCommitsToStopAndTheCommitmentSurvivesTheRed` (137), `yellowTooCloseCommitsToProceedWithoutBraking` (154), `greenReleasesAStoppedVehicle` (168), `lightIsForgottenOnceNoLongerSeen` (179), `conflictGreenLightAndPedestrianPedestrianWins` (297); `PrologDroolsEquivalenceTest`, casos "yellow, ...", "green, ..." e "green light and pedestrian"; `PrologSimulationE2ETest.drivesOnWhenTheLightTurnsGreen` (112); `TrafficLightCycleE2ETest` e `RedLightHoldTimerE2ETest` (parametrizados nos dois motores): `yellowFarAheadStopsBeforeTheLine` (75), `staysStoppedThroughRedAndDrivesOnAtGreen` (106), `yellowTooCloseIsDrivenThroughWithoutBraking` (153), `keepsDrivingOnWhenTheYellowTurnsRedBeforeItHasPassed` (187), `yellowDetectedFarAwayCommitsToStopFromTheFirstDetectionAndNeverChanges` (222), `commitmentIsClearedOnceTheLightIsBehind` (274); `RedLightHoldTimerE2ETest`: `redTimeStartsWhenTheEgoIsAtRestBeforeTheLine` (95), `redTimeCountsFromTheStopHoweverLongTheApproachTakes` (145), `greenDoesNotMoveTheEgoWhileAPedestrianIsCrossing` (177); `SimulationEngineE2ETest`: `priorityConflictPedestrianOverridesGreenLight` (601), `redTrafficLightStopsAndHoldsThenGreenResumesAndResetClearsFact` (804) |
 
 **Relações**
 
@@ -175,12 +177,12 @@ Distância necessária para parar a 60 km/h: 75,9 m com 2,8 m/s²; 95,8 m com 2,
 | Entrada | Caminho | Resultado |
 |---|---|---|
 | Amarelo visto a 110 m, 30 km/h | C06_D7 Sim; C06_D9 Não (o semáforo só conta a 40 m) | Compromisso de parar desde a primeira deteção; ainda sem proposta do semáforo |
-| Amarelo visto a 90 m, 60 km/h | C06_D7 Sim; C06_D9 Sim, C06_D10 Não | Compromisso de parar; `MAINTAIN_SPEED` 60 (teste da linha 618) |
-| O mesmo semáforo a 50 m, ainda a 60 km/h | compromisso mantido; C06_D10 Sim | `REDUCE_SPEED` (teste da linha 618) |
-| Amarelo visto a 50 m, 60 km/h | C06_D7 Não | Compromisso de prosseguir; sem proposta do semáforo (teste da linha 649) |
-| O mesmo semáforo depois a 45 m e 20 km/h, e depois vermelho | compromisso mantido | Sem proposta do semáforo (teste da linha 649) |
+| Amarelo visto a 90 m, 60 km/h | C06_D7 Sim; C06_D9 Sim, C06_D10 Não | Compromisso de parar; `MAINTAIN_SPEED` 60 (teste da linha 990) |
+| O mesmo semáforo a 50 m, ainda a 60 km/h | compromisso mantido; C06_D10 Sim | `REDUCE_SPEED` (teste da linha 990) |
+| Amarelo visto a 50 m, 60 km/h | C06_D7 Não | Compromisso de prosseguir; sem proposta do semáforo (teste da linha 1021) |
+| O mesmo semáforo depois a 45 m e 20 km/h, e depois vermelho | compromisso mantido | Sem proposta do semáforo (teste da linha 1021) |
 | Amarelo a 20 m, parado, compromisso de parar | C06_D1 Sim | `STOP` |
 | Verde a 20 m, 50 km/h, sem outros perigos | C06_D3 Sim; C06_D5 Não | `CONTINUE` 50 |
-| Verde a 20 m, 50 km/h, peão a 14 m | R2 propõe 10; C08 propõe 60 | `STOP` (teste da linha 297) |
+| Verde a 20 m, 50 km/h, peão a 14 m | R2 propõe 10; C08 propõe 70 (`Emergency brake for pedestrian when comfortable braking no longer stops in time`: travar até 6 m do peão pediria 12,1 m/s²) | `EMERGENCY_BRAKE` (teste da linha 546, que aceita `STOP`, `BRAKE` ou `EMERGENCY_BRAKE` de uma regra de peão) |
 | Verde a 3 m, parado | C06_D3 Sim; C06_D5 Sim | `RESUME` 30 (prioridade 30 ganha à de R2) |
 | Verde a 80 m | C06_D3 Não, C06_D4 Não | Sem proposta de C06 |

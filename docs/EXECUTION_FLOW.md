@@ -7,7 +7,8 @@
 Scope of the statements in this document:
 
 - They refer to the Spring Boot server path with the **Drools** backend and its pseudo session clock, which is the default way to run the system.
-- Where the **SWI-Prolog** backend differs, this is stated. Those differences come from reading the code; the Prolog backend was not executed in this analysis.
+- Where the **SWI-Prolog** backend differs, this is stated. Those differences come from reading the code and from the Prolog tests, which now run (SWI-Prolog 9.2.9 installed); the worked examples of §4 were run with Drools only.
+- Version: working tree as of 2026-10-21.
 - Differences in the legacy JavaFX client are noted where relevant.
 - Timings are in **simulation time**: one tick = 100 ms.
 
@@ -22,7 +23,7 @@ flowchart TD
     LOOP --> TICK["SimulationEngine.tick()"]
     TICK --> RUN{"status is RUNNING?"}
     RUN -- no --> SNAP0["snapshot() only<br/>(world frozen)"] --> PUB
-    RUN -- yes --> WORLD["Steps 1–5: physics and light cycle,<br/>sim time +100 ms, backend clock,<br/>queued API mutations, scenario timed actions"]
+    RUN -- yes --> WORLD["Steps 1–5: finished maneuver back to IDLE, physics and light cycle,<br/>sim time +100 ms, backend clock,<br/>queued API mutations, scenario timed actions"]
     WORLD --> SENSE["Step 6: SensorManager.observe<br/>(sensors due this tick emit events)"]
     SENSE --> INPUT["Steps 7–9: beginDecisionCycle (DecisionContext cleared),<br/>insertEvent for each event,<br/>updateVehicleState (ego state from the world)"]
     INPUT --> FIRE["Step 10: backend.decide()<br/>Drools: perception → decision → fallback groups<br/>Prolog: one JSON request, rules run in swipl"]
@@ -31,14 +32,14 @@ flowchart TD
     ERR -- no --> ARB["DecisionContext.applyTo:<br/>speed channel + lane channel,<br/>outcome of every proposal, lane checks"]
     ARB --> DEC["Step 11: trace decision change"]
     DEC --> ACT["Step 12: DecisionActuator.applyDecision<br/>(lane decision, then speed decision)"]
-    ACT --> BOOK["Step 13: maneuver, passed-object and demo bookkeeping"]
+    ACT --> BOOK["Step 13: maneuver bookkeeping, SessionSnapshot to the session recorder,<br/>passed-object and demo bookkeeping"]
     BOOK --> SNAP["snapshot()"]
     SNAP --> PUB["Publish WebSocket 'snapshot' frame → Angular UI"]
     PUB --> LOOP
     CMD(["REST commands:<br/>start / pause / stop / reset / load scenario /<br/>switch backend / world mutations / lane-change request"]) -.-> TICK
 ```
 
-The step numbers follow the order of statements in [`SimulationEngine.tick()`](../src/main/java/com/one2drive/projeto1/simulation/SimulationEngine.java) (lines 274–338).
+The step numbers follow the order of statements in [`SimulationEngine.tick()`](../src/main/java/com/one2drive/projeto1/simulation/SimulationEngine.java) (lines 290–368).
 
 ---
 
@@ -50,15 +51,16 @@ The step numbers follow the order of statements in [`SimulationEngine.tick()`](.
 |---|---|---|
 | Spring start-up | `DrivingExpertSystemServerApplication.main` | Starts the web server on port 8080 (`application.properties`) |
 | Configuration | `SimulationCoreConfig.simulationConfig()` → `SimulationConfig.defaultConfig()` | Tick 100 ms, map 100 blocks of 5 m, sensor ranges and rates, accelerations, light timings |
-| Scenario library | `ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json")` | 15 scenarios parsed with Jackson |
+| Scenario library | `ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json")` | 14 scenarios parsed with Jackson (Java comments allowed; S15 is commented out) |
 | Engine | `SimulationCoreConfig.simulationEngine(…, @Value("${expert.backend:drools}"))` → `new SimulationEngine(config, S1, pseudoClock=true, …, ExpertBackendType.parse(backend))` | Builds the world from S1, registers the five sensors, holds the vehicle at rest (speed 0, `STOPPED`), creates the backend. Status `STOPPED` |
 | Drools backend | `DroolsBackend` constructor → `KnowledgeSession.createPseudoClock` | New `KieSession` (all DRL files compiled into `drivingKbase`); pseudo clock; listeners; global `droolsSupport`; seed facts; live query "Current Driving Decision"; then `VehicleStateFact` and `CruiseTargetFact(initial speed)` |
 | Seed facts | `KnowledgeSession.create` | `DecisionContext`, `DrivingDecision`, `CurrentSpeedLimit(120, "default")`, `PendingSpeedLimit`, `WeatherStateFact(CLEAR)`, both `LaneOccupancyState` *occupied*, "none" front/side-lane/pedestrian/hazard/sign/light facts, inactive request, move-off, pedestrian-braking and overtaking states |
-| Prolog backend (if selected) | `PrologBackend` → `PrologKnowledgeSession.start` → `PrologProcess` | Starts `swipl`, sends `reset` with the cruise speed, the `StoppingPolicy` figures and the priority values; `driving_state.pl` seeds the same initial beliefs |
-| Scheduler | `SimulationRuntimeService.startLoop()` (`@PostConstruct`) | Single-thread scheduler: `tick()` and a snapshot every 100 ms; exceptions are logged and the loop continues |
-| Start | `POST /api/simulation/start` → `SimulationEngine.start()` | If the world is still at rest at time 0, the scenario's initial speed is applied (`CRUISING`); status `RUNNING` |
+| Prolog backend (if selected) | `PrologBackend` → `PrologKnowledgeSession.start` → `PrologProcess` | Starts `swipl` (found by `PrologProcess.executable()`: `-Dprolog.executable`, `PATH`, or the usual install folders), sends `reset` with the cruise speed, the `StoppingPolicy` figures and the priority values; `driving_state.pl` seeds the same initial beliefs |
+| Scheduler | `SimulationRuntimeService.startLoop()` (`@PostConstruct`) | Single-thread scheduler: `tick()` and the snapshot under the service lock every 100 ms, then the WebSocket publish outside it; exceptions are logged and the loop continues |
+| Session recorder | `SimulationRuntimeService` constructor → `SimulationEngine.setSessionSnapshotConsumer` | The engine hands every decided cycle to the runtime service, which records it while a session is open |
+| Start | `POST /api/simulation/start` → `SimulationRuntimeService.start()` → `SimulationEngine.start()` | From `STOPPED`, a new session is opened (id, scenario, backend, world description). If the world is still at rest at time 0, the scenario's initial speed is applied (`CRUISING`); status `RUNNING` |
 
-Loading a scenario (`POST /api/scenarios/{id}/load`), `POST /api/simulation/reset` (which always reloads S1) and `POST /api/simulation/backend/{type}` (which reloads the current scenario) all call `SimulationEngine.reset`. It closes the old backend, rebuilds the world and creates a new backend session from an empty working memory. If a backend switch fails, the previous backend is restored and the error is returned (HTTP 503).
+Loading a scenario (`POST /api/scenarios/{id}/load`), `POST /api/simulation/reset` (which always reloads S1) and `POST /api/simulation/backend/{type}` (which reloads the current scenario) all save the open session first (if any) and then call `SimulationEngine.reset`. It closes the old backend, rebuilds the world and creates a new backend session from an empty working memory. If a backend switch fails, the previous backend is restored and the error is returned (HTTP 503).
 
 ### 2.2 Input acquisition and definition
 
@@ -101,18 +103,19 @@ Conditions are of five kinds:
 
 - **Belief conditions** on state facts, e.g. a `PedestrianStateFact` in the path within 32 m.
 - **Temporal (CEP) conditions** on event windows, e.g. three or more `TTCEvent` with TTC < 2.5 s in `window:time(2s)`, or Allen relations such as `VehicleSpeedEvent(this after[1200ms] $stopped)`.
-- **Goals proved by backward chaining:** `safeToChangeLane(side)` and its four sub-goal queries.
+- **Goals proved by backward chaining:** `safeToChangeLane(side)` and its four sub-goal queries. Its negation is read through `SafeLaneSide`, a fact the perception rule "Derive the sides that are safe to change lane to" inserts logically for each side the goal proves.
 - **Arithmetic conditions** on stopping distances and braking curves (`StoppingPolicy` formulas).
 - **Freshness and change guards** in perception rules, so that a belief is updated only by newer or different information.
 
 ### 2.5 Rule activation and firing
 
-**Drools.** The control rule (salience 10000) sets the focus, and the three agenda groups run in order:
+**Drools.** `KnowledgeSession.beginDecisionCycle` stacks the agenda focus every cycle; the control rule (group `control`, salience 10000) fires first and marks the cycle dispatched, and the three phase groups run in order:
 
-1. **`perception`** (32 rules):
+1. **`perception`** (33 rules):
    - updates from events (salience 1000; 1010 for activating a pending speed limit);
-   - stale clearing and request expiry (900).
-2. **`decision`** (84 rules), in salience order:
+   - stale clearing and request expiry (900);
+   - the sides safe to change lane to (800).
+2. **`decision`** (87 rules), in salience order:
    - emergency rules (900–870);
    - traffic-light commitment (700);
    - barrier rules (650–640);
@@ -132,7 +135,7 @@ Conditions are of five kinds:
 Rules that modify a fact cause dependent rules to be re-evaluated within the same `fireAllRules` call (forward chaining); `no-loop` stops self-retriggering. A tick is capped at 5000 firings.
 
 **Prolog.**
-- `server.pl` handles the `tick` request:
+- Java sends `prepareCycle` (drops the previous cycle's fuzzy facts), then the `tick` request, which `server.pl` handles:
   - `update_state` applies the events to the stored state;
   - `load_cycle_facts` builds a fresh working memory;
   - `run_rules` fires rules by precedence (equal to the Drools salience), re-matching only the rules that read a new fact type;
@@ -164,7 +167,7 @@ After inference:
 ### 2.8 Result presentation and consumption
 
 - **Vehicle:** acceleration, indicator, steering and driving state; for an accepted lane maneuver, `LaneChangeState.REQUESTED` and the target lane.
-- **Timeline:** `ExplanationTrace` (500 entries):
+- **Timeline:** `ExplanationTrace` (the whole backend session; the snapshot carries the last 160 entries):
   - perception changes (`SensorSignificance`);
   - rule activations and firings (Drools listeners; for Prolog, one `RULE FIRED` entry per rule that concluded something);
   - fact changes and decisions;
@@ -173,6 +176,7 @@ After inference:
   - backend errors.
 - **Snapshot:** `SimulationEngine.snapshot()` → `ApiModelMapper` → `ApiSimulationSnapshot` → WebSocket frame `snapshot` (`/api/ws/simulation`), also returned by `GET /api/simulation/state`. It carries the ego, environment, speed advisor, both decision channels, the proposals and their outcomes, the lane checks, sensor telemetry, world objects, working memory, timeline, road map, lane safety, demo phases, and the active backend and its error.
 - **Decision panel (Angular):** shows the speed and lane channels with their rules, the proposal list with outcomes, and the engine toggle.
+- **Session record:** while a session is open, `SimulationRuntimeService.recordTickSnapshot` adds a vehicle sample and the new timeline events every running tick, and the cycle's `SessionSnapshot` (world, sensors and vehicle the rules decided on, working memory, proposals, lane checks, the decision as the actuator left it) whenever the cycle has a `DECISION` entry. After STOP the UI opens the trip questions dialog, which asks `POST /api/history/sessions/{id}/why` for a recorded decision.
 
 ### 2.9 State updates and repeated execution
 
@@ -202,8 +206,8 @@ Because the road loops, a scenario never ends by itself.
 | Trigger | Effect |
 |---|---|
 | `POST /api/simulation/pause` | Status `PAUSED`; ticks return snapshots without advancing; `resume` continues |
-| `POST /api/simulation/stop` | Status `STOPPED`; frozen; `start` continues from the current state |
-| `reset` / scenario load / backend switch | Pending mutations cleared, backend closed and recreated, clock and sensors reset, world rebuilt, vehicle at rest, status `STOPPED` |
+| `POST /api/simulation/stop` | Status `STOPPED`; frozen; the open session is saved to `history.directory` (default `~/.projeto-1/sessions`) and its id returned; `start` continues from the current state in a new session |
+| `reset` / scenario load / backend switch | Open session saved, pending mutations cleared, backend closed and recreated, clock and sensors reset, world rebuilt, vehicle at rest, status `STOPPED` |
 | Inference failure | Status `PAUSED`, `backendError` shown in the UI; reset or switch backend to continue (§3.7) |
 | Server shutdown | `SimulationRuntimeService.stopLoop()` (`@PreDestroy`) stops the scheduler; `SimulationEngine.close()` (bean destroy method) closes the backend (Drools: live query and session; Prolog: process) |
 
@@ -226,19 +230,20 @@ All applicable rules fire and propose; arbitration combines them per channel.
 
 ### 3.3 Emergency
 
-The four `EMERGENCY_SAFETY` rules (priority 70) override every other speed proposal, and they veto lane maneuvers that have not started. `EMERGENCY_BRAKE` applies 8.5 m/s² and switches on the hazard lights. The decision stays as long as its condition holds:
+The five `EMERGENCY_SAFETY` rules (priority 70) override every other speed proposal, and they veto lane maneuvers that have not started. `EMERGENCY_BRAKE` applies 8.5 m/s² and switches on the hazard lights. The decision stays as long as its condition holds:
 
 - persistent TTC: at least three samples below 2.5 s within 2 s;
 - immediate TTC: one sample below 1.3 s within 200 ms;
 - pedestrian: a conflicting pedestrian within 6 m;
+- pedestrian beyond comfortable braking: a conflicting pedestrian further than 6 m that comfortable braking (with a 10 % margin) can no longer stop short of, 6 m before it;
 - obstacle: a HIGH obstacle within 8 m in the physical lane within 300 ms.
 
 Other rules also issue `EMERGENCY_BRAKE` when comfortable braking no longer suffices:
 
-- the stop-sign and red-light approaches and "Hold at red traffic light" (priority 60);
-- "Stop before obstacle ahead while still in its lane" (priority 50).
+- the stop-sign and red-light approaches, "Hold at red traffic light" and "Closed barrier requires stop" (priority 60);
+- "Stop before obstacle ahead while still in its lane" and the new "Stop before closed barrier while still in its lane" (priority 50).
 
-The closed-barrier stop has no such escalation (R-22).
+The barrier escalation is new since the R-22 probe of 2026-10-18, which was not re-run.
 
 ### 3.4 Missing or stale input data
 
@@ -313,7 +318,7 @@ If `backend.decide()` throws an `ExpertSystemException`:
 - it sets the status to `PAUSED`;
 - it returns the snapshot **without applying any decision**.
 
-For Prolog, the cause can be an error reply, a closed stream, a dead process or no reply within 2 s; on a timeout the process is killed. The UI shows the error banner ("Reset, or switch engine, to continue"), and `GET /api/simulation/status` reports `drools: "ERROR"`. A reset clears the error. Not executed in this analysis.
+For Prolog, the cause can be an error reply, a closed stream, a dead process or no reply within 2 s; on a timeout the process is killed. The UI shows the error banner ("Reset, or switch engine, to continue"), and `GET /api/simulation/status` reports `drools: "ERROR"`. A reset clears the error. Not probed in this analysis.
 
 ### 3.8 Backend switch
 
@@ -322,13 +327,13 @@ For Prolog, the cause can be an error reply, a closed stream, a dead process or 
 - The engine resets with the new backend: an empty working memory, the world rebuilt, status `STOPPED`.
 - If the new backend cannot start (e.g. `swipl` missing), the previous backend is restored, the exception propagates, and the API answers HTTP 503.
 
-`PrologSimulationE2ETest.failedSwitchKeepsThePreviousBackend` (executed here) checks this last case with a nonexistent executable.
+`PrologSimulationE2ETest.failedSwitchKeepsThePreviousBackend` checks this last case with a nonexistent executable (passing in the Surefire reports of 2026-10-21).
 
 ---
 
 ## 4. Worked Examples (Observed)
 
-The following traces were observed by running the real engine (Drools, pseudo clock) on a copy of the repository: exploratory probes, see [TESTING.md §5](TESTING.md#5-exploratory-verification-probes). The numbers come from those runs.
+The following traces were observed on 2026-10-18 by running the real engine (Drools, pseudo clock) on a copy of the repository: exploratory probes, see [TESTING.md §5](TESTING.md#5-exploratory-verification-probes). The numbers come from those runs and were not re-measured for the current rules (the rule base has grown from 119 to 123 rules since; e.g. "Derive the sides that are safe to change lane to" would now also appear in the rule lists).
 
 ### 4.1 Speed limit sign (scenario S2)
 
@@ -406,12 +411,13 @@ S3: ego `RIGHT` at 70 km/h, red light (road-wide) at 120 m (probe P-15):
 
 | Stage | Classes and methods | Rules |
 |---|---|---|
-| Initialisation | `SimulationCoreConfig`, `SimulationEngine` constructor / `reset` / `switchBackend`, `DroolsBackend`, `KnowledgeSession.create`, `PrologBackend`, `PrologKnowledgeSession.start`, `ScenarioFactory.buildWorld` | `00-declarations.drl`; Prolog `reset_state/3` |
+| Initialisation | `SimulationCoreConfig`, `SimulationEngine` constructor / `reset` / `switchBackend`, `DroolsBackend`, `KnowledgeSession.create`, `PrologBackend`, `PrologKnowledgeSession.start`, `PrologProcess.executable`, `ScenarioFactory.buildWorld` | `00-declarations.drl`; Prolog `reset_state/3` |
 | Input acquisition | `SensorManager.observe`, the five sensors, `flushPendingMutations`, `runTimedActions`, `requestLaneChange`, `requestAcceleration`, controllers | — |
 | Representation | `WorldState`, `RoadMap`, `ExpertSystemBackend.insertEvent` (`EventRouter`), `updateVehicleState` | `01-state-updates.drl`; `driving_state.pl` |
-| Condition evaluation and activation | `DroolsBackend.decide` (`fireAllRules`), `PrologKnowledgeSession.cycle` (`run_rules/0`) | all DRL files; `driving_rules.pl` |
-| Conflict handling | `DroolsSupport.proposeDecision`, `PrologProposal.proposeTo`, `DecisionContext.applyTo` | the 64 proposing rules |
+| Condition evaluation and activation | `KnowledgeSession.beginDecisionCycle` (agenda focus), `DroolsBackend.decide` (`fireAllRules`), `PrologKnowledgeSession.cycle` (`prepareCycle`, `run_rules/0`) | all DRL files (`control.drl` first); `driving_rules.pl` |
+| Conflict handling | `DroolsSupport.proposeDecision`, `PrologProposal.proposeTo`, `DecisionContext.applyTo` | the 67 proposing rules |
 | Final selection | `DecisionContext.applyTo`, `DroolsBackend.laneCheck`, `trackDecisionTransition`, `DecisionActuator.applyDecision` | `lane-safety.drl` (why-not) |
 | Presentation | `snapshot`, `ApiModelMapper`, `RealtimeSnapshotPublisher`, `ExplanationTrace`, listeners, `InferenceNarrator` | `queries.drl` |
+| Session history and later explanations | `SimulationRuntimeService` (`start`, `recordTickSnapshot`, `stop`, `finalizeActiveSession`), `SessionHistoryStore`, `SessionExplanationService`, `FlowchartPathBuilder`, `AlternativeExplainer`, `DecisionFlowchart` | — (recorded proposals, nothing re-inferred) |
 | State update and repetition | `WorldPhysicsEngine.updateWorld` (incl. `RoadMap.advanceTrafficLights`), `settleManeuver`, `normalizeCompletedManeuver`, `consumePassedRoadElements` | state-machine rules in `front-vehicle.drl`, `pedestrian.drl`, `traffic-signs.drl`, `traffic-lights.drl`, `defaults.drl` |
-| Termination | `pause`, `stop`, `reset`, `close`, `SimulationRuntimeService.stopLoop`; failure: `SimulationEngine.tick` catch block | — |
+| Termination | `pause`, `stop` (saves the session), `reset`, `close`, `SimulationRuntimeService.stopLoop`; failure: `SimulationEngine.tick` catch block | — |

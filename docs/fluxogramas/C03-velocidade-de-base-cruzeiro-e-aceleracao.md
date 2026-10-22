@@ -1,6 +1,6 @@
 # C03 — Velocidade de base, cruzeiro e pedido de aceleração
 
-- **Branch / commit:** `teste_ana` @ `70082b4` + alterações de 18/10 por commitar (working tree)
+- **Branch / commit:** working tree a 21/10/2026
 - **Estado da informação:** confirmado pelo código; cruzeiro e base confirmados por testes; pedido de aceleração isolado sem teste.
 
 ## Fluxograma
@@ -84,8 +84,9 @@ R1 e R2 não têm guarda sobre a prioridade: é a arbitragem (M02) que decide. R
 | Elemento | Local |
 |---|---|
 | Velocidade de cruzeiro | `CruiseTargetFact`, inserido pelo backend com a velocidade inicial do cenário (`DroolsBackend.java:59`) |
-| Pedido de aceleração | `SimulationEngine.requestAcceleration()` (885); ação temporizada `REQUEST_ACCELERATION` (664); botão "Request Accel 90" da interface JavaFX antiga (`ui/DrivingExpertSystemApp.java:195`). Não existe endpoint REST |
-| Testes | `DrivingExpertSystemRulesTest`: `sessionSeedLimitAloneIsNotATargetToSpeedUpTo` (112), `conflictAccelerationAndCriticalTtcEmergencyWins` (446); `SimulationEngineE2ETest.vehicleBuildsBackUpToScenarioCruiseSpeedAfterBrakingWithNoSign` (965) |
+| Pedido de aceleração | `SimulationEngine.requestAcceleration()` (984); ação temporizada `REQUEST_ACCELERATION` (752); botão "Request Accel 90" da interface JavaFX antiga (`ui/DrivingExpertSystemApp.java:195`). Não existe endpoint REST |
+| Testes | `DrivingExpertSystemRulesTest`: `sessionSeedLimitAloneIsNotATargetToSpeedUpTo` (112), `conflictAccelerationAndCriticalTtcEmergencyWins` (578); `SimulationEngineE2ETest.vehicleBuildsBackUpToScenarioCruiseSpeedAfterBrakingWithNoSign` (966); `PrologRulesTest.clearRoadBuildsBackUpToTheCruiseSpeed` (114); `PrologDroolsEquivalenceTest`: "no restriction", "driver acceleration request accepted, then expired", "driver acceleration request against a lower signed limit" |
+| Prolog | As três regras com os mesmos nomes em `driving_rules.pl` (`cruise_speed/1`, `no_speed_sign`); o pedido persiste no estado `accel_request/2` de `driving_state.pl` |
 
 **Relações**
 
@@ -97,7 +98,7 @@ R1 e R2 não têm guarda sobre a prioridade: é a arbitragem (M02) que decide. R
 
 - O alvo de R2 não é limitado pelo limite legal na própria regra. A correção só chega quando a velocidade excede o limite e C01 propõe `REDUCE_SPEED` (teto de 20).
 - Nenhum cenário em `scenarios.json` usa `REQUEST_ACCELERATION` e não há endpoint REST: na interface Angular o pedido de aceleração não é acessível.
-- Não há teste em que R2 seja a decisão final.
+- Nenhum teste afirma que R2 seja a decisão final: os casos de pedido de aceleração em `PrologDroolsEquivalenceTest` só verificam que os dois motores decidem o mesmo.
 
 ## Exemplos de entradas
 

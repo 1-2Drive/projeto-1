@@ -17,26 +17,26 @@
            overtaking_state/5, last_decision/2, last_priority/1, move_off/2, cruise/1,
            param/2, priority_value/2, lane_settled/1, physical_lane/1, pedestrian_braking/2.
 
-% Window of the persistent-TTC rule (window:time(2s) in Drools).
+% Janela da regra de TTC persistente (window:time(2s) no Drools).
 ttc_window_ms(2000).
-% A low TTC counts when a rain reading is within this of it (coincides[400ms] in Drools).
+% Um TTC baixo conta quando há uma leitura de chuva a menos disto (coincides[400ms] no Drools).
 rain_coincidence_ms(400).
-% Missed readings after which an object is no longer considered (Drools: 1000/400).
+% Leituras em falta após as quais um objeto deixa de ser considerado (Drools: 1000/400).
 pedestrian_validity_ms(1000).
 light_validity_ms(400).
 stop_validity_ms(1500).
-% With no radar reading for more than 250 ms, the front vehicle is no longer ahead.
+% Sem leitura do radar há mais de 250 ms, o veículo da frente deixa de estar à frente.
 front_validity_ms(250).
-% Window of the distances to the front vehicle (window:time(2s) in Drools).
+% Janela das distâncias ao veículo da frente (window:time(2s) no Drools).
 front_distance_window_ms(2000).
 left_vehicle_validity_ms(250).
-% Obstacles, potholes and barriers: forgotten 1 s after the last reading.
+% Obstáculos, buracos e barreiras: esquecidos 1 s após a última leitura.
 hazard_validity_ms(1000).
-% Window of the emergency brake for an obstacle (window:time(300ms) in Drools).
+% Janela da travagem de emergência para um obstáculo (window:time(300ms) no Drools).
 obstacle_window_ms(300).
-% A pending speed limit sign the camera stops reporting while still ahead is dropped.
+% Um sinal de limite de velocidade pendente que a câmara deixa de reportar ainda à frente é descartado.
 pending_limit_validity_ms(1000).
-% A driver request lasts 1.5 s.
+% Um pedido do condutor dura 1,5 s.
 request_validity_ms(1500).
 
 state_predicates([ego_state/3, lane_change/1, markings/2, target_lane_state/1, safe_lanes/2,
@@ -52,51 +52,51 @@ state_predicates([ego_state/3, lane_change/1, markings/2, target_lane_state/1, s
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Reinício da sessão
 
-% The same initial state as the seeds of KnowledgeSession.create: a default limit of
-% 120 km/h (not a sign), no traffic light, no pedestrian.
+% O mesmo estado inicial que as sementes de KnowledgeSession.create: um limite por omissão de
+% 120 km/h (não um sinal), nenhum semáforo, nenhum peão.
 reset_state(Cruise, Params, Priorities) :-
     state_predicates(Predicates),
     forall(member(Name/Arity, Predicates),
            ( functor(Head, Name, Arity), retractall(Head) )),
     assertz(ego_state(0.0, center, 0)),
-    % physical_lane(Lane): the lane the vehicle is physically in (VehicleStateFact.physicalLane),
-    % which differs from the committed lane during a lane change and on the tick it completes.
+    % physical_lane(Lane): a faixa em que o veículo está fisicamente (VehicleStateFact.physicalLane),
+    % que difere da faixa assumida durante uma mudança de faixa e no tick em que esta termina.
     assertz(physical_lane(center)),
     assertz(lane_change(idle)),
     assertz(markings(dashed, dashed)),
     assertz(target_lane_state(center)),
     assertz(safe_lanes(false, false)),
-    % road_flags(RightLaneBlockedAhead, PresentationDemo), computed by Java.
+    % road_flags(RightLaneBlockedAhead, PresentationDemo), calculados pelo Java.
     assertz(road_flags(false, false)),
-    % Driver requests: lane_request(Active, Direction, Ms), accel_request(TargetKmh, Ms).
+    % Pedidos do condutor: lane_request(Active, Direction, Ms), accel_request(TargetKmh, Ms).
     assertz(lane_request(false, left, -1)),
     assertz(accel_request(0.0, 0)),
     assertz(ego_position(0.0)),
-    % weather_state(Condition, Visibility, Grip, Ms): clear-weather seed, as in Drools.
+    % weather_state(Condition, Visibility, Grip, Ms): semente de tempo limpo, como no Drools.
     assertz(weather_state(clear, 1.0, 1.0, 0)),
-    % occupancy(Side, Occupied, FrontDistanceM, SafeToEnter). The adjacent lanes start
-    % occupied and not safe to enter: the vehicle never moves into a lane only because it
-    % has not sensed it yet (a pessimistic seed, as in Drools).
+    % occupancy(Side, Occupied, FrontDistanceM, SafeToEnter). As faixas adjacentes começam
+    % ocupadas e sem segurança para entrar: o veículo nunca entra numa faixa só porque ainda
+    % não a detetou (uma semente pessimista, como no Drools).
     assertz(occupancy(left, true, inf, false)),
     assertz(occupancy(right, true, inf, false)),
-    % occupancy_read(Side, Ms): when that side was last read (LaneOccupancyState.timestamp).
+    % occupancy_read(Side, Ms): quando esse lado foi lido pela última vez (LaneOccupancyState.timestamp).
     assertz(occupancy_read(left, -1)),
     assertz(occupancy_read(right, -1)),
-    % lane_settled(Ms): when the last lane change settled (laneSettledAtMillis), -1 if none.
+    % lane_settled(Ms): quando terminou a última mudança de faixa (laneSettledAtMillis), -1 se nenhuma.
     assertz(lane_settled(-1)),
     % overtaking_state(Active, OriginLane, TargetPassed, StartMs, Target)
     assertz(overtaking_state(false, right, false, 0, none)),
-    % boxed_in_state(Active, Lane, SinceMs): Drools' BoxedInFact, absent at the start.
+    % boxed_in_state(Active, Lane, SinceMs): o BoxedInFact do Drools, ausente no início.
     retractall(boxed_in_state(_, _, _)),
     assertz(boxed_in_state(false, none, 0)),
     assertz(limit_state(120, default, 0)),
-    % pending_limit(SignId, LimitKmh, SignPositionM, Ms): Drools' PendingSpeedLimit.
+    % pending_limit(SignId, LimitKmh, SignPositionM, Ms): o PendingSpeedLimit do Drools.
     assertz(pending_limit(none, 0, inf, -1)),
     assertz(last_decision(continue, 'Default continue decision')),
     assertz(last_priority(0)),
-    % move_off(Active, Ms): Drools' MoveOffState.
+    % move_off(Active, Ms): o MoveOffState do Drools.
     assertz(move_off(false, 0)),
-    % pedestrian_braking(Phase, Ms): Drools' PedestrianBrakingState (none, braking, holding).
+    % pedestrian_braking(Phase, Ms): o PedestrianBrakingState do Drools (none, braking, holding).
     assertz(pedestrian_braking(none, 0)),
     assertz(cruise(Cruise)),
     forall(get_dict(Name, Params, Value), assertz(param(Name, Value))),
@@ -105,10 +105,10 @@ reset_state(Cruise, Params, Priorities) :-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Ciclo: estado do veículo, eventos e esquecimento do que deixou de ser visto
 
-% vehicle_input(Now, SpeedKmh, PositionM, Lane, LaneChange, Left-Right markings, TargetLane,
+% vehicle_input(Now, SpeedKmh, PositionM, Lane, LaneChange, marcações Left-Right, TargetLane,
 %               SafeLeft-SafeRight, RightBlocked-Demo, LaneSettledMs, PhysicalLane)
-% The previous decision, already arbitrated by Java: Drools also sees it, as the
-% DrivingDecision fact, and the STOP rule uses it to keep hard braking already under way.
+% A decisão anterior, já arbitrada pelo Java: o Drools também a vê, como o facto
+% DrivingDecision, e a regra STOP usa-a para manter uma travagem forte já em curso.
 update_state(vehicle_input(Now, Speed, Position, Lane, LaneChange, Markings, Target, Safe, Flags, Settled, Physical),
              Events, previous(Action, Rule, Priority)) :-
     Flags = RightBlocked-Demo,
@@ -119,8 +119,8 @@ update_state(vehicle_input(Now, Speed, Position, Lane, LaneChange, Markings, Tar
     replace(ego_position(_), ego_position(Position)),
     downcase_atom(Target, TargetLower),
     replace(target_lane_state(_), target_lane_state(TargetLower)),
-    % The adjacent lanes Java finds the ego may enter (WorldState.isLaneSafe), like
-    % leftAdjacentLaneSafe and rightAdjacentLaneSafe in Drools' VehicleStateFact.
+    % As faixas adjacentes em que o Java considera que o ego pode entrar (WorldState.isLaneSafe), como
+    % leftAdjacentLaneSafe e rightAdjacentLaneSafe no VehicleStateFact do Drools.
     Safe = SafeLeft-SafeRight,
     replace(safe_lanes(_, _), safe_lanes(SafeLeft, SafeRight)),
     replace(ego_state(_, _, _), ego_state(Speed, Lane, Now)),
@@ -132,20 +132,20 @@ update_state(vehicle_input(Now, Speed, Position, Lane, LaneChange, Markings, Tar
     replace(markings(_, _), markings(LeftLower, RightLower)),
     downcase_atom(Action, ActionLower),
     replace(last_decision(_, _), last_decision(ActionLower, Rule)),
-    % Only a distance adopts a new front vehicle; relative speed and TTC only update the one
-    % already followed. Distances go first so the order of events in the cycle does not
-    % matter, as in Drools, which re-evaluates after every update.
-    % "Activate the pending speed limit at its sign" runs before the new readings, so a sign
-    % just passed takes effect before the camera's reading of the next one replaces it.
+    % Só uma distância adota um novo veículo da frente; a velocidade relativa e o TTC só atualizam o
+    % que já é seguido. As distâncias vão primeiro para que a ordem dos eventos no ciclo não
+    % importe, como no Drools, que reavalia após cada atualização.
+    % "Activate the pending speed limit at its sign" corre antes das novas leituras, para que um sinal
+    % acabado de passar entre em vigor antes de a leitura da câmara do seguinte o substituir.
     activate_pending_limit(Now),
     partition(distance_event, Events, Distances, Others),
     maplist(record_event, Distances),
     maplist(record_event, Others),
     expire_old_readings(Now).
 
-% "Activate the pending speed limit at its sign": the pending limit becomes the limit in force
-% once the vehicle reaches the sign; the pending sign is forgotten, keeping its reading time
-% so an older reading cannot bring it back.
+% "Activate the pending speed limit at its sign": o limite pendente passa a ser o limite em vigor
+% quando o veículo chega ao sinal; o sinal pendente é esquecido, mantendo a hora da leitura
+% para que uma leitura mais antiga não o possa trazer de volta.
 activate_pending_limit(Now) :-
     (   pending_limit(SignId, Limit, SignPosition, Ms),
         SignId \== none,
@@ -163,10 +163,10 @@ replace(Old, New) :-
 record_event(Event) :-
     (   get_dict(type, Event, Type), on_event(Type, Event)
     ->  true
-    ;   true    % an event type no rule reads yet: ignored
+    ;   true    % um tipo de evento que nenhuma regra lê ainda: ignorado
     ).
 
-% An infinite distance arrives from Java as "Infinity".
+% Uma distância infinita chega do Java como "Infinity".
 distance(X, X) :- number(X), !.
 distance(_, inf).
 
@@ -176,8 +176,8 @@ valid_hazard(Id, D) :-
 distance_event(Event) :-
     get_dict(type, Event, 'FrontDistanceEvent').
 
-% "Track the speed limit sign ahead as pending": a limit only starts at its sign, so a sign
-% read ahead is kept with its position on the road until the vehicle gets there.
+% "Track the speed limit sign ahead as pending": um limite só começa no seu sinal, por isso um sinal
+% lido à frente é guardado com a sua posição na estrada até o veículo lá chegar.
 on_event('SpeedLimitDetectedEvent', E) :-
     pending_limit(_, _, _, Since),
     (   number(E.distanceMeters),
@@ -190,10 +190,10 @@ on_event('SpeedLimitDetectedEvent', E) :-
     ;   true
     ).
 
-% "Update traffic light state": the commitment is about one light and one yellow/red phase;
-% another light or green cancels it.
+% "Update traffic light state": o compromisso diz respeito a um semáforo e a uma fase amarela/vermelha;
+% outro semáforo ou o verde cancelam-no.
 on_event('TrafficLightEvent', E) :-
-    number(E.distanceMeters),    % an infinite distance arrives as "Infinity": no reading
+    number(E.distanceMeters),    % uma distância infinita chega como "Infinity": sem leitura
     downcase_atom(E.state, State),
     (   light_track(Id0, _, _, Commitment0, _), Id0 == E.lightId, State \== green
     ->  Commitment = Commitment0
@@ -202,8 +202,8 @@ on_event('TrafficLightEvent', E) :-
     replace(light_track(_, _, _, _, _),
             light_track(E.lightId, State, E.distanceMeters, Commitment, E.timestamp)).
 
-% "Update pedestrian state": a reading with no pedestrian (id none, distance not positive or
-% infinite) clears the state.
+% "Update pedestrian state": uma leitura sem peão (id none, distância não positiva ou
+% infinita) limpa o estado.
 on_event('PedestrianDetectedEvent', E) :-
     retractall(pedestrian_track(_, _, _, _, _)),
     (   E.pedestrianId \== none, number(E.distanceMeters), E.distanceMeters > 0
@@ -212,16 +212,16 @@ on_event('PedestrianDetectedEvent', E) :-
     ;   true
     ).
 
-% "Update stop sign state": a reading more than 8 m away is a new approach, so the stop
-% already made is forgotten; closer, the stop under way is kept.
+% "Update stop sign state": uma leitura a mais de 8 m é uma nova aproximação, por isso a paragem
+% já feita é esquecida; mais perto, a paragem em curso é mantida.
 on_event('StopSignEvent', E) :-
     number(E.distanceMeters),
     (   stop_track(_, _, Since, Start0, Done0)
     ->  E.timestamp >= Since
     ;   Start0 = -1, Done0 = false
     ),
-    % The camera measures to the sign; the state keeps the distance to the stop line, which
-    % lies StoppingPolicy.STOP_SIGN_OFFSET_METERS before it.
+    % A câmara mede até ao sinal; o estado guarda a distância à linha de paragem, que
+    % fica StoppingPolicy.STOP_SIGN_OFFSET_METERS antes dele.
     param(stopSignOffsetMeters, Offset),
     ToStopLine is E.distanceMeters - Offset,
     (   ToStopLine > 8
@@ -231,9 +231,9 @@ on_event('StopSignEvent', E) :-
     replace(stop_track(_, _, _, _, _),
             stop_track(E.signId, ToStopLine, E.timestamp, Start, Done)).
 
-% "Update obstacle/pothole/barrier state": one reading per hazard type; a reading with no
-% hazard (none, distance not positive or infinite) clears it. Each obstacle reading also
-% enters the emergency-brake window.
+% "Update obstacle/pothole/barrier state": uma leitura por tipo de perigo; uma leitura sem
+% perigo (none, distância não positiva ou infinita) limpa-o. Cada leitura de obstáculo entra
+% também na janela da travagem de emergência.
 on_event('ObstacleDetectedEvent', E) :-
     retractall(obstacle_track(_, _, _, _, _)),
     (   valid_hazard(E.obstacleId, E.distanceMeters)
@@ -261,10 +261,10 @@ on_event('BarrierDetectedEvent', E) :-
     ;   true
     ).
 
-% "Update weather state": the environment sensor's latest reading; it does not expire. The
-% weather rules read this state (the rain readings are also kept for the TTC rule, as the
-% WeatherEvents in Drools): the ReducedVisibilityEvent and ReducedGripEvent the
-% sensor also emits below 0.85 are ignored, as in Drools, where no rule reads them any more.
+% "Update weather state": a última leitura do sensor ambiental; não expira. As
+% regras do tempo leem este estado (as leituras de chuva são também guardadas para a regra de TTC, como
+% os WeatherEvents no Drools): os ReducedVisibilityEvent e ReducedGripEvent que o sensor
+% também emite abaixo de 0,85 são ignorados, como no Drools, onde já nenhuma regra os lê.
 on_event('WeatherEvent', E) :-
     (   E.condition == 'RAIN'
     ->  assertz(rain_reading(E.timestamp))
@@ -278,14 +278,14 @@ on_event('WeatherEvent', E) :-
     ;   true
     ).
 
-% Keep the current environmental reading as the antecedent context for the same fuzzy
-% speed rules as Drools. The legacy reduced-* event types are intentionally ignored; the
-% sensor emits WeatherEvent in the same cycle and the DRL no longer has crisp rules for them.
+% Mantém a leitura ambiental atual como contexto antecedente das mesmas regras difusas de
+% velocidade do Drools. Os tipos de evento reduced-* antigos são ignorados de propósito; o
+% sensor emite WeatherEvent no mesmo ciclo e o DRL já não tem regras nítidas para eles.
 on_event('ReducedVisibilityEvent', _E).
 on_event('ReducedGripEvent', _E).
 
-% "Update lane change request": only a newer request (or another direction at the same
-% instant) activates the state; reactivating an expired request would fight the expiry.
+% "Update lane change request": só um pedido mais recente (ou outra direção no mesmo
+% instante) ativa o estado; reativar um pedido expirado contrariaria a expiração.
 on_event('LaneChangeRequestEvent', E) :-
     lane_request(_, Direction0, Since),
     downcase_atom(E.direction, Direction),
@@ -308,8 +308,8 @@ on_event('TTCEvent', E) :-
     ;   true
     ).
 
-% "Update front vehicle from distance": a reading with no target (none, distance not
-% positive or infinite) clears the front vehicle. Each valid reading also enters the window.
+% "Update front vehicle from distance": uma leitura sem alvo (none, distância não
+% positiva ou infinita) limpa o veículo da frente. Cada leitura válida entra também na janela.
 on_event('FrontDistanceEvent', E) :-
     (   front_track(_, _, _, Since) -> E.timestamp >= Since ; true ),
     (   E.targetId \== none, number(E.distanceMeters), E.distanceMeters > 0
@@ -319,14 +319,14 @@ on_event('FrontDistanceEvent', E) :-
     ;   retractall(front_track(_, _, _, _))
     ).
 
-% "Update lane occupancy left/right": Side is the ego's side (left/right), not a lane.
+% "Update lane occupancy left/right": Side é o lado do ego (left/right), não uma faixa.
 on_event('LaneOccupancyEvent', E) :-
     downcase_atom(E.lane, Side),
     distance(E.frontDistanceMeters, Front),
     replace(occupancy(Side, _, _, _), occupancy(Side, E.occupied, Front, E.safeToEnter)),
     replace(occupancy_read(Side, _), occupancy_read(Side, E.timestamp)).
 
-% "Update left lane vehicle state": the nearest vehicle ahead in the left lane.
+% "Update left lane vehicle state": o veículo mais próximo à frente na faixa da esquerda.
 on_event('LeftLaneVehicleEvent', E) :-
     (   E.targetId \== none, number(E.distanceMeters)
     ->  replace(left_vehicle_track(_, _, _, _),
@@ -334,7 +334,7 @@ on_event('LeftLaneVehicleEvent', E) :-
     ;   retractall(left_vehicle_track(_, _, _, _))
     ).
 
-% "Update right lane vehicle state": the nearest vehicle ahead in the right lane.
+% "Update right lane vehicle state": o veículo mais próximo à frente na faixa da direita.
 on_event('RightLaneVehicleEvent', E) :-
     (   E.targetId \== none, number(E.distanceMeters)
     ->  replace(right_vehicle_track(_, _, _, _),
@@ -342,7 +342,7 @@ on_event('RightLaneVehicleEvent', E) :-
     ;   retractall(right_vehicle_track(_, _, _, _))
     ).
 
-% "Update far left lane vehicle state": the nearest vehicle ahead two lanes to the left.
+% "Update far left lane vehicle state": o veículo mais próximo à frente duas faixas à esquerda.
 on_event('FarLeftLaneVehicleEvent', E) :-
     (   E.targetId \== none, number(E.distanceMeters)
     ->  replace(far_left_vehicle_track(_, _, _, _),
@@ -350,7 +350,7 @@ on_event('FarLeftLaneVehicleEvent', E) :-
     ;   retractall(far_left_vehicle_track(_, _, _, _))
     ).
 
-% "Update front vehicle from relative speed": only for the vehicle already followed.
+% "Update front vehicle from relative speed": só para o veículo já seguido.
 on_event('RelativeSpeedEvent', E) :-
     (   front_track(Target, D, _, Since), Target == E.targetId, E.timestamp >= Since,
         number(E.relativeSpeedMps)
@@ -358,18 +358,18 @@ on_event('RelativeSpeedEvent', E) :-
     ;   true
     ).
 
-% Readings kept in a time window: dropped once they are Window ms old.
+% Leituras mantidas numa janela temporal: descartadas quando atingem Window ms de idade.
 expire_window(Template, Stamp, Window, Now) :-
     forall(( Template, Now - Stamp >= Window ), retract(Template)).
 
-% Tracked objects: dropped when not read for more than Validity ms.
+% Objetos seguidos: descartados quando não são lidos há mais de Validity ms.
 expire_track(Template, Stamp, Validity, Now) :-
     forall(( Template, Now - Stamp > Validity ), retract(Template)).
 
 expire_old_readings(Now) :-
     ttc_window_ms(TtcWindow),
     expire_window(ttc_reading(T1, _, _), T1, TtcWindow, Now),
-    % A rain reading older than the TTC window and the coincidence cannot match any TTC.
+    % Uma leitura de chuva mais antiga do que a janela de TTC e a coincidência não corresponde a nenhum TTC.
     rain_coincidence_ms(Coincidence),
     RainWindow is TtcWindow + Coincidence,
     expire_window(rain_reading(TR), TR, RainWindow, Now),
@@ -396,8 +396,8 @@ expire_old_readings(Now) :-
     stop_validity_ms(StopValidity),
     expire_stop_track(StopValidity, Now).
 
-% "Clear stale stop sign perception": a stop still owed past the line (the camera lost the
-% sign driving by it) is kept until it is made.
+% "Clear stale stop sign perception": uma paragem ainda devida depois da linha (a câmara perdeu
+% o sinal ao passar por ele) é mantida até ser feita.
 expire_stop_track(Validity, Now) :-
     forall(( stop_track(Id, D, Ms, Start, Done), Now - Ms > Validity,
              ( Done == true ; D > 4.0 ) ),
@@ -411,9 +411,9 @@ expire_lane_request(Now) :-
     ;   true
     ).
 
-% "Drop a pending speed limit the camera no longer sees": the camera reports a sign on every
-% reading until the vehicle is past it, so a sign no longer reported while still ahead is
-% gone or out of sight (rain shortens the camera range).
+% "Drop a pending speed limit the camera no longer sees": a câmara reporta um sinal em todas as
+% leituras até o veículo o passar, por isso um sinal que deixa de ser reportado ainda à frente
+% desapareceu ou saiu do campo de visão (a chuva encurta o alcance da câmara).
 expire_pending_limit(Now) :-
     pending_limit_validity_ms(Validity),
     (   pending_limit(SignId, _, _, Since), SignId \== none, Now - Since > Validity
@@ -424,8 +424,8 @@ expire_pending_limit(Now) :-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Conclusões que persistem
 
-% The commitment at the traffic light, the time the vehicle stopped at the STOP, the STOP
-% completed, moving off, and the overtaking state the cycle ended with.
+% O compromisso no semáforo, o instante em que o veículo parou no STOP, o STOP
+% cumprido, o arranque e o estado de ultrapassagem com que o ciclo terminou.
 store_conclusions :-
     forall(( known(light_commitment(Id, Commitment)),
              retract(light_track(Id, State, D, _, Ms)) ),
@@ -454,17 +454,17 @@ store_conclusions :-
     ),
     current_overtaking(Active, Origin, Passed, Start, Target),
     replace(overtaking_state(_, _, _, _, _), overtaking_state(Active, Origin, Passed, Start, Target)),
-    % Shown in the working memory the user sees: the state the cycle ended with. The rules
-    % have already stopped, so none reads it.
+    % Mostrado na memória de trabalho que o utilizador vê: o estado com que o ciclo terminou. As
+    % regras já pararam, por isso nenhuma o lê.
     add_fact(overtaking_result(Active, Origin, Passed, Start, Target)),
     store_boxed_in.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Estado -> memória de trabalho (os factos iniciais do ciclo)
 
-% Clear derived weather facts between cycles. Drools completes perception before the
-% decision agenda; reusing fuzzy memberships from the preceding cycle can cause stale
-% fuzzy proposals that were already retracted by current weather state in Drools.
+% Limpa os factos meteorológicos derivados entre ciclos. O Drools completa a perceção antes da
+% agenda de decisão; reutilizar graus de pertença difusos do ciclo anterior pode causar propostas
+% difusas obsoletas que o estado meteorológico atual já tinha retirado no Drools.
 prepare_cycle :-
     findall(Id, (wm_fact(Id, Fact), cycle_fuzzy_fact(Fact)), Ids),
     forall(member(Id, Ids),
@@ -482,6 +482,12 @@ load_cycle_facts :-
     add_fact(ego_lane(Lane)),
     physical_lane(Physical),
     add_fact(ego_physical_lane(Physical)),
+    % ego_path_lane(Lane): a faixa ao longo da qual segue a trajetória do veículo (VehicleStateFact.pathLane):
+    % a faixa de destino enquanto uma mudança de faixa está em curso, a faixa assumida caso contrário.
+    lane_change(ChangeState),
+    target_lane_state(PathTarget),
+    (   ChangeState == idle -> PathLane = Lane ; PathLane = PathTarget ),
+    add_fact(ego_path_lane(PathLane)),
     ego_position(Position),
     add_fact(ego_position(Position)),
     load_vehicle,
@@ -584,7 +590,7 @@ load_lights_and_signs :-
              (   Start >= 0 -> add_fact(stop_hold_started(Id, Start)) ; true ),
              (   Done == true -> add_fact(stop_completed(Id)) ; true ) )).
 
-% A vehicle read in this very cycle also gets a *_read_now fact.
+% Um veículo lido neste mesmo ciclo recebe também um facto *_read_now.
 load_vehicles(Now) :-
     forall(front_track(Id, D, Rel, Ms),
            ( add_fact(front_vehicle(Id, D, Rel)),
@@ -620,7 +626,7 @@ load_ttc(Now) :-
 
 :- dynamic boxed_in_state/3.
 
-% Started or cleared by the rules of this cycle; otherwise as it was.
+% Iniciado ou limpo pelas regras deste ciclo; caso contrário, fica como estava.
 store_boxed_in :-
     (   known(boxed_in_started(Lane, Since))
     ->  replace(boxed_in_state(_, _, _), boxed_in_state(true, Lane, Since))

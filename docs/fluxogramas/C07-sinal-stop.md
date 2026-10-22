@@ -1,15 +1,15 @@
 # C07 — Sinal STOP
 
-- **Branch / commit:** `teste_ana` @ `70082b4` + alterações de 18/10 por commitar (working tree)
+- **Branch / commit:** working tree a 21/10/2026
 - **Estado da informação:** confirmado pelo código e por testes.
 
 Dividido em três subfluxogramas: aproximação (C07-A), paragem e contagem de 1,2 s (C07-B), prosseguir (C07-C).
 
-**Tempo da paragem por CEP (operadores de Allen).** A paragem de 1,2 s já não é contada à mão. Quando o carro para na linha, R3 insere um evento derivado, `StoppedAtStopLineEvent`; R4 considera a paragem cumprida quando existe uma leitura de velocidade pelo menos 1,2 s depois desse evento: `VehicleSpeedEvent(this after[1200ms] $stopped)`. No Prolog, o mesmo com `allen_after/3`.
+**Tempo da paragem por CEP (operadores de Allen).** A paragem de 1,2 s já não é contada à mão. Quando o carro para na linha, R3 insere um evento derivado, `StoppedAtStopLineEvent`; R4 considera a paragem cumprida quando existe uma leitura de velocidade pelo menos 1,2 s depois desse evento: `VehicleSpeedEvent(this after[1200ms] $stopped)`. No Prolog, o mesmo com `allen_after/3` sobre o instante guardado em `stop_hold_started/2` (contado pelo relógio do ciclo, não por leituras de velocidade).
 
 **Distâncias.** O veículo tem de parar na **linha de paragem**, 15 m antes do sinal (`StoppingPolicy.STOP_SIGN_OFFSET_METERS`). A câmara mede a distância ao sinal e `Update stop sign state` guarda no facto a distância **à linha** (distância ao sinal − 15 m). Todas as distâncias deste cenário são à linha de paragem.
 
-**Faixa.** O sinal STOP só vale para a faixa onde está: a câmara só reporta um STOP na faixa do veículo (`WorldState.nearestStopSign`).
+**Faixa.** O sinal STOP só vale para a faixa onde está: a câmara só reporta um STOP na faixa para onde o veículo segue (`WorldState.nearestStopSign`, com `EgoVehicleState.getPathLane()`): durante uma mudança de faixa já conta o sinal da faixa de destino e deixa de contar o da faixa que o veículo abandona.
 
 ## Fluxograma C07-A — Aproximação
 
@@ -124,7 +124,7 @@ Os nós a **vermelho** nos fluxogramas acima assinalam passos onde há um proble
 | C07_P1 | ~~Na aproximação, `EMERGENCY_BRAKE` alterna com `REDUCE_SPEED` e `MAINTAIN_SPEED` durante vários ticks.~~ **Resolvido**: a regra mantém-se ativa em toda a aproximação final e a histerese de C07_D3 dá uma única travagem forte | Confirmado por teste (`stopSignApproachBrakesSteadilyInsteadOfPulsingEmergencyBrake`) | Caso B07 | **Repetido a 17/10 (caso A02): no Drools não houve nenhuma travagem de emergência em 3 corridas; no Prolog a alternância `EMERGENCY_BRAKE`/`REDUCE_SPEED` reaparece em todas (2 a 4 vezes). Divergência entre motores, por investigar.**
 | C07B_P | ~~A 4 m ou menos da linha só existe `STOP` com travagem confortável (2,8 m/s²), sem travagem de emergência. Um STOP visto pela primeira vez já com a linha a 4 m ou menos (sinal a menos de 19 m) não é respeitado com paragem antes da linha.~~ **Resolvido a 18/10**: com a linha a 4 m ou menos, se a travagem confortável já não chega trava de emergência (mesmo critério da aproximação) e o estado do sinal mantém-se até a paragem ser feita | Confirmado por teste (`StopSignSeenLateE2ETest`, Drools e Prolog) e em execução | Caso A21 | 18/10: pára 6 m depois da linha, 1,2 s parado, e segue, nos dois motores.
 
-Os casos (A01 a A22, B01 a B08) estão descritos em `relatorio-validacao.md`, secção 8.
+Os casos (A01 a A22, B01 a B08) estão descritos em `relatorio-validacao.md`, secção 8, que não está no repositório.
 
 ## Tabela de decisões
 
@@ -166,24 +166,24 @@ Os casos (A01 a A22, B01 a B08) estão descritos em `relatorio-validacao.md`, se
 | R4 `Stop sign condition satisfied after full stop hold` | `traffic-signs.drl:160` | 635 | — | — | `satisfied` |
 | R6 `Forget the stop when the stop sign is re-armed` | `traffic-signs.drl:175` | 640 | — | — | apaga `StoppedAtStopLineEvent` |
 | R5 `Proceed after stop sign condition satisfied` | `traffic-signs.drl:185` | 200 | `CONTINUE` | 30 | — |
-| `Update stop sign state` | `01-state-updates.drl:108` | 1000 | — | — | `StopSignState` |
-| `Clear stale stop sign perception` | `01-state-updates.drl:563` | 900 | — | — | `StopSignState` |
+| `Update stop sign state` | `01-state-updates.drl:108` | 1000 | — | — | `StopSignState` (distância à linha = distância ao sinal − `STOP_SIGN_OFFSET_METERS`; leitura a mais de 8 m repõe `satisfied`) |
+| `Clear stale stop sign perception` | `01-state-updates.drl:563` | 900 | — | — | `StopSignState` (1500 ms sem leitura) |
 
 **Rastreabilidade**
 
 | Elemento | Local |
 |---|---|
-| Sensor | `CameraSensor.observe()`: STOP mais próximo à frente **na faixa do veículo**, a até 120 m × visibilidade |
+| Sensor | `CameraSensor.observe()`: STOP mais próximo à frente **na faixa para onde o veículo segue**, a até 120 m × visibilidade; a distância reportada é ao sinal |
 | Factos e eventos | `drools/facts/StopSignState.java`; `drools/events/StoppedAtStopLineEvent.java` (declarado como evento em `00-declarations.drl`, `@expires(30s)`) |
-| Prolog | `driving_rules.pl`: as mesmas regras, com `allen_after/3` (`driving_rules.pl:1839`); R2 está partida em duas cláusulas, `Stop sign requires full stop near line` e `… (emergency)`, e a exceção da expiração é `expire_stop_track/2` (`driving_state.pl`), o equivalente ao `after` do Drools sobre os instantes em ms |
+| Prolog | `driving_rules.pl`: as mesmas regras, com `allen_after/3` (`driving_rules.pl:2167`); R1 tem as variantes `(emergency)`, `(brake)` e `(hold speed)`, R2 está partida em duas regras, `Stop sign requires full stop near line` e `… (emergency)`; R3 e R4 concluem `stop_hold_started/2` e `stop_completed/1`, guardados em `stop_track/5` (`driving_state.pl`). R6 não existe como regra: a reposição a mais de 8 m está em `on_event('StopSignEvent', _)`, com o desvio da linha lido de `param(stopSignOffsetMeters)`, e a exceção da expiração é `expire_stop_track/2` |
 | Justificação de desenho | Comentário em `traffic-signs.drl:17-48` |
 | Cenário de demonstração | `S4` (Stop sign) |
-| Testes | `DrivingExpertSystemRulesTest`: `stopSignTriggersStopSequence` (160), `stopSignTooCloseForComfortableBrakingTriggersEmergencyBrake` (186); `SimulationEngineE2ETest`: `stopSignStopsOnlyTheVehicleDrivingInItsLane` (267), `stopSignFlowBringsVehicleToFullStopThenProceeds` (316), `stopSignApproachBrakesSteadilyInsteadOfPulsingEmergencyBrake` (377); `StopSignSeenLateE2ETest.stopsAsSoonAsPossibleWhenTheLineIsBehind` (Drools e Prolog: sinal visto com a linha já para trás); `PrologSimulationE2ETest.stopSignFlowBringsVehicleToFullStopThenProceeds` (139) |
+| Testes | `DrivingExpertSystemRulesTest`: `stopSignTriggersStopSequence` (160), `stopSignTooCloseForComfortableBrakingTriggersEmergencyBrake` (186); `SimulationEngineE2ETest`: `stopSignStopsOnlyTheVehicleDrivingInItsLane` (267), `stopSignFlowBringsVehicleToFullStopThenProceeds` (316), `stopSignApproachBrakesSteadilyInsteadOfPulsingEmergencyBrake` (377); `StopSignSeenLateE2ETest.stopsAsSoonAsPossibleWhenTheLineIsBehind` (47; Drools e Prolog: sinal visto com a linha já para trás); `StopSignInLaneBeingEnteredE2ETest.stopsAtTheSignOfTheLaneBeingEntered` (48; Drools e Prolog); `PrologRulesTest`: `stopSignTriggersStopSequence` (310), `stopSignTooCloseForComfortableBrakingTriggersEmergencyBrake` (334), `stopSignEmergencyBrakeIsHeldUntilThereIsRoomAgain` (343), `stopSignIsForgottenOnceNoLongerSeen` (360); `PrologSimulationE2ETest`: `stopSignFlowBringsVehicleToFullStopThenProceeds` (139), `stopSignApproachBrakesSteadilyInsteadOfPulsingEmergencyBrake` (186); `PrologDroolsEquivalenceTest`, casos "stop sign ..." |
 
 **Relações**
 
 - Lê o limite de C01. Depois de R5, C04 continua o arranque.
-- Conflitos (M02): R1 e R2 (60) sobrepõem-se a todos os tetos de velocidade; só as emergências (70) lhes ganham. R5 (30, 25 km/h) é uma libertação: contra `Move off…` de C04 (30 km/h) fica a de velocidade mais baixa, R5; o comentário em `defaults.drl:84-86` confirma a intenção.
+- Conflitos (M02): R1 e R2 (60) sobrepõem-se a todos os tetos de velocidade; só as emergências (70) lhes ganham. R5 (30, 25 km/h) é uma libertação: contra `Move off…` de C04 (30 km/h) fica a de velocidade mais baixa, R5; o comentário em `defaults.drl:84-85` confirma a intenção.
 
 **Limitações**
 
@@ -191,7 +191,7 @@ Os casos (A01 a A22, B01 a B08) estão descritos em `relatorio-validacao.md`, se
 - R4 conta o tempo pelas leituras do sensor de velocidade (a cada 100 ms): sem leituras de velocidade, a paragem nunca seria dada por cumprida. Na simulação o sensor de velocidade lê em cada tick; nos testes unitários o `DroolsTestHarness` insere a leitura em cada ciclo.
 - A histerese de C07_D3 e de C07B_D3 depende do nome da regra de origem da decisão anterior (`startsWith("Stop sign")`).
 - Com a linha já para trás, o carro pára depois dela: a paragem é feita o mais cedo possível, mas não antes da linha.
-- A câmara só reporta o sinal STOP mais próximo na faixa do veículo; um STOP noutra faixa não é visto (teste `stopSignStopsOnlyTheVehicleDrivingInItsLane`).
+- A câmara só reporta o sinal STOP mais próximo na faixa para onde o veículo segue; um STOP noutra faixa não é visto (testes `stopSignStopsOnlyTheVehicleDrivingInItsLane` e `stopsAtTheSignOfTheLaneBeingEntered`).
 
 ## Exemplos de entradas
 

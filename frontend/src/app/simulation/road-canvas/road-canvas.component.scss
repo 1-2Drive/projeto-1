@@ -463,6 +463,15 @@
 
 .obj--pedestrian {
   width: 1.55rem;
+  /* Glide between the 100 ms snapshots while it walks across; only top: left follows the
+     camera and must stay on the crosswalk, which is not animated. */
+  transition: filter 140ms ease, opacity 200ms ease, top 100ms linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .obj--pedestrian {
+    transition: filter 140ms ease, opacity 200ms ease;
+  }
 }
 
 .obj--speedLimit,

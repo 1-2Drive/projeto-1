@@ -2,7 +2,7 @@
 
 **Objetivo:** depois de abrandar ou parar, voltar à velocidade normal da estrada; e ter sempre uma decisão, mesmo quando nada de especial acontece.
 
-Cada cenário tem uma **velocidade de cruzeiro** (a velocidade inicial). Enquanto nenhum sinal de limite tiver sido passado, é a ela que o carro regressa. Um pedido de aceleração não vem de um condutor: vem de uma ação programada do cenário ou de um botão da aplicação desktop.
+Cada cenário tem uma **velocidade de cruzeiro** (a velocidade inicial). Enquanto nenhum sinal de limite tiver sido passado, é a ela que o carro regressa. Um pedido de aceleração não vem de um condutor: vem do operador (pela API ou pelos botões da aplicação desktop) ou de uma ação programada do cenário.
 
 ```mermaid
 flowchart TD

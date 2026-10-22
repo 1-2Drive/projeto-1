@@ -268,6 +268,10 @@ public class PrologKnowledgeSession implements AutoCloseable {
         params.put("stopSignOffsetMeters", StoppingPolicy.STOP_SIGN_OFFSET_METERS);
         params.put("speedLimitApproachBufferMeters", StoppingPolicy.SPEED_LIMIT_APPROACH_BUFFER_METERS);
         params.put("obstacleStopOffsetMeters", StoppingPolicy.OBSTACLE_STOP_OFFSET_METERS);
+        params.put("barrierStopOffsetMeters", StoppingPolicy.BARRIER_STOP_OFFSET_METERS);
+        params.put("potholeCrossingSpeedKmh", StoppingPolicy.POTHOLE_CROSSING_SPEED_KMH);
+        params.put("hazardLengthMeters", StoppingPolicy.HAZARD_LENGTH_METERS);
+        params.put("laneExitSeconds", StoppingPolicy.LANE_EXIT_SECONDS);
         params.put("followingGapMeters", StoppingPolicy.FOLLOWING_GAP_METERS);
         params.put("laneChangeSeconds", StoppingPolicy.LANE_CHANGE_SECONDS);
         return params;

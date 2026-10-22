@@ -7,7 +7,7 @@ Visibilidade e aderência não são "sim ou não": vão de 0 (péssimas) a 1 (pe
 ```mermaid
 flowchart TD
     S(["O sensor do tempo mede chuva,<br/>visibilidade (0 a 1) e aderência (0 a 1)"]) --> P1["Classifica cada valor, com graus:<br/>• má: até 0,35 (deixa de o ser aos 0,5)<br/>• reduzida: 0,35 a 0,7 (máximo aos 0,5)<br/>• razoável: 0,5 a 0,85 (máximo aos 0,7)<br/>• boa: a partir de 0,7 (totalmente aos 0,85)"]
-    P1 --> P2["Aplica regras simples, usando a pior das duas:<br/>• má → muito devagar (≈ 25 km/h)<br/>• reduzida → devagar (≈ 40 km/h)<br/>• razoável → moderado (≈ 55 km/h)<br/>• boa com chuva → prudente (≈ 65 km/h)<br/>• boa sem chuva → normal (≈ 75 km/h)"]
+    P1 --> P2["Aplica regras simples:<br/>• visibilidade ou aderência má → muito devagar (≈ 25 km/h)<br/>• visibilidade ou aderência reduzida → devagar (≈ 40 km/h)<br/>• visibilidade ou aderência razoável → moderado (≈ 55 km/h)<br/>• as duas boas, com chuva → prudente (≈ 65 km/h)<br/>• as duas boas, sem chuva → normal (≈ 75 km/h)"]
     P2 --> Q1{"Alguma regra que não seja<br/>'boa sem chuva' tem grau acima de 0?<br/>(chuva, ou visibilidade ou aderência < 0,85)"}
     Q1 -- "Não" --> A2["Sem restrição pelo tempo"]
     Q1 -- "Sim" --> P3["Combina as regras numa única<br/>velocidade recomendada (centro de gravidade)"]
@@ -30,5 +30,6 @@ flowchart TD
 | Chuva com visibilidade e piso reduzidos (botão "Rain") | Cerca de 51 km/h |
 | Visibilidade a 0,5 | Cerca de 40 km/h |
 | Visibilidade ou piso muito maus | Cerca de 25 km/h |
+| Visibilidade a 0,8, piso bom, sem chuva | Cerca de 67 km/h: "razoável" restringe e "normal" puxa para cima (sozinha, "normal" não restringe) |
 
 O mau tempo só pode baixar a velocidade, nunca a faz ultrapassar o limite legal. Com chuva o carro também mantém mais distância do carro da frente (09), trava mais cedo perante um risco de colisão medido com chuva (10) e exige mais espaço para voltar à direita (11).

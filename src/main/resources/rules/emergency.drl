@@ -2,6 +2,7 @@ package rules
 
 import com.one2drive.projeto1.decision.DecisionContext
 import com.one2drive.projeto1.decision.DecisionPriority
+import com.one2drive.projeto1.decision.StoppingPolicy
 import com.one2drive.projeto1.domain.DrivingAction
 import com.one2drive.projeto1.domain.PedestrianCrossingState
 import com.one2drive.projeto1.domain.RiskLevel
@@ -74,6 +75,33 @@ then
         "Pedestrian critical distance in current path",
         drools.getRule().getName(),
         "distance=" + $distance + "m"
+    );
+end
+
+// The pedestrian approach (pedestrian.drl) brakes along a comfortable curve and the
+// mandatory stop is executed at the comfortable deceleration; neither can save a pedestrian
+// first seen when only hard braking still stops short of it (at 90 km/h a pedestrian 90 m
+// ahead, where comfortable braking needs 110 m). The same escalation the obstacle and the
+// barrier rules make: once comfortable braking (with a margin) no longer stops the vehicle
+// 6 m short of the pedestrian, brake hard now rather than at the 6 m emergency distance.
+rule "Emergency brake for pedestrian when comfortable braking no longer stops in time"
+agenda-group "decision"
+salience 879
+when
+    $ctx : DecisionContext()
+    VehicleStateFact( $speed : speedKmh )
+    PedestrianStateFact( inPath == true || crossingState == PedestrianCrossingState.CROSSING, $distance : distanceMeters > 6.0 )
+    eval( ($speed / 3.6) * ($speed / 3.6) / (2.0 * Math.max(0.5, $distance - 6.0)) > StoppingPolicy.COMFORT_DECELERATION_MPS2 * 1.1 )
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.EMERGENCY_BRAKE,
+        0.0,
+        RiskLevel.CRITICAL,
+        DecisionPriority.EMERGENCY_SAFETY,
+        "Pedestrian ahead; comfortable braking no longer stops short of it",
+        drools.getRule().getName(),
+        "distance=" + $distance + "m at " + Math.round($speed) + " km/h"
     );
 end
 

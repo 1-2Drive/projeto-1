@@ -39,7 +39,7 @@ flowchart TD
 |---|---|
 | STOP à frente, a 50 km/h | A cerca de 50 m da linha começa a abrandar de forma progressiva e pára na linha |
 | STOP visto já perto, depressa demais | Trava a fundo, numa só travagem contínua |
-| STOP visto só depois de a linha ter ficado para trás (a 60 km/h, a 8 m do sinal) | Trava a fundo, pára assim que consegue (cerca de 6 m depois da linha), cumpre a paragem e só então segue |
+| STOP visto só depois de a linha ter ficado para trás (a 60 km/h, a 8 m do sinal) | Trava a fundo, pára assim que consegue (já depois da linha), cumpre a paragem de 1,2 s e só então segue |
 | Parou na linha | Espera 1,2 segundos e avança a 25 km/h |
 | STOP noutra faixa | Não se aplica ao carro |
 

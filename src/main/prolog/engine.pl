@@ -45,7 +45,7 @@
            fired/2,                                                       % Meta-conhecimento: refração
            rule_reads/2, rule_rank/2, rule_precedence/2, index_built/0.   % Meta-conhecimento: índice e controlo
 
-% Guard against a rule set that keeps producing new instantiations.
+% Proteção contra um conjunto de regras que não para de produzir novas instanciações.
 max_firings_per_cycle(5000).
 
 % Meta-conhecimento (índice de dependências) ligado por omissão. Desligado, cada disparo
@@ -54,7 +54,7 @@ max_firings_per_cycle(5000).
 :- dynamic use_dependency_index/1, cycle_stats/3, rematch_count/1.
 use_dependency_index(true).
 rematch_count(0).
-% cycle_stats(Rematches, Firings, Millis): what the last run_rules/0 cost.
+% cycle_stats(Rematches, Firings, Millis): o que custou o último run_rules/0.
 cycle_stats(0, 0, 0.0).
 
 set_dependency_index(Flag) :-
@@ -73,15 +73,16 @@ reset_working_memory :-
     retractall(wm_next_id(_)),
     assertz(wm_next_id(1)).
 
-% The query used by rule conditions and helper predicates.
+% A consulta usada pelas condições das regras e pelos predicados auxiliares.
 known(Fact) :-
     wm_fact(_, Fact).
 
-% A perceived fact: no rule supports it. Facts are a set, so a duplicate is ignored.
+% Um facto percebido: nenhuma regra o suporta. Os factos são um conjunto, pelo que um
+% duplicado é ignorado.
 add_fact(Fact) :-
     store_fact(Fact, perceived, _).
 
-% store_fact(+Fact, +Support, -New): New is true when the fact was not yet known.
+% store_fact(+Fact, +Support, -New): New é true quando o facto ainda não era conhecido.
 store_fact(Fact, _, false) :-
     wm_fact(_, Known),
     Known == Fact, !.
@@ -142,10 +143,10 @@ condition_reads(prove(Goal), Keys0, Keys) :- !,
 condition_reads(Pattern, Keys, [Name/Arity|Keys]) :-
     functor(Pattern, Name, Arity).
 
-% goal_reads(+Term, +Seen0, -Seen, +Keys0, -Keys): the fact types a goal may read. It walks
-% every subterm (so findall/3, aggregate_all/3, \+ and if-then-else need no special case)
-% and the clauses of every user predicate it meets, once each. Over-approximating only
-% costs an extra re-match.
+% goal_reads(+Term, +Seen0, -Seen, +Keys0, -Keys): os tipos de facto que um objetivo pode
+% ler. Percorre todos os subtermos (pelo que findall/3, aggregate_all/3, \+ e if-then-else
+% não precisam de tratamento especial) e as cláusulas de cada predicado do utilizador que
+% encontra, uma vez cada. Sobrestimar só custa uma nova avaliação a mais.
 goal_reads(Term, Seen, Seen, Keys, Keys) :-
     \+ compound(Term), \+ atom(Term), !.
 goal_reads(known(Fact), Seen, Seen, Keys, [Name/Arity|Keys]) :-
@@ -167,7 +168,7 @@ goal_reads(Term, Seen0, Seen, Keys0, Keys) :-
     ;   Seen = Seen1, Keys = Keys1
     ).
 
-% A predicate of this program, as opposed to a built-in or library one.
+% Um predicado deste programa, por oposição a um predicado do sistema ou de uma biblioteca.
 helper_predicate(Name/Arity) :-
     functor(Head, Name, Arity),
     predicate_property(user:Head, defined),
@@ -183,8 +184,8 @@ foldl2(G, [X|Xs], S0, S, K0, K) :-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Correspondência das condições
 
-% An instantiation: the conditions as they matched, the evidence (fact ids and the negated
-% patterns that held) and the actions to perform.
+% Uma instanciação: as condições tal como corresponderam, a evidência (ids dos factos e os
+% padrões negados que se verificaram) e as ações a executar.
 match(Id, inst(Conditions, Evidence, Actions)) :-
     rule(Id, _, Conditions, Actions),
     satisfy(Conditions, Evidence).
@@ -192,8 +193,8 @@ match(Id, inst(Conditions, Evidence, Actions)) :-
 satisfy(Conditions, Evidence) :-
     satisfy(Conditions, [], Evidence).
 
-% Seen: the evidence of the conditions before this one, so a fact a proof reads again (the
-% ego lane, for instance) is listed once.
+% Seen: a evidência das condições anteriores a esta, para que um facto que uma prova volta a
+% ler (a faixa do ego, por exemplo) fique listado uma só vez.
 satisfy([], _, []).
 satisfy([Condition|Conditions], Seen, Evidence) :-
     holds(Condition, Proof),
@@ -226,8 +227,8 @@ holds(prove(Goal), proof(Ids)) :- !,
 holds(Pattern, Id) :-
     wm_fact(Id, Pattern).
 
-% Encadeamento inverso: prove_goal(+Goal, -Ids) proves Goal from the clauses of the helper
-% predicates down to the facts, and returns the ids of the facts it read.
+% Encadeamento inverso: prove_goal(+Goal, -Ids) prova Goal a partir das cláusulas dos
+% predicados auxiliares até aos factos, e devolve os ids dos factos que leu.
 prove_goal(true, []) :- !.
 prove_goal((A, B), Ids) :- !,
     prove_goal(A, IdsA),
@@ -243,7 +244,8 @@ prove_goal(Goal, Ids) :-
 prove_goal(Goal, []) :-
     call(Goal).
 
-% Replaces the rule's activations with its current matches, leaving out what already fired.
+% Substitui as ativações da regra pelas suas correspondências atuais, deixando de fora o que
+% já disparou.
 % Meta-conhecimento: precedência e ordem da regra (do índice) e refração (already_fired/2).
 rematch(Id) :-
     retract(rematch_count(N0)),
@@ -257,7 +259,7 @@ rematch(Id) :-
              \+ already_fired(Id, Inst) ),
            assertz(activation(Id, Precedence, Rank, Order, Inst))).
 
-% Meta-conhecimento (refração): an instantiation that already fired in this cycle.
+% Meta-conhecimento (refração): uma instanciação que já disparou neste ciclo.
 already_fired(Id, inst(Conditions, _, _)) :-
     fired(Id, Done),
     Done =@= Conditions, !.
@@ -295,7 +297,8 @@ fire_loop(Count, Max, Firings) :-
     ;   Firings = Count
     ).
 
-% Meta-conhecimento (resolução de conflitos): highest precedence, then rule rank, then match order.
+% Meta-conhecimento (resolução de conflitos): maior precedência, depois a ordem da regra,
+% depois a ordem da correspondência.
 best_activation(Id, Inst) :-
     findall(key(Neg, Rank, Order)-Id,
             ( activation(Id, Precedence, Rank, Order, _), Neg is -Precedence ),
@@ -310,7 +313,7 @@ fire(Id, Inst) :-
     assertz(fired(Id, Conditions)),
     foldl(perform(Id, Evidence), Actions, [], Changed0),
     sort(Changed0, Changed),
-    % Meta-conhecimento (índice de dependências): only the rules that read a new fact type.
+    % Meta-conhecimento (índice de dependências): só as regras que leem um tipo de facto novo.
     (   use_dependency_index(true)
     ->  findall(Reader, ( member(Key, Changed), rule_reads(Key, Reader) ), Readers0)
     ;   findall(Reader, rule_rank(Reader, _), Readers0)
@@ -329,10 +332,10 @@ perform(Id, Evidence, assert(Fact), Changed0, Changed) :-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Explicações
 
-% explain(+FactId, -Tree): how a fact came to be known.
-%   perceived(Fact)                  loaded from perception
-%   derived(Fact, Rule, Because)     concluded by Rule; Because explains each piece of evidence,
-%                                    absent(Pattern) for a negated pattern
+% explain(+FactId, -Tree): como um facto passou a ser conhecido.
+%   perceived(Fact)                  carregado a partir da perceção
+%   derived(Fact, Rule, Because)     concluído por Rule; Because explica cada elemento da
+%                                    evidência, absent(Pattern) para um padrão negado
 explain(Id, perceived(Fact)) :-
     wm_fact(Id, Fact),
     \+ wm_support(Id, _, _), !.
@@ -345,10 +348,10 @@ explain_evidence(not(Pattern), absent(Pattern)) :- !.
 explain_evidence(Id, Tree) :-
     explain(Id, Tree).
 
-% why_not(+RuleId, -Blocking): why a rule has no match now. Among all ways to match the
-% conditions from the left, it takes the one that gets furthest and reports the condition
-% where it stopped, followed by the later conditions that do not hold either, all with the
-% bindings that partial match produced.
+% why_not(+RuleId, -Blocking): porque é que uma regra não tem agora correspondência. De
+% todas as maneiras de fazer corresponder as condições a partir da esquerda, escolhe a que vai
+% mais longe e indica a condição onde parou, seguida das condições posteriores que também não
+% se verificam, todas com as ligações produzidas por essa correspondência parcial.
 why_not(Id, []) :-
     match(Id, _), !.
 why_not(Id, Blocking) :-
@@ -359,7 +362,7 @@ why_not(Id, Blocking) :-
     include(fails_leniently, Later, AlsoFailing),
     Blocking = [Stop|AlsoFailing].
 
-% Every prefix that holds, with the conditions left after it.
+% Cada prefixo que se verifica, com as condições que ficam depois dele.
 partial_match([], Depth, Depth, []).
 partial_match([Condition|Conditions], Depth0, Depth, Rest) :-
     (   holds(Condition, _),
@@ -369,14 +372,15 @@ partial_match([Condition|Conditions], Depth0, Depth, Rest) :-
         Rest = [Condition|Conditions]
     ).
 
-% A condition with variables the failed match never bound may raise an error: it counts as
-% not holding.
+% Uma condição com variáveis que a correspondência falhada nunca ligou pode lançar um erro:
+% conta como não se verificando.
 fails_leniently(Condition) :-
     \+ catch(holds(Condition, _), _, fail).
 
-% subgoal_results(+Goal, -Results): why a goal proved by backward chaining holds or not.
-% Takes the body of the goal's clause and proves each conjunct on its own, so a goal that
-% fails names the sub-goals that fail. Results is a list of SubGoal-true or SubGoal-false.
+% subgoal_results(+Goal, -Results): porque é que um objetivo provado por encadeamento inverso
+% se verifica ou não. Toma o corpo da cláusula do objetivo e prova cada conjunção
+% isoladamente, para que um objetivo que falha indique os subobjetivos que falham. Results é
+% uma lista de SubGoal-true ou SubGoal-false.
 subgoal_results(Goal, Results) :-
     clause(Goal, Body), !,
     conjuncts(Body, SubGoals),

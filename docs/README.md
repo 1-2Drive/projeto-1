@@ -6,9 +6,9 @@ This folder documents the **Drools Realtime Driving Expert System** (Maven proje
 > - **Drools** (a Java rule engine, version 8.44), the default;
 > - **SWI-Prolog**, running the project's own rule interpreter (`src/main/prolog/`).
 >
-> Both are hosted by a Java 17 / Spring Boot application, with an Angular web interface and a legacy JavaFX client. All documents describe the actual implementation. SWI-Prolog was **not installed** on the analysis machine: statements about the Prolog engine come from reading its code, and its tests were skipped.
+> Both are hosted by a Java 17 / Spring Boot application, with an Angular web interface and a legacy JavaFX client. All documents describe the actual implementation. SWI-Prolog (9.2.9) is now installed on the analysis machine and the Prolog tests run; the exploratory probes and worked examples of this documentation were run earlier, with the Drools engine only.
 
-**Version documented:** commit `70082b4` on branch `feat/drools-realtime-driving-expert-system`, analysed on 2026-10-18. This is a refresh of the documentation first written for commit `96d80f7` (2026-10-09). Finding IDs are stable across the two versions; fixed and obsolete findings are kept and marked.
+**Version documented:** Working tree as of 2026-10-21. This refreshes the documentation first written on 2026-10-09 and refreshed on 2026-10-18. Finding IDs are stable across the versions; fixed and obsolete findings are kept and marked.
 
 ---
 
@@ -20,9 +20,9 @@ This folder documents the **Drools Realtime Driving Expert System** (Maven proje
 | [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) | Technologies, directory layout, packages, rule and Prolog file organisation, configuration, how to build, run and test, where to look when changing a feature | Developers and maintainers |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Components, the two backends, information flow, data representation, the role of each inference engine, per-channel arbitration, interfaces, design decisions, architectural findings (A-01…A-14), discrepancies with older documentation | Developers, maintainers, evaluators |
 | [EXECUTION_FLOW.md](EXECUTION_FLOW.md) | Chronological flow from start-up through one 100 ms tick; special situations (several rules, no rule, emergency, missing input, engine failure, engine switch); state diagrams; worked examples from real runs | Developers, maintainers, evaluators |
-| [BUSINESS_RULES.md](BUSINESS_RULES.md) | Catalogue of all 119 Drools rules and 6 queries (conditions, outputs, priorities, interactions, measured test coverage), the Prolog correspondence, and the rule consistency audit (R-01…R-26) | Developers, maintainers, evaluators; domain readers for the plain-language parts |
+| [BUSINESS_RULES.md](BUSINESS_RULES.md) | Catalogue of all 123 Drools rules and 6 queries (conditions, outputs, priorities, interactions, measured test coverage), the Prolog correspondence, and the rule consistency audit (R-01…R-26) | Developers, maintainers, evaluators; domain readers for the plain-language parts |
 | [TESTING.md](TESTING.md) | Test tools and organisation, commands, results of the tests executed in this analysis, exploratory probes, measured rule coverage, scenario coverage, gaps (T-01…T-20) and proposed tests | Developers, maintainers, evaluators |
-| [TRACEABILITY_MATRIX.md](TRACEABILITY_MATRIX.md) | Links 64 inferred requirements and 15 scenarios to rules, files, tests and a coverage status | Evaluators, maintainers |
+| [TRACEABILITY_MATRIX.md](TRACEABILITY_MATRIX.md) | Links inferred requirements and the scenarios to rules, files, tests and a coverage status | Evaluators, maintainers |
 | [GLOSSARY.md](GLOSSARY.md) | Alphabetical definitions of technical and domain terms, for both engines | All readers |
 
 ---
@@ -70,12 +70,13 @@ This folder documents the **Drools Realtime Driving Expert System** (Maven proje
   - rain, visibility and grip with fuzzy logic;
   - moving off after a stop.
 - **Technical:**
-  - Java 17, Maven, Spring Boot REST and a WebSocket realtime channel;
+  - Java 17, Maven, Spring Boot REST and a plain WebSocket realtime channel (`/api/ws/simulation`);
   - an inference-backend interface;
-  - Drools: stateful session in stream (CEP) mode with a pseudo clock, six entry points, three agenda groups, 119 rules, 6 queries (including backward chaining for lane-change safety), truth maintenance, Allen temporal operators;
-  - SWI-Prolog: a persistent process with its own production-rule interpreter (dependency index, refraction, meta-interpreter for backward chaining);
+  - Drools: stateful session in stream (CEP) mode with a pseudo clock, six entry points, a control rule and three phase agenda groups, 123 rules, 6 queries (including backward chaining for lane-change safety), truth maintenance, Allen temporal operators;
+  - SWI-Prolog: a persistent process with its own production-rule interpreter (dependency index and control knowledge labelled "Meta-conhecimento", refraction, meta-interpreter for backward chaining);
   - arbitration of all proposals per control channel in `DecisionContext`;
   - actuator and physics;
+  - session history: each run, from START to STOP (or reset, scenario load, engine switch), saved as a JSON file, with "why / why not / how" answers for any recorded decision, mapped onto the decision flowchart (`DecisionFlowchart`);
   - Angular presentation layer; JavaFX legacy client.
 - **Quality:**
   - rule-by-rule consistency audit, re-checked against the new version;
@@ -92,22 +93,22 @@ This folder documents the **Drools Realtime Driving Expert System** (Maven proje
 
 All of the following were verified during this analysis; sources are given in the linked documents.
 
-- **Knowledge base (Drools):** 19 DRL files with 119 rules and 6 queries:
-  - 32 perception rules;
+- **Knowledge base (Drools):** 19 DRL files with 123 rules and 6 queries:
+  - 33 perception rules;
   - 1 control rule;
-  - 64 rules that propose decisions;
+  - 67 rules that propose decisions;
   - 22 rules that keep internal state or intermediate (fuzzy) conclusions.
-- **Knowledge base (Prolog):** 107 rules mirroring the Drools decision rules. 74 have the same name; 11 Drools rules are split into one Prolog rule per outcome.
+- **Knowledge base (Prolog):** 120 rules mirroring the Drools decision rules. 75 have the same name as a Drools rule; 43 are per-outcome variants of 16 Drools rules (`'Name (outcome)'`); 2 are a Prolog-only intermediate conclusion (`pedestrian_conflict/1`). The two Drools decision rules with no Prolog rule (the control rule, the stop-sign re-arm) are listed with their reason in `RuleNameParityTest`, which checks the name parity from the sources.
 - **Decision selection:** two independent decisions per tick, speed and lane, both made in Java (`DecisionContext`) for either engine:
   - **speed:** mandatory stops and emergencies (priority 60–70) override; otherwise all speed ceilings bind and the lowest wins;
   - **lane:** the highest priority wins;
   - **veto:** braking for a stop vetoes a lane change.
   - Every proposal's outcome is recorded ("why not").
 - **Tests:**
-  - Backend: 473 JUnit tests run; **218 executed and passed**, **255 skipped** (they need SWI-Prolog), 0 failures.
-  - Frontend: 57 Angular unit tests executed, **52 passed and 5 failed**; the failures are in the tests, not caused by the environment.
-  - The 18 Playwright browser tests were **not executed**.
-  - Measured rule coverage: 111 of the 119 Drools rules fire during the test suite.
+  - Backend: the Surefire reports in `target/surefire-reports` (2026-10-21) show **588 test runs in 53 classes, 0 failures, 2 skipped**. The Prolog tests now run; the two skipped tests are `InvariantSweepProbeTest`, which runs only with `-Dprobe.sweep`.
+  - Frontend: 13 Karma spec files with 83 cases; not re-run in this refresh (on 2026-10-18, 57 cases ran and 5 failed, in the tests themselves).
+  - The 22 Playwright browser tests (`simulation.spec.ts`, `realtime.spec.ts`) were **not executed**.
+  - Measured rule coverage (2026-10-18, 119 rules then): 111 Drools rules fired during the test suite; not re-measured for the 123 current rules.
 - **Fixed since the previous version** (confirmed by re-running the probes):
   - speed limit overridden in rain (R-01);
   - gap lost behind slow vehicles (R-03);
@@ -118,22 +119,22 @@ All of the following were verified during this analysis; sources are given in th
   - scenarios that did not show their topic (R-20);
   - most of the late pedestrian reaction (R-04).
 - **Most important open findings** (details in [BUSINESS_RULES.md §17](BUSINESS_RULES.md#17-consistency-audit) and [ARCHITECTURE.md §9.2](ARCHITECTURE.md#92-audit-findings)):
-  - **R-22:** with no way around a closed barrier, the car reaches it from 70 km/h and above (29.7 km/h at impact from 70, 64.8 km/h from 90).
+  - **R-22:** with no way around a closed barrier, the car reached it from 70 km/h and above in the 2026-10-18 probe (29.7 km/h at impact from 70, 64.8 km/h from 90). Both barrier stop rules now escalate to `EMERGENCY_BRAKE` when comfortable braking no longer suffices ("Stop before closed barrier while still in its lane" is new); the probe was not re-run.
   - **R-23 / R-02:** a `REDUCE_SPEED` decision can still accelerate the car; in rain on a road without signs, a car cruising at 30 km/h speeds up to about 51 km/h.
-  - **R-11:** a pedestrian stop can hide a needed emergency brake for a nearer obstacle (obstacle reached at 27.8 km/h in the probe).
+  - **R-11:** a pedestrian stop can hide a needed emergency brake for a nearer obstacle (obstacle reached at 27.8 km/h in the 2026-10-18 probe).
   - **A-07:** the JavaFX client's realtime clock disables emergency TTC braking and makes the car wait forever at a stop sign.
-  - **A-14:** the Drools and Prolog knowledge bases are kept equivalent by hand, and without SWI-Prolog their equivalence tests are skipped, not failed.
-- **Missing features:** several intended features from the draft project report are not implemented, including time-headway keeping, lane-departure detection, sensor-failure handling, confidence values, intersections and driver monitoring ([BUSINESS_DOMAIN.md §10](BUSINESS_DOMAIN.md#10-confirmed-limitations-and-missing-features)). "Why-not" explanations, previously missing, now exist.
+  - **A-14:** the Drools and Prolog knowledge bases are kept equivalent by hand. `RuleNameParityTest` and `DecisionFlowchartTest` now check rule names without SWI-Prolog, and the equivalence tests run where it is installed; without `swipl` they are still skipped, not failed.
+- **Missing features:** several intended features from the draft project report are not implemented, including time-headway keeping, lane-departure detection, sensor-failure handling, confidence values, intersections and driver monitoring ([BUSINESS_DOMAIN.md §10](BUSINESS_DOMAIN.md#10-confirmed-limitations-and-missing-features)). "Why-not" explanations, previously missing, now exist, live and for saved sessions.
 
 ---
 
 ## 5. Evidence Conventions
 
 - **Confirmed (static):** follows directly from reading the cited code.
-- **Confirmed (execution):** observed by running code — the project's own tests, or exploratory probes run on a copy of the repository ([TESTING.md §5](TESTING.md#5-exploratory-verification-probes)). Probes are not part of the project's test suite. All executions in this analysis used the **Drools** engine.
+- **Confirmed (execution):** observed by running code — the project's own tests, or exploratory probes run on a copy of the repository ([TESTING.md §5](TESTING.md#5-exploratory-verification-probes)). Probes are not part of the project's test suite. All probes used the **Drools** engine.
 - **Potential:** plausible from the code but not demonstrated.
 - **Inferred requirement:** a requirement reconstructed from the README, the code, or the Portuguese draft report and conceptual diagram. The repository has no approved requirements specification.
-- **Status of findings:** Open, Partially fixed, Fixed (at `70082b4`), or Obsolete (the feature was removed).
+- **Status of findings:** Open, Partially fixed, Fixed, or Obsolete (the feature was removed).
 - **Names:** rule names are quoted exactly as written in the DRL files, e.g. "Reduce speed when exceeding detected limit". Code identifiers and file paths are unchanged.
 
 ---
@@ -143,6 +144,9 @@ All of the following were verified during this analysis; sources are given in th
 | Item | Relation to this documentation |
 |---|---|
 | [`../README.md`](../README.md) | Project README with installation and demo instructions, now including the two rule engines. Mostly accurate. Outdated or inaccurate statements (test counts, `window:length(5)`, entry points in `kmodule.xml`, tick order, "only sensor knowledge", "same rule names" for Prolog) are listed in [ARCHITECTURE.md §9.4](ARCHITECTURE.md#94-discrepancies-with-existing-documentation) |
+| [`../AGENTS.md`](../AGENTS.md) | Guidance for coding agents: the most compact up-to-date description of the architecture, the two engines and their conventions |
+| [`invariant-sweep-2026-10-20.md`](invariant-sweep-2026-10-20.md) | Dated report of an invariant sweep run on both engines with `InvariantSweepProbeTest`; kept as it was, it describes the state of 2026-10-20 |
+| [`fluxogramas/`](fluxogramas) | Portuguese flowcharts per behaviour and a scenario catalogue; `fluxogramas_apresentar/99-sistema-completo.md` is the decision flowchart that `explanation/DecisionFlowchart.java` maps rules onto. `scripts/render-flowcharts.sh` renders them to PNG |
 | [`report-implementation-audit.md`](report-implementation-audit.md) | An earlier audit report, kept unchanged. It predates the Prolog backend and the current arbitration, and several of its claims are contradicted by the code; see [ARCHITECTURE.md §9.4](ARCHITECTURE.md#94-discrepancies-with-existing-documentation) |
 | [`../diagrams/`](../diagrams) | Earlier Mermaid diagrams. Diagrams 02, 04 and 08 are outdated (ARCHITECTURE.md §9.4). `first_diagram.md` is a Portuguese conceptual model used as a source of inferred requirements |
 | [`../Relatorio_Previo_ENGCIA/`](../Relatorio_Previo_ENGCIA) | Portuguese LaTeX preliminary report. Mostly section headings; the sensors chapter is used as a source of inferred requirements |
@@ -152,8 +156,8 @@ All of the following were verified during this analysis; sources are given in th
 ## 7. Limitations of This Documentation
 
 - **Not run here:**
-  - the SWI-Prolog backend and its 255 tests (SWI-Prolog not installed);
-  - the full stack (Spring Boot + Angular), the JavaFX client and the Playwright suite.
+  - the full stack (Spring Boot + Angular), the JavaFX client and the Playwright suite;
+  - in this refresh, no build or test was run: backend results come from the Surefire reports of 2026-10-21, and probe results and worked examples from the 2026-10-18 analysis.
 
   Statements about them come from reading the code.
 - **Probes:** they show that a behaviour occurs in a specific set-up; they do not measure how often it occurs.

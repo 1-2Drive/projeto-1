@@ -764,7 +764,11 @@ export function buildItems(input: ItemsInput): ItemsView {
         break;
       }
       case 'stopSign': {
-        const frame = spriteFrame(camera, lateral, ahead, MIN_SPRITE_PX_PER_METRE * 1.3);
+        // Like the speed-limit sign, a real roadside sign: upright on a pole on the verge, outside
+        // the lanes (left verge for the left lane, right verge otherwise). The lane it governs is
+        // still the backend's; it is shown by the stop line painted across that lane.
+        const verge = (laneName === 'LEFT' ? -1 : 1) * (SHOULDER_HALF_METRES - 0.9);
+        const frame = spriteFrame(camera, verge, ahead, MIN_SPRITE_PX_PER_METRE * 1.3);
         if (!frame) {
           break;
         }
@@ -773,9 +777,8 @@ export function buildItems(input: ItemsInput): ItemsView {
           flat.push(view('stopLine', { role: 'decor', d: pathOf(line) }));
         }
         standing.push(view('stopSign', {
-          transform: frame.transform, depth: frame.z,
-          halo: detected ? haloPath(camera, lateral, ahead, 1.0, 1.0) : null,
-          tag: tagAt(frame.x, frame.y - 2.9 * frame.scale - 4)
+          lateral: verge, transform: frame.transform, depth: frame.z,
+          tag: tagAt(frame.x, frame.y - 3.5 * frame.scale - 4)
         }));
         break;
       }

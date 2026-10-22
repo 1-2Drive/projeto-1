@@ -422,6 +422,54 @@ describe('RoadCanvasComponent', () => {
         expect(signs[0].getAttribute('data-lane')).toBe(lane);
       }
     });
+
+    it('stands the stop sign on the verge, upright on a pole, never inside the lanes', () => {
+      for (const lane of ['LEFT', 'CENTER', 'RIGHT']) {
+        show({
+          ego: { positionMeters: 0, lane: 'CENTER', lateralPositionMeters: 0 },
+          objects: [{ id: `s-${lane}`, type: 'StopSign', positionMeters: 60, lane, details: '' }]
+        });
+        const sign = q('[data-testid="road-stop-sign"]')!;
+        // Beyond the asphalt (5.25 m from the centre line), on the left verge for the left lane.
+        const lateral = Number(sign.getAttribute('data-lateral'));
+        expect(Math.abs(lateral)).toBeGreaterThan(5.25, lane);
+        expect(lateral < 0).toBe(lane === 'LEFT', lane);
+        expect(sign.querySelector('.sign__pole')).toBeTruthy();
+
+        // On screen it is outside the asphalt edge at its own depth.
+        const frame = translation(sign.querySelector('.sign--stop')!);
+        const asphalt = vertices(q('.surface__asphalt')!);
+        const at = (a: { x: number; y: number }, b: { x: number; y: number }) => a.x + (b.x - a.x) * ((a.y - frame.y) / (a.y - b.y));
+        const left = at(asphalt[0], asphalt[3]);
+        const right = at(asphalt[1], asphalt[2]);
+        expect(frame.x < left || frame.x > right).toBeTrue();
+
+        // The lane it governs is marked by a stop line painted across that lane, flat on the road.
+        const line = vertices(q('.stop-line')!);
+        expect(line.length).toBe(4);
+        expect(Math.max(...line.map((p) => p.y)) - Math.min(...line.map((p) => p.y))).toBeLessThan(6);
+      }
+    });
+
+    it('scales the roadside stop sign with distance without drifting into the lane', () => {
+      const probe = (ahead: number) => {
+        show({ ego: { positionMeters: 0, lane: 'CENTER', lateralPositionMeters: 0 }, objects: [{ id: 's', type: 'StopSign', positionMeters: ahead, lane: 'RIGHT', details: '' }] });
+        const frame = translation(q('[data-testid="road-stop-sign"] .sign--stop')!);
+        const asphalt = vertices(q('.surface__asphalt')!);
+        const edge = asphalt[1].x + (asphalt[2].x - asphalt[1].x) * ((asphalt[1].y - frame.y) / (asphalt[1].y - asphalt[2].y));
+        return { scale: frame.scale, y: frame.y, clearance: frame.x - edge };
+      };
+      const far = probe(150);
+      const mid = probe(40);
+      const near = probe(10);
+      // Far signs keep a legibility floor, so only the nearer ones must grow strictly.
+      expect(near.scale).toBeGreaterThan(mid.scale);
+      expect(mid.scale).toBeGreaterThan(far.scale);
+      expect(near.y).toBeGreaterThan(mid.y);
+      for (const p of [far, mid, near]) {
+        expect(p.clearance).toBeGreaterThan(0);
+      }
+    });
   });
 
   describe('ego vehicle', () => {

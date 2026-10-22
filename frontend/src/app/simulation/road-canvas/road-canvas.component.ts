@@ -25,6 +25,8 @@ const EMPTY_RANGES = {
 /** Used until the first measurement, and whenever the canvas has no usable size (tests, hidden tabs). */
 const DEFAULT_VIEWPORT: Viewport = { width: 960, height: 420 };
 const MIN_USABLE_SIZE_PX = 80;
+/** Undetected objects get a distance plate only when this close, so a busy road stays readable. */
+const TAG_RANGE_METRES = 70;
 
 /** A snapshot arrives about every tick; the drawn state slides to it over the observed gap. */
 const MIN_BLEND_MILLIS = 60;
@@ -280,7 +282,7 @@ export class RoadCanvasComponent implements AfterViewInit {
       kin: this.kin(),
       snapshot,
       egoLane: this.currentLane(),
-      tagRangeMeters: Math.max(ranges.cameraRangeMeters, ranges.radarRangeMeters)
+      tagRangeMeters: Math.min(TAG_RANGE_METRES, Math.max(ranges.cameraRangeMeters, ranges.radarRangeMeters))
     });
   });
 

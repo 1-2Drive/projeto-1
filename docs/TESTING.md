@@ -119,7 +119,7 @@ Scenarios loaded from `scenarios.json` by tests: S1, S2, S4, S5, S7, S8 (over RE
 - has no sensors, actuator or physics, and leaves the Java-side inputs (adjacent-lane safety, markings) at their defaults;
 - inserts the events the test chooses.
 
-### 3.2 Frontend unit tests (Karma/Jasmine): 155 cases in 16 files
+### 3.2 Frontend unit tests (Karma/Jasmine): 159 cases in 16 files
 
 | Spec file (under `frontend/src/app/`) | Declared `it(…)` | Topics |
 |---|---|---|
@@ -137,10 +137,10 @@ Scenarios loaded from `scenarios.json` by tests: S1, S2, S4, S5, S7, S8 (over RE
 | `simulation/road-canvas/road-solids.spec.ts` | 12 | 3D solids: back-face culling, car wheels, indicator lamps, depth scaling, lane placement, yaw revealing the flank, stable lamp slots |
 | `simulation/road-canvas/road-kinematics.spec.ts` | 5 | numbers drawn from a snapshot, blending between snapshots, resets shown at once |
 | `simulation/road-map/road-map.component.spec.ts` | 3 | matrix drawing, car position, painting |
-| `simulation/simulation-page/simulation-page.component.spec.ts` | 4 | button states, demo button, STOP-time question dialog, historical session kept on RESET |
+| `simulation/simulation-page/simulation-page.component.spec.ts` | 6 | button states, demo button, STOP-time question dialog, historical session kept on RESET; dashboard cells, evidence tabs and the road map / toolbox tabs |
 | `telemetry/speed-advisor/speed-advisor.component.spec.ts` | 1 | above-recommendation styling |
 
-The turn-signal case (one per indicator state) and the responsive-canvas cases (one per page size) are generated in loops, so Karma executes 155 cases from 144 declarations. These tests check presentation and HTTP/WebSocket plumbing with mocked data; they do not test driving rules.
+The turn-signal case (one per indicator state) and the responsive-canvas cases (one per page size) are generated in loops, so Karma executes 159 cases from 148 declarations. These tests check presentation and HTTP/WebSocket plumbing with mocked data; they do not test driving rules.
 
 ### 3.3 Browser end-to-end tests (Playwright): 22 tests
 

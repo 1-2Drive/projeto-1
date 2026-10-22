@@ -2,13 +2,47 @@ import { expect, test } from '@playwright/test';
 
 const TITLE = /Sistema Inteligente de Apoio . Decis.o de Condu..o/;
 
+/** The evidence column keeps the decision, timeline, memory and explanation in tabs. */
+async function evidenceTab(page: import('@playwright/test').Page, name: string): Promise<void> {
+  const tab = page.getByRole('tab', { name, exact: true });
+  if ((await tab.getAttribute('aria-selected')) !== 'true') {
+    await tab.click();
+  }
+}
+
+/** The decision panel's action line, with the Decision tab open. */
+async function decisionAction(page: import('@playwright/test').Page) {
+  await evidenceTab(page, 'Decision');
+  return page.locator('[data-testid="decision-action"]');
+}
+
+/** The inference timeline panel, with its tab open. */
+async function timelinePanel(page: import('@playwright/test').Page) {
+  await evidenceTab(page, 'Inference Timeline');
+  return page.locator('[data-testid="timeline-panel"]');
+}
+
+/** The dashboard keeps the scenario toolbox and the road map in tabs below the road. */
+async function openBottomTab(page: import('@playwright/test').Page, name: 'Road Map' | 'Scenario Toolbox'): Promise<void> {
+  const tab = page.getByRole('tab', { name, exact: true });
+  if ((await tab.getAttribute('aria-selected')) !== 'true') {
+    await tab.click();
+  }
+}
+
+/** Clicks a toolbox button (add-obstacle, add-speed-50, ...), opening the toolbox tab first. */
+async function clickTool(page: import('@playwright/test').Page, testId: string): Promise<void> {
+  await openBottomTab(page, 'Scenario Toolbox');
+  await page.locator(`[data-testid="${testId}"]`).click();
+}
+
 /** Fills the configuration drawer and confirms it, which is the only way to mutate the world. */
 async function addWorldObject(
   page: import('@playwright/test').Page,
   trigger: string,
   options: { distance?: string; lane?: string } = {}
 ): Promise<void> {
-  await page.locator(`[data-testid="${trigger}"]`).click();
+  await clickTool(page, trigger);
   await expect(page.locator('[data-testid="config-panel"]')).toBeVisible();
   if (options.distance !== undefined) {
     await page.locator('[data-testid="drawer-distance-input"]').fill(options.distance);
@@ -18,13 +52,14 @@ async function addWorldObject(
   }
   await page.locator('[data-testid="apply-config"]').click();
   await expect(page.locator('[data-testid="config-panel"]')).toHaveCount(0);
-  await expect(page.locator('[data-testid="timeline-panel"]')).toContainText(/PERCEPTION|RULE|FACT|ACTUATOR/i, {
+  await expect(await timelinePanel(page)).toContainText(/PERCEPTION|RULE|FACT|ACTUATOR/i, {
     timeout: 10000
   });
 }
 
 async function loadScenario(page: import('@playwright/test').Page, exactName: string): Promise<void> {
   await page.locator('[data-testid="reset-btn"]').click();
+  await openBottomTab(page, 'Scenario Toolbox');
   await page.getByRole('button', { name: exactName, exact: true }).click();
   await expect(page.locator('[data-testid="simulation-status"]')).toContainText('STOPPED');
   await expect(page.locator('[data-testid="simulation-clock"]')).toContainText('00:00.000');
@@ -73,11 +108,10 @@ test.describe('Driving expert simulation UI', () => {
     await addWorldObject(page, 'add-speed-50', { distance: '150' });
 
     await expect(page.locator('[data-testid="speed-limit"]')).toContainText('50', { timeout: 40000 });
-    await expect(page.locator('[data-testid="decision-action"]'))
+    // The timeline only keeps what it saw while it was on screen, so read it before switching tabs.
+    await expect(await timelinePanel(page)).toContainText(/50 km\/h|speed limit/i, { timeout: 40000 });
+    await expect(await decisionAction(page))
       .toContainText(/REDUCE_SPEED|BRAKE|EMERGENCY_BRAKE|MAINTAIN_SPEED/, { timeout: 40000 });
-
-    await page.locator('button:has-text("Inference Timeline")').click();
-    await expect(page.locator('[data-testid="timeline-panel"]')).toContainText(/50 km\/h|speed limit/i, { timeout: 20000 });
   });
 
   test('speed limit has no lane selector and is painted on all three lanes', async ({ page }) => {
@@ -86,7 +120,7 @@ test.describe('Driving expert simulation UI', () => {
 
     for (const limit of ['30', '90']) {
       await page.locator('[data-testid="reset-btn"]').click();
-      await page.locator(`[data-testid="add-speed-${limit}"]`).click();
+      await clickTool(page, `add-speed-${limit}`);
       await expect(page.locator('[data-testid="config-panel"]')).toBeVisible();
       await expect(page.locator('[data-testid="lane-select"]')).toHaveCount(0);
       await page.locator('[data-testid="drawer-distance-input"]').fill('60');
@@ -115,7 +149,7 @@ test.describe('Driving expert simulation UI', () => {
     await page.goto('/');
     await loadScenario(page, 'S1 Empty safe road');
 
-    await page.locator('[data-testid="add-traffic-light"]').click();
+    await clickTool(page, 'add-traffic-light');
     await expect(page.locator('[data-testid="config-panel"]')).toBeVisible();
     await expect(page.locator('[data-testid="lane-select"]')).toHaveCount(0);
     await page.locator('[data-testid="drawer-distance-input"]').fill('100');
@@ -148,7 +182,7 @@ test.describe('Driving expert simulation UI', () => {
 
     for (const lane of ['LEFT', 'CENTER', 'RIGHT']) {
       await page.locator('[data-testid="reset-btn"]').click();
-      await page.locator('[data-testid="add-stop-sign"]').click();
+      await clickTool(page, 'add-stop-sign');
       await expect(page.locator('[data-testid="config-panel"]')).toBeVisible();
       await page.locator('[data-testid="drawer-distance-input"]').fill('60');
       await page.locator('[data-testid="lane-select"]').selectOption(lane);
@@ -168,11 +202,11 @@ test.describe('Driving expert simulation UI', () => {
     await page.locator('[data-testid="start-btn"]').click();
     await addWorldObject(page, 'add-pedestrian', { distance: '8' });
 
-    await expect(page.locator('[data-testid="decision-action"]'))
+    await expect(await decisionAction(page))
       .toContainText(/STOP|BRAKE|EMERGENCY_BRAKE/, { timeout: 40000 });
 
     await page.locator('button:has-text("Inference Timeline")').click();
-    await expect(page.locator('[data-testid="timeline-panel"]'))
+    await expect(await timelinePanel(page))
       .toContainText(/pedestrian/i, { timeout: 20000 });
   });
 
@@ -182,14 +216,14 @@ test.describe('Driving expert simulation UI', () => {
     await page.goto('/');
     await loadScenario(page, 'S1 Empty safe road');
     await page.waitForTimeout(250);
-    await page.locator('[data-testid="add-pothole"]').click();
+    await clickTool(page, 'add-pothole');
     await page.locator('[data-testid="lane-select"]').selectOption('RIGHT');
     await page.locator('[data-testid="drawer-distance-input"]').fill('100');
     await page.locator('[data-testid="apply-config"]').click();
     await page.locator('[data-testid="start-btn"]').click();
     await expect(page.locator('[data-testid="simulation-status"]')).toContainText('RUNNING');
 
-    await expect(page.locator('[data-testid="decision-action"]'))
+    await expect(await decisionAction(page))
       .toContainText('CHANGE_LANE_LEFT', { timeout: 45000 });
     await expect(page.locator('[data-testid="road-ego"]'))
       .toHaveAttribute('data-maneuver', /REQUESTED|CHANGING/, { timeout: 15000 });
@@ -200,11 +234,12 @@ test.describe('Driving expert simulation UI', () => {
       return Number(value);
     }, { timeout: 15000 }).toBeLessThan(lateralAtStart - 0.1);
     // The live narration describes the move only while it runs; data-lane switches when it completes.
+    await page.getByRole('tab', { name: 'Situation', exact: true }).click();
     await expect(page.locator('[data-testid="situation-panel"]'))
       .toContainText(/pothole|moving to the CENTER/i, { timeout: 15000 });
 
     await expect(page.locator('[data-testid="road-ego"]')).toHaveAttribute('data-lane', 'CENTER', { timeout: 20000 });
-    await expect(page.locator('[data-testid="timeline-panel"]'))
+    await expect(await timelinePanel(page))
       .toContainText(/MANEUVER STARTED|MANEUVER COMPLETED/i, { timeout: 15000 });
   });
 
@@ -214,11 +249,11 @@ test.describe('Driving expert simulation UI', () => {
     await loadScenario(page, 'S1 Empty safe road');
     await page.locator('[data-testid="start-btn"]').click();
     await expect(page.locator('[data-testid="simulation-status"]')).toContainText('RUNNING');
-    await page.locator('[data-testid="add-pothole"]').click();
+    await clickTool(page, 'add-pothole');
     await page.locator('[data-testid="lane-select"]').selectOption('RIGHT');
     await page.locator('[data-testid="drawer-distance-input"]').fill('25');
     await page.locator('[data-testid="apply-config"]').click();
-    await expect(page.locator('[data-testid="decision-action"]')).toContainText('CHANGE_LANE_LEFT', { timeout: 45000 });
+    await expect(await decisionAction(page)).toContainText('CHANGE_LANE_LEFT', { timeout: 45000 });
     await page.locator('[data-testid="stop-btn"]').click();
 
     const dialog = page.locator('[data-testid="trip-questions-dialog"]');
@@ -302,19 +337,19 @@ test.describe('Driving expert simulation UI', () => {
     await page.goto('/');
     await loadScenario(page, 'S1 Empty safe road');
     await page.waitForTimeout(250);
-    await page.locator('[data-testid="add-vehicle"]').click();
+    await clickTool(page, 'add-vehicle');
     await page.locator('[data-testid="lane-select"]').selectOption('RIGHT');
     await page.locator('[data-testid="drawer-distance-input"]').fill('20');
     await page.locator('[data-testid="actor-speed-input"]').fill('30');
     await page.locator('[data-testid="apply-config"]').click();
-    await page.locator('[data-testid="add-pothole"]').click();
+    await clickTool(page, 'add-pothole');
     await page.locator('[data-testid="lane-select"]').selectOption('RIGHT');
     await page.locator('[data-testid="drawer-distance-input"]').fill('90');
     await page.locator('[data-testid="apply-config"]').click();
     await page.locator('[data-testid="start-btn"]').click();
     await expect(page.locator('[data-testid="simulation-status"]')).toContainText('RUNNING');
 
-    await expect(page.locator('[data-testid="decision-action"]'))
+    await expect(await decisionAction(page))
       .toContainText(/REDUCE_SPEED|EMERGENCY_BRAKE/, { timeout: 45000 });
     await expect(page.locator('[data-testid="road-ego"]'))
       .toHaveAttribute('data-lane', 'RIGHT', { timeout: 35000 });
@@ -353,6 +388,7 @@ test.describe('Driving expert simulation UI', () => {
 
     await page.goto('/');
     await page.locator('[data-testid="reset-btn"]').click();
+    await openBottomTab(page, 'Scenario Toolbox');
     await page.locator('button:has-text("S14_SLOW_VEHICLE_OVERTAKE")').click();
     await page.locator('[data-testid="start-btn"]').click();
     await expect(page.locator('[data-testid="simulation-status"]')).toContainText('RUNNING');
@@ -362,7 +398,7 @@ test.describe('Driving expert simulation UI', () => {
     await expect(page.locator('[data-testid="hud-position"]')).not.toContainText('0.0 m', { timeout: 15000 });
 
     // Vehicle decides to change left and signals left
-    await expect(page.locator('[data-testid="decision-action"]'))
+    await expect(await decisionAction(page))
       .toContainText('CHANGE_LANE_LEFT', { timeout: 35000 });
     await expect(page.locator('[data-testid="hud-indicator"]')).toContainText('LEFT', { timeout: 15000 });
 
@@ -402,7 +438,7 @@ test.describe('Driving expert simulation UI', () => {
     await page.locator('[data-testid="road-map"]').scrollIntoViewIfNeeded();
 
     // Add obstacle 150m ahead in CENTER
-    await page.locator('[data-testid="add-obstacle"]').click();
+    await clickTool(page, 'add-obstacle');
     await expect(page.locator('[data-testid="config-panel"]')).toBeVisible();
     await page.locator('[data-testid="apply-config"]').click();
     await page.waitForTimeout(400);
@@ -413,6 +449,7 @@ test.describe('Driving expert simulation UI', () => {
     await expect(roadObstacle).toHaveAttribute('data-object-id', 'r30-CENTER');
 
     // Matrix contains obstacle in row 30 CENTER
+    await openBottomTab(page, 'Road Map');
     const cell = page.locator('[data-testid="map-cell-30-CENTER"]');
     await expect(cell).toHaveClass(/cell--obstacle/);
   });
@@ -468,7 +505,7 @@ test.describe('Driving expert simulation UI', () => {
     await page.screenshot({ path: '../screenshot_viewport_1920x1080.png' });
 
     // 3. Toolbox object and matrix synchronization
-    await page.locator('[data-testid="add-obstacle"]').click();
+    await clickTool(page, 'add-obstacle');
     await expect(page.locator('[data-testid="config-panel"]')).toBeVisible();
     await page.locator('[data-testid="apply-config"]').click();
     await page.waitForTimeout(500);
@@ -492,7 +529,7 @@ test.describe('Driving expert simulation UI', () => {
     expect(beforeBox).not.toBeNull();
 
     // Open Stop sign drawer
-    await page.locator('[data-testid="add-stop-sign"]').click();
+    await clickTool(page, 'add-stop-sign');
     await page.waitForTimeout(300);
 
     const afterBox = await app.boundingBox();
@@ -527,7 +564,7 @@ test.describe('Driving expert simulation UI', () => {
     await expect(page.locator('.backdrop')).toHaveCount(0);
 
     // Open Obstacle and cancel
-    await page.locator('[data-testid="add-obstacle"]').click();
+    await clickTool(page, 'add-obstacle');
     await page.waitForTimeout(300);
     await expect(drawer).toBeVisible();
     await page.locator('.drawer__btn--ghost').click();
@@ -536,7 +573,7 @@ test.describe('Driving expert simulation UI', () => {
     await expect(page.locator('.backdrop')).toHaveCount(0);
 
     // Open Pedestrian and add to road
-    await page.locator('[data-testid="add-pedestrian"]').click();
+    await clickTool(page, 'add-pedestrian');
     await page.waitForTimeout(300);
     await page.locator('[data-testid="apply-config"]').click();
     await page.waitForTimeout(400);
@@ -564,7 +601,9 @@ test.describe('Driving expert simulation UI', () => {
 
     // Capture initial values
     const p0 = await getPos();
-    const signBox0 = await sign.boundingBox();
+    // Measure the paint itself: the distance / DETECTED plate above it comes and goes.
+    const paint = sign.locator('.limit-mark');
+    const signBox0 = await paint.boundingBox();
     expect(signBox0).not.toBeNull();
 
     // Wait 2.5 seconds of live simulation
@@ -572,7 +611,7 @@ test.describe('Driving expert simulation UI', () => {
 
     const p1 = await getPos();
     const speed1 = await getSpeed();
-    const signBox1 = await sign.boundingBox();
+    const signBox1 = await paint.boundingBox();
     expect(signBox1).not.toBeNull();
 
     // Assert: POSITION strictly increases

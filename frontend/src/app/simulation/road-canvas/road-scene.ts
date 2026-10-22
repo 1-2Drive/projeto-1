@@ -593,6 +593,8 @@ const GANTRY_STRUCTURE: Solid[] = [
 
 const LAMP_Y = { RED: HEAD_TOP - 0.38, YELLOW: (HEAD_TOP + HEAD_BOTTOM) / 2, GREEN: HEAD_BOTTOM + 0.38 } as const;
 const HEAD_BACK_Z = -0.22;
+/** A lit lamp glows, but never as a floodlight over the scene when the gantry is close. */
+const GLOW_MAX_PX = 26;
 const headCache = new Map<string, Solid>();
 
 /** A signal head hanging over a lane; the lit lamp follows the backend state. */
@@ -797,7 +799,7 @@ export function buildItems(input: ItemsInput): ItemsView {
             faces: rendered.faces,
             glow: lamp ? {
               x: lamp.x, y: lamp.y,
-              r: Math.max(5, (camera.focal / lamp.z) * 0.8),
+              r: Math.min(GLOW_MAX_PX, Math.max(5, (camera.focal / lamp.z) * 0.8)),
               cls: `glow glow--${state.toLowerCase()}`
             } : null,
             tag: main && top ? tagAt(top.x, top.y - 4) : null

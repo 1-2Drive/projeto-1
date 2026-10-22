@@ -109,6 +109,37 @@ describe('SimulationPageComponent', () => {
     expect(pause.disabled).toBeTrue();
   });
 
+  it('keeps the dashboard cells: road, evidence tabs, telemetry and the road map / toolbox tabs', () => {
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('.workspace__center app-road-canvas')).toBeTruthy();
+    const tabs = Array.from(el.querySelectorAll('.evidence .tabs > [role="tab"]')).map((t) => t.textContent!.trim());
+    expect(tabs).toEqual(['Inference Timeline', 'Working Memory', 'Explanation', 'World State', 'Decision', 'Situation']);
+    expect(el.querySelector('app-speed-advisor')).toBeTruthy();
+    expect(el.querySelector('app-sensors-panel')).toBeTruthy();
+
+    // The road map is the default bottom tab; the toolbox and scenario library sit in the other.
+    expect(el.querySelector('app-road-map')).toBeTruthy();
+    expect(el.querySelector('app-toolbox')).toBeNull();
+    (el.querySelectorAll('.bottom-tabs__nav [role="tab"]')[1] as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(el.querySelector('app-toolbox')).toBeTruthy();
+    expect(el.querySelector('app-scenario-library')).toBeTruthy();
+    expect(el.querySelector('app-road-map')).toBeNull();
+  });
+
+  it('shows the situation narration and the decision panel from their evidence tabs', () => {
+    const el = fixture.nativeElement as HTMLElement;
+    const tab = (name: string) => Array.from(el.querySelectorAll('.evidence .tabs > [role="tab"]'))
+      .find((t) => t.textContent!.trim() === name) as HTMLButtonElement;
+    tab('Situation').click();
+    fixture.detectChanges();
+    expect(el.querySelector('app-situation-panel')).toBeTruthy();
+    tab('Decision').click();
+    fixture.detectChanges();
+    expect(el.querySelector('app-decision-panel')).toBeTruthy();
+    expect(el.querySelector('app-situation-panel')).toBeNull();
+  });
+
   it('calls demo action from demo button', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     const demo = compiled.querySelector('[data-testid="run-demo-btn"]') as HTMLButtonElement;

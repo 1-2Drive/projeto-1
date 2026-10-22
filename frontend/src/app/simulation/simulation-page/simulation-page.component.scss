@@ -408,6 +408,12 @@
   scrollbar-width: thin;
 }
 
+.telemetry-pair > app-speed-advisor {
+  height: auto;
+  align-self: start;
+  overflow: visible;
+}
+
 .bottom-tabs {
   display: flex;
   flex-direction: column;

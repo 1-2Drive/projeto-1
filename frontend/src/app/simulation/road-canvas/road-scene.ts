@@ -12,9 +12,10 @@ import {
   SHOULDER_HALF_METRES, spriteFrame, VIEW_AHEAD_METRES
 } from './road-projection';
 import {
-  box, CarPose, EGO_CAR, extrude, FaceView, faceOf, rectZ, discZ, Decal, RenderedCar,
+  box, CarPose, extrude, FaceView, faceOf, rectZ, discZ, Decal, RenderedCar,
   renderCar, renderSolid, shadowPoints, Solid, TRAFFIC_CAR, translate
 } from './road-solids';
+import { EGO_CAR } from './road-ev-model';
 
 /** Category drives which asset is rendered for a world object. */
 export type RoadObjectKind =

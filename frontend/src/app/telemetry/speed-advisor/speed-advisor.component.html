@@ -14,22 +14,25 @@
 
         <path d="M 20 90 A 70 70 0 0 1 160 90" class="dial__legal"
               [style.stroke-dasharray]="limitDash() + ' ' + arcLength" />
+
+        <!-- Markers sit on the arc's own circle, so they stay on it at any card width. -->
+        <g class="pin pin--legal" [attr.transform]="'translate(' + pinX(limitAngle(), 85) + ' ' + pinY(limitAngle(), 85) + ')'">
+          <rect x="-11" y="-5.5" width="22" height="11" rx="2.5" />
+          <text y="2.6" text-anchor="middle">{{ legalLimitKmh() | number: '1.0-0' }}</text>
+        </g>
+
+        @if (!idle()) {
+          <g class="pin pin--rec" [attr.transform]="'translate(' + pinX(recommendedAngle(), 53) + ' ' + pinY(recommendedAngle(), 53) + ')'">
+            <rect x="-11" y="-5.5" width="22" height="11" rx="2.5" />
+            <text y="2.6" text-anchor="middle" data-testid="speed-recommended">{{ recommendedKmh() | number: '1.0-0' }}</text>
+          </g>
+        }
       </svg>
 
       <div class="gauge__readout">
         <strong data-testid="speed-current">{{ currentKmh() | number: '1.0-0' }}</strong>
         <span>km/h</span>
       </div>
-
-      <span class="gauge__pin gauge__pin--legal" [style.transform]="'rotate(' + limitAngle() + 'deg)'">
-        <em>{{ legalLimitKmh() | number: '1.0-0' }}</em>
-      </span>
-
-      @if (!idle()) {
-        <span class="gauge__pin gauge__pin--rec" [style.transform]="'rotate(' + recommendedAngle() + 'deg)'">
-          <em data-testid="speed-recommended">{{ recommendedKmh() | number: '1.0-0' }}</em>
-        </span>
-      }
     </div>
 
     <footer class="gauge__legend">

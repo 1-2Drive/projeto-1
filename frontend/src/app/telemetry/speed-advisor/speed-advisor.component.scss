@@ -1,20 +1,19 @@
 :host {
   display: block;
-  height: 100%;
-  min-height: 0;
   min-width: 0;
 }
 
 .gauge {
   display: grid;
-  gap: 0.45rem;
+  /* The card is as tall as its content: head, gauge, legend. The page grid must not stretch it. */
+  align-content: start;
+  gap: 0.5rem;
   padding: 0.7rem 0.8rem 0.75rem;
   border: 1px solid var(--ds-border);
   border-radius: var(--ds-radius-lg);
   background:
     radial-gradient(120% 90% at 50% 0%, rgba(35, 74, 102, 0.42) 0%, rgba(13, 20, 28, 0.9) 68%),
     rgba(13, 20, 28, 0.9);
-  min-height: 100%;
   box-sizing: border-box;
   overflow: hidden;
   /* The legend below adapts to the width of the card, not of the screen. */
@@ -58,11 +57,18 @@
   position: relative;
   display: grid;
   justify-items: center;
+  margin-top: 0.15rem;
+
+  /* Gauge and readout share one cell: the number always sits inside the arc, never drifts. */
+  > * {
+    grid-area: 1 / 1;
+  }
 }
 
 .dial {
+  display: block;
   width: 100%;
-  max-width: 13rem;
+  max-width: 22rem;
   overflow: visible;
 
   path {
@@ -102,10 +108,10 @@
 }
 
 .gauge__readout {
-  position: absolute;
-  bottom: 0.15rem;
+  align-self: end;
   display: grid;
   justify-items: center;
+  padding-bottom: 0.1rem;
 
   strong {
     font-family: var(--ds-font-mono);
@@ -123,34 +129,33 @@
   }
 }
 
-.gauge__pin {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: start center;
-  pointer-events: none;
+.pin {
+  rect {
+    stroke-width: 0.8;
+  }
 
-  em {
-    position: absolute;
-    top: -0.15rem;
-    transform-origin: center;
-    padding: 0.05rem 0.24rem;
-    border-radius: var(--ds-radius-sm);
+  text {
     font-family: var(--ds-font-mono);
-    font-style: normal;
-    font-size: 0.56rem;
+    font-size: 7.6px;
+    font-weight: 600;
   }
 
-  &--legal em {
-    border: 1px solid #6c5a1e;
-    background: #2a2410;
-    color: #f2d582;
+  &--legal rect {
+    fill: #2a2410;
+    stroke: #6c5a1e;
   }
 
-  &--rec em {
-    border: 1px solid #1f5f77;
-    background: #0d2b36;
-    color: #9fe3f5;
+  &--legal text {
+    fill: #f2d582;
+  }
+
+  &--rec rect {
+    fill: #0d2b36;
+    stroke: #1f5f77;
+  }
+
+  &--rec text {
+    fill: #9fe3f5;
   }
 }
 
@@ -211,6 +216,17 @@
 
   &--below strong {
     color: #a7dfbc;
+  }
+}
+
+/* A wide card (large screens) gets a larger gauge and number, so it stays full instead of stretched. */
+@container (min-width: 19rem) {
+  .gauge__readout strong {
+    font-size: 2.7rem;
+  }
+
+  .gauge__readout span {
+    font-size: 0.68rem;
   }
 }
 

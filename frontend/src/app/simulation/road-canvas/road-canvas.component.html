@@ -189,13 +189,13 @@
                   @for (wheel of car.wheels; track $index) {
                     <g [class]="wheel.cls">
                       @for (face of wheel.faces; track $index) {
-                        <path [attr.d]="face.d" [class]="face.cls" />
+                        <path [attr.d]="face.d" [class]="face.cls" [attr.style]="face.style" />
                       }
                     </g>
                   }
                 </g>
                 @for (face of car.faces; track $index) {
-                  <path [attr.d]="face.d" [class]="face.cls" />
+                  <path [attr.d]="face.d" [class]="face.cls" [attr.style]="face.style" />
                 }
                 @if (item.lamps; as lamps) {
                   <circle class="car__brake-glow" [attr.cx]="lamps.x" [attr.cy]="lamps.y" [attr.r]="lamps.r * 1.25"
@@ -205,12 +205,12 @@
                 <g class="car__indicators">
                   <g class="car__indicator car__indicator--left" data-testid="ego-indicator-left">
                     @for (face of car.indicatorLeft; track $index) {
-                      <path [attr.d]="face.d" [class]="face.cls" [class.indicator-light--on]="indicatorLeft() || indicatorHazard()" />
+                      <path [attr.d]="face.d" [class]="face.cls" [attr.style]="face.style" [class.indicator-light--on]="indicatorLeft() || indicatorHazard()" />
                     }
                   </g>
                   <g class="car__indicator car__indicator--right" data-testid="ego-indicator-right">
                     @for (face of car.indicatorRight; track $index) {
-                      <path [attr.d]="face.d" [class]="face.cls" [class.indicator-light--on]="indicatorRight() || indicatorHazard()" />
+                      <path [attr.d]="face.d" [class]="face.cls" [attr.style]="face.style" [class.indicator-light--on]="indicatorRight() || indicatorHazard()" />
                     }
                   </g>
                 </g>

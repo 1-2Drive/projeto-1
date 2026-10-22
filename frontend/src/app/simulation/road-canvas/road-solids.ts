@@ -22,6 +22,10 @@ export interface Decal {
   extra?: string;
   /** Group the decal is reported in (e.g. `indicator-left`); undefined draws it with the body. */
   group?: string;
+  /** Position inside its group (lamps are reported rear lamp, flank repeater, mirror lamp). */
+  slot?: number;
+  /** Gloss of the decal when it differs from its face (a glass panel on body paint). */
+  gloss?: number;
 }
 
 export interface Face3 {
@@ -29,6 +33,8 @@ export interface Face3 {
   part: string;
   role: FaceRole;
   decals: Decal[];
+  /** How shiny the surface is: glass and paint catch the light, rubber does not. */
+  gloss?: number;
 }
 
 export interface Solid {
@@ -36,12 +42,20 @@ export interface Solid {
   centre: Vec3;
   /** Shade each face by its own angle to the light (rounded bodies) instead of by its side. */
   smooth?: boolean;
+  /**
+   * Not convex (a body with a roof): faces are listed far to near, so that nearer ones paint over
+   * farther ones, and each face is wound counter-clockwise seen from outside, which says which
+   * way it looks (a convex solid reads that from its centre).
+   */
+  skinned?: boolean;
 }
 
 export interface FaceView {
   /** SVG path data, empty when the face is hidden (so lamps keep a stable DOM). */
   d: string;
   cls: string;
+  /** Light and shadow of a smooth surface, as CSS custom properties (`--lite`, `--dark`). */
+  style?: string;
   /** Mean camera depth, for ordering whole objects. */
   z: number;
 }
@@ -200,6 +214,53 @@ export function loft(part: string, rings: ReadonlyArray<ReadonlyArray<Vec3>>, ca
   return { faces, centre, smooth };
 }
 
+/**
+ * A rounded body skinned through cross-sections that change along the car, rear to front: every
+ * ring has the same vertex order, running up the right side and down the left, so each face can
+ * be wound counter-clockwise seen from outside. Unlike {@link loft} the body need not be convex
+ * (it has a roof), so the faces are listed far to near and the end caps (a tail, a nose) are
+ * optional. `face(segment, edge)` returns the face between ring `segment` and the next, along edge `edge`.
+ */
+export function skin(part: string, rings: ReadonlyArray<ReadonlyArray<Vec3>>): {
+  solid: Solid; face: (segment: number, edge: number) => Face3; tail: Face3;
+} {
+  const size = rings[0].length;
+  const segments = rings.length - 1;
+  const quad = (i: number, j: number): Vec3[] => {
+    const k = (j + 1) % size;
+    return [rings[i][j], rings[i][k], rings[i + 1][k], rings[i + 1][j]];
+  };
+  // The ring order decides which way the faces wind: find out from the highest face of the middle.
+  const mid = Math.floor(segments / 2);
+  let highest = 0;
+  for (let j = 1; j < size; j++) {
+    if (centroid(quad(mid, j))[1] > centroid(quad(mid, highest))[1]) {
+      highest = j;
+    }
+  }
+  const flipped = windingNormal(quad(mid, highest))[1] < 0;
+  const wound = (pts: Vec3[]): Vec3[] => (flipped ? [...pts].reverse() : pts);
+
+  const grid: Face3[][] = [];
+  for (let i = 0; i < segments; i++) {
+    grid.push(Array.from({ length: size }, (_, j) => {
+      const pts = wound(quad(i, j));
+      return { pts, part, role: roleOfNormal(windingNormal(pts)), decals: [], gloss: 0.5 } as Face3;
+    }));
+  }
+  // The end caps look backwards (the tail) and forwards (the nose), whatever the ring order.
+  const facing = (pts: Vec3[], towards: number): Vec3[] => (windingNormal(pts)[2] * towards < 0 ? [...pts].reverse() : pts);
+  const tail: Face3 = { pts: facing([...rings[0]], -1), part, role: 'rear', decals: [], gloss: 0.4 };
+  const nose: Face3 = { pts: facing([...rings[segments]], 1), part, role: 'front', decals: [], gloss: 0.4 };
+  // Far to near: the nose first, the tail last, so nearer faces paint over farther ones.
+  const faces: Face3[] = [nose];
+  for (let i = segments - 1; i >= 0; i--) {
+    faces.push(...grid[i]);
+  }
+  faces.push(tail);
+  return { solid: { faces, centre: centroid(rings.flat()), smooth: true, skinned: true }, face: (i, j) => grid[i][j], tail };
+}
+
 function roleOfNormal(n: Vec3): FaceRole {
   const [x, y, z] = n;
   if (Math.abs(y) >= Math.abs(x) && Math.abs(y) >= Math.abs(z)) {
@@ -246,29 +307,42 @@ function outwardNormal(pts: readonly Vec3[], solidCentre: Vec3): Vec3 {
   return dot(n, sub(c, solidCentre)) < 0 ? [-n[0], -n[1], -n[2]] : n;
 }
 
-/** True when the face looks at the camera (outward normal against the camera position). */
-function facesCamera(camera: Camera, pts: readonly Vec3[], solidCentre: Vec3): boolean {
-  if (pts.length < 3) {
-    return false;
+/** Normal of a polygon wound counter-clockwise seen from outside (Newell's method, robust to thin faces). */
+function windingNormal(pts: readonly Vec3[]): Vec3 {
+  let x = 0;
+  let y = 0;
+  let z = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i];
+    const b = pts[(i + 1) % pts.length];
+    x += (a[1] - b[1]) * (a[2] + b[2]);
+    y += (a[2] - b[2]) * (a[0] + b[0]);
+    z += (a[0] - b[0]) * (a[1] + b[1]);
   }
-  const n = outwardNormal(pts, solidCentre);
-  return dot(n, sub([camera.x, camera.eye, -camera.back], centroid(pts))) > 1e-6;
+  return [x, y, z];
 }
 
 /** Light from above, slightly to the left and behind the car, as seen from the chase camera. */
-const LIGHT: Vec3 = (() => {
-  const v: Vec3 = [-0.42, 0.82, -0.38];
-  const l = Math.hypot(...v);
+function unit(v: Vec3): Vec3 {
+  const l = Math.hypot(...v) || 1;
   return [v[0] / l, v[1] / l, v[2] / l];
-})();
-const SHADE_STEPS = 7;
+}
+const LIGHT: Vec3 = unit([-0.42, 0.82, -0.38]);
 
-/** Brightness bucket 0..SHADE_STEPS of a face, from the angle between its normal and the light. */
-function shadeStep(normal: Vec3): number {
-  const length = Math.hypot(...normal) || 1;
-  const lambert = dot(normal, LIGHT) / length;
-  const t = Math.min(1, Math.max(0, (lambert + 0.35) / 1.3));
-  return Math.round(t * SHADE_STEPS);
+/**
+ * Light and shadow of a surface as CSS custom properties: a soft wrap-around diffuse term from the
+ * angle to the light, plus a highlight where the surface mirrors the light towards the camera.
+ */
+function shading(normal: Vec3, toCamera: Vec3, gloss: number): string {
+  const n = unit(normal);
+  const half = dot(n, LIGHT) * 0.5 + 0.5;
+  const halfway = unit([LIGHT[0] + toCamera[0], LIGHT[1] + toCamera[1], LIGHT[2] + toCamera[2]]);
+  const shine = Math.pow(Math.max(0, dot(n, halfway)), 16 + gloss * 40) * (4 + gloss * 34);
+  // Dark glass keeps its depth: it picks up the highlight, not the broad diffuse light.
+  const wash = gloss > 0.8 ? 0.3 : 1;
+  const lite = Math.max(0, half - 0.7) * 75 * wash + shine;
+  const dark = Math.max(0, 0.7 - half) * 100;
+  return `--lite:${Math.min(60, lite).toFixed(1)}%;--dark:${Math.min(58, dark).toFixed(1)}%`;
 }
 
 function projectAll(camera: Camera, pts: readonly Vec3[]): ScreenPoint[] | null {
@@ -306,32 +380,45 @@ export function renderSolid(camera: Camera, solid: Solid, transform: Transform, 
   const groups: Record<string, FaceView[]> = {};
   let zSum = 0;
   let zCount = 0;
+  const slots = new Map<FaceView, number>();
   const addGroup = (group: string, view: FaceView) => (groups[group] ??= []).push(view);
 
+  const eye: Vec3 = [camera.x, camera.eye, -camera.back];
   for (const face of solid.faces) {
     const world = face.pts.map(transform);
-    const visible = facesCamera(camera, world, centre);
+    const normal = solid.skinned ? windingNormal(world) : outwardNormal(world, centre);
+    const middle = centroid(world);
+    const toCamera = sub(eye, middle);
+    const visible = world.length >= 3 && dot(normal, toCamera) > 1e-6;
     const screen = visible ? projectAll(camera, world) : null;
-    const shade = solid.smooth && screen ? ` f--smooth f--s${shadeStep(outwardNormal(world, centre))}` : '';
+    const style = solid.smooth && screen ? shading(normal, unit(toCamera), face.gloss ?? 0.3) : undefined;
+    const shade = solid.smooth ? ' f--smooth' : '';
     if (screen) {
       const z = screen.reduce((sum, p) => sum + p.z, 0) / screen.length;
       zSum += z;
       zCount++;
-      faces.push({ d: pathOfPoints(screen), cls: `${classPrefix}f f--${face.part} f--${face.role}${shade}`, z });
+      faces.push({ d: pathOfPoints(screen), cls: `${classPrefix}f f--${face.part} f--${face.role}${shade}`, style, z });
     }
     for (const decal of face.decals) {
       const projected = screen ? projectAll(camera, decal.pts.map(transform)) : null;
       const view: FaceView = {
         d: projected ? pathOfPoints(projected) : '',
         cls: `${classPrefix}f f--${decal.part} f--${face.role}${shade}${decal.extra ? ' ' + decal.extra : ''}`,
+        style: solid.smooth && projected && decal.gloss !== undefined ? shading(normal, unit(toCamera), decal.gloss) : style,
         z: projected ? projected.reduce((sum, p) => sum + p.z, 0) / projected.length : 0
       };
+      if (decal.slot !== undefined) {
+        slots.set(view, decal.slot);
+      }
       if (decal.group) {
         addGroup(decal.group, view);
       } else if (projected) {
         faces.push(view);
       }
     }
+  }
+  for (const views of Object.values(groups)) {
+    views.sort((a, b) => (slots.get(a) ?? 0) - (slots.get(b) ?? 0));
   }
   return { faces, groups, z: zCount ? zSum / zCount : 0 };
 }
@@ -436,163 +523,6 @@ function buildCar(spec: CarSpec): CarModel {
   return { wheels, body, length, width: hw * 2, height: spec.roofY };
 }
 
-// -------------------------------------------------------------------------------------------
-// The ego: a modern electric fastback sedan (an original design, not a copy of any make).
-// Smooth shoulders, a tapering tail with a full-width light bar, a sloping glass roof.
-// -------------------------------------------------------------------------------------------
-
-/** One cross-section of the lower body: an octagon with rounded-looking chamfers, bottom to top. */
-function bodyRing(z: number, hw: number, y0: number, y1: number): Vec3[] {
-  const bw = hw * 0.84;
-  const tw = hw * 0.87;
-  const low = 0.12;
-  const high = 0.17;
-  return [
-    [-bw, y0, z], [bw, y0, z], [hw, y0 + low, z], [hw, y1 - high, z],
-    [tw, y1, z], [-tw, y1, z], [-hw, y1 - high, z], [-hw, y0 + low, z]
-  ];
-}
-
-/** One cross-section of the glasshouse: belt line, shoulder and roof, with the sides leaning in. */
-function cabinRing(z: number, a: number, b: number, c: number, yBelt: number, yShoulder: number, yRoof: number): Vec3[] {
-  return [
-    [-a, yBelt, z], [a, yBelt, z], [b, yShoulder, z], [c, yRoof, z], [-c, yRoof, z], [-b, yShoulder, z]
-  ];
-}
-
-const EV_LENGTH = 4.7;
-const EV_HW = 0.94;
-const EV_WHEEL_RADIUS = 0.34;
-
-function buildElectricSedan(): CarModel {
-  const z0 = -EV_LENGTH / 2;
-  const hw = EV_HW;
-
-  // ---- lower body: tapering tail, long deck, low nose ----
-  const tub = loft('body', [
-    bodyRing(z0, 0.8, 0.34, 0.9),
-    bodyRing(z0 + 0.16, 0.88, 0.3, 0.97),
-    bodyRing(-1.85, 0.93, 0.28, 1.0),
-    bodyRing(-0.2, hw, 0.27, 0.98),
-    bodyRing(1.9, hw, 0.27, 0.84),
-    bodyRing(2.2, 0.9, 0.3, 0.76),
-    bodyRing(EV_LENGTH / 2, 0.8, 0.36, 0.66)
-  ]);
-
-  // The rear: a dark band under a slim lamp bar that runs across the whole tail, plate, diffuser.
-  const tail = tub.faces[tub.faces.length - 2];
-  const bar = (x0: number, x1: number, y0: number, y1: number): Vec3[] =>
-    [[x0, y1, z0], [x1, y1 - 0.01, z0], [x1, y0 + 0.01, z0], [x0, y0, z0]];
-  tail.decals.push(
-    { pts: rectZ(-0.72, 0.72, 0.72, 0.89, z0), part: 'bumper' },
-    { pts: bar(-0.7, -0.5, 0.74, 0.86), part: 'lens' },
-    { pts: bar(0.5, 0.7, 0.74, 0.86), part: 'lens' },
-    { pts: bar(-0.7, -0.5, 0.74, 0.86), part: 'indicator', extra: 'indicator-light', group: 'indicator-left' },
-    { pts: bar(0.5, 0.7, 0.74, 0.86), part: 'indicator', extra: 'indicator-light', group: 'indicator-right' },
-    { pts: bar(-0.5, -0.04, 0.775, 0.855), part: 'tail', extra: 'brake-lamp' },
-    { pts: bar(0.04, 0.5, 0.775, 0.855), part: 'tail', extra: 'brake-lamp' },
-    { pts: rectZ(-0.04, 0.04, 0.8, 0.83, z0), part: 'tail', extra: 'brake-lamp' },
-    { pts: rectZ(-0.24, 0.24, 0.55, 0.65, z0), part: 'plate' },
-    { pts: rectZ(-0.6, 0.6, 0.37, 0.44, z0), part: 'bumper' }
-  );
-
-  // Flank repeaters towards the front wing, and the wheel arches, on the vertical flanks.
-  // Segments 2 (z = -1.85 .. -0.2) and 3 (z = -0.2 .. 1.9) have vertical flanks at x = +-hw: the
-  // rear and the front wheel arches, and the front repeater, are drawn on them.
-  for (const side of ['left', 'right'] as const) {
-    const edge = side === 'left' ? 6 : 2;
-    const x = side === 'left' ? -hw : hw;
-    const flank = tub.faces[3 * 8 + edge];
-    flank.decals.push({ pts: archPolygon(x, 1.42), part: 'arch' });
-    flank.decals.push({
-      pts: rectX(x, 0.55, 0.62, 1.05, 1.32), part: 'indicator',
-      extra: 'indicator-light', group: `indicator-${side}`
-    });
-  }
-  for (const side of ['left', 'right'] as const) {
-    const edge = side === 'left' ? 6 : 2;
-    tub.faces[2 * 8 + edge].decals.push({ pts: archPolygon(side === 'left' ? -hw : hw, -1.4), part: 'arch' });
-  }
-
-  // Lamps are reported in face order (rear lamp, flank repeater, mirror lamp): the tail goes first.
-  tub.faces.unshift(...tub.faces.splice(tub.faces.length - 2, 1));
-
-  // ---- glasshouse: fastback with a glass roof ----
-  const cabin = loft('body', [
-    cabinRing(-1.5, 0.8, 0.79, 0.7, 0.99, 1.0, 1.02),
-    cabinRing(-0.72, 0.85, 0.83, 0.72, 0.99, 1.23, 1.4),
-    cabinRing(0.25, 0.87, 0.85, 0.73, 0.98, 1.3, 1.45),
-    cabinRing(0.6, 0.86, 0.84, 0.72, 0.97, 1.28, 1.42),
-    cabinRing(1.3, 0.82, 0.8, 0.66, 0.9, 0.92, 0.94)
-  ], false);
-  // Faces: segment i, edge j -> i * 6 + j.  Edges: 1 = lower right, 2 = upper right, 3 = roof, 4 = upper left, 5 = lower left.
-  const cabinFace = (segment: number, edge: number) => cabin.faces[segment * 6 + edge];
-  const rearWindow = cabinFace(0, 3);
-  rearWindow.decals.push({ pts: inset(rearWindow.pts, 0.86), part: 'glass' });
-  for (const segment of [1, 2]) {
-    const roofPanel = cabinFace(segment, 3);
-    roofPanel.part = 'roof';
-    roofPanel.decals.push({ pts: inset(roofPanel.pts, 0.82), part: 'roof-glass' });
-  }
-  for (const segment of [1, 2, 3]) {
-    for (const edge of [1, 2, 4, 5]) {
-      const side = cabinFace(segment, edge);
-      side.decals.push({ pts: inset(side.pts, 0.78), part: 'glass' });
-    }
-  }
-  const windscreen = cabinFace(3, 3);
-  windscreen.decals.push({ pts: inset(windscreen.pts, 0.86), part: 'glass' });
-
-  // ---- door mirrors, each with its own indicator ----
-  const body: Solid[] = [tub, cabin];
-  for (const side of [-1, 1]) {
-    const inner = side * (hw - 0.1);
-    const outer = side * (hw + 0.09);
-    const mirror = box('body', Math.min(inner, outer), Math.max(inner, outer), 0.92, 0.99, 0.55, 0.76);
-    mirror.smooth = true;
-    faceOf(mirror, 'rear').decals.push({
-      pts: rectZ(Math.min(inner, outer) + 0.02, Math.max(inner, outer) - 0.02, 0.945, 0.97, 0.55),
-      part: 'indicator', extra: 'indicator-light', group: side < 0 ? 'indicator-left' : 'indicator-right'
-    });
-    body.push(mirror);
-  }
-
-  const wheels = [
-    { cx: -hw + 0.1, cz: 1.42, front: true },
-    { cx: hw - 0.1, cz: 1.42, front: true },
-    { cx: -hw + 0.1, cz: -1.4, front: false },
-    { cx: hw - 0.1, cz: -1.4, front: false }
-  ].map((w) => {
-    const solid = wheelSolid('wheel', EV_WHEEL_RADIUS, -0.11, 0.11);
-    // A bright rim disc on each outer face, so the wheels read as wheels.
-    for (const role of ['left', 'right'] as const) {
-      const f = faceOf(solid, role);
-      f.decals.push({ pts: inset(f.pts, 0.62), part: 'rim' });
-    }
-    return { ...w, solid };
-  });
-
-  return { wheels, body, length: EV_LENGTH, width: hw * 2, height: 1.45 };
-}
-
-/** A wheel arch on a vertical flank at x: the arc of the tyre cut off at the lower edge of the flank. */
-function archPolygon(x: number, cz: number): Vec3[] {
-  const centreY = EV_WHEEL_RADIUS;
-  const lowest = 0.4;
-  const radius = EV_WHEEL_RADIUS + 0.02;
-  const half = Math.sqrt(radius * radius - (lowest - centreY) ** 2);
-  const start = Math.atan2(lowest - centreY, half);
-  const pts: Vec3[] = [];
-  const steps = 8;
-  for (let i = 0; i <= steps; i++) {
-    const a = start + ((Math.PI - 2 * start) * i) / steps;
-    pts.push([x, centreY + Math.sin(a) * radius, cz + Math.cos(a) * radius]);
-  }
-  return pts;
-}
-
-export const EGO_CAR: CarModel = buildElectricSedan();
-
 /** Other traffic: a taller saloon with a longer cabin, so it reads differently from the ego. */
 export const TRAFFIC_CAR: CarModel = buildCar({
   length: 4.5, hw: 0.93, beltY: 0.98, roofY: 1.56,
@@ -670,7 +600,7 @@ export function renderCar(camera: Camera, model: CarModel, pose: CarPose): Rende
 /** Flat shadow under a car, as a ground ellipse (screen points). */
 export function shadowPoints(camera: Camera, lateral: number, ahead: number, halfWidth: number, halfLength: number): ScreenPoint[] | null {
   const pts: ScreenPoint[] = [];
-  const sides = 14;
+  const sides = 28;
   for (let i = 0; i < sides; i++) {
     const a = (i / sides) * Math.PI * 2;
     const p = project(camera, lateral + Math.cos(a) * halfWidth, 0, ahead + Math.sin(a) * halfLength);

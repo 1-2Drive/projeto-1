@@ -121,7 +121,7 @@ Scenarios loaded from `scenarios.json` by tests: S1, S2, S4, S5, S7, S8 (over RE
 - has no sensors, actuator or physics, and leaves the Java-side inputs (adjacent-lane safety, markings) at their defaults;
 - inserts the events the test chooses.
 
-### 3.2 Frontend unit tests (Karma/Jasmine): 164 cases in 16 files
+### 3.2 Frontend unit tests (Karma/Jasmine): 169 cases in 16 files
 
 | Spec file (under `frontend/src/app/`) | Declared `it(…)` | Topics |
 |---|---|---|
@@ -136,13 +136,13 @@ Scenarios loaded from `scenarios.json` by tests: S1, S2, S4, S5, S7, S8 (over RE
 | `scenario/toolbox/toolbox.component.spec.ts` | 11 | control grouping and the tools under each section, rain toggles, visibility slider, configuration drawer, road-wide elements without a lane (speed limit, traffic light, stop sign), distance validation |
 | `simulation/road-canvas/road-canvas.component.spec.ts` | 56 | 3D driving view: perspective road, lane order and depth scaling, each object kind in its lane (pothole, barrier, pedestrian, stop sign, gantry traffic light, crosswalk, vehicles, radar as roadside infrastructure), road-wide signs and lights (one stop sign with a stop line across the road, on the right verge), no visible EGO label, sensor fields on the road (camera cone shortened by rain, radar corridor, blind-spot pads), lane-change motion and yaw, snapshot smoothing, detection badges, passed objects, rain, turn-signal lamps, responsive canvas sizes |
 | `simulation/road-canvas/road-projection.spec.ts` | 13 | camera model: vanishing point, lane order, linear lateral mapping, inverse-depth scaling, near clip, ground quads, paint matrices, billboard floor, camera fit for the five page sizes |
-| `simulation/road-canvas/road-solids.spec.ts` | 12 | 3D solids: back-face culling, car wheels, indicator lamps, depth scaling, lane placement, yaw revealing the flank, stable lamp slots |
+| `simulation/road-canvas/road-solids.spec.ts` | 15 | 3D solids: back-face culling, car wheels, indicator lamps, depth scaling, lane placement, yaw revealing the flank, stable lamp slots; the ego as one smooth shaded body (black glass roof, aero wheels) unlike the traffic, wheels staying under the body at every yaw, tyres on the road |
 | `simulation/road-canvas/road-kinematics.spec.ts` | 5 | numbers drawn from a snapshot, blending between snapshots, resets shown at once |
 | `simulation/road-map/road-map.component.spec.ts` | 3 | matrix drawing, car position, painting |
-| `simulation/simulation-page/simulation-page.component.spec.ts` | 7 | control-bar zones (run controls, rule engine, automated demo, status row), button states, demo button, STOP-time question dialog, historical session kept on RESET; dashboard cells, evidence tabs and the road map / toolbox tabs |
-| `telemetry/speed-advisor/speed-advisor.component.spec.ts` | 2 | above-recommendation styling; legal limit, recommended and delta as three non-overlapping columns, label above value |
+| `simulation/simulation-page/simulation-page.component.spec.ts` | 8 | speed advisor sized by its content, control-bar zones (run controls, rule engine, automated demo, status row), button states, demo button, STOP-time question dialog, historical session kept on RESET; dashboard cells, evidence tabs and the road map / toolbox tabs |
+| `telemetry/speed-advisor/speed-advisor.component.spec.ts` | 3 | above-recommendation styling; legal limit, recommended and delta as three non-overlapping columns, label above value; the card keeps the height of its content with the speed inside the gauge, in a much taller grid row |
 
-The turn-signal case (one per indicator state) and the responsive-canvas cases (one per page size) are generated in loops, so Karma executes 164 cases from 153 declarations. These tests check presentation and HTTP/WebSocket plumbing with mocked data; they do not test driving rules.
+The turn-signal case (one per indicator state) and the responsive-canvas cases (one per page size) are generated in loops, so Karma executes 169 cases from 158 declarations. These tests check presentation and HTTP/WebSocket plumbing with mocked data; they do not test driving rules.
 
 ### 3.3 Browser end-to-end tests (Playwright): 24 tests
 

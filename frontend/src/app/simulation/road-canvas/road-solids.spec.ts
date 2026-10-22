@@ -1,5 +1,6 @@
 import { createCamera, pixelsPerMetre, project } from './road-projection';
-import { box, EGO_CAR, extrude, FaceView, renderCar, renderSolid, TRAFFIC_CAR, translate } from './road-solids';
+import { EGO_CAR } from './road-ev-model';
+import { box, extrude, FaceView, renderCar, renderSolid, TRAFFIC_CAR, translate } from './road-solids';
 
 /** Bounding box of every path in a list of faces. */
 function bounds(faces: FaceView[]) {
@@ -117,6 +118,44 @@ describe('road solids', () => {
       // The flank repeaters face away from a camera straight behind: present but not drawn.
       expect(away.indicatorLeft.some((lamp) => lamp.d === '')).toBeTrue();
       expect(away.indicatorLeft.some((lamp) => lamp.d !== '')).toBeTrue();
+    });
+
+    it('draws the ego as one smooth, shaded body with a black glass roof and aero wheels, unlike the traffic', () => {
+      const ego = renderCar(camera, EGO_CAR, { lateral: 0, ahead: 0, yawDegrees: 0, steerDegrees: 0 });
+      const smooth = ego.faces.filter((f) => f.cls.includes('f--smooth'));
+      expect(smooth.length).toBeGreaterThan(100, 'a rounded body is made of many small faces, not a few boxes');
+      expect(smooth.every((f) => /--lite:[\d.]+%;--dark:[\d.]+%/.test(f.style ?? ''))).toBeTrue();
+      // Light falls differently on different faces: the body is shaded face by face.
+      expect(new Set(smooth.map((f) => f.style)).size).toBeGreaterThan(20);
+      expect(ego.faces.some((f) => f.cls.includes('f--roof-glass'))).toBeTrue();
+      const wheelClasses = ego.wheels.flatMap((w) => w.faces.map((f) => f.cls)).join(' ');
+      expect(wheelClasses).toContain('f--smooth');
+
+      const traffic = renderCar(camera, TRAFFIC_CAR, { lateral: 0, ahead: 0, yawDegrees: 0, steerDegrees: 0 });
+      expect(traffic.faces.some((f) => f.cls.includes('f--smooth'))).toBeFalse();
+      expect(traffic.faces.length).toBeLessThan(smooth.length / 4);
+    });
+
+    it('keeps the ego together under yaw: the wheels stay under the body, whichever way the nose turns', () => {
+      for (const yaw of [-25, -12, 0, 12, 25]) {
+        const ego = renderCar(camera, EGO_CAR, { lateral: 0, ahead: 20, yawDegrees: yaw, steerDegrees: yaw * 0.3 });
+        const body = bounds(ego.faces);
+        const wheels = bounds(ego.wheels.flatMap((w) => w.faces));
+        const margin = (body.right - body.left) * 0.08;
+        expect(wheels.left).toBeGreaterThanOrEqual(body.left - margin, `yaw ${yaw}`);
+        expect(wheels.right).toBeLessThanOrEqual(body.right + margin, `yaw ${yaw}`);
+        // The tyres touch the road a little below the body, never hang above it.
+        expect(wheels.bottom).toBeGreaterThanOrEqual(body.bottom - margin, `yaw ${yaw}`);
+        expect(wheels.top).toBeGreaterThan(body.top, `yaw ${yaw}`);
+      }
+    });
+
+    it('stands the ego on the road: its tyres touch the contact point of the car', () => {
+      const car = renderCar(camera, EGO_CAR, { lateral: 0, ahead: 30, yawDegrees: 0, steerDegrees: 0 });
+      const contact = project(camera, 0, 0, 30 - 1.4 - 0.34)!;
+      const wheels = bounds(car.wheels.flatMap((w) => w.faces));
+      expect(wheels.bottom).toBeGreaterThanOrEqual(contact.y - 2);
+      expect(wheels.bottom).toBeLessThanOrEqual(contact.y + 12);
     });
 
     it('draws the ego and other traffic from different models', () => {

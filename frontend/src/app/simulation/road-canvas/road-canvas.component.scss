@@ -199,7 +199,8 @@
    The part sets the colour (--c); the side only lightens or darkens it, as a light from the
    upper left would. */
 .f {
-  fill: color-mix(in srgb, color-mix(in srgb, var(--c, #8a96a3), #fff var(--lite, 0%)), #000 var(--dark, 0%));
+  --fill: color-mix(in srgb, color-mix(in srgb, var(--c, #8a96a3), #fff var(--lite, 0%)), #000 var(--dark, 0%));
+  fill: var(--fill);
   stroke: rgba(0, 0, 0, 0.28);
   stroke-width: 0.5px;
   stroke-linejoin: round;
@@ -311,6 +312,7 @@
 /* ===================== vehicles ===================== */
 .car__shadow {
   fill: rgba(0, 0, 0, 0.5);
+  filter: blur(2.5px);
 }
 
 .car__reflection,
@@ -331,29 +333,24 @@
   opacity: 0.9;
 }
 
-/* Ego: a deep metallic red electric sedan, so it never reads as traffic. Its rounded body is shaded
-   face by face (f--s0 .. f--s7, from the angle to the light) rather than by which side it shows. */
-.car--ego .f--body { --c: #b4232f; }
-.car--ego .f--roof { --c: #a41f2b; }
-.car--ego .f--tail { --c: #d3342d; }
-.car--ego .f--glass { --c: #0f2030; }
-.car--ego .f--roof-glass { --c: #0e1b28; stroke: rgba(150, 190, 220, 0.2); }
-.car--ego .f--arch { --c: #07090c; stroke: none; }
-.car--ego .f.f--glass.f--smooth,
-.car--ego .f.f--roof-glass.f--smooth { --lite: 3%; --dark: 0%; }
-.car--ego .f--rim { --c: #aab4be; stroke: rgba(0, 0, 0, 0.4); }
-.car--ego .f--wheel { --c: #101419; }
-.car--ego .f--bumper { --c: #12161b; stroke: none; }
+/* Ego: a deep metallic red electric fastback, so it never reads as traffic. Its rounded body is shaded
+   face by face (--lite / --dark, set from each face's angle to the light and the camera), and a smooth
+   face is outlined in its own colour so the facets blend into one surface. */
+.f.f--smooth {
+  stroke: var(--fill);
+  stroke-width: 0.8px;
+}
 
-.f.f--smooth { --lite: 0%; --dark: 0%; }
-.f.f--smooth.f--s0 { --dark: 58%; }
-.f.f--smooth.f--s1 { --dark: 46%; }
-.f.f--smooth.f--s2 { --dark: 34%; }
-.f.f--smooth.f--s3 { --dark: 22%; }
-.f.f--smooth.f--s4 { --dark: 10%; }
-.f.f--smooth.f--s5 { --lite: 7%; }
-.f.f--smooth.f--s6 { --lite: 17%; }
-.f.f--smooth.f--s7 { --lite: 30%; }
+.car--ego .f--body { --c: #a61b29; }
+.car--ego .f--tail { --c: #e0372f; }
+.car--ego .f--glass { --c: #0b1722; }
+.car--ego .f--roof-glass { --c: #05090e; }
+.car--ego .f--rim { --c: #6d7680; }
+.car--ego .f--hub { --c: #2a3138; }
+.car--ego .f--wheel { --c: #0d1116; }
+.car--ego .f--bumper { --c: #0d1015; stroke: none; }
+.car--ego .f--lens,
+.car--ego .f--plate { stroke: none; }
 
 /* Other traffic: cool steel tones. */
 .car--other .f--body { --c: #5f7f9f; }

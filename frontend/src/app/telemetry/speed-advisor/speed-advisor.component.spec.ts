@@ -83,4 +83,36 @@ describe('SpeedAdvisorComponent', () => {
       expect(column.querySelector('strong')!.getBoundingClientRect().top).toBeGreaterThanOrEqual(label.getBoundingClientRect().bottom - 1);
     }
   });
+
+  it('is as tall as its content, with the speed inside the gauge, however tall its parent is', () => {
+    fixture.componentRef.setInput('snapshot', {
+      simulationTimeMillis: 1000,
+      status: 'RUNNING',
+      egoVehicle: { speedKmh: 50, positionMeters: 0, lane: 'CENTER', accelerationMps2: 0 },
+      speedAdvisor: { currentKmh: 50, legalLimitKmh: 50, recommendedKmh: 50, action: 'MAINTAIN_SPEED' }
+    });
+    // A grid row much taller than the card, as the bottom tabs make on a large screen.
+    const row = document.createElement('div');
+    row.style.cssText = 'display:grid;grid-template-rows:600px;width:300px';
+    row.appendChild(fixture.nativeElement);
+    document.body.appendChild(row);
+    fixture.detectChanges();
+
+    try {
+      const card = fixture.nativeElement.querySelector('.gauge') as HTMLElement;
+      expect(card.getBoundingClientRect().height).toBeLessThan(330, 'the card must not stretch to the row');
+
+      const dial = fixture.nativeElement.querySelector('.dial') as SVGElement;
+      const readout = fixture.nativeElement.querySelector('.gauge__readout') as HTMLElement;
+      const gauge = dial.getBoundingClientRect();
+      const number = readout.getBoundingClientRect();
+      expect(number.top).toBeGreaterThanOrEqual(gauge.top);
+      expect(number.bottom).toBeLessThanOrEqual(gauge.bottom + 1, 'the speed sits inside the gauge, not below it');
+      // The legend follows the gauge closely: no empty band between them.
+      const legend = fixture.nativeElement.querySelector('.gauge__legend') as HTMLElement;
+      expect(legend.getBoundingClientRect().top - gauge.bottom).toBeLessThan(24);
+    } finally {
+      row.remove();
+    }
+  });
 });

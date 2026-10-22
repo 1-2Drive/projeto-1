@@ -134,6 +134,13 @@ describe('SimulationPageComponent', () => {
     expect(bar.nextElementSibling!.tagName.toLowerCase()).toBe('app-flow-stage');
   });
 
+  it('lets the speed advisor keep the height of its content instead of the height of the row', () => {
+    const el = fixture.nativeElement as HTMLElement;
+    const advisor = el.querySelector('.telemetry-pair > app-speed-advisor') as HTMLElement;
+    expect(getComputedStyle(advisor).alignSelf).toBe('start');
+    expect(getComputedStyle(advisor).height).not.toBe(getComputedStyle(el.querySelector('.telemetry-pair')!).height);
+  });
+
   it('keeps the dashboard cells: road, evidence tabs, telemetry and the road map / toolbox tabs', () => {
     const el = fixture.nativeElement as HTMLElement;
     expect(el.querySelector('.workspace__center app-road-canvas')).toBeTruthy();

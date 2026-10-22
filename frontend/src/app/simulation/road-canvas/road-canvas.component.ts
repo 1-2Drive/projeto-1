@@ -1,106 +1,18 @@
-import { DecimalPipe, NgIf } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
-import { ApiRoadElement, ApiSimulationSnapshot, LaneName } from '../../core/models/api.models';
+import { NgTemplateOutlet } from '@angular/common';
+import {
+  AfterViewInit, ChangeDetectionStrategy, ChangeDetectorRef, Component, DestroyRef, ElementRef, NgZone, computed,
+  inject, input, signal
+} from '@angular/core';
+import { ApiSimulationSnapshot } from '../../core/models/api.models';
+import {
+  blendKinematics, EMPTY_KINEMATICS, isContinuation, Kinematics, kinematicsOf
+} from './road-kinematics';
+import { createCamera, Viewport } from './road-projection';
+import {
+  buildEgo, buildItems, buildMarkings, buildRoadSurface, buildSensors, RoadItemView, RoadObjectKind
+} from './road-scene';
 
-/** Category drives which vector asset is rendered for a world object. */
-export type RoadObjectKind =
-  | 'speedLimit'
-  | 'stopSign'
-  | 'trafficLight'
-  | 'barrier'
-  | 'pothole'
-  | 'obstacle'
-  | 'vehicle'
-  | 'pedestrian'
-  | 'crosswalk';
-
-export interface RoadRenderItem {
-  id: string;
-  kind: RoadObjectKind;
-  /** Human label drawn inside the asset (e.g. "50" on a speed limit sign). */
-  label: string;
-  /** Backend-reported state used to light the correct indicator (traffic light/barrier). */
-  state: string;
-  ariaLabel: string;
-  relativeMeters: number;
-  worldPositionMeters: number;
-  xPercent: number;
-  yPercent: number;
-  detectedByCamera: boolean;
-  detectedByRadar: boolean;
-  visible: boolean;
-}
-
-/** A rectangle in percent of the road canvas (x, y from the top-left corner). */
-export interface SensorRect {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-export interface BlindSpotRect extends SensorRect {
-  /** True when the backend reports something beside the car on that side. */
-  occupied: boolean;
-}
-
-/**
- * Sensor fields of view in percent of the road canvas, all anchored on the ego
- * vehicle so they slide with it during a lane change.
- */
-export interface SensorGeometry {
-  /** SVG polygon points of the camera cone: nose of the car widening to all lanes. */
-  cameraPoints: string;
-  /** Band between the effective and the nominal camera range when visibility is reduced. */
-  cameraLost: SensorRect | null;
-  /** Radar corridor inside the ego lane. */
-  radar: SensorRect;
-  blindLeft: BlindSpotRect | null;
-  blindRight: BlindSpotRect | null;
-}
-
-/**
- * Lane centre offsets in metres, mirroring the backend Lane.centreMeters() contract.
- * The road view maps this continuously, so a lane change is visible as smooth motion
- * rather than a jump between discrete bands.
- */
-const LANE_CENTRE_METRES: Record<LaneName, number> = {
-  LEFT: -3.5,
-  CENTER: 0,
-  RIGHT: 3.5
-};
-
-/** Vertical centre band of each lane, as a percentage of the road height. */
-const LANE_CENTER_Y: Record<LaneName, number> = {
-  LEFT: 25,
-  CENTER: 50,
-  RIGHT: 75
-};
-
-/** Vertical extent of the asphalt in percent of the canvas height (matches .surface in the SCSS). */
-const ROAD_TOP_PERCENT = 11.5;
-const ROAD_BOTTOM_PERCENT = 88.5;
-/** Distance between two lane centres in percent of the canvas height. */
-const LANE_PITCH_PERCENT = LANE_CENTER_Y.CENTER - LANE_CENTER_Y.LEFT;
-/** Where a crossing pedestrian starts and ends, in metres from the centre line (Pedestrian.java). */
-const SIDEWALK_METRES = 5.5;
-/**
- * A crosswalk is painted at the start of its 5 m map block (RoadMap, SimulationConfig), the
- * pedestrian anywhere in that block: within this distance it is drawn on the crosswalk.
- */
-const CROSSWALK_SNAP_METERS = 5;
-/** Horizontal distance from the ego centre to its nose, in percent of the canvas width. */
-const EGO_NOSE_OFFSET_PERCENT = 3;
-/** Half the height of the camera cone's narrow end at the car's nose. */
-const CAMERA_TIP_HALF_PERCENT = 4;
-/** Half the height of the radar corridor, which stays inside the ego lane. */
-const RADAR_HALF_HEIGHT_PERCENT = 10;
-/** Half the height of a blind-spot pad before it is clamped to the asphalt. */
-const BLIND_PAD_HALF_HEIGHT_PERCENT = 9;
-/** Blind-spot pads thinner than this (clamped at the road edge) are not drawn. */
-const MIN_PAD_HEIGHT_PERCENT = 2;
-/** Distance ahead at which the camera cone has widened to cover all three lanes. */
-const CAMERA_SPREAD_METERS = 40;
+export type { RoadObjectKind, RoadItemView, SensorView } from './road-scene';
 
 const EMPTY_RANGES = {
   cameraRangeMeters: 0,
@@ -110,31 +22,147 @@ const EMPTY_RANGES = {
   radarRateMillis: 0
 };
 
+/** Used until the first measurement, and whenever the canvas has no usable size (tests, hidden tabs). */
+const DEFAULT_VIEWPORT: Viewport = { width: 960, height: 420 };
+const MIN_USABLE_SIZE_PX = 80;
+
+/** A snapshot arrives about every tick; the drawn state slides to it over the observed gap. */
+const MIN_BLEND_MILLIS = 60;
+const MAX_BLEND_MILLIS = 250;
+const DEFAULT_BLEND_MILLIS = 100;
+
+interface Blend {
+  from: Kinematics;
+  start: number;
+  duration: number;
+}
+
+/**
+ * The driving view: a chase-camera, perspective rendering of the same world state the road-map
+ * matrix shows. Geometry comes from road-projection.ts / road-scene.ts; this component only
+ * feeds them the snapshot and draws the result. It never writes back into the simulation.
+ */
 @Component({
   selector: 'app-road-canvas',
   standalone: true,
-  imports: [NgIf, DecimalPipe],
+  imports: [NgTemplateOutlet],
   templateUrl: './road-canvas.component.html',
   styleUrl: './road-canvas.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class RoadCanvasComponent {
+export class RoadCanvasComponent implements AfterViewInit {
   readonly snapshot = input<ApiSimulationSnapshot | null>(null);
+  /** Slide between consecutive snapshots at display rate; off, every snapshot is drawn as received. */
+  readonly animate = input(true);
 
-  /** Visible road span in viewport (in world meters). */
-  readonly viewportSpanMeters = 180;
-  /** Left margin in world meters at scenario start so vehicle begins near the left edge (~5.5%). */
-  readonly egoTrackingRatio = 0.20;
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly zone = inject(NgZone);
+  private readonly cdr = inject(ChangeDetectorRef);
+  private readonly destroyRef = inject(DestroyRef);
 
-  /** Metres of road visible behind and ahead for backward compatibility. */
-  readonly worldBackwardMeters = 40;
-  readonly worldForwardMeters = 200;
+  private readonly viewport = signal<Viewport>(DEFAULT_VIEWPORT);
+  private readonly target = computed(() => kinematicsOf(this.snapshot()));
+  /** Bumped on every animation frame, so the drawn numbers are recomputed while a blend runs. */
+  private readonly frameTick = signal(0);
 
-  protected readonly ranges = computed(() => this.snapshot()?.sensorRanges ?? EMPTY_RANGES);
+  private blend: Blend | null = null;
+  private lastTarget: Kinematics | null = null;
+  private lastShown: Kinematics = EMPTY_KINEMATICS;
+  private lastArrival = 0;
+  private frameHandle = 0;
+  private destroyed = false;
 
-  /** Distance ticks drawn on the road so scale is always readable. */
-  protected readonly distanceTicks = [0, 40, 80, 120, 160, 200];
+  /**
+   * Numbers currently drawn: the newest snapshot, or a point on the way to it. Without a blend
+   * (not running, first snapshot, a reset, `animate` off) this is simply the snapshot.
+   */
+  protected readonly kin = computed<Kinematics>(() => {
+    const target = this.target();
+    this.frameTick();
+    return this.advance(target);
+  });
 
+  constructor() {
+    this.destroyRef.onDestroy(() => {
+      this.destroyed = true;
+      if (this.frameHandle) {
+        cancelAnimationFrame(this.frameHandle);
+      }
+    });
+  }
+
+  ngAfterViewInit(): void {
+    if (typeof ResizeObserver === 'undefined') {
+      return;
+    }
+    const observer = new ResizeObserver((entries) => {
+      const rect = entries[entries.length - 1].contentRect;
+      if (rect.width < MIN_USABLE_SIZE_PX || rect.height < MIN_USABLE_SIZE_PX) {
+        return;
+      }
+      const current = this.viewport();
+      if (Math.abs(current.width - rect.width) < 0.5 && Math.abs(current.height - rect.height) < 0.5) {
+        return;
+      }
+      this.zone.run(() => this.viewport.set({ width: rect.width, height: rect.height }));
+    });
+    observer.observe(this.host.nativeElement);
+    this.destroyRef.onDestroy(() => observer.disconnect());
+  }
+
+  // ----- smoothing --------------------------------------------------------------------------
+
+  /**
+   * Position of the blend at this instant. It only touches component fields (never signals) and
+   * is deterministic for a given target and clock, so it is safe inside a computed.
+   */
+  private advance(target: Kinematics): Kinematics {
+    const now = performance.now();
+    if (target !== this.lastTarget) {
+      const from = this.lastShown;
+      const gap = this.lastArrival ? now - this.lastArrival : DEFAULT_BLEND_MILLIS;
+      this.lastArrival = now;
+      this.lastTarget = target;
+      const running = this.snapshot()?.status === 'RUNNING';
+      this.blend = this.animate() && running && from !== EMPTY_KINEMATICS && isContinuation(from, target)
+        ? { from, start: now, duration: Math.min(MAX_BLEND_MILLIS, Math.max(MIN_BLEND_MILLIS, gap)) }
+        : null;
+    }
+    let shown = target;
+    const blend = this.blend;
+    if (blend) {
+      const k = (now - blend.start) / blend.duration;
+      if (k >= 1) {
+        this.blend = null;
+      } else {
+        shown = blendKinematics(blend.from, target, Math.max(0, k));
+        this.scheduleFrame();
+      }
+    }
+    this.lastShown = shown;
+    return shown;
+  }
+
+  private scheduleFrame(): void {
+    if (this.frameHandle || this.destroyed) {
+      return;
+    }
+    this.zone.runOutsideAngular(() => (this.frameHandle = requestAnimationFrame(this.onFrame)));
+  }
+
+  private readonly onFrame = (): void => {
+    this.frameHandle = 0;
+    if (this.destroyed) {
+      return;
+    }
+    this.frameTick.update((n) => n + 1);
+    // Only this view needs a refresh: skip a whole-application pass at display rate.
+    this.cdr.detectChanges();
+  };
+
+  // ----- telemetry the HUD and the ego lamps read straight from the snapshot -----------------
+
+  protected readonly ranges = computed(() => ({ ...EMPTY_RANGES, ...(this.snapshot()?.sensorRanges ?? {}) }));
   protected readonly egoPosition = computed(() => this.snapshot()?.egoVehicle?.positionMeters ?? 0);
   protected readonly egoSpeed = computed(() => this.snapshot()?.egoVehicle?.speedKmh ?? 0);
   protected readonly egoAcceleration = computed(() => this.snapshot()?.egoVehicle?.accelerationMps2 ?? 0);
@@ -155,167 +183,8 @@ export class RoadCanvasComponent {
   });
   protected readonly leftMarking = computed(() => this.snapshot()?.roadMarks?.leftMarking ?? 'DASHED');
   protected readonly rightMarking = computed(() => this.snapshot()?.roadMarks?.rightMarking ?? 'DASHED');
-
-  protected readonly wheelSteerAngle = computed(() => {
-    const st = this.steeringName();
-    if (st === 'LEFT') return -12;
-    if (st === 'RIGHT') return 12;
-    return 0;
-  });
-
   protected readonly indicatorHazard = computed(() => this.indicatorName() === 'HAZARD');
-
-  /**
-   * Camera offset in world meters: smoothly tracks the ego vehicle, placing it
-   * at egoTrackingRatio (20%) of the viewport so the car has stable tracking
-   * while road markings, signs, and hazards visibly stream past.
-   */
-  protected readonly cameraOffset = computed(() => {
-    const egoPos = this.egoPosition();
-    return egoPos - (this.viewportSpanMeters * this.egoTrackingRatio);
-  });
-
-  /**
-   * Deterministic conversion from world meters to screen percentage across the viewport.
-   * Shared by ego vehicle, distance ticks, sensor cones, and all road obstacles.
-   */
-  protected worldToPercentX(worldMeters: number): number {
-    const offset = this.cameraOffset();
-    return ((worldMeters - offset) / this.viewportSpanMeters) * 100;
-  }
-
-  /**
-   * Ego vehicle screen X coordinate. Positioned at stable tracking region (~20%).
-   */
-  protected readonly egoXPercent = computed(() => {
-    return Math.max(0, Math.min(100, this.worldToPercentX(this.egoPosition())));
-  });
-
-  /** Dynamic ticks in world metres. Completely static while camera is static; scrolls when camera scrolls. */
-  protected readonly dynamicTicks = computed(() => {
-    const camOffset = this.cameraOffset();
-    const span = this.viewportSpanMeters;
-    const minM = camOffset;
-    const maxM = camOffset + span;
-    const step = 40;
-    const first = Math.floor(minM / step) * step;
-    const ticks: { worldMeters: number; percent: number }[] = [];
-    for (let m = first; m <= maxM + step; m += step) {
-      const pct = this.worldToPercentX(m);
-      if (pct >= -5 && pct <= 105) {
-        ticks.push({
-          worldMeters: m,
-          percent: pct
-        });
-      }
-    }
-    return ticks;
-  });
-
-  /** Dash offset in percent for streaming lane line animation. Continuously streams backwards as vehicle advances! */
-  protected readonly dashOffsetPercent = computed(() => {
-    const dashLengthMeters = 16.0;
-    const egoPos = this.egoPosition();
-    const mod = ((egoPos % dashLengthMeters) + dashLengthMeters) % dashLengthMeters;
-    return -(mod / dashLengthMeters) * 100;
-  });
-
-  protected readonly laneLabels = [
-    { lane: 'LEFT' as const, y: LANE_CENTER_Y.LEFT },
-    { lane: 'CENTER' as const, y: LANE_CENTER_Y.CENTER },
-    { lane: 'RIGHT' as const, y: LANE_CENTER_Y.RIGHT }
-  ];
-
-  protected readonly items = computed<RoadRenderItem[]>(() => {
-    const snapshot = this.snapshot();
-    if (!snapshot || !snapshot.worldObjects) {
-      return [];
-    }
-    const egoPos = this.egoPosition();
-    const worldPosOf = (item: ApiRoadElement) => item.worldPositionMeters != null && Number.isFinite(item.worldPositionMeters)
-      ? item.worldPositionMeters
-      : (egoPos + item.positionMeters);
-    const crosswalkPositions = snapshot.worldObjects
-      .filter((item) => this.kindOf(item) === 'crosswalk')
-      .map(worldPosOf);
-    return snapshot.worldObjects
-      .filter((item) => item.positionMeters >= -36)
-      .map((item) => {
-        const kind = this.kindOf(item);
-        const state = this.stateOf(item);
-        const worldPos = worldPosOf(item);
-        // A pedestrian is drawn walking along the middle of its crosswalk's stripes.
-        const xPct = this.worldToPercentX(kind === 'pedestrian' ? this.onCrosswalk(worldPos, crosswalkPositions) : worldPos);
-        return {
-          id: item.id,
-          kind,
-          label: this.labelOf(item),
-          state,
-          ariaLabel: `${this.objectIconLabel(kind)} ${state ? state.toLowerCase() + ' ' : ''}at ${worldPos.toFixed(0)} metres`,
-          relativeMeters: item.positionMeters,
-          worldPositionMeters: worldPos,
-          xPercent: xPct,
-          // A speed limit and a traffic light are drawn in every lane; the copy that carries
-          // the detection badge and the distance is the one in the lane the ego drives in.
-          yPercent: kind === 'speedLimit' || kind === 'trafficLight'
-            ? LANE_CENTER_Y[this.currentLane()]
-            : kind === 'pedestrian' && item.lateralPositionMeters != null && Number.isFinite(item.lateralPositionMeters)
-              ? this.pedestrianY(item.lateralPositionMeters)
-              : this.lateralToY(LANE_CENTRE_METRES[item.lane as LaneName] ?? 0),
-          detectedByCamera: snapshot.cameraDetectedObjectIds?.includes(item.id) ?? false,
-          detectedByRadar: snapshot.radarDetectedObjectIds?.includes(item.id) ?? false,
-          visible: item.positionMeters >= -36 && item.positionMeters <= this.worldForwardMeters && xPct >= -10 && xPct <= 110
-        };
-      })
-      .filter((item) => item.visible);
-  });
-
-  /** The crosswalk the pedestrian at this position crosses at, or its own position with none. */
-  private onCrosswalk(worldPos: number, crosswalkPositions: number[]): number {
-    let best = worldPos;
-    let bestDistance = CROSSWALK_SNAP_METERS;
-    for (const crosswalk of crosswalkPositions) {
-      const distance = Math.abs(crosswalk - worldPos);
-      if (distance <= bestDistance) {
-        best = crosswalk;
-        bestDistance = distance;
-      }
-    }
-    return best;
-  }
-
-  /**
-   * Where a pedestrian is across the road, from sidewalk to sidewalk: unlike lateralToY it is
-   * not held to the lane centres, so it walks smoothly across the lanes.
-   */
-  protected pedestrianY(lateralMeters: number): number {
-    const clamped = Math.max(-SIDEWALK_METRES, Math.min(SIDEWALK_METRES, lateralMeters));
-    return LANE_CENTER_Y.CENTER + (clamped / LANE_CENTRE_METRES.RIGHT) * LANE_PITCH_PERCENT;
-  }
-
-  /** Objects drawn as cards above the road; crosswalks are painted on the asphalt instead. */
-  protected readonly objects = computed(() => this.items().filter((item) => item.kind !== 'crosswalk'));
-  protected readonly crosswalks = computed(() => this.items().filter((item) => item.kind === 'crosswalk'));
-
-  /**
-   * Vertical position comes straight from the backend lateral coordinate, so during a
-   * lane change the car visibly slides across the road.
-   */
-  protected readonly egoYPercent = computed(() => {
-    const snapshot = this.snapshot();
-    if (!snapshot) {
-      return LANE_CENTER_Y.CENTER;
-    }
-    const lateral = snapshot.egoVehicle.lateralPositionMeters;
-    if (Number.isFinite(lateral)) {
-      return this.lateralToY(lateral);
-    }
-    return this.lateralToY(LANE_CENTRE_METRES[snapshot.egoVehicle.lane] ?? 0);
-  });
-
   protected readonly maneuverState = computed(() => this.snapshot()?.maneuver?.state ?? 'IDLE');
-  protected readonly maneuverProgress = computed(() => this.snapshot()?.maneuver?.progress ?? 0);
-  protected readonly maneuverTargetLane = computed(() => this.snapshot()?.maneuver?.targetLane ?? 'CENTER');
   protected readonly indicatorLeft = computed(() => {
     const ego = this.snapshot()?.egoVehicle;
     if (ego?.indicatorState === 'LEFT') return true;
@@ -334,7 +203,7 @@ export class RoadCanvasComponent {
 
   /**
    * Range the camera can actually see. The backend publishes it as
-   * sensors.environment.effectiveRangeMeters (camera range × visibility factor);
+   * sensors.environment.effectiveRangeMeters (camera range x visibility factor);
    * without telemetry the nominal range is assumed.
    */
   protected readonly effectiveCameraRange = computed(() => {
@@ -348,7 +217,7 @@ export class RoadCanvasComponent {
 
   protected readonly cameraDegraded = computed(() => this.effectiveCameraRange() < this.ranges().cameraRangeMeters - 0.5);
 
-  /** "CAMERA FOV (120 m)" in clear weather; "CAMERA 84 m (120 × 70%)" when visibility shortens it. */
+  /** "CAMERA FOV (120 m)" in clear weather; "CAMERA 84 m (120 x 70%)" when visibility shortens it. */
   protected readonly cameraLabel = computed(() => {
     const nominal = Math.round(this.ranges().cameraRangeMeters);
     if (!this.cameraDegraded()) {
@@ -356,76 +225,7 @@ export class RoadCanvasComponent {
     }
     const effective = Math.round(this.effectiveCameraRange());
     const percent = Math.round((this.effectiveCameraRange() / this.ranges().cameraRangeMeters) * 100);
-    return `CAMERA ${effective} m (${nominal} × ${percent}%)`;
-  });
-
-  protected readonly cameraEdgePercent = computed(() => {
-    return this.worldToPercentX(this.egoPosition() + this.effectiveCameraRange());
-  });
-
-  protected readonly cameraNominalEdgePercent = computed(() => {
-    return this.worldToPercentX(this.egoPosition() + this.ranges().cameraRangeMeters);
-  });
-
-  protected readonly radarEdgePercent = computed(() => {
-    return this.worldToPercentX(this.egoPosition() + this.ranges().radarRangeMeters);
-  });
-
-  protected readonly sensorGeometry = computed<SensorGeometry>(() => {
-    const snapshot = this.snapshot();
-    const egoX = this.egoXPercent();
-    const egoY = this.egoYPercent();
-    const egoPos = this.egoPosition();
-    const nose = egoX + EGO_NOSE_OFFSET_PERCENT;
-
-    const cameraEdge = Math.max(nose, Math.min(100, this.cameraEdgePercent()));
-    const spreadX = Math.min(cameraEdge, this.worldToPercentX(egoPos + CAMERA_SPREAD_METERS));
-    const cameraPoints = [
-      `${nose},${egoY - CAMERA_TIP_HALF_PERCENT}`,
-      `${spreadX},${ROAD_TOP_PERCENT}`,
-      `${cameraEdge},${ROAD_TOP_PERCENT}`,
-      `${cameraEdge},${ROAD_BOTTOM_PERCENT}`,
-      `${spreadX},${ROAD_BOTTOM_PERCENT}`,
-      `${nose},${egoY + CAMERA_TIP_HALF_PERCENT}`
-    ].join(' ');
-
-    const nominalEdge = Math.min(100, this.cameraNominalEdgePercent());
-    const cameraLost: SensorRect | null = this.cameraDegraded() && nominalEdge > cameraEdge + 0.5
-      ? { x: cameraEdge, y: ROAD_TOP_PERCENT, width: nominalEdge - cameraEdge, height: ROAD_BOTTOM_PERCENT - ROAD_TOP_PERCENT }
-      : null;
-
-    const radarEdge = Math.min(100, this.radarEdgePercent());
-    const radar: SensorRect = {
-      x: nose,
-      y: egoY - RADAR_HALF_HEIGHT_PERCENT,
-      width: Math.max(0, radarEdge - nose),
-      height: 2 * RADAR_HALF_HEIGHT_PERCENT
-    };
-
-    // The backend blind-spot zone is symmetric (|distance| <= blindSpotRangeMeters), so the pad is too.
-    const blindStart = this.worldToPercentX(egoPos - this.ranges().blindSpotRangeMeters);
-    const blindEnd = this.worldToPercentX(egoPos + this.ranges().blindSpotRangeMeters);
-    const lane = this.currentLane();
-    const blind = (side: 'LEFT' | 'RIGHT'): BlindSpotRect | null => {
-      const telemetry = side === 'LEFT' ? snapshot?.sensors?.blindSpotLeft : snapshot?.sensors?.blindSpotRight;
-      const noLane = telemetry
-        ? telemetry.status === 'NO LANE'
-        : (side === 'LEFT' ? lane === 'LEFT' : lane === 'RIGHT');
-      if (noLane) {
-        return null;
-      }
-      // The telemetry can report CLEAR on the road-edge side (before START, or mid lane
-      // change while ego.lane is still the source lane), so the pad is also kept on the asphalt.
-      const centreY = side === 'LEFT' ? egoY - LANE_PITCH_PERCENT : egoY + LANE_PITCH_PERCENT;
-      const top = Math.max(ROAD_TOP_PERCENT, centreY - BLIND_PAD_HALF_HEIGHT_PERCENT);
-      const bottom = Math.min(ROAD_BOTTOM_PERCENT, centreY + BLIND_PAD_HALF_HEIGHT_PERCENT);
-      if (bottom - top < MIN_PAD_HEIGHT_PERCENT) {
-        return null;
-      }
-      return { x: blindStart, y: top, width: blindEnd - blindStart, height: bottom - top, occupied: telemetry?.occupied ?? false };
-    };
-
-    return { cameraPoints, cameraLost, radar, blindLeft: blind('LEFT'), blindRight: blind('RIGHT') };
+    return `CAMERA ${effective} m (${nominal} \u00d7 ${percent}%)`;
   });
 
   /** True before the first tick so the UI can invite the user to press START. */
@@ -447,39 +247,66 @@ export class RoadCanvasComponent {
     const env = this.snapshot()?.environment;
     const visibility = Math.round((env?.visibilityFactor ?? 1) * 100);
     const grip = Math.round((env?.gripFactor ?? 1) * 100);
-    return `RAIN · VIS ${visibility}% · GRIP ${grip}%`;
+    return `RAIN \u00b7 VIS ${visibility}% \u00b7 GRIP ${grip}%`;
   });
 
-  protected tickPercent(meters: number): number {
-    return this.toPercentX(meters);
+  // ----- the perspective scene --------------------------------------------------------------
+
+  protected readonly camera = computed(() => createCamera(this.viewport(), this.kin().egoLateral));
+  protected readonly viewBox = computed(() => `0 0 ${this.camera().width.toFixed(1)} ${this.camera().height.toFixed(1)}`);
+  protected readonly surface = computed(() => buildRoadSurface(this.camera()));
+  protected readonly markings = computed(() =>
+    buildMarkings(this.camera(), this.kin().egoPos, this.leftMarking(), this.rightMarking()));
+
+  protected readonly sensors = computed(() => buildSensors({
+    camera: this.camera(),
+    egoLateral: this.kin().egoLateral,
+    egoPos: this.kin().egoPos,
+    lane: this.currentLane(),
+    ranges: this.ranges(),
+    effectiveCameraRange: this.effectiveCameraRange(),
+    cameraLabel: this.cameraLabel(),
+    snapshot: this.snapshot()
+  }));
+
+  private readonly items = computed(() => {
+    const snapshot = this.snapshot();
+    if (!snapshot) {
+      return { flat: [] as RoadItemView[], standing: [] as RoadItemView[] };
+    }
+    const ranges = this.ranges();
+    return buildItems({
+      camera: this.camera(),
+      kin: this.kin(),
+      snapshot,
+      egoLane: this.currentLane(),
+      tagRangeMeters: Math.max(ranges.cameraRangeMeters, ranges.radarRangeMeters)
+    });
+  });
+
+  /** Painted on the road surface (crosswalks, potholes, stop lines, speed-limit paint). */
+  protected readonly flatItems = computed(() => this.items().flat.slice().sort((a, b) => b.depth - a.depth));
+
+  /** Everything that stands on the road, far to near, the ego among them. */
+  protected readonly standingItems = computed<RoadItemView[]>(() => {
+    const ego = buildEgo({
+      camera: this.camera(),
+      lateral: this.kin().egoLateral,
+      headingDegrees: this.kin().heading,
+      steering: this.steeringName()
+    });
+    return [...this.items().standing, ego].sort((a, b) => b.depth - a.depth);
+  });
+
+  protected testIdFor(item: RoadItemView): string | null {
+    if (item.role === 'decor') {
+      return null;
+    }
+    const base = this.baseTestId(item.kind);
+    return item.role === 'copy' ? `${base}-mark` : base;
   }
 
-  protected isVisible(relativeMeters: number): boolean {
-    const xPct = this.toPercentX(relativeMeters);
-    return xPct >= -15 && xPct <= 115;
-  }
-
-  /** Maps a lateral offset in metres onto the vertical centre band of the road. */
-  protected lateralToY(lateralMeters: number): number {
-    const clamped = Math.max(LANE_CENTRE_METRES.LEFT, Math.min(LANE_CENTRE_METRES.RIGHT, lateralMeters));
-    return LANE_CENTER_Y.CENTER + (clamped / LANE_CENTRE_METRES.RIGHT)
-      * (LANE_CENTER_Y.RIGHT - LANE_CENTER_Y.CENTER);
-  }
-
-  /**
-   * A speed limit and a traffic light hold for the whole road, so they are drawn in every
-   * lane: these are the lanes other than the one the item itself is drawn in.
-   */
-  protected otherLaneYs(item: RoadRenderItem): number[] {
-    return this.laneLabels.map((lane) => lane.y).filter((y) => Math.abs(y - item.yPercent) > 0.5);
-  }
-
-  /** Retained for test compatibility */
-  protected toPercentX(relativeMeters: number): number {
-    return this.worldToPercentX(this.egoPosition() + relativeMeters);
-  }
-
-  protected testIdFor(kind: RoadObjectKind): string {
+  private baseTestId(kind: RoadObjectKind): string {
     switch (kind) {
       case 'obstacle': return 'road-obstacle';
       case 'pothole': return 'road-pothole';
@@ -489,68 +316,13 @@ export class RoadCanvasComponent {
       case 'speedLimit': return 'road-speed-limit';
       case 'vehicle': return 'road-vehicle';
       case 'pedestrian': return 'road-pedestrian';
+      case 'crosswalk': return 'crosswalk';
+      case 'radar': return 'road-radar';
       default: return 'road-' + kind;
     }
   }
 
-  protected objectIconLabel(kind: RoadObjectKind): string {
-    switch (kind) {
-      case 'speedLimit':
-        return 'Speed limit sign';
-      case 'stopSign':
-        return 'Stop sign';
-      case 'trafficLight':
-        return 'Traffic light';
-      case 'barrier':
-        return 'Barrier';
-      case 'pothole':
-        return 'Pothole';
-      case 'obstacle':
-        return 'Obstacle';
-      case 'vehicle':
-        return 'Vehicle';
-      case 'pedestrian':
-        return 'Pedestrian';
-      case 'crosswalk':
-        return 'Crosswalk';
-    }
-  }
-
-  /** Reads the backend-reported state token (RED / GREEN / open=true / ...). */
-  private stateOf(item: ApiRoadElement): string {
-    const details = item.details ?? '';
-    if (item.type.includes('TrafficLight')) {
-      return details.match(/state=(\w+)/)?.[1] ?? '';
-    }
-    if (item.type.includes('Barrier')) {
-      const open = details.match(/open=(\w+)/)?.[1];
-      return open ? (open === 'true' ? 'OPEN' : 'CLOSED') : '';
-    }
-    return '';
-  }
-
-  private kindOf(item: ApiRoadElement): RoadObjectKind {
-    const type = item.type;
-    if (type.includes('SpeedLimit')) return 'speedLimit';
-    if (type.includes('StopSign')) return 'stopSign';
-    if (type.includes('TrafficLight')) return 'trafficLight';
-    if (type.includes('Barrier')) return 'barrier';
-    if (type.includes('Pothole')) return 'pothole';
-    if (type.includes('Obstacle')) return 'obstacle';
-    if (type.includes('Crosswalk')) return 'crosswalk';
-    if (type.includes('Pedestrian')) return 'pedestrian';
-    if (type.includes('Vehicle')) return 'vehicle';
-    return 'obstacle';
-  }
-
-  private labelOf(item: ApiRoadElement): string {
-    const details = item.details ?? '';
-    if (item.type.includes('SpeedLimit')) {
-      return details.match(/limitKmh=(\d+)/)?.[1] ?? '';
-    }
-    if (item.type.includes('Vehicle')) {
-      return details.match(/speedMps=([\d.]+)/)?.[1] ?? '';
-    }
-    return '';
+  protected trackById(_index: number, item: RoadItemView): string {
+    return `${item.id}:${item.shape}:${item.role}:${item.lane}`;
   }
 }

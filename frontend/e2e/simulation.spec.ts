@@ -96,8 +96,18 @@ test.describe('Driving expert simulation UI', () => {
       const marks = page.locator('.limit-mark');
       await expect(marks).toHaveCount(3);
       await expect(marks).toHaveText([limit, limit, limit]);
-      const boxes = await marks.evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().x));
-      expect(Math.max(...boxes) - Math.min(...boxes)).toBeLessThan(1);
+      // One speed limit, one road position: the three paint marks sit at the same depth, so on
+      // the same screen row, with LEFT / CENTER / RIGHT from left to right.
+      const marksAt = await marks.evaluateAll((nodes) => nodes.map((node) => {
+        const box = node.getBoundingClientRect();
+        const holder = node.parentElement as Element;
+        return { y: box.y + box.height / 2, x: box.x + box.width / 2, depth: holder.getAttribute('data-depth'), lane: holder.getAttribute('data-lane') };
+      }));
+      expect(new Set(marksAt.map((m) => m.depth)).size).toBe(1);
+      expect(Math.max(...marksAt.map((m) => m.y)) - Math.min(...marksAt.map((m) => m.y))).toBeLessThan(1);
+      const byLane = (lane: string) => marksAt.find((m) => m.lane === lane)!.x;
+      expect(byLane('LEFT')).toBeLessThan(byLane('CENTER'));
+      expect(byLane('CENTER')).toBeLessThan(byLane('RIGHT'));
     }
   });
 
@@ -118,11 +128,18 @@ test.describe('Driving expert simulation UI', () => {
     for (let i = 0; i < 3; i++) {
       await expect(lights.nth(i)).toHaveAttribute('data-state', 'RED');
     }
-    const xs = await lights.evaluateAll((nodes) => nodes.map((node) => {
+    // One light, one road position: the three heads hang over their lanes at the same depth, so on
+    // the same screen row, LEFT / CENTER / RIGHT from left to right.
+    const heads = await lights.evaluateAll((nodes) => nodes.map((node) => {
       const box = node.getBoundingClientRect();
-      return box.x + box.width / 2;
+      // The head in the ego lane also carries the distance tag above it, so compare the bottoms.
+      return { x: box.x + box.width / 2, y: box.y + box.height, lane: node.getAttribute('data-lane'), depth: node.getAttribute('data-depth') };
     }));
-    expect(Math.max(...xs) - Math.min(...xs)).toBeLessThan(1);
+    expect(heads.map((h) => h.lane)).toEqual(['LEFT', 'CENTER', 'RIGHT']);
+    expect(new Set(heads.map((h) => h.depth)).size).toBe(1);
+    expect(Math.max(...heads.map((h) => h.y)) - Math.min(...heads.map((h) => h.y))).toBeLessThan(1);
+    expect(heads[0].x).toBeLessThan(heads[1].x);
+    expect(heads[1].x).toBeLessThan(heads[2].x);
   });
 
   test('stop sign is placed only in the lane chosen in the drawer', async ({ page }) => {
@@ -562,21 +579,23 @@ test.describe('Driving expert simulation UI', () => {
     expect(p1).toBeGreaterThan(p0);
     // Assert: Speed > 0
     expect(speed1).toBeGreaterThan(0);
-    // Assert: sign screen coordinates change and approach ego from right to left
-    expect(signBox1!.x).toBeLessThan(signBox0!.x);
+    // Assert: the sign approaches the ego down the road, so it moves down the screen
+    expect(signBox1!.y).toBeGreaterThan(signBox0!.y);
 
     // Wait until ego vehicle drives past the sign
     await page.waitForTimeout(4500);
     const p2 = await getPos();
     expect(p2).toBeGreaterThan(p1);
 
-    // Once passed and moved off-screen, sign leaves forward view
+    // Once passed and out of the camera's view, the sign leaves the scene
+    const roadBottom = (await page.locator('app-road-canvas').boundingBox())!.y
+      + (await page.locator('app-road-canvas').boundingBox())!.height;
     await expect.poll(async () => {
       const count = await sign.count();
       if (count === 0) return true;
       const box = await sign.boundingBox();
       if (!box) return true;
-      return box.x < 300;
+      return box.y > roadBottom - 20;
     }, { timeout: 20000 }).toBe(true);
   });
 });

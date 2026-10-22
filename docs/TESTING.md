@@ -119,7 +119,7 @@ Scenarios loaded from `scenarios.json` by tests: S1, S2, S4, S5, S7, S8 (over RE
 - has no sensors, actuator or physics, and leaves the Java-side inputs (adjacent-lane safety, markings) at their defaults;
 - inserts the events the test chooses.
 
-### 3.2 Frontend unit tests (Karma/Jasmine): 86 cases in 13 files
+### 3.2 Frontend unit tests (Karma/Jasmine): 155 cases in 16 files
 
 | Spec file (under `frontend/src/app/`) | Declared `it(…)` | Topics |
 |---|---|---|
@@ -132,12 +132,15 @@ Scenarios loaded from `scenarios.json` by tests: S1, S2, S4, S5, S7, S8 (over RE
 | `expert-system/trip-questions/trip-questions-dialog.component.spec.ts` | 6 | latest decision explained on open, decision list with both channels, WHY / WHY NOT / HOW switching without a new request, history and Escape, unavailable explanation, trip without decisions |
 | `scenario/element-properties/element-properties.component.spec.ts` | 4 | vehicle below 6 km/h refused, 6 km/h accepted, pedestrian may stand still, vehicle default speed after a pedestrian |
 | `scenario/toolbox/toolbox.component.spec.ts` | 10 | control grouping, rain toggles, visibility slider, configuration drawer, road-wide elements without a lane, stop-sign lane, distance validation |
-| `simulation/road-canvas/road-canvas.component.spec.ts` | 25 | world items, road-wide signs and lights, sensor fields (camera cone shortened by rain, radar corridor, blind-spot pads), lane-change motion, badges, passed objects, crosswalk and pedestrian position across the road, turn-signal lamps |
+| `simulation/road-canvas/road-canvas.component.spec.ts` | 56 | 3D driving view: perspective road, lane order and depth scaling, each object kind in its lane (pothole, barrier, pedestrian, stop sign, gantry traffic light, crosswalk, vehicles, radar as roadside infrastructure), road-wide signs and lights, sensor fields on the road (camera cone shortened by rain, radar corridor, blind-spot pads), lane-change motion and yaw, snapshot smoothing, badges, passed objects, rain, turn-signal lamps, responsive canvas sizes |
+| `simulation/road-canvas/road-projection.spec.ts` | 13 | camera model: vanishing point, lane order, linear lateral mapping, inverse-depth scaling, near clip, ground quads, paint matrices, billboard floor, camera fit for the five page sizes |
+| `simulation/road-canvas/road-solids.spec.ts` | 12 | 3D solids: back-face culling, car wheels, indicator lamps, depth scaling, lane placement, yaw revealing the flank, stable lamp slots |
+| `simulation/road-canvas/road-kinematics.spec.ts` | 5 | numbers drawn from a snapshot, blending between snapshots, resets shown at once |
 | `simulation/road-map/road-map.component.spec.ts` | 3 | matrix drawing, car position, painting |
 | `simulation/simulation-page/simulation-page.component.spec.ts` | 4 | button states, demo button, STOP-time question dialog, historical session kept on RESET |
 | `telemetry/speed-advisor/speed-advisor.component.spec.ts` | 1 | above-recommendation styling |
 
-The turn-signal case is generated in a loop (one per indicator state), so Karma would execute 86 cases from 83 declarations. These tests check presentation and HTTP/WebSocket plumbing with mocked data; they do not test driving rules.
+The turn-signal case (one per indicator state) and the responsive-canvas cases (one per page size) are generated in loops, so Karma executes 155 cases from 144 declarations. These tests check presentation and HTTP/WebSocket plumbing with mocked data; they do not test driving rules.
 
 ### 3.3 Browser end-to-end tests (Playwright): 22 tests
 

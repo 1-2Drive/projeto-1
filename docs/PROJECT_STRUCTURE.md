@@ -439,7 +439,7 @@ Results, coverage and gaps are in [TESTING.md](TESTING.md).
 | Timeline and explanations | `explanation/ExplanationTrace.java`, `drools/listeners/*`, `PrologBackend.traceFiredRules`, `simulation/SensorSignificance.java`, `api/service/InferenceNarrator.java` |
 | Session history and trip questions | `history/*`, `SimulationRuntimeService` (recording), `SimulationEngine.tick` (`SessionSnapshot`), `api/service/SessionExplanationService.java`, `RecordedCycle`, `FlowchartPathBuilder`, `AlternativeExplainer`, `explanation/DecisionFlowchart.java`; frontend `expert-system/trip-questions/` |
 | Decision panel | `frontend/src/app/expert-system/decision-panel/` (channels, proposals and outcomes) |
-| Road view | `frontend/src/app/simulation/road-canvas/` (draws backend coordinates; a pedestrian at its `lateralPositionMeters` and on its crosswalk), `simulation/RoadRenderItem.java`, `api/model/ApiRoadElement.java` |
+| Road view | `frontend/src/app/simulation/road-canvas/` (chase-camera 3D view of backend coordinates: `road-projection.ts` is the pinhole camera, `road-solids.ts` the 3D car/barrier/gantry models, `road-scene.ts` the view-model builders, `road-kinematics.ts` the snapshot smoothing; a pedestrian at its `lateralPositionMeters` and on its crosswalk), `simulation/RoadRenderItem.java`, `api/model/ApiRoadElement.java` |
 | Realtime channel | `api/config/WebSocketConfig.java`, `api/controller/RealtimeWebSocketHandler.java`, `api/service/RealtimeSnapshotPublisher.java`; frontend `core/websocket/realtime-stream.service.ts` |
 
 ---

@@ -356,7 +356,7 @@ Plugins: `maven-compiler-plugin` 3.13.0, `maven-surefire-plugin` 3.2.5, `spring-
 
 | Purpose | Command | Verified during this analysis |
 |---|---|---|
-| Compile and run backend tests | `mvn clean test` | Not in this refresh. The Surefire reports in `target/surefire-reports` (2026-10-21) show 588 runs in 53 classes, 0 failures, 2 skipped (`InvariantSweepProbeTest`, which needs `-Dprobe.sweep`) |
+| Compile and run backend tests | `mvn clean test` | Not in this refresh. The Surefire reports in `target/surefire-reports` (2026-10-22) show 598 runs in 54 classes, 0 failures, 2 skipped (`InvariantSweepProbeTest`, which needs `-Dprobe.sweep`) |
 | Prolog tests only | `mvn test -Dtest='Prolog*Test'` | Not in this refresh (included in the reports above) |
 | Start backend on port 8080 | `mvn spring-boot:run` | No |
 | Start with the Prolog backend | set `expert.backend=prolog` (needs `swipl`) | No |
@@ -402,7 +402,7 @@ World mutations sent while the simulation runs are queued and applied at the sta
 
 | Suite | Location | Command | Count |
 |---|---|---|---|
-| Backend (JUnit 5) | `src/test/java/com/one2drive/projeto1/` | `mvn test` (single class: `mvn test -Dtest=SimulationEngineE2ETest`) | 53 classes (251 `@Test` and 109 `@ParameterizedTest` methods); 588 runs in the Surefire reports of 2026-10-21 |
+| Backend (JUnit 5) | `src/test/java/com/one2drive/projeto1/` | `mvn test` (single class: `mvn test -Dtest=SimulationEngineE2ETest`) | 54 classes; 598 runs in the Surefire reports of 2026-10-22 |
 | Frontend unit (Karma/Jasmine) | `frontend/src/app/**/*.spec.ts` | `cd frontend && npm test` | 83 cases in 13 files |
 | Browser end-to-end (Playwright) | `frontend/e2e/simulation.spec.ts`, `frontend/e2e/realtime.spec.ts` | start backend + frontend, then `cd frontend && npm run e2e` | 22 tests |
 

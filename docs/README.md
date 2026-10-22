@@ -23,6 +23,7 @@ This folder documents the **Drools Realtime Driving Expert System** (Maven proje
 | [BUSINESS_RULES.md](BUSINESS_RULES.md) | Catalogue of all 123 Drools rules and 6 queries (conditions, outputs, priorities, interactions, measured test coverage), the Prolog correspondence, and the rule consistency audit (R-01…R-26) | Developers, maintainers, evaluators; domain readers for the plain-language parts |
 | [TESTING.md](TESTING.md) | Test tools and organisation, commands, results of the tests executed in this analysis, exploratory probes, measured rule coverage, scenario coverage, gaps (T-01…T-20) and proposed tests | Developers, maintainers, evaluators |
 | [TRACEABILITY_MATRIX.md](TRACEABILITY_MATRIX.md) | Links inferred requirements and the scenarios to rules, files, tests and a coverage status | Evaluators, maintainers |
+| [3d-road-visualization.md](3d-road-visualization.md) | The 3D / perspective driving view of the Angular front end (PR #70): projection, ego vehicle, road objects, STOP sign, Speed Advisor, dashboard layout, test evidence | Front-end developers, evaluators |
 | [GLOSSARY.md](GLOSSARY.md) | Alphabetical definitions of technical and domain terms, for both engines | All readers |
 
 ---
@@ -105,7 +106,7 @@ All of the following were verified during this analysis; sources are given in th
   - **veto:** braking for a stop vetoes a lane change.
   - Every proposal's outcome is recorded ("why not").
 - **Tests:**
-  - Backend: the Surefire reports in `target/surefire-reports` (2026-10-21) show **588 test runs in 53 classes, 0 failures, 2 skipped**. The Prolog tests now run; the two skipped tests are `InvariantSweepProbeTest`, which runs only with `-Dprobe.sweep`.
+  - Backend: the Surefire reports in `target/surefire-reports` (2026-10-22) show **598 test runs in 54 classes, 0 failures, 2 skipped**. The Prolog tests now run; the two skipped tests are `InvariantSweepProbeTest`, which runs only with `-Dprobe.sweep`.
   - Frontend: 13 Karma spec files with 83 cases; not re-run in this refresh (on 2026-10-18, 57 cases ran and 5 failed, in the tests themselves).
   - The 22 Playwright browser tests (`simulation.spec.ts`, `realtime.spec.ts`) were **not executed**.
   - Measured rule coverage (2026-10-18, 119 rules then): 111 Drools rules fired during the test suite; not re-measured for the 123 current rules.

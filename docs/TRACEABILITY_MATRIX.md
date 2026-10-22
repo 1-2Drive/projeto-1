@@ -36,7 +36,7 @@ REQ-01…REQ-57 keep the IDs of the baseline analysis (commit `96d80f7`). REQ-58
 
 **Test evidence used in this matrix:**
 
-- In the latest run (`mvn clean test`, 2026-10-21, SWI-Prolog installed), 588 JUnit tests ran: 586 were executed and passed, and 2 were skipped (the opt-in `InvariantSweepProbeTest`). The Prolog-dependent tests, including every PROLOG run of the dual-backend E2E classes, were executed.
+- In the latest run (`mvn test`, 2026-10-22, SWI-Prolog installed), 598 JUnit tests ran: 596 were executed and passed, and 2 were skipped (the opt-in `InvariantSweepProbeTest`). The Prolog-dependent tests, including every PROLOG run of the dual-backend E2E classes, were executed.
 - The 86 Angular unit cases were **not** run (no Chrome for Karma on the analysis machine); only `ng build` and the spec compile (`tsc -p tsconfig.spec.json`) were checked. Angular specs are therefore cited as "not run" and not counted as evidence.
 - The 22 Playwright tests were **not** executed ([TESTING.md §4](TESTING.md#4-test-execution-in-this-analysis)).
 - Test-class abbreviations (RT, SE, RL, LC, RM, BX, CW, FS, LL, WN, LO, MV, PC, PD, RH, RS, SR, SF, TC, PS) are defined in [BUSINESS_RULES.md §1](BUSINESS_RULES.md#1-how-to-read-this-catalogue); DC = `DecisionContextTest`, PW = Playwright. Other test classes are named in full.

@@ -46,7 +46,7 @@ Not present: Spring MVC test support (MockMvc, controller tests), JaCoCo or any 
 
 ## 3. Test Organisation (Existing Tests)
 
-### 3.1 Backend (JUnit 5): 588 test runs in 53 classes
+### 3.1 Backend (JUnit 5): 598 test runs in 54 classes
 
 All classes are under `src/test/java/com/one2drive/projeto1/`. "E2E" in a Java class name means an **engine-level integration test**: it runs the real `SimulationEngine` with sensors, rules and actuator, but without HTTP or a browser (except `RealtimeWebSocketE2ETest`, which runs the real server).
 
@@ -185,6 +185,7 @@ Notes:
 | Suite | Command | Environment | When | Result |
 |---|---|---|---|---|
 | Backend JUnit | `mvn clean test` | Linux, JDK 25.0.4.1 (per the Surefire reports), Maven 3.9.9, SWI-Prolog 9.2.9 on `PATH` | 2026-10-21 (Surefire reports written 21:13–21:18 local time) | **588 run, 0 failures, 0 errors, 2 skipped** |
+| Backend JUnit (final run of PR #70) | `mvn -o test` | macOS, JDK 17 | 2026-10-22 | **598 run, 0 failures, 0 errors, 2 skipped** (54 classes) |
 | Frontend compile | `npx ng build`; `npx tsc -p tsconfig.spec.json --noEmit` | same machine | 2026-10-21 | **Both pass** (compile checks only, no test executed) |
 | Frontend unit | — | — | — | **Not executed**: no Chrome available for Karma on the analysis machine |
 | Browser E2E | — | — | — | **Not executed** |
@@ -221,7 +222,7 @@ Its results are therefore **not verified** here.
 |---|---|---|---|
 | Earlier audit report | 79 | — | — |
 | Analysis at `70082b4` | 473 (218 executed, 255 skipped) | 57 executed, 5 failing | 20 present, not run |
-| This run | 588 (586 executed, 2 skipped) | 86 present, not run | 22 present, not run |
+| This run (re-run 2026-10-22) | 598 (596 executed, 2 skipped) | 86 present, not run | 22 present, not run |
 
 **Running the tests in the repository itself:**
 

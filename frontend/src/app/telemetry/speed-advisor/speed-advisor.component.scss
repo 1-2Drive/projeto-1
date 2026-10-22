@@ -17,13 +17,16 @@
   min-height: 100%;
   box-sizing: border-box;
   overflow: hidden;
+  /* The legend below adapts to the width of the card, not of the screen. */
+  container-type: inline-size;
 }
 
 .gauge__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.4rem;
+  gap: 0.25rem 0.4rem;
+  flex-wrap: wrap;
 
   > * {
     min-width: 0;
@@ -153,28 +156,45 @@
 
 .gauge__legend {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.3rem;
-  padding-top: 0.45rem;
+  /* One column per metric, each as wide as its own text, so labels never collide. */
+  grid-template-columns: repeat(3, max-content);
+  justify-content: space-between;
+  column-gap: 0.5rem;
+  padding-top: 0.55rem;
   border-top: 1px solid var(--ds-border);
 }
 
 .legend {
-  min-width: 0;
   display: grid;
-  gap: 0.1rem;
-  font-size: 0.56rem;
-  letter-spacing: 0.07em;
+  gap: 0.2rem;
+  align-content: start;
+  white-space: nowrap;
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--ds-text-muted);
 
   strong {
     font-family: var(--ds-font-mono);
-    font-size: 0.72rem;
+    font-size: 0.78rem;
     letter-spacing: 0;
     text-transform: none;
     color: var(--ds-text-primary);
-    overflow-wrap: anywhere;
+  }
+
+  &--limit {
+    justify-items: start;
+    text-align: left;
+  }
+
+  &--rec {
+    justify-items: center;
+    text-align: center;
+  }
+
+  &--delta {
+    justify-items: end;
+    text-align: right;
   }
 
   &--limit strong {
@@ -191,6 +211,27 @@
 
   &--below strong {
     color: #a7dfbc;
+  }
+}
+
+/* A card too narrow for three columns lists the metrics as label / value rows instead. */
+@container (max-width: 13.75rem) {
+  .gauge__legend {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 0.25rem;
+  }
+
+  .legend {
+    grid-auto-flow: column;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+
+  .legend--limit,
+  .legend--rec,
+  .legend--delta {
+    justify-items: stretch;
+    text-align: left;
   }
 }
 

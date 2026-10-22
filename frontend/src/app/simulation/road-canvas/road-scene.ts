@@ -102,7 +102,6 @@ export interface RoadItemView {
   heads?: GantryHead[];
   beacon?: { x: number; y: number; r: number } | null;
   /** Ego only. */
-  egoTag?: { x: number; y: number };
   lamps?: { x: number; y: number; r: number } | null;
 }
 
@@ -766,15 +765,15 @@ export function buildItems(input: ItemsInput): ItemsView {
         break;
       }
       case 'stopSign': {
-        // Like the speed-limit sign, a real roadside sign: upright on a pole on the verge, outside
-        // the lanes (left verge for the left lane, right verge otherwise). The lane it governs is
-        // still the backend's; it is shown by the stop line painted across that lane.
-        const verge = (laneName === 'LEFT' ? -1 : 1) * (SHOULDER_HALF_METRES - 0.9);
+        // Like the speed-limit sign, a real roadside sign: upright on a pole on the right verge,
+        // outside the lanes. A stop sign governs the whole road, so it stands once, whatever cell
+        // the backend stores it in, and its stop line is painted across all three lanes.
+        const verge = SHOULDER_HALF_METRES - 0.9;
         const frame = spriteFrame(camera, verge, ahead, MIN_SPRITE_PX_PER_METRE * 1.3);
         if (!frame) {
           break;
         }
-        const line = groundQuad(camera, lateral - 1.6, lateral + 1.6, ahead - 0.25, ahead + 0.25);
+        const line = groundQuad(camera, -ASPHALT_HALF_METRES, ASPHALT_HALF_METRES, ahead - 0.25, ahead + 0.25);
         if (line) {
           flat.push(view('stopLine', { role: 'decor', d: pathOf(line) }));
         }
@@ -905,14 +904,11 @@ export function buildEgo(input: EgoInput): RoadItemView {
   const yaw = clamp(input.headingDegrees * YAW_EMPHASIS, -25, 25);
   const car = renderCar(camera, EGO_CAR, { lateral: input.lateral, ahead: 0, yawDegrees: yaw, steerDegrees: steer + yaw * 0.3 });
   const shadow = shadowPoints(camera, input.lateral, 0, 1.2, 2.6);
-  const centre = project(camera, input.lateral, 0, 0);
-  const roof = car.roofY || (centre ? centre.y - 60 : 0);
   return {
     id: 'ego', kind: 'vehicle', shape: 'ego', role: 'main', lane: 'CENTER', state: '', label: '', ariaLabel: 'Ego vehicle',
     relativeMeters: 0, worldPositionMeters: 0, ahead: 0, lateral: input.lateral, depth: camera.back, opacity: 1,
     detectedByCamera: false, detectedByRadar: false, passed: false, tag: null, halo: null,
     car, shadow: shadow ? pathOf(shadow) : '',
-    egoTag: { x: centre?.x ?? camera.cx, y: roof - 7 },
     lamps: car.lamps
   };
 }

@@ -217,7 +217,7 @@
 .f--wheel { --c: #0c1015; }
 .f--plate { --c: #e6edf2; stroke: none; }
 .f--bumper { --c: #1f262d; stroke: none; }
-.f--lens { --c: #6a4a14; stroke: none; }
+.f--lens { --c: #7a3a14; stroke: none; }
 .f--tail { --c: #9b2a26; stroke: none; }
 .f--roof-shine { fill: rgba(255, 255, 255, 0.16); stroke: none; }
 
@@ -331,10 +331,29 @@
   opacity: 0.9;
 }
 
-/* Ego: gold, so it never reads as traffic. */
-.car--ego .f--body { --c: #e6ad45; }
-.car--ego .f--roof { --c: #f0bf62; }
-.car--ego .f--tail { --c: #a82d28; }
+/* Ego: a deep metallic red electric sedan, so it never reads as traffic. Its rounded body is shaded
+   face by face (f--s0 .. f--s7, from the angle to the light) rather than by which side it shows. */
+.car--ego .f--body { --c: #b4232f; }
+.car--ego .f--roof { --c: #a41f2b; }
+.car--ego .f--tail { --c: #d3342d; }
+.car--ego .f--glass { --c: #0f2030; }
+.car--ego .f--roof-glass { --c: #0e1b28; stroke: rgba(150, 190, 220, 0.2); }
+.car--ego .f--arch { --c: #07090c; stroke: none; }
+.car--ego .f.f--glass.f--smooth,
+.car--ego .f.f--roof-glass.f--smooth { --lite: 3%; --dark: 0%; }
+.car--ego .f--rim { --c: #aab4be; stroke: rgba(0, 0, 0, 0.4); }
+.car--ego .f--wheel { --c: #101419; }
+.car--ego .f--bumper { --c: #12161b; stroke: none; }
+
+.f.f--smooth { --lite: 0%; --dark: 0%; }
+.f.f--smooth.f--s0 { --dark: 58%; }
+.f.f--smooth.f--s1 { --dark: 46%; }
+.f.f--smooth.f--s2 { --dark: 34%; }
+.f.f--smooth.f--s3 { --dark: 22%; }
+.f.f--smooth.f--s4 { --dark: 10%; }
+.f.f--smooth.f--s5 { --lite: 7%; }
+.f.f--smooth.f--s6 { --lite: 17%; }
+.f.f--smooth.f--s7 { --lite: 30%; }
 
 /* Other traffic: cool steel tones. */
 .car--other .f--body { --c: #5f7f9f; }
@@ -349,19 +368,6 @@
 /* Brake lights only mirror backend state; the UI never decides that the vehicle is braking. */
 .ego--braking .brake-lamp {
   fill: #ff3b30;
-}
-
-.ego__tag rect {
-  fill: rgba(15, 23, 42, 0.88);
-  stroke: rgba(232, 176, 82, 0.65);
-  stroke-width: 1px;
-}
-
-.ego__tag-name {
-  fill: #f6cf8d;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
 }
 
 /* Blinkers are only drawn while active: off, the lamps are hidden. */

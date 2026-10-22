@@ -216,13 +216,6 @@
                 </g>
               </g>
             }
-            @if (item.egoTag; as tag) {
-              <g class="ego__tag" aria-hidden="true" data-testid="ego-badge"
-                 [attr.transform]="'translate(' + tag.x.toFixed(1) + ' ' + tag.y.toFixed(1) + ')'">
-                <rect x="-19" y="-14" width="38" height="14" rx="3" />
-                <text x="0" y="-4" text-anchor="middle" class="ego__tag-name">EGO</text>
-              </g>
-            }
           </g>
         }
         @case ('gantry') {

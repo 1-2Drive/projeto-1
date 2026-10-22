@@ -530,7 +530,7 @@ Tests: these six rules fire in 5, 1, 1, 3, 3 and 3 runs (BX, RL). The fall-back 
 
 ## 8. Stop Sign Rules
 
-**File:** [`traffic-signs.drl`](../src/main/resources/rules/traffic-signs.drl). A stop sign binds only the lane it stands in: the camera reports only a sign in the car's path lane (its lane, or the lane it is moving into during a lane change; `WorldState.nearestStopSign`). `StopSignState.distanceMeters` is the distance to the **stop line**, 15 m before the sign (`StoppingPolicy.STOP_SIGN_OFFSET_METERS`).
+**File:** [`traffic-signs.drl`](../src/main/resources/rules/traffic-signs.drl). A stop sign governs the whole road, like a speed limit or a traffic light: the camera reports the nearest sign ahead whatever lane the car drives in and whatever cell of the road map the sign was written to (`WorldState.nearestStopSign`); the toolbox asks only for a distance. `StopSignState.distanceMeters` is the distance to the **stop line**, 15 m before the sign (`StoppingPolicy.STOP_SIGN_OFFSET_METERS`).
 
 ```mermaid
 stateDiagram-v2

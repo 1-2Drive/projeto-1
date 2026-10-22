@@ -455,5 +455,5 @@ Details and evidence are in [ARCHITECTURE.md §9](ARCHITECTURE.md#9-architectura
   - no rule reads `VisibilityEvent`, `RoadGripEvent`, `ReducedVisibilityEvent`, `ReducedGripEvent` or `CrosswalkDetectedEvent`;
   - `DrivingAction.WAIT` is never proposed;
   - no rule reads `VehicleStateFact.leftAdjacentLaneSafe` or `rightAdjacentLaneSafe`.
-- **Screenshots in the repository root:** the current Playwright suite writes only `screenshot_viewport_1440x900.png`, `screenshot_viewport_1920x1080.png`, `screenshot_toolbox_objects_road.png` and `screenshot_clean_ego_badge.png`. The other nine are leftovers, four of which are named after the removed speed radar (`screenshot_A_far_from_radar.png` … `screenshot_D_passed_radar.png`).
+- **Screenshots:** the Playwright suite writes its evidence screenshots to `frontend/test-results/evidence/` (git-ignored); the old `screenshot_*.png` files in the repository root were removed.
 - **Outdated statements elsewhere:** some statements in `README.md`, `docs/report-implementation-audit.md` and `diagrams/` no longer match the code (test counts, rule counts, `window:length(5)`, `ABORTED`, Prolog rule names). The list is in [ARCHITECTURE.md §9.4](ARCHITECTURE.md#94-discrepancies-with-existing-documentation).

@@ -18,10 +18,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A stop sign binds the lane it stands in. A vehicle moving into that lane is bound by it
- * from the moment the lane change starts, not only once the manoeuvre has settled: read from
- * the committed lane, the sign was first seen with the lane change over, too close to stop
- * at the line, and at higher speed the vehicle drove through it.
+ * A stop sign governs the whole road. A vehicle changing lane towards the cell the sign was
+ * written to stays bound by it throughout the manoeuvre: it is first seen with the lane
+ * change still under way, and the vehicle must still stop at the line without hard braking.
  */
 class StopSignInLaneBeingEnteredE2ETest {
     private static final double SIGN_METERS = 120.0;
@@ -44,7 +43,7 @@ class StopSignInLaneBeingEnteredE2ETest {
     @ParameterizedTest(name = "{0}")
     @EnumSource(ExpertBackendType.class)
     @Timeout(60)
-    @DisplayName("moving into the centre lane, the vehicle stops at the stop sign of that lane without hard braking")
+    @DisplayName("changing lanes on the approach, the vehicle still stops at the stop sign without hard braking")
     void stopsAtTheSignOfTheLaneBeingEntered(ExpertBackendType backend) {
         try (SimulationEngine engine = engine(backend)) {
             engine.start();
@@ -65,7 +64,7 @@ class StopSignInLaneBeingEnteredE2ETest {
                 }
             }
             assertTrue(ego.getLane() == Lane.CENTER, "the vehicle must have moved into the centre lane");
-            assertTrue(stopRuleSeen, "the stop sign of the lane being entered must bind the vehicle");
+            assertTrue(stopRuleSeen, "the stop sign must bind the vehicle during the lane change");
             assertFalse(Double.isNaN(restPosition), "the vehicle must come to rest at the stop sign");
             assertTrue(restPosition < SIGN_METERS - StoppingPolicy.STOP_SIGN_OFFSET_METERS + StoppingPolicy.STOP_LINE_TOLERANCE_METERS,
                 "stopped past the stop line: at " + restPosition + " m, sign at " + SIGN_METERS);

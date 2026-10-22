@@ -259,12 +259,13 @@ class SimulationEngineE2ETest {
     }
 
     /**
-     * A stop sign belongs to the lane it stands in. The continuous markings keep the
-     * vehicle in its lane, so each run shows one lane against one sign.
+     * A stop sign governs the whole road: whichever cell of the road map it was written to,
+     * a vehicle in any lane must stop for it. The continuous markings keep the vehicle in
+     * its lane, so each run shows one lane against one sign.
      */
     @Test
     @Timeout(60)
-    void stopSignStopsOnlyTheVehicleDrivingInItsLane() {
+    void stopSignStopsTheVehicleInEveryLane() {
         List<Lane> lanes = List.of(Lane.LEFT, Lane.CENTER, Lane.RIGHT);
         for (Lane signLane : lanes) {
             for (Lane egoLane : lanes) {
@@ -294,18 +295,13 @@ class SimulationEngineE2ETest {
                         stopped = snapshot.egoSpeedKmh() < 0.6;
                         assertEquals(egoLane, engine.getWorldState().getEgo().getLane());
                     }
-                    String where = "sign in " + signLane + ", ego in " + egoLane;
-                    if (signLane == egoLane) {
-                        assertTrue(stopped, "The vehicle must stop at the sign of its own lane: " + where);
-                        double rest = engine.getWorldState().signedDistance(placed.getPositionMeters());
-                        assertTrue(rest >= STOP_LINE_METERS - 1.0 && rest <= STOP_LINE_METERS + 4.0,
-                            "and come to rest at the stop line before the sign, not on it: " + rest + " m short, " + where);
-                    } else {
-                        assertFalse(stopped, "A sign in another lane must not stop the vehicle: " + where);
-                        assertTrue(slowest > 40.0, "and must not slow it down either, slowest " + slowest + " km/h: " + where);
-                        assertFalse(engine.snapshot().detectedObjectIds().contains(placed.getId()),
-                            "and is not reported as detected: " + where);
-                    }
+                    String where = "sign cell in " + signLane + ", ego in " + egoLane;
+                    assertTrue(stopped, "The vehicle must stop at the stop sign whatever lane it drives in: " + where);
+                    double rest = engine.getWorldState().signedDistance(placed.getPositionMeters());
+                    assertTrue(rest >= STOP_LINE_METERS - 1.0 && rest <= STOP_LINE_METERS + 4.0,
+                        "and come to rest at the stop line before the sign, not on it: " + rest + " m short, " + where);
+                    assertTrue(engine.snapshot().detectedObjectIds().contains(placed.getId()),
+                        "and report the one sign as detected: " + where);
                 }
             }
         }

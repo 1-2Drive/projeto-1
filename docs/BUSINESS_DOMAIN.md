@@ -147,7 +147,7 @@ Short definitions are given here; [GLOSSARY.md](GLOSSARY.md) has the full list.
 | **Ego vehicle** | The car controlled by the expert system |
 | **Lanes** | Three lanes: LEFT, CENTER and RIGHT. The car normally drives in RIGHT (keep-right rule) and uses CENTER or LEFT to overtake or avoid hazards |
 | **Road** | A loop divided into 5 m blocks (500 m by default). After the last block the car starts again at the first. Fixed objects are placed in a grid of blocks × lanes (the road map) |
-| **Road elements** | Fixed objects on the road: speed-limit sign, stop sign, traffic light, crosswalk, pothole and static obstacle (severity LOW, MEDIUM or HIGH), barrier (open or closed). Speed-limit signs, traffic lights and crosswalks apply to the whole road; a stop sign only to its lane |
+| **Road elements** | Fixed objects on the road: speed-limit sign, stop sign, traffic light, crosswalk, pothole and static obstacle (severity LOW, MEDIUM or HIGH), barrier (open or closed). Speed-limit signs, traffic lights, crosswalks and stop signs apply to the whole road, whatever lane they were written to |
 | **Stop line** | Where the car must stop: 15 m before a stop sign, 18 m before a traffic light |
 | **Road markings** | The lines between lanes: dashed (may be crossed) or continuous (may not be crossed). One line separates LEFT and CENTER, another separates CENTER and RIGHT |
 | **Other road users** | Other vehicles (their own speed, in one lane; they stop for a pedestrian ahead and then speed back up) and pedestrians (standing on the road, crossing it, or finished crossing) |
@@ -178,7 +178,7 @@ Short definitions are given here; [GLOSSARY.md](GLOSSARY.md) has the full list.
 | Operator | New objects or road users, map painting, weather changes, lane-change requests, START/PAUSE/RESET, engine switch | Applied at the next 0.1 s step |
 | Speedometer | Current speed | Every 0.1 s |
 | Front radar | Distance, closing speed and TTC of the nearest vehicle ahead in the same lane (≤ 130 m); distance and closing speed of the nearest vehicle ahead in the lane to the left, to the right and two lanes to the left | Every 0.1 s |
-| Camera | Nearest speed-limit sign, traffic light, stop sign (path lane only: its lane, or the lane it is moving into), crosswalk, pothole, obstacle, barrier (≤ 120 m × visibility; path lane preferred); the most relevant pedestrian ahead and whether it is in the path or crossing | Every 0.2 s |
+| Camera | Nearest speed-limit sign, traffic light, stop sign (road-wide, any lane), crosswalk, pothole, obstacle, barrier (≤ 120 m × visibility; path lane preferred); the most relevant pedestrian ahead and whether it is in the path or crossing | Every 0.2 s |
 | Blind-spot sensors | For each side: can the car move into that lane? No when it is the road edge, there is a continuous line, a hazard or pedestrian, or a vehicle too close or closing in | Every 0.2 s |
 | Environment sensor | Weather condition, visibility, grip | Every 0.4 s |
 
@@ -288,7 +288,7 @@ Stopping for a pedestrian counts as a mandatory stop, like a red light. A pedest
 
 - The car brakes smoothly so as to stop at the stop line (15 m before the sign); if it is too fast to stop comfortably, it brakes hard.
 - It must stand still for 1.2 seconds, then proceeds at low speed.
-- A stop sign in another lane does not concern the car; during a lane change, the one in the lane being entered does.
+- A stop sign governs the whole road: the car obeys it whichever lane it drives in, and a lane change on the approach does not release it.
 
 ### 8.6 Traffic lights
 

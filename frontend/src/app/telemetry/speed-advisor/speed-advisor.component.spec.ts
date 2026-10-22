@@ -54,4 +54,33 @@ describe('SpeedAdvisorComponent', () => {
     const legend = fixture.nativeElement.querySelector('.legend--delta') as HTMLElement;
     expect(legend.classList.contains('legend--above')).toBeTrue();
   });
+
+  it('lists legal limit, recommended speed and delta as three separate columns, label above value', () => {
+    fixture.componentRef.setInput('snapshot', {
+      simulationTimeMillis: 1000,
+      status: 'RUNNING',
+      egoVehicle: { speedKmh: 50, positionMeters: 0, lane: 'CENTER', accelerationMps2: 0 },
+      speedAdvisor: { currentKmh: 50, legalLimitKmh: 50, recommendedKmh: 50, action: 'MAINTAIN_SPEED' }
+    });
+    fixture.detectChanges();
+
+    const legend = fixture.nativeElement.querySelector('.gauge__legend') as HTMLElement;
+    const columns = Array.from(legend.children) as HTMLElement[];
+    expect(columns.length).toBe(3);
+    expect(columns.map((c) => (c.firstChild!.textContent ?? '').trim())).toEqual(['Legal limit', 'Recommended', 'Delta']);
+    expect(columns.map((c) => c.querySelector('strong')!.textContent!.trim())).toEqual(['50 km/h', '50 km/h', '0 km/h']);
+
+    // Each metric is its own column of the legend grid, and the columns never overlap.
+    expect(getComputedStyle(legend).display).toBe('grid');
+    const boxes = columns.map((c) => c.getBoundingClientRect());
+    for (let i = 1; i < boxes.length; i++) {
+      expect(boxes[i].left).toBeGreaterThanOrEqual(boxes[i - 1].right);
+    }
+    // The value sits below its label in the same column.
+    for (const column of columns) {
+      const label = document.createRange();
+      label.selectNodeContents(column.firstChild!);
+      expect(column.querySelector('strong')!.getBoundingClientRect().top).toBeGreaterThanOrEqual(label.getBoundingClientRect().bottom - 1);
+    }
+  });
 });

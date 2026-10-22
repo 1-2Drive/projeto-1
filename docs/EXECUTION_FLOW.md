@@ -78,7 +78,7 @@ Inputs reach the system in four ways:
 |---|---|---|---|
 | `SpeedSensor` | 100 ms | every tick | `VehicleSpeedEvent` |
 | `FrontRadarSensor` | 100 ms | every tick (if something is in range) | `FrontDistanceEvent`, `RelativeSpeedEvent`, `TTCEvent` for the nearest vehicle ahead in the own lane ≤ 130 m (distance noise σ 0.7 m); `LeftLaneVehicleEvent`, `RightLaneVehicleEvent`, `FarLeftLaneVehicleEvent` for the nearest vehicle ahead in those lanes |
-| `CameraSensor` | 200 ms | t = 100, 300, 500 … ms | nearest speed-limit sign, traffic light, stop sign (own lane only), crosswalk, pothole, barrier, obstacle (own lane preferred, else any lane), the most relevant pedestrian; range 120 m × visibility (84 m in rain) |
+| `CameraSensor` | 200 ms | t = 100, 300, 500 … ms | nearest speed-limit sign, traffic light, stop sign (any lane: it governs the whole road), crosswalk, pothole, barrier, obstacle (own lane preferred, else any lane), the most relevant pedestrian; range 120 m × visibility (84 m in rain) |
 | `BlindSpotSensor` | 200 ms | t = 100, 300, 500 … ms | two `LaneOccupancyEvent` (left and right side) |
 | `EnvironmentSensor` | 400 ms | t = 100, 500, 900 … ms | `WeatherEvent`, `VisibilityEvent`, `RoadGripEvent`; `ReducedVisibilityEvent` / `ReducedGripEvent` below 0.85 |
 
@@ -296,7 +296,7 @@ There is no abort transition (A-12). Emergency rules can still brake.
 ```mermaid
 stateDiagram-v2
     [*] --> NoSign
-    NoSign --> Approaching: stop sign in the ego lane seen by the camera
+    NoSign --> Approaching: stop sign ahead seen by the camera (any lane)
     Approaching --> Approaching: line 4 to 125 m away, above the braking curve (priority 60, hold or brake)
     Approaching --> AtLine: line 4 m or less, full stop required (STOP, priority 60)
     AtLine --> Stopped: speed below 0.6 km/h, StoppedAtStopLineEvent inserted

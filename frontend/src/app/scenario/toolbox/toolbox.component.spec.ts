@@ -22,6 +22,30 @@ describe('ToolboxComponent', () => {
     expect(compiled.querySelector('[data-testid="add-pothole"]')).toBeTruthy();
   });
 
+  it('keeps every tool under its own section, each section a card of the same grid', () => {
+    const compiled = fixture.nativeElement as HTMLElement;
+    const groups = Array.from(compiled.querySelectorAll('.toolbox__groups > .group')) as HTMLElement[];
+    const tools = (group: HTMLElement) => Array.from(group.querySelectorAll('[data-testid]'))
+      .map((el) => el.getAttribute('data-testid'));
+
+    expect(groups.map((g) => g.querySelector('h3')!.textContent!.trim()))
+      .toEqual(['Road signs', 'Traffic control', 'Actors', 'Road markings', 'Hazards', 'Environment']);
+    expect(tools(groups[0])).toEqual([
+      'add-speed-30', 'add-speed-50', 'add-speed-70', 'add-speed-90', 'add-speed-100', 'add-speed-120', 'add-stop-sign'
+    ]);
+    expect(tools(groups[1])).toEqual(['add-traffic-light', 'add-barrier']);
+    expect(tools(groups[2])).toEqual(['add-vehicle', 'add-pedestrian']);
+    expect(tools(groups[3])).toEqual(['add-crosswalk']);
+    expect(tools(groups[4])).toEqual(['add-pothole', 'add-obstacle']);
+    expect(tools(groups[5])).toEqual(['toggle-rain', 'visibility-slider', 'grip-slider']);
+
+    // Every tool is an icon followed by its label, so the label never sits on top of the icon.
+    for (const tile of Array.from(compiled.querySelectorAll('.tile'))) {
+      expect(tile.children[0].tagName.toLowerCase()).toBe('svg');
+      expect(tile.children[1].classList.contains('tile__label')).toBeTrue();
+    }
+  });
+
   it('emits an environment update when rain is toggled off', () => {
     const component = fixture.componentInstance;
     fixture.componentRef.setInput('environment', {
@@ -128,7 +152,7 @@ describe('ToolboxComponent', () => {
     (compiled.querySelector('[data-testid="add-stop-sign"]') as HTMLButtonElement).click();
     fixture.detectChanges();
     await fixture.whenStable();
-    expect(compiled.querySelector('[data-testid="lane-select"]')).toBeTruthy();
+    expect(compiled.querySelector('[data-testid="lane-select"]')).toBeNull();
   });
 
   it('offers no lane for a traffic light, which governs the whole road', async () => {
@@ -153,30 +177,27 @@ describe('ToolboxComponent', () => {
     })]);
   });
 
-  it('adds a stop sign to the lane chosen in the drawer', async () => {
+  it('offers no lane for a stop sign, which governs the whole road', async () => {
     const component = fixture.componentInstance;
     const emitted: unknown[] = [];
     component.createRoadElement.subscribe((payload) => emitted.push(payload));
     const compiled = fixture.nativeElement as HTMLElement;
 
-    for (const lane of ['LEFT', 'CENTER', 'RIGHT']) {
-      (compiled.querySelector('[data-testid="add-stop-sign"]') as HTMLButtonElement).click();
-      fixture.detectChanges();
-      await fixture.whenStable();
+    (compiled.querySelector('[data-testid="add-stop-sign"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    await fixture.whenStable();
 
-      const select = compiled.querySelector('[data-testid="lane-select"]') as HTMLSelectElement;
-      expect(Array.from(select.options).map((option) => option.value)).toEqual(['LEFT', 'CENTER', 'RIGHT']);
-      select.value = lane;
-      select.dispatchEvent(new Event('change'));
-      fixture.detectChanges();
-      await fixture.whenStable();
+    const panel = compiled.querySelector('[data-testid="config-panel"]') as HTMLElement;
+    expect(panel.textContent).toContain('Add stop sign');
+    expect(panel.textContent).toContain('Applies to all lanes.');
+    expect(compiled.querySelector('[data-testid="drawer-distance-input"]')).toBeTruthy();
+    expect(compiled.querySelector('[data-testid="lane-select"]')).toBeNull();
 
-      (compiled.querySelector('[data-testid="apply-config"]') as HTMLButtonElement).click();
-      fixture.detectChanges();
-    }
+    (compiled.querySelector('[data-testid="apply-config"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
 
-    expect(emitted).toEqual(['LEFT', 'CENTER', 'RIGHT'].map((lane) =>
-      jasmine.objectContaining({ type: 'STOP_SIGN', lane, distanceAheadMeters: 150 })));
+    // One road-wide element: the cell lane is only where the road map stores it.
+    expect(emitted).toEqual([jasmine.objectContaining({ type: 'STOP_SIGN', lane: 'CENTER', distanceAheadMeters: 150 })]);
   });
 
   it('blocks confirmation when the distance is out of range', async () => {

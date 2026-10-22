@@ -109,6 +109,31 @@ describe('SimulationPageComponent', () => {
     expect(pause.disabled).toBeTrue();
   });
 
+  it('lays the control bar out in three zones with the status row below, then the flow stages', () => {
+    const el = fixture.nativeElement as HTMLElement;
+    const bar = el.querySelector('nav.controls') as HTMLElement;
+    const zones = Array.from(bar.children).map((c) => c.className);
+    expect(zones).toEqual(['controls__primary', 'controls__engine', 'controls__demo', 'controls__status']);
+
+    const text = (selector: string) => (bar.querySelector(selector)!.textContent ?? '').replace(/\s+/g, ' ').trim();
+    expect(text('.controls__primary')).toContain('START');
+    expect(text('.controls__primary')).toContain('PAUSE');
+    expect(text('.controls__primary')).toContain('STOP');
+    expect(text('.controls__primary')).toContain('RESET');
+    expect(text('.controls__engine')).toContain('Rule engine');
+    expect(text('.controls__engine')).toContain('Drools');
+    expect(text('.controls__engine')).toContain('Prolog');
+    expect(text('.controls__demo')).toContain('Automated demo');
+    expect(text('.controls__demo')).toContain('RUN DEMO');
+    expect(bar.querySelectorAll('.controls__demo button').length).toBe(3);
+    expect(bar.querySelectorAll('.controls__status app-status-badge').length).toBe(3);
+    expect(bar.querySelector('[data-testid="simulation-status"]')).toBeTruthy();
+    expect(bar.querySelector('[data-testid="simulation-clock"]')).toBeTruthy();
+
+    // The flow stages come right after the control bar.
+    expect(bar.nextElementSibling!.tagName.toLowerCase()).toBe('app-flow-stage');
+  });
+
   it('keeps the dashboard cells: road, evidence tabs, telemetry and the road map / toolbox tabs', () => {
     const el = fixture.nativeElement as HTMLElement;
     expect(el.querySelector('.workspace__center app-road-canvas')).toBeTruthy();

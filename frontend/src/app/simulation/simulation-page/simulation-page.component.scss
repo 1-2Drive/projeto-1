@@ -93,12 +93,15 @@
 
 /* ============================ controls ============================ */
 .controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--ds-space-3);
+  display: grid;
+  /* Three zones on the first row (run controls, rule engine, automated demo), the status row below. */
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-areas:
+    'primary engine demo'
+    'status  status status';
   align-items: center;
-  justify-content: space-between;
-  padding: 0.5rem 0.7rem;
+  gap: var(--ds-space-2) var(--ds-space-4);
+  padding: 0.55rem 0.8rem;
   border: 1px solid var(--ds-border);
   border-radius: var(--ds-radius-md);
   background: rgba(15, 23, 32, 0.72);
@@ -112,13 +115,28 @@
   align-items: center;
   gap: 0.4rem;
   flex-wrap: wrap;
+  min-width: 0;
 }
 
-.controls__engine,
-.controls__demo,
+.controls__primary {
+  grid-area: primary;
+  justify-self: start;
+}
+
+.controls__engine {
+  grid-area: engine;
+  justify-self: center;
+}
+
+.controls__demo {
+  grid-area: demo;
+  justify-self: end;
+}
+
 .controls__status {
-  padding-left: var(--ds-space-3);
-  border-left: 1px dashed var(--ds-border);
+  grid-area: status;
+  padding-top: var(--ds-space-2);
+  border-top: 1px dashed var(--ds-border);
 }
 
 .controls__label {
@@ -269,7 +287,7 @@
   gap: var(--ds-space-3);
   grid-template-columns: minmax(0, 1fr) var(--right-rail);
   align-items: stretch;
-  height: clamp(25rem, 43vh, 29rem);
+  height: clamp(23rem, 42vh, 29rem);
   min-height: 0;
   flex: 0 0 auto;
 }
@@ -365,7 +383,7 @@
 /* ============================ lower workspace tabs ============================ */
 .lower-workspace {
   display: grid;
-  grid-template-columns: minmax(32rem, 0.72fr) minmax(0, 1.28fr);
+  grid-template-columns: minmax(34rem, 0.75fr) minmax(0, 1.25fr);
   gap: var(--ds-space-3);
   min-width: 0;
   height: auto;
@@ -375,7 +393,7 @@
 
 .telemetry-pair {
   display: grid;
-  grid-template-columns: minmax(13rem, 0.8fr) minmax(18rem, 1.2fr);
+  grid-template-columns: minmax(16rem, 1fr) minmax(0, 1fr);
   gap: var(--ds-space-3);
   min-width: 0;
   min-height: 0;
@@ -403,14 +421,14 @@
 .bottom-tabs__nav {
   display: flex;
   align-items: end;
-  min-height: 2.5rem;
-  padding: 0.35rem 0.45rem 0;
+  min-height: 2.25rem;
+  padding: 0.3rem 0.45rem 0;
   border-bottom: 1px solid var(--ds-border);
   background: rgba(11, 18, 25, 0.62);
 
   button {
-    min-height: 2.5rem;
-    padding: 0.55rem 1.1rem;
+    min-height: 2.25rem;
+    padding: 0.45rem 1.1rem;
     border: 1px solid transparent;
     border-bottom: none;
     border-radius: var(--ds-radius-sm) var(--ds-radius-sm) 0 0;
@@ -444,7 +462,7 @@
   min-width: 0;
   flex: 1 1 auto;
   min-height: 0;
-  padding: var(--ds-space-3);
+  padding: var(--ds-space-2) var(--ds-space-3);
   overflow-y: auto;
   overflow-x: hidden;
 }
@@ -462,15 +480,13 @@
 
 .scenario-tab {
   display: grid;
-  grid-template-columns: minmax(0, 3fr) minmax(25rem, 1.2fr);
-  gap: var(--ds-space-3);
-  align-items: stretch;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: var(--ds-space-2);
 }
 
 .scenario-tab > * {
   min-width: 0;
-  min-height: 0;
-  height: 100%;
 }
 
 
@@ -537,19 +553,19 @@
     min-height: 28rem;
   }
 
-  .scenario-tab {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
+  /* Narrow screens stack the zones in reading order. */
   .controls {
-    justify-content: flex-start;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'primary'
+      'engine'
+      'demo'
+      'status';
   }
 
   .controls__engine,
-  .controls__demo,
-  .controls__status {
-    padding-left: 0;
-    border-left: none;
+  .controls__demo {
+    justify-self: start;
   }
 }
 

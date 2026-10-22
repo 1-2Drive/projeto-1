@@ -25,7 +25,7 @@ public final class DecisionFlowchart {
 
     /** The recorded perception that gives a node its context in the explanation. */
     public enum Perception {
-        NONE, RADAR, PEDESTRIAN, OBSTACLE, POTHOLE, SPEED_SIGN, WEATHER, BLIND_SPOTS, VEHICLE
+        NONE, RADAR, PEDESTRIAN, OBSTACLE, POTHOLE, SPEED_SIGN, STOP_SIGN, TRAFFIC_LIGHT, WEATHER, BLIND_SPOTS, VEHICLE
     }
 
     /**
@@ -90,15 +90,15 @@ public final class DecisionFlowchart {
         speed("VS", "05/06", "Does a traffic light ahead govern the speed?",
             "Red: stop at the line (hard if comfortable braking is not enough); yellow: stop if it can, "
                 + "otherwise proceed; green: release the hold",
-            "No traffic light restricts the speed", Perception.NONE, true,
+            "No traffic light restricts the speed", Perception.TRAFFIC_LIGHT, true,
             List.of("Red traffic light progressive approach", "Hold at red traffic light",
                 "Red traffic light requires full stop and hold", "Yellow traffic light: stop before the line",
                 "Green traffic light releases red-light hold",
                 "Green traffic light allows progression when no higher hazard"),
             List.of("Commit to stop or to proceed at traffic light")),
-        speed("V07", "07", "Is there a STOP sign in the vehicle's lane?",
+        speed("V07", "07", "Is there a STOP sign ahead on the road?",
             "Slow down and stop at the line; proceed after a full stop of 1.2 s",
-            "No STOP sign to obey", Perception.NONE, true,
+            "No STOP sign to obey", Perception.STOP_SIGN, true,
             List.of("Stop sign requires progressive deceleration", "Stop sign requires full stop near line",
                 "Proceed after stop sign condition satisfied"),
             List.of("Start stop timer once vehicle is stopped", "Stop sign condition satisfied after full stop hold",

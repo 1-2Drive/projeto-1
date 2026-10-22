@@ -32,6 +32,36 @@ describe('DecisionExplanationComponent', () => {
     expect(element.textContent).not.toContain('TECHNICAL EVIDENCE');
   });
 
+  it('shows only what the answer it is given says: another trip leaves nothing of the previous one behind', () => {
+    const stopAnswer: ApiWhyAnswer = {
+      ...POTHOLE_ANSWER,
+      sessionId: 'another-trip',
+      timestampMillis: 7500,
+      situation: { speedKmh: 15, lane: 'RIGHT', laneChangeState: 'IDLE', recommendedSpeedKmh: 0, actuatorResult: 'action=STOP' },
+      why: [{
+        channel: 'LONGITUDINAL', title: 'Speed · longitudinal', action: 'STOP', effect: 'slows down from 15 km/h to a stop',
+        relevant: true, summary: "The vehicle stops because 'Stop sign requires full stop near line' holds: distance=3.4m.",
+        decidingRule: { rule: 'Stop sign requires full stop near line', action: 'STOP', channel: 'LONGITUDINAL', recommendedSpeedKmh: 0,
+          priority: 60, rung: 'legal mandatory stop', outcome: 'WON', detail: '', reason: 'Stop sign reached', evidence: [] },
+        conditions: ['distance=3.4m'], arbitration: 'It was the only speed proposal.', alsoConsidered: []
+      }],
+      whyNot: [],
+      how: []
+    };
+
+    const first = render('WHY').textContent!;
+    expect(first).toContain('Avoid pothole in right lane by changing left');
+
+    const second = render('WHY', stopAnswer).textContent!;
+    expect(second).toContain('Stop sign requires full stop near line');
+    expect(second).toContain('distance=3.4m');
+    // Nothing of the pothole trip's evidence is left, and nothing was added that the answer does not say.
+    for (const leftover of ['pothole', 'Avoid pothole', 'cruise=50.0', '42 km/h', 'action=CHANGE_LANE_LEFT']) {
+      expect(second).not.toContain(leftover);
+    }
+    expect(fixture.nativeElement.querySelectorAll('[data-testid="why-channel"]').length).toBe(1);
+  });
+
   it('WHY shows an untouched default channel as a single line', () => {
     const answer: ApiWhyAnswer = {
       ...POTHOLE_ANSWER,

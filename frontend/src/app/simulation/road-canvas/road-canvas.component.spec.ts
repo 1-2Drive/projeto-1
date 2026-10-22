@@ -410,7 +410,7 @@ describe('RoadCanvasComponent', () => {
       }
     });
 
-    it('draws a stop sign once, in the lane it stands in', () => {
+    it('draws a stop sign once, however the backend stores it in the road map', () => {
       for (const lane of ['LEFT', 'CENTER', 'RIGHT']) {
         show({
           ego: { speedKmh: 50, lane: 'RIGHT' },
@@ -418,22 +418,23 @@ describe('RoadCanvasComponent', () => {
         });
 
         const signs = qa('[data-testid="road-stop-sign"]');
-        expect(signs.length).toBe(1, `a stop sign in ${lane} is not repeated in the other lanes`);
+        expect(signs.length).toBe(1, `a stop sign in ${lane} is one road-wide sign, not repeated per lane`);
+        expect(qa('.stop-line').length).toBe(1, `and has a single stop line, from ${lane}`);
         expect(signs[0].getAttribute('data-lane')).toBe(lane);
       }
     });
 
-    it('stands the stop sign on the verge, upright on a pole, never inside the lanes', () => {
+    it('stands the stop sign on the right verge, upright on a pole, never inside the lanes', () => {
       for (const lane of ['LEFT', 'CENTER', 'RIGHT']) {
         show({
           ego: { positionMeters: 0, lane: 'CENTER', lateralPositionMeters: 0 },
           objects: [{ id: `s-${lane}`, type: 'StopSign', positionMeters: 60, lane, details: '' }]
         });
         const sign = q('[data-testid="road-stop-sign"]')!;
-        // Beyond the asphalt (5.25 m from the centre line), on the left verge for the left lane.
+        // Beyond the asphalt (5.25 m from the centre line), always on the right verge: it is road-wide.
         const lateral = Number(sign.getAttribute('data-lateral'));
         expect(Math.abs(lateral)).toBeGreaterThan(5.25, lane);
-        expect(lateral < 0).toBe(lane === 'LEFT', lane);
+        expect(lateral).toBeGreaterThan(0, lane);
         expect(sign.querySelector('.sign__pole')).toBeTruthy();
 
         // On screen it is outside the asphalt edge at its own depth.
@@ -444,10 +445,18 @@ describe('RoadCanvasComponent', () => {
         const right = at(asphalt[1], asphalt[2]);
         expect(frame.x < left || frame.x > right).toBeTrue();
 
-        // The lane it governs is marked by a stop line painted across that lane, flat on the road.
+        // The stop line is painted flat across the whole road, so it spans every lane.
         const line = vertices(q('.stop-line')!);
         expect(line.length).toBe(4);
         expect(Math.max(...line.map((p) => p.y)) - Math.min(...line.map((p) => p.y))).toBeLessThan(6);
+        const lineY = line.reduce((sum, p) => sum + p.y, 0) / line.length;
+        const roadWidth = (y: number) => {
+          const l = asphalt[0].x + (asphalt[3].x - asphalt[0].x) * ((asphalt[0].y - y) / (asphalt[0].y - asphalt[3].y));
+          const r = asphalt[1].x + (asphalt[2].x - asphalt[1].x) * ((asphalt[1].y - y) / (asphalt[1].y - asphalt[2].y));
+          return r - l;
+        };
+        const lineWidth = Math.max(...line.map((p) => p.x)) - Math.min(...line.map((p) => p.x));
+        expect(lineWidth).toBeGreaterThan(roadWidth(lineY) * 0.95, `the stop line spans the whole road, from ${lane}`);
       }
     });
 
@@ -531,7 +540,8 @@ describe('RoadCanvasComponent', () => {
       expect(q('.ego')!.classList.contains('ego--braking')).toBeFalse();
       show({ ego: { drivingState: 'BRAKING', accelerationMps2: -2 } });
       expect(q('.ego')!.classList.contains('ego--braking')).toBeTrue();
-      expect(qa('.ego .brake-lamp').length).toBe(2);
+      // Two tail lamps and the light bar that joins them: all three light up together.
+      expect(qa('.ego .brake-lamp').length).toBe(3);
     });
 
     for (const indicator of ['LEFT', 'RIGHT', 'HAZARD', 'OFF']) {
@@ -558,17 +568,18 @@ describe('RoadCanvasComponent', () => {
       });
     }
 
-    it('should render clean EGO badge without concatenating state text like EGOCRUISING', () => {
+    it('shows no visible EGO label above the car, but keeps the ego identifiable for tests and screen readers', () => {
       show({
         ego: { positionMeters: 10, lane: 'CENTER', lateralPositionMeters: 0, drivingState: 'CRUISING' },
         objects: [{ id: 'obs_1', type: 'StaticObstacle', positionMeters: 50, worldPositionMeters: 60, lane: 'CENTER', details: 'severity=HIGH' }]
       });
 
-      const egoTag = q('.ego__tag')!;
-      expect(egoTag).toBeTruthy();
-      expect(egoTag.textContent!.trim()).toBe('EGO');
-      expect(q('[data-testid="road-ego"]')!.textContent!.trim()).toBe('EGO');
-      expect(root.textContent).not.toContain('EGOCRUISING');
+      expect(q('.ego__tag')).toBeNull();
+      expect(q('[data-testid="ego-badge"]')).toBeNull();
+      const ego = q('[data-testid="road-ego"]')!;
+      expect(ego).toBeTruthy();
+      expect(ego.textContent!.trim()).toBe('', 'the ego car carries no text');
+      expect(ego.querySelector('.car--ego')!.getAttribute('aria-label')).toBe('Ego vehicle');
       expect(q('[data-testid="road-obstacle"]')).toBeTruthy('Obstacle must have data-testid="road-obstacle"');
     });
   });

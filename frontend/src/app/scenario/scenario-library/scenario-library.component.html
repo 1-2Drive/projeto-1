@@ -3,8 +3,10 @@
   <ul class="list">
     @for (scenario of scenarios(); track scenario.id) {
       <li>
-        <button type="button" (click)="loadScenario.emit(scenario.id)">
-          <strong>{{ scenario.id }}</strong>
+        <button type="button" [attr.data-scenario-id]="scenario.id"
+                [title]="scenario.id + ' — ' + scenario.name"
+                (click)="loadScenario.emit(scenario.id)">
+          <strong>{{ shortId(scenario.id) }}</strong>
           <span>{{ scenario.name }}</span>
         </button>
       </li>

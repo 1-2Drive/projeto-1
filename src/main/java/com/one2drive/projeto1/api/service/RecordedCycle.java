@@ -1,5 +1,6 @@
 package com.one2drive.projeto1.api.service;
 
+import com.one2drive.projeto1.api.model.ApiRoadElement;
 import com.one2drive.projeto1.api.model.ApiSimulationSnapshot;
 import com.one2drive.projeto1.api.model.ApiWhyAnswer.RuleRef;
 import com.one2drive.projeto1.decision.DecisionPriority;
@@ -15,6 +16,7 @@ import com.one2drive.projeto1.history.SessionSnapshot.LaneCheckSnapshot;
 import com.one2drive.projeto1.history.SessionSnapshot.ProposalSnapshot;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -375,6 +377,8 @@ final class RecordedCycle {
             case OBSTACLE -> lines.addAll(camera("Obstacle", "obstacle"));
             case POTHOLE -> lines.addAll(camera("Pothole", "pothole"));
             case SPEED_SIGN -> lines.addAll(camera("Speed limit", "speed-limit sign"));
+            case STOP_SIGN -> lines.addAll(worldObjects("StopSign", "STOP sign"));
+            case TRAFFIC_LIGHT -> lines.addAll(worldObjects("TrafficLight", "traffic light"));
             case WEATHER -> {
                 if (snapshot.environment() != null) {
                     lines.add("Environment: " + snapshot.environment().weatherCondition() + ", visibility "
@@ -394,6 +398,34 @@ final class RecordedCycle {
             case NONE -> { }
         }
         return lines;
+    }
+
+    /**
+     * Road-wide infrastructure the cameras do not list (stop signs, traffic lights), read from
+     * the world as recorded at this cycle: the objects still ahead, nearest first.
+     */
+    private List<String> worldObjects(String type, String noun) {
+        List<ApiRoadElement> ahead = snapshot.worldObjects() == null ? List.of() : snapshot.worldObjects().stream()
+            .filter(o -> type.equals(o.type()) && o.positionMeters() > 0)
+            .sorted(Comparator.comparingDouble(ApiRoadElement::positionMeters))
+            .limit(2)
+            .toList();
+        if (ahead.isEmpty()) {
+            return List.of("World: no " + noun + " ahead");
+        }
+        return ahead.stream()
+            .map(o -> "World: " + noun + " " + o.id() + " " + metres(o.positionMeters()) + " m ahead"
+                + stateOf(o))
+            .toList();
+    }
+
+    private static String stateOf(ApiRoadElement object) {
+        String details = object.details();
+        if (details == null) {
+            return "";
+        }
+        java.util.regex.Matcher state = java.util.regex.Pattern.compile("state=([A-Z]+)").matcher(details);
+        return state.find() ? ", " + state.group(1) : "";
     }
 
     private List<String> camera(String label, String noun) {

@@ -176,21 +176,58 @@ test.describe('Driving expert simulation UI', () => {
     expect(heads[1].x).toBeLessThan(heads[2].x);
   });
 
-  test('stop sign is placed only in the lane chosen in the drawer', async ({ page }) => {
+  test('stop sign has no lane field: one road-wide sign on the verge with a stop line across the road', async ({ page }) => {
     await page.goto('/');
     await loadScenario(page, 'S1 Empty safe road');
 
-    for (const lane of ['LEFT', 'CENTER', 'RIGHT']) {
-      await page.locator('[data-testid="reset-btn"]').click();
-      await clickTool(page, 'add-stop-sign');
-      await expect(page.locator('[data-testid="config-panel"]')).toBeVisible();
-      await page.locator('[data-testid="drawer-distance-input"]').fill('60');
-      await page.locator('[data-testid="lane-select"]').selectOption(lane);
-      await page.locator('[data-testid="apply-config"]').click();
+    await clickTool(page, 'add-stop-sign');
+    const drawer = page.locator('[data-testid="config-panel"]');
+    await expect(drawer).toBeVisible();
+    await expect(drawer).toContainText('Add stop sign');
+    await expect(drawer).toContainText('Applies to all lanes.');
+    await expect(page.locator('[data-testid="drawer-distance-input"]')).toBeVisible();
+    await expect(page.locator('[data-testid="lane-select"]')).toHaveCount(0);
+    await page.locator('[data-testid="drawer-distance-input"]').fill('60');
+    await page.locator('[data-testid="apply-config"]').click();
 
-      const sign = page.locator('[data-testid="road-stop-sign"]');
-      await expect(sign).toHaveCount(1);
-      await expect(sign).toHaveAttribute('data-object-id', `r12-${lane}`);
+    const sign = page.locator('[data-testid="road-stop-sign"]');
+    await expect(sign).toHaveCount(1);
+    await expect(page.locator('.stop-line')).toHaveCount(1);
+    // One element, written to one map cell, drawn once on the right verge (outside the 5.25 m asphalt).
+    expect(Math.abs(Number(await sign.getAttribute('data-lateral')))).toBeGreaterThan(5.25);
+    await openBottomTab(page, 'Road Map');
+    await expect(page.locator('[data-testid^="map-cell-"][data-code="4"]')).toHaveCount(1);
+  });
+
+  test('one stop sign, placed with no lane, stops the vehicle whether it drives in the left, centre or right lane', async ({ page }) => {
+    test.setTimeout(240000);
+    await page.goto('/');
+    const egoLane = async () => (await (await page.request.get('/api/simulation/state')).json()).egoVehicle;
+
+    for (const target of ['RIGHT', 'CENTER', 'LEFT']) {
+      await loadScenario(page, 'S1 Empty safe road');
+      await page.locator('[data-testid="start-btn"]').click();
+      await expect(page.locator('[data-testid="simulation-status"]')).toContainText('RUNNING');
+      // Drive into the lane under test, one lane change at a time.
+      const route = target === 'LEFT' ? [['LEFT', 'CENTER'], ['LEFT', 'LEFT']] : target === 'CENTER' ? [['LEFT', 'CENTER']] : [];
+      for (const [direction, expected] of route) {
+        await page.request.post('/api/simulation/lane-change/' + direction);
+        await expect.poll(async () => {
+          const ego = await egoLane();
+          return `${ego.lane}/${ego.laneChangeState}`;
+        }, { timeout: 25000 }).toBe(`${expected}/IDLE`);
+      }
+      expect((await egoLane()).lane).toBe(target);
+      const startedAt = (await egoLane()).positionMeters;
+
+      await addWorldObject(page, 'add-stop-sign', { distance: '150' });
+      await expect(page.locator('[data-testid="road-stop-sign"]')).toHaveCount(1);
+
+      await expect.poll(async () => (await egoLane()).speedKmh, { timeout: 60000, message: `from the ${target} lane` }).toBeLessThan(0.6);
+      const stopped = await egoLane();
+      expect(stopped.positionMeters - startedAt, `stopped before the sign, from ${target}`).toBeGreaterThan(100);
+      expect(stopped.positionMeters - startedAt).toBeLessThan(150);
+      await expect(await decisionAction(page)).toContainText(/STOP|WAIT/);
     }
   });
 
@@ -251,7 +288,8 @@ test.describe('Driving expert simulation UI', () => {
     await expect(page.locator('[data-testid="simulation-status"]')).toContainText('RUNNING');
     await clickTool(page, 'add-pothole');
     await page.locator('[data-testid="lane-select"]').selectOption('RIGHT');
-    await page.locator('[data-testid="drawer-distance-input"]').fill('25');
+    // Far enough ahead to leave the lane before it (the rules need room for the manoeuvre; nearer, the vehicle only slows down).
+    await page.locator('[data-testid="drawer-distance-input"]').fill('100');
     await page.locator('[data-testid="apply-config"]').click();
     await expect(await decisionAction(page)).toContainText('CHANGE_LANE_LEFT', { timeout: 45000 });
     await page.locator('[data-testid="stop-btn"]').click();
@@ -302,6 +340,82 @@ test.describe('Driving expert simulation UI', () => {
     await expect(page.locator('[data-testid="why-answer"] [data-testid="why-channel"]')).toHaveCount(2);
     await page.locator('[data-testid="reset-btn"]').click();
     expect(await page.request.get('/api/history/sessions/' + sessionId).then((response) => response.ok())).toBeTruthy();
+  });
+
+  test('WHY / WHY NOT / HOW are rebuilt from each trip: a stop sign, a pothole and a red light never share an answer', async ({ page }) => {
+    test.setTimeout(240000);
+    await page.goto('/');
+
+    interface Trip { name: string; scenario: string; until: string; pick: (snap: any) => boolean; node: string; world: RegExp | null }
+    const trips: Trip[] = [
+      { name: 'stop sign', scenario: 'S4', until: '00:10', node: 'V07', world: /World: STOP sign r\d+-\w+ [\d.]+ m ahead/,
+        pick: (snap) => snap.decision.speedAction === 'STOP' },
+      { name: 'pothole', scenario: 'S5', until: '00:05', node: 'F12', world: null,
+        pick: (snap) => String(snap.decision.laneAction).startsWith('CHANGE_LANE') },
+      { name: 'red light', scenario: 'S3', until: '00:12', node: 'VS', world: /World: traffic light r\d+-\w+ [\d.]+ m ahead, RED/,
+        pick: (snap) => snap.decision.speedAction === 'STOP' }
+    ];
+    const answers: Record<string, { why: string; whyNot: string; how: string; rule: string; clock: string }> = {};
+
+    for (const trip of trips) {
+      await page.locator('[data-testid="reset-btn"]').click();
+      await openBottomTab(page, 'Scenario Toolbox');
+      await page.locator(`[data-scenario-id="${trip.scenario}"]`).click();
+      await page.locator('[data-testid="start-btn"]').click();
+      await expect(page.locator('[data-testid="simulation-clock"]')).toContainText(trip.until, { timeout: 60000 });
+      await page.locator('[data-testid="stop-btn"]').click();
+
+      const dialog = page.locator('[data-testid="trip-questions-dialog"]');
+      await expect(dialog).toBeVisible();
+      const sessionId = (await dialog.getAttribute('data-session-id'))!;
+      const session = await (await page.request.get('/api/history/sessions/' + sessionId)).json();
+      expect(session.scenarioId).toContain(trip.scenario);
+      const snapshot = session.decisionSnapshots.find(trip.pick);
+      expect(snapshot, `${trip.name}: the saved trip holds the decision to ask about`).toBeTruthy();
+
+      const select = page.locator('[data-testid="trip-decision-select"]');
+      await expect.poll(() => select.locator('option').count()).toBeGreaterThan(1);
+      await select.selectOption(String(snapshot.simulationTimeMillis));
+      const answer = page.locator('[data-testid="trip-answer"]');
+      const rule: string = trip.name === 'pothole' ? snapshot.decision.laneSourceRule : snapshot.decision.speedSourceRule;
+      const clock = clockPattern(snapshot.simulationTimeMillis);
+
+      // WHY: the rule that decided, the clock and the speed of that very tick.
+      await page.locator('[data-testid="why-mode"]').click();
+      await expect(answer).toContainText(rule);
+      await expect(answer).toContainText(new RegExp(clock));
+      await expect(answer).toContainText(`${Math.round(snapshot.vehicle.speedKmh)} km/h in the ${snapshot.vehicle.lane} lane`);
+      const why = await answer.innerText();
+
+      await page.locator('[data-testid="why-not-mode"]').click();
+      await expect(answer).toContainText(new RegExp(clock));
+      const whyNot = await answer.innerText();
+
+      // HOW: the decision path of that tick, with the question this trip turned on decisive.
+      await page.locator('[data-testid="how-mode"]').click();
+      await expect(answer).toContainText(new RegExp(clock));
+      await expect(page.locator(`[data-testid="how-flow"] [data-node="${trip.node}"]`).first()).toHaveClass(/flow__step--decisive/);
+      const how = await answer.innerText();
+      if (trip.world) {
+        expect(how).toMatch(trip.world);
+      }
+      answers[trip.name] = { why, whyNot, how, rule, clock };
+      await dialog.locator('[data-testid="close-trip-dialog"]').click();
+    }
+
+    // Three different trips, three different answers in every mode, each with its own rule, clock and evidence.
+    const names = Object.keys(answers);
+    for (const mode of ['why', 'whyNot', 'how'] as const) {
+      expect(new Set(names.map((n) => answers[n][mode])).size, `${mode} differs per trip`).toBe(names.length);
+    }
+    expect(new Set(names.map((n) => answers[n].rule)).size).toBe(names.length);
+    for (const name of names) {
+      for (const other of names.filter((n) => n !== name)) {
+        for (const mode of ['why', 'whyNot'] as const) {
+          expect(answers[name][mode], `${name} ${mode} must not carry the ${other} rule`).not.toContain(answers[other].rule);
+        }
+      }
+    }
   });
 
   test('the decision selector explains each recorded decision of the trip', async ({ page }) => {
@@ -389,7 +503,7 @@ test.describe('Driving expert simulation UI', () => {
     await page.goto('/');
     await page.locator('[data-testid="reset-btn"]').click();
     await openBottomTab(page, 'Scenario Toolbox');
-    await page.locator('button:has-text("S14_SLOW_VEHICLE_OVERTAKE")').click();
+    await page.locator('[data-scenario-id="S14_SLOW_VEHICLE_OVERTAKE"]').click();
     await page.locator('[data-testid="start-btn"]').click();
     await expect(page.locator('[data-testid="simulation-status"]')).toContainText('RUNNING');
 
@@ -478,31 +592,29 @@ test.describe('Driving expert simulation UI', () => {
     await expect(cell).toHaveClass(/cell--free/);
   });
 
-  test('TEST E: clean EGO badge is displayed and EGOCRUISING never appears', async ({ page }) => {
+  test('TEST E: the ego car carries no visible EGO label', async ({ page }) => {
     await page.goto('/');
-    const egoBadge = page.locator('[data-testid="ego-badge"]');
-    await expect(egoBadge).toBeVisible();
-    await expect(egoBadge).toHaveText('EGO');
+    await expect(page.locator('[data-testid="road-ego"]')).toBeVisible();
+    await expect(page.locator('[data-testid="ego-badge"]')).toHaveCount(0);
 
     const egoText = await page.locator('[data-testid="road-ego"]').textContent();
-    expect(egoText?.trim()).toBe('EGO');
-    expect(egoText).not.toContain('EGOCRUISING');
-    expect(egoText).not.toContain('CRUISING');
+    expect(egoText?.trim()).toBe('');
+    await expect(page.locator('[data-testid="road-scene"] text', { hasText: /^EGO$/ })).toHaveCount(0);
   });
 
-  test('capture evidence screenshots for viewports, toolbox objects, and clean EGO badge', async ({ page }) => {
+  test('capture evidence screenshots for viewports, toolbox objects, and the ego car', async ({ page }) => {
     test.setTimeout(60000);
 
     // 1. Viewport 1440x900
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/');
     await page.waitForTimeout(500);
-    await page.screenshot({ path: '../screenshot_viewport_1440x900.png' });
+    await page.screenshot({ path: 'test-results/evidence/viewport-1440x900.png' });
 
     // 2. Viewport 1920x1080
     await page.setViewportSize({ width: 1920, height: 1080 });
     await page.waitForTimeout(500);
-    await page.screenshot({ path: '../screenshot_viewport_1920x1080.png' });
+    await page.screenshot({ path: 'test-results/evidence/viewport-1920x1080.png' });
 
     // 3. Toolbox object and matrix synchronization
     await clickTool(page, 'add-obstacle');
@@ -510,11 +622,11 @@ test.describe('Driving expert simulation UI', () => {
     await page.locator('[data-testid="apply-config"]').click();
     await page.waitForTimeout(500);
     await expect(page.locator('[data-testid="road-obstacle"]')).toBeVisible();
-    await page.screenshot({ path: '../screenshot_toolbox_objects_road.png' });
+    await page.screenshot({ path: 'test-results/evidence/toolbox-objects-road.png' });
 
-    // 4. Clean EGO badge
+    // 4. The ego car
     const egoEl = page.locator('[data-testid="road-ego"]');
-    await egoEl.screenshot({ path: '../screenshot_clean_ego_badge.png' });
+    await egoEl.screenshot({ path: 'test-results/evidence/ego-car.png' });
   });
 
   test('world mutation drawer layout stability: no displacement, right-side alignment, clean cleanup', async ({ page }) => {

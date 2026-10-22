@@ -800,7 +800,7 @@ It is no longer the primary UI, but core simulation and Drools remain shared.
 
 ## Scenario Editor
 
-The left Toolbox supports speed limits, stop signs, traffic lights, potholes, obstacles, barriers, front vehicles, pedestrians, rain, low visibility, and low grip. Configurable actions collect the supported lane, distance, state, severity, and speed fields before calling the REST API.
+The left Toolbox supports speed limits, stop signs, traffic lights, potholes, obstacles, barriers, front vehicles, pedestrians, rain, low visibility, and low grip. Configurable actions collect the supported lane, distance, state, severity, and speed fields before calling the REST API. Speed limits, traffic lights, crosswalks and stop signs are road-wide: their drawer asks only for a distance.
 
 ## Presentation Demo
 

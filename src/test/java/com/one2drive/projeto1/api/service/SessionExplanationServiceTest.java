@@ -75,7 +75,7 @@ class SessionExplanationServiceTest {
 
         Alternative slowDown = alternative(answer, "REDUCE");
         assertEquals(AlternativeStatus.CONDITION_NOT_MET, slowDown.status());
-        assertTrue(slowDown.requiredConditions().stream().anyMatch(c -> c.text().startsWith("Is a pothole in the vehicle's lane")));
+        assertTrue(slowDown.requiredConditions().stream().anyMatch(c -> c.text().startsWith("Is a pothole in the vehicle's path")));
         assertTrue(slowDown.prevailing().contains(CRUISE));
     }
 
@@ -311,6 +311,107 @@ class SessionExplanationServiceTest {
         assertTrue(answer.how().isEmpty());
     }
 
+    // ---- the answers are built from the recorded session, never from a template ----------------
+
+    private static final String STOP_RULE = "Stop sign requires full stop near line";
+    private static final String RED_RULE = "Red traffic light requires full stop and hold";
+    private static final String RADAR_RULE = "Reduce speed when closing front vehicle";
+
+    /** A stop at a stop sign, 3.4 m short of the line. */
+    private static SessionSnapshot stopSignStop() {
+        var decision = decision("STOP", STOP_RULE, 60, 0.0, "KEEP_LANE", "Default lane decision", 0,
+            List.of(proposal(STOP_RULE, "STOP", "LONGITUDINAL", 60, 0.0, "WON", "", "Stop sign reached; full stop required",
+                "distance=3.4m")), List.of(), "Stop sign reached; full stop required", "No lane rule holds");
+        var camera = new ApiSimulationSnapshot.CameraTelemetryView(120, List.of(), "CLEAR");
+        var radar = new ApiSimulationSnapshot.RadarTelemetryView(130, "none", Double.POSITIVE_INFINITY, 0, Double.POSITIVE_INFINITY, "CLEAR");
+        var sign = new com.one2drive.projeto1.api.model.ApiRoadElement("r30-CENTER", "StopSign", 3.4, "CENTER", "StopSign{lane=CENTER}");
+        return snapshot(7500, 15, "RIGHT", "IDLE", decision, List.of(STOP_RULE), radar, camera, List.of(sign));
+    }
+
+    /** A stop for a red light 22.5 m ahead. */
+    private static SessionSnapshot redLightStop() {
+        var decision = decision("STOP", RED_RULE, 60, 0.0, "KEEP_LANE", "Default lane decision", 0,
+            List.of(proposal(RED_RULE, "STOP", "LONGITUDINAL", 60, 0.0, "WON", "", "Red light ahead; stop at the line",
+                "state=RED distance=22.5m")), List.of(), "Red light ahead; stop at the line", "No lane rule holds");
+        var camera = new ApiSimulationSnapshot.CameraTelemetryView(120, List.of(), "CLEAR");
+        var radar = new ApiSimulationSnapshot.RadarTelemetryView(130, "none", Double.POSITIVE_INFINITY, 0, Double.POSITIVE_INFINITY, "CLEAR");
+        var light = new com.one2drive.projeto1.api.model.ApiRoadElement("r44-CENTER", "TrafficLight", 22.5, "CENTER", "TrafficLight{state=RED}");
+        return snapshot(31200, 28, "RIGHT", "IDLE", decision, List.of(RED_RULE), radar, camera, List.of(light));
+    }
+
+    /** Slowing for a vehicle ahead on the radar: 41 m away, closing at 22 km/h, TTC 3.1 s. */
+    private static SessionSnapshot radarSlowdown() {
+        var decision = decision("REDUCE_SPEED", RADAR_RULE, 35, 38.0, "KEEP_LANE", "Default lane decision", 0,
+            List.of(proposal(RADAR_RULE, "REDUCE_SPEED", "LONGITUDINAL", 35, 38.0, "WON", "", "Closing on the vehicle ahead",
+                "ttc=3.1s distance=41.0m")), List.of(), "Closing on the vehicle ahead", "No lane rule holds");
+        var camera = new ApiSimulationSnapshot.CameraTelemetryView(120, List.of(), "CLEAR");
+        var radar = new ApiSimulationSnapshot.RadarTelemetryView(130, "v7", 41.0, -22.0, 3.1, "TRACKING");
+        return snapshot(52000, 61, "RIGHT", "IDLE", decision, List.of(RADAR_RULE), radar, camera, List.of());
+    }
+
+    @Test
+    void differentTripsGiveDifferentAnswersBuiltFromTheirOwnRecordedEvidence() throws Exception {
+        record Trip(String name, SessionSnapshot snapshot, List<String> own) { }
+        List<Trip> trips = List.of(
+            new Trip("stop sign", stopSignStop(), List.of(STOP_RULE, "3.4", "15 km/h", "r30-CENTER")),
+            new Trip("pothole", potholeAvoidance(), List.of(POTHOLE_AVOID, "18.0", "42 km/h", "p1")),
+            new Trip("red light", redLightStop(), List.of(RED_RULE, "22.5", "28 km/h", "r44-CENTER", "RED")),
+            new Trip("radar", radarSlowdown(), List.of(RADAR_RULE, "41.0", "61 km/h", "v7", "3.1")));
+
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        java.util.Map<String, String> json = new java.util.LinkedHashMap<>();
+        java.util.Map<String, ApiWhyAnswer> answers = new java.util.LinkedHashMap<>();
+        for (Trip trip : trips) {
+            ApiWhyAnswer answer = explain(trip.snapshot());
+            answers.put(trip.name(), answer);
+            json.put(trip.name(), mapper.writeValueAsString(answer));
+            assertEquals(trip.snapshot().simulationTimeMillis(), answer.timestampMillis(), trip.name() + ": its own clock");
+        }
+
+        for (Trip trip : trips) {
+            for (String token : trip.own()) {
+                assertTrue(json.get(trip.name()).contains(token), trip.name() + " must show its own evidence: " + token);
+            }
+            // Nothing of another trip may leak in: its rule, its numbers, its objects.
+            for (Trip other : trips) {
+                if (other == trip) {
+                    continue;
+                }
+                for (String token : List.of(other.own().get(0), other.own().get(3))) {
+                    assertFalse(json.get(trip.name()).contains(token),
+                        trip.name() + " must not mention " + other.name() + "'s " + token);
+                }
+            }
+        }
+
+        // The decisive flowchart node of the speed decision differs between the trips.
+        java.util.Map<String, String> decisiveNode = new java.util.LinkedHashMap<>();
+        for (var entry : answers.entrySet()) {
+            var speedFlow = entry.getValue().how().stream().filter(f -> f.channel().equals("LONGITUDINAL")).findFirst().orElseThrow();
+            decisiveNode.put(entry.getKey(), speedFlow.steps().stream().filter(FlowStep::decisive)
+                .map(FlowStep::nodeId).findFirst().orElse("-"));
+        }
+        assertEquals("V07", decisiveNode.get("stop sign"));
+        assertEquals("VS", decisiveNode.get("red light"));
+        assertEquals(4, new java.util.HashSet<>(decisiveNode.values()).size(), "four trips, four different paths: " + decisiveNode);
+    }
+
+    @Test
+    void theHowPathShowsTheWorldRecordedInThatCycle() {
+        var stopStep = how(explain(stopSignStop()), "V07");
+        assertTrue(stopStep.observed().contains("World: STOP sign r30-CENTER 3.4 m ahead"), stopStep.observed().toString());
+
+        var lightStep = how(explain(redLightStop()), "VS");
+        assertTrue(lightStep.observed().contains("World: traffic light r44-CENTER 22.5 m ahead, RED"), lightStep.observed().toString());
+
+        var withoutSign = how(explain(radarSlowdown()), "V07");
+        assertTrue(withoutSign.observed().contains("World: no STOP sign ahead"), withoutSign.observed().toString());
+    }
+
+    private static FlowStep how(ApiWhyAnswer answer, String nodeId) {
+        return answer.how().stream().flatMap(f -> f.steps().stream()).filter(s -> s.nodeId().equals(nodeId)).findFirst().orElseThrow();
+    }
+
     // ---- fixtures -----------------------------------------------------------------------
 
     /** The ego in the RIGHT lane steers left around a pothole while building back up to its cruise speed. */
@@ -334,19 +435,27 @@ class SessionExplanationServiceTest {
 
     private static SessionSnapshot snapshot(long time, double speed, String lane, String laneChangeState,
                                             DecisionSnapshot decision, List<String> fired) {
+        var camera = new ApiSimulationSnapshot.CameraTelemetryView(120,
+            List.of(new ApiSimulationSnapshot.CameraDetectionView("p1", "Pothole", 18.0, lane)), "DETECTED");
+        var radar = new ApiSimulationSnapshot.RadarTelemetryView(130, "none", Double.POSITIVE_INFINITY, 0, Double.POSITIVE_INFINITY, "CLEAR");
+        return snapshot(time, speed, lane, laneChangeState, decision, fired, radar, camera, List.of());
+    }
+
+    private static SessionSnapshot snapshot(long time, double speed, String lane, String laneChangeState,
+                                            DecisionSnapshot decision, List<String> fired,
+                                            ApiSimulationSnapshot.RadarTelemetryView radar,
+                                            ApiSimulationSnapshot.CameraTelemetryView camera,
+                                            List<com.one2drive.projeto1.api.model.ApiRoadElement> world) {
         var vehicle = new ApiSimulationSnapshot.EgoVehicleView(speed, 100, lane, 0, 0, lane, laneChangeState, 0,
             "CRUISING", "OFF", "STRAIGHT", 0);
-        var sensors = new ApiSimulationSnapshot.SensorTelemetryView(
-            new ApiSimulationSnapshot.RadarTelemetryView(130, "none", Double.POSITIVE_INFINITY, 0, Double.POSITIVE_INFINITY, "CLEAR"),
-            new ApiSimulationSnapshot.CameraTelemetryView(120,
-                List.of(new ApiSimulationSnapshot.CameraDetectionView("p1", "Pothole", 18.0, lane)), "DETECTED"),
+        var sensors = new ApiSimulationSnapshot.SensorTelemetryView(radar, camera,
             new ApiSimulationSnapshot.BlindSpotTelemetryView(30, false, "none", Double.POSITIVE_INFINITY, "CLEAR"),
             new ApiSimulationSnapshot.BlindSpotTelemetryView(30, false, "none", Double.POSITIVE_INFINITY, "NO LANE"),
             new ApiSimulationSnapshot.EnvironmentTelemetryView("CLEAR", 120, 100, false));
         List<ApiTimelineEntry> timeline = fired.stream()
             .map(rule -> new ApiTimelineEntry(time, "RULE_FIRED", "RULE FIRED \"" + rule + "\"")).toList();
         return new SessionSnapshot(time, vehicle, new ApiSimulationSnapshot.EnvironmentView("CLEAR", 1, 1), sensors,
-            List.of(), List.of(), timeline, decision, null);
+            world, List.of(), timeline, decision, null);
     }
 
     private static DecisionSnapshot decision(String speedAction, String speedRule, int speedPriority, double target,

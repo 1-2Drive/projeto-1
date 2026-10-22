@@ -83,9 +83,9 @@ class CameraSensorTest {
     }
 
     @Test
-    void reportsAStopSignOnlyWhileTheVehicleIsInItsLane() {
+    void reportsAStopSignWhicheverLaneTheVehicleDrivesIn() {
         ScenarioDefinition scenario = new ScenarioDefinition();
-        scenario.setId("STOP_LANE");
+        scenario.setId("STOP_ALL_LANES");
         scenario.setInitialLane(Lane.RIGHT);
         scenario.setInitialWeather(WeatherCondition.CLEAR);
         ScenarioRoadElementDefinition sign = new ScenarioRoadElementDefinition();
@@ -96,13 +96,11 @@ class CameraSensorTest {
         WorldState world = ScenarioFactory.buildWorld(scenario, SimulationConfig.defaultConfig());
         CameraSensor camera = new CameraSensor(SimulationConfig.defaultConfig());
 
-        assertFalse(seesStopSign(camera, world), "a stop sign in CENTER is not for a vehicle in RIGHT");
-
-        world.getEgo().setLane(Lane.CENTER);
-        assertTrue(seesStopSign(camera, world), "after moving into CENTER the sign of that lane applies");
-
-        world.getEgo().setLane(Lane.LEFT);
-        assertFalse(seesStopSign(camera, world), "and stops applying once the vehicle has left CENTER");
+        for (Lane lane : new Lane[] {Lane.RIGHT, Lane.CENTER, Lane.LEFT}) {
+            world.getEgo().setLane(lane);
+            assertTrue(seesStopSign(camera, world),
+                "a stop sign governs the whole road, so a vehicle in " + lane + " sees it too");
+        }
     }
 
     private static boolean seesStopSign(CameraSensor camera, WorldState world) {

@@ -35,8 +35,8 @@ const ACTIONS: Record<ToolboxAction, ActionDefinition> = {
     needsLightState: false, needsBarrierState: false, needsActorSpeed: false
   },
   STOP_SIGN: {
-    title: 'Add stop sign', hint: 'Vehicle must decelerate, stop and hold before proceeding.',
-    needsLane: true, needsSeverity: false, needsSpeedLimit: false,
+    title: 'Add stop sign', hint: 'Vehicle must decelerate, stop and hold before proceeding. Applies to all lanes.',
+    needsLane: false, needsSeverity: false, needsSpeedLimit: false,
     needsLightState: false, needsBarrierState: false, needsActorSpeed: false
   },
   TRAFFIC_LIGHT: {
@@ -196,7 +196,9 @@ export class ElementPropertiesComponent {
         this.createRoadElement.emit({ type: 'CROSSWALK', lane: 'CENTER', distanceAheadMeters: this.distanceAheadMeters() });
         break;
       case 'STOP_SIGN':
-        this.createRoadElement.emit(this.simpleElement('STOP_SIGN'));
+        // One sign in the map, valid for the whole road: the road view draws it on the verge and
+        // the stop line across every lane. The cell lane is only where the map stores it.
+        this.createRoadElement.emit({ type: 'STOP_SIGN', lane: 'CENTER', distanceAheadMeters: this.distanceAheadMeters() });
         break;
       case 'TRAFFIC_LIGHT':
         // One light in the map, valid for the whole road: the road view repeats it in every lane.

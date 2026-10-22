@@ -27,7 +27,6 @@ type DecisionSnapshot = ApiSessionDetail['decisionSnapshots'][number];
 export class TripQuestionsDialogComponent implements OnInit {
   readonly sessionId = input.required<string>();
   readonly close = output<void>();
-  readonly openHistory = output<string>();
 
   private readonly state = inject(SimulationStateService);
   private readonly api = inject(BackendApiService);
@@ -97,10 +96,6 @@ export class TripQuestionsDialogComponent implements OnInit {
   }
 
   protected dismiss(): void { this.close.emit(); }
-
-  protected showHistory(): void {
-    this.openHistory.emit(this.sessionId());
-  }
 
   protected formatTime(millis: number): string {
     const mm = Math.floor(millis / 60_000).toString().padStart(2, '0');

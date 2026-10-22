@@ -105,15 +105,11 @@ describe('TripQuestionsDialogComponent', () => {
     expect(state.explainSessionDecision).toHaveBeenCalledTimes(1);
   });
 
-  it('opens history and closes on Escape', async () => {
+  it('closes on Escape', async () => {
     await open();
     const component = fixture.componentInstance;
-    const opened = jasmine.createSpy('openHistory');
     const closed = jasmine.createSpy('close');
-    component.openHistory.subscribe(opened);
     component.close.subscribe(closed);
-    click('open-session-history');
-    expect(opened).toHaveBeenCalledOnceWith('just-stopped');
     element.querySelector('[role="dialog"]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(closed).toHaveBeenCalled();
   });

@@ -1,9 +1,17 @@
+:host {
+  display: block;
+  height: 100%;
+  min-height: 0;
+}
+
 .panel {
   background: var(--ds-bg-elevated);
   border: 1px solid var(--ds-border);
   border-radius: var(--ds-radius-md);
   padding: 0.85rem;
   color: var(--ds-text-primary);
+  min-height: 100%;
+  box-sizing: border-box;
 
   h3 {
     margin: 0 0 0.6rem;

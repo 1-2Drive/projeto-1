@@ -79,7 +79,6 @@ class SimulationStateServiceStub {
   addActor = jasmine.createSpy('addActor');
   updateEnvironment = jasmine.createSpy('updateEnvironment');
   clearError = jasmine.createSpy('clearError');
-  runPresentationDemo = jasmine.createSpy('runPresentationDemo');
 }
 
 describe('SimulationPageComponent', () => {
@@ -109,14 +108,6 @@ describe('SimulationPageComponent', () => {
     expect(pause.disabled).toBeTrue();
   });
 
-  it('calls demo action from demo button', () => {
-    const compiled = fixture.nativeElement as HTMLElement;
-    const demo = compiled.querySelector('[data-testid="run-demo-btn"]') as HTMLButtonElement;
-    demo.click();
-
-    expect(state.runPresentationDemo).toHaveBeenCalled();
-  });
-
   it('renders the STOP-time question dialog only for the persisted stopped session and closes it cleanly', () => {
     state.stoppedSessionId.set('saved-trip-1');
     fixture.detectChanges();
@@ -126,13 +117,5 @@ describe('SimulationPageComponent', () => {
     const close = fixture.nativeElement.querySelector('[data-testid="close-trip-dialog"]') as HTMLButtonElement;
     close.click();
     expect(state.clearStoppedSession).toHaveBeenCalled();
-  });
-
-  it('opens historical session UI without deleting it when RESET is requested', () => {
-    state.stoppedSessionId.set('saved-trip-1');
-    fixture.detectChanges();
-    (fixture.nativeElement.querySelector('[data-testid="open-session-history"]') as HTMLButtonElement).click();
-    expect(state.clearStoppedSession).toHaveBeenCalled();
-    expect(state.openHistoricalSession).toHaveBeenCalledWith('saved-trip-1');
   });
 });

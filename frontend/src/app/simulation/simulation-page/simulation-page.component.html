@@ -1,13 +1,44 @@
 <main class="page">
 
-  <!-- ============================ header ============================ -->
-  <header class="top">
-    <div class="top__identity">
-      <h1>Sistema Inteligente de Apoio à Decisão de Condução</h1>
-      <p>Realtime Expert System · {{ engine().tagline }}</p>
+  <!-- ============================ control bar ============================ -->
+  <nav class="controls" aria-label="Simulation controls">
+    <div class="controls__primary">
+      <button data-testid="start-btn" type="button" class="btn btn--primary"
+              [disabled]="!canStart()" (click)="start()" [title]="isPaused() ? 'Resume simulation' : 'Start the simulation (START)'">
+        <span class="btn__glyph" aria-hidden="true">▶</span>{{ isPaused() ? 'RESUME' : 'START' }}
+      </button>
+      <button data-testid="pause-btn" type="button" class="btn"
+              [disabled]="!canPause()" (click)="pause()" title="Freeze the simulation to inspect evidence">
+        <span class="btn__glyph" aria-hidden="true">❚❚</span>PAUSE
+      </button>
+      <button data-testid="stop-btn" type="button" class="btn"
+              [disabled]="!canStop()" (click)="stop()" title="Stop the simulation">
+        <span class="btn__glyph" aria-hidden="true">■</span>STOP
+      </button>
+      <button data-testid="reset-btn" type="button" class="btn"
+              [disabled]="!canReset()" (click)="reset()" title="Reset world, sensors and the rule engine's working memory">
+        <span class="btn__glyph" aria-hidden="true">↺</span>RESET
+      </button>
     </div>
 
-    <div class="top__status">
+    <div class="controls__engine" role="group" aria-label="Rule engine">
+      <span class="controls__label">Rule engine</span>
+      @for (option of engines; track option.id) {
+        <button type="button" class="btn"
+                [class.btn--selected]="option.id === expertBackend()"
+                [attr.aria-pressed]="option.id === expertBackend()"
+                [attr.data-testid]="'engine-' + option.id.toLowerCase() + '-btn'"
+                [disabled]="vm().loading"
+                (click)="switchBackend(option.id)"
+                [title]="option.id === expertBackend()
+                  ? option.label + ' is deciding'
+                  : 'Decide with ' + option.label + ': reloads the current scenario with an empty working memory'">
+          {{ option.label }}
+        </button>
+      }
+    </div>
+
+    <div class="controls__status">
       <app-status-badge
         label="Backend"
         [connected]="vm().connection.backendConnected"
@@ -37,60 +68,6 @@
       </div>
       <span data-testid="simulation-status" class="sr-only">{{ simulationStatus() }}</span>
     </div>
-  </header>
-
-  <!-- ============================ control bar ============================ -->
-  <nav class="controls" aria-label="Simulation controls">
-    <div class="controls__primary">
-      <button data-testid="start-btn" type="button" class="btn btn--primary"
-              [disabled]="!canStart()" (click)="start()" [title]="isPaused() ? 'Resume simulation' : 'Start the simulation (START)'">
-        <span class="btn__glyph" aria-hidden="true">▶</span>{{ isPaused() ? 'RESUME' : 'START' }}
-      </button>
-      <button data-testid="pause-btn" type="button" class="btn"
-              [disabled]="!canPause()" (click)="pause()" title="Freeze the simulation to inspect evidence">
-        <span class="btn__glyph" aria-hidden="true">❚❚</span>PAUSE
-      </button>
-      <button data-testid="stop-btn" type="button" class="btn"
-              [disabled]="!canStop()" (click)="stop()" title="Stop the simulation">
-        <span class="btn__glyph" aria-hidden="true">■</span>STOP
-      </button>
-      <button data-testid="reset-btn" type="button" class="btn"
-              [disabled]="!canReset()" (click)="reset()" title="Reset world, sensors and the rule engine's working memory">
-        <span class="btn__glyph" aria-hidden="true">↺</span>RESET
-      </button>
-    </div>
-
-    <div class="controls__engine" role="group" aria-label="Rule engine">
-      <span class="controls__demo-label">Rule engine</span>
-      @for (option of engines; track option.id) {
-        <button type="button" class="btn"
-                [class.btn--selected]="option.id === expertBackend()"
-                [attr.aria-pressed]="option.id === expertBackend()"
-                [attr.data-testid]="'engine-' + option.id.toLowerCase() + '-btn'"
-                [disabled]="vm().loading"
-                (click)="switchBackend(option.id)"
-                [title]="option.id === expertBackend()
-                  ? option.label + ' is deciding'
-                  : 'Decide with ' + option.label + ': reloads the current scenario with an empty working memory'">
-          {{ option.label }}
-        </button>
-      }
-    </div>
-
-    <div class="controls__demo">
-      <span class="controls__demo-label">Automated demo</span>
-      <button data-testid="run-demo-btn" type="button" class="btn btn--ghost"
-              [disabled]="vm().loading" (click)="runPresentationDemo()"
-              title="Load the scripted presentation scenario and start it">
-        RUN DEMO
-      </button>
-      <button type="button" class="btn btn--ghost btn--icon"
-              [disabled]="!canStop()" (click)="restartDemo()" title="Restart the scripted demo"
-              aria-label="Restart automated demo">↻</button>
-      <button type="button" class="btn btn--ghost btn--icon"
-              [disabled]="!canStop()" (click)="stopDemo()" title="Stop the scripted demo"
-              aria-label="Stop automated demo">✕</button>
-    </div>
   </nav>
 
   <app-flow-stage [activeStage]="snapshot()?.activeStage ?? 'WORLD'" />
@@ -113,97 +90,101 @@
 
   @if (tripDialogSessionId(); as stoppedSessionId) {
     <app-trip-questions-dialog [sessionId]="stoppedSessionId"
-      (close)="closeTripDialog()" (openHistory)="openSavedSession($event)" />
-  }
-
-  <!-- Only rendered while the scripted demo scenario is loaded. -->
-  @if (demoPhases().length > 0) {
-    <section class="demo" aria-label="Automated demo progress">
-      <span class="demo__title">Automated demo</span>
-      <div class="demo__steps">
-        @for (phase of demoPhases(); track phase.id) {
-          <div class="demo__step"
-               [class.demo__step--done]="phase.status === 'DONE'"
-               [class.demo__step--active]="phase.status === 'ACTIVE'"
-               [attr.data-testid]="'demo-phase-' + phase.id">
-            <span class="demo__mark" aria-hidden="true">
-              @switch (phase.status) {
-                @case ('DONE') { ✓ }
-                @case ('ACTIVE') { ▶ }
-                @default { ○ }
-              }
-            </span>
-            <span class="demo__label">{{ phase.label }}</span>
-          </div>
-        }
-      </div>
-    </section>
+      (close)="closeTripDialog()" />
   }
 
   <!-- ============================ workspace ============================ -->
   <section class="workspace">
-
-    <aside class="workspace__left" aria-label="Scenario controls">
-      <app-toolbox
-        [simulationStatus]="simulationStatus()"
-        [environment]="snapshot()?.environment ?? null"
-        (createRoadElement)="addRoadElement($event)"
-        (createActor)="addActor($event)"
-        (updateEnvironment)="updateEnvironment($event)"
-      />
-      <app-scenario-library [scenarios]="scenarios()" (loadScenario)="loadScenario($event)" />
-    </aside>
-
     <section class="workspace__center">
       <app-road-canvas [snapshot]="snapshot()" />
-      <app-road-map [snapshot]="snapshot()" (paint)="setMapCell($event)" />
     </section>
 
-    <aside class="workspace__right" aria-label="Decision and telemetry">
-      <app-situation-panel [snapshot]="snapshot()" />
-      <app-speed-advisor [snapshot]="snapshot()" />
-      <app-decision-panel [snapshot]="snapshot()" />
-      <app-sensors-panel [snapshot]="snapshot()" />
-      <app-vehicle-state [snapshot]="snapshot()" />
+    <aside class="workspace__right evidence" aria-label="Expert system evidence">
+      <nav class="tabs" role="tablist" aria-label="Expert system evidence">
+        <button role="tab" [attr.aria-selected]="activeTab() === 'timeline'"
+                [class.active]="activeTab() === 'timeline'" (click)="setTab('timeline')">
+          Inference Timeline
+        </button>
+        <button role="tab" [attr.aria-selected]="activeTab() === 'memory'"
+                [class.active]="activeTab() === 'memory'" (click)="setTab('memory')">
+          Working Memory
+        </button>
+        <button role="tab" [attr.aria-selected]="activeTab() === 'explanation'"
+                [class.active]="activeTab() === 'explanation'" (click)="setTab('explanation')">
+          Explanation
+        </button>
+        <button role="tab" [attr.aria-selected]="activeTab() === 'world'"
+                [class.active]="activeTab() === 'world'" (click)="setTab('world')">
+          World State
+        </button>
+        <button role="tab" [attr.aria-selected]="activeTab() === 'decision'"
+                [class.active]="activeTab() === 'decision'" (click)="setTab('decision')">
+          Decision
+        </button>
+      </nav>
+
+      <div class="tabs__body">
+        @switch (activeTab()) {
+          @case ('timeline') {
+            <app-rule-timeline [snapshot]="snapshot()" (inspectDecision)="inspectTimelineDecision($event)" />
+          }
+          @case ('memory') {
+            <app-working-memory [snapshot]="snapshot()" />
+          }
+          @case ('explanation') {
+            <app-explanation-panel [snapshot]="snapshot()" />
+          }
+          @case ('world') {
+            <app-world-state [snapshot]="snapshot()" />
+          }
+          @case ('decision') {
+            <app-decision-panel [snapshot]="snapshot()" />
+          }
+        }
+      </div>
     </aside>
   </section>
 
-  <!-- ============================ evidence ============================ -->
-  <section class="evidence">
-    <nav class="tabs" role="tablist" aria-label="Expert system evidence">
-      <button role="tab" [attr.aria-selected]="activeTab() === 'timeline'"
-              [class.active]="activeTab() === 'timeline'" (click)="setTab('timeline')">
-        Inference Timeline
-      </button>
-      <button role="tab" [attr.aria-selected]="activeTab() === 'memory'"
-              [class.active]="activeTab() === 'memory'" (click)="setTab('memory')">
-        Working Memory
-      </button>
-      <button role="tab" [attr.aria-selected]="activeTab() === 'explanation'"
-              [class.active]="activeTab() === 'explanation'" (click)="setTab('explanation')">
-        Explanation
-      </button>
-      <button role="tab" [attr.aria-selected]="activeTab() === 'world'"
-              [class.active]="activeTab() === 'world'" (click)="setTab('world')">
-        World State
-      </button>
-    </nav>
+  <!-- ============================ lower workspace ============================ -->
+  <section class="lower-workspace" aria-label="Telemetry and simulation tools">
+    <section class="telemetry-pair" aria-label="Speed and sensors">
+      <app-speed-advisor [snapshot]="snapshot()" />
+      <app-sensors-panel [snapshot]="snapshot()" />
+    </section>
 
-    <div class="tabs__body">
-      @switch (activeTab()) {
-        @case ('timeline') {
-          <app-rule-timeline [snapshot]="snapshot()" (inspectDecision)="inspectTimelineDecision($event)" />
+    <section class="bottom-tabs" aria-label="Simulation tools">
+      <nav class="bottom-tabs__nav" role="tablist" aria-label="Simulation tools">
+        <button role="tab" [attr.aria-selected]="bottomTab() === 'road-map'"
+                [class.active]="bottomTab() === 'road-map'" (click)="setBottomTab('road-map')">
+          Road Map
+        </button>
+        <button role="tab" [attr.aria-selected]="bottomTab() === 'toolbox'"
+                [class.active]="bottomTab() === 'toolbox'" (click)="setBottomTab('toolbox')">
+          Scenario Toolbox
+        </button>
+      </nav>
+
+      <div class="bottom-tabs__body">
+        @switch (bottomTab()) {
+          @case ('road-map') {
+            <div class="road-map-tab">
+              <app-road-map [snapshot]="snapshot()" (paint)="setMapCell($event)" />
+            </div>
+          }
+          @case ('toolbox') {
+            <section class="scenario-tab" aria-label="Scenario controls">
+              <app-toolbox
+                [simulationStatus]="simulationStatus()"
+                [environment]="snapshot()?.environment ?? null"
+                (createRoadElement)="addRoadElement($event)"
+                (createActor)="addActor($event)"
+                (updateEnvironment)="updateEnvironment($event)"
+              />
+              <app-scenario-library [scenarios]="scenarios()" (loadScenario)="loadScenario($event)" />
+            </section>
+          }
         }
-        @case ('memory') {
-          <app-working-memory [snapshot]="snapshot()" />
-        }
-        @case ('explanation') {
-          <app-explanation-panel [snapshot]="snapshot()" />
-        }
-        @case ('world') {
-          <app-world-state [snapshot]="snapshot()" />
-        }
-      }
-    </div>
+      </div>
+    </section>
   </section>
 </main>

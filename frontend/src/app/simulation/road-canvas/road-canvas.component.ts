@@ -78,8 +78,8 @@ const LANE_CENTER_Y: Record<LaneName, number> = {
 };
 
 /** Vertical extent of the asphalt in percent of the canvas height (matches .surface in the SCSS). */
-const ROAD_TOP_PERCENT = 11.5;
-const ROAD_BOTTOM_PERCENT = 88.5;
+const ROAD_TOP_PERCENT = 0;
+const ROAD_BOTTOM_PERCENT = 100;
 /** Distance between two lane centres in percent of the canvas height. */
 const LANE_PITCH_PERCENT = LANE_CENTER_Y.CENTER - LANE_CENTER_Y.LEFT;
 /** Horizontal distance from the ego centre to its nose, in percent of the canvas width. */
@@ -124,9 +124,6 @@ export class RoadCanvasComponent {
   readonly worldForwardMeters = 200;
 
   protected readonly ranges = computed(() => this.snapshot()?.sensorRanges ?? EMPTY_RANGES);
-
-  /** Distance ticks drawn on the road so scale is always readable. */
-  protected readonly distanceTicks = [0, 40, 80, 120, 160, 200];
 
   protected readonly egoPosition = computed(() => this.snapshot()?.egoVehicle?.positionMeters ?? 0);
   protected readonly egoSpeed = computed(() => this.snapshot()?.egoVehicle?.speedKmh ?? 0);
@@ -182,27 +179,6 @@ export class RoadCanvasComponent {
    */
   protected readonly egoXPercent = computed(() => {
     return Math.max(0, Math.min(100, this.worldToPercentX(this.egoPosition())));
-  });
-
-  /** Dynamic ticks in world metres. Completely static while camera is static; scrolls when camera scrolls. */
-  protected readonly dynamicTicks = computed(() => {
-    const camOffset = this.cameraOffset();
-    const span = this.viewportSpanMeters;
-    const minM = camOffset;
-    const maxM = camOffset + span;
-    const step = 40;
-    const first = Math.floor(minM / step) * step;
-    const ticks: { worldMeters: number; percent: number }[] = [];
-    for (let m = first; m <= maxM + step; m += step) {
-      const pct = this.worldToPercentX(m);
-      if (pct >= -5 && pct <= 105) {
-        ticks.push({
-          worldMeters: m,
-          percent: pct
-        });
-      }
-    }
-    return ticks;
   });
 
   /** Dash offset in percent for streaming lane line animation. Continuously streams backwards as vehicle advances! */
@@ -380,6 +356,9 @@ export class RoadCanvasComponent {
       // The telemetry can report CLEAR on the road-edge side (before START, or mid lane
       // change while ego.lane is still the source lane), so the pad is also kept on the asphalt.
       const centreY = side === 'LEFT' ? egoY - LANE_PITCH_PERCENT : egoY + LANE_PITCH_PERCENT;
+      if (centreY <= ROAD_TOP_PERCENT || centreY >= ROAD_BOTTOM_PERCENT) {
+        return null;
+      }
       const top = Math.max(ROAD_TOP_PERCENT, centreY - BLIND_PAD_HALF_HEIGHT_PERCENT);
       const bottom = Math.min(ROAD_BOTTOM_PERCENT, centreY + BLIND_PAD_HALF_HEIGHT_PERCENT);
       if (bottom - top < MIN_PAD_HEIGHT_PERCENT) {

@@ -1,11 +1,5 @@
 <section class="road" [class.road--running]="running()" [class.road--rain]="raining()">
 
-  <!-- ============ roadside ============ -->
-  <div class="verdicts" aria-hidden="true">
-    <div class="verdict verdict--top"></div>
-    <div class="verdict verdict--bottom"></div>
-  </div>
-
   <!-- ============ road surface ============ -->
   <div class="surface" aria-hidden="true">
     <div class="surface__asphalt"></div>
@@ -40,15 +34,6 @@
                 stroke-linecap="round" stroke-linejoin="round" />
         </svg>
       }
-    }
-  </div>
-
-  <!-- ============ distance scale ============ -->
-  <div class="scale" aria-hidden="true">
-    @for (t of dynamicTicks(); track t.worldMeters) {
-      <div class="scale__tick" [style.left.%]="t.percent">
-        <span>{{ t.worldMeters }} m</span>
-      </div>
     }
   </div>
 
@@ -356,21 +341,6 @@
       </div>
     </div>
   }
-
-  <!-- ============ Telemetry HUD Ribbon ============ -->
-  <div class="telemetry-hud" data-testid="telemetry-hud">
-    <div class="hud-item"><span class="hud-label">POSITION</span><strong class="hud-val" data-testid="hud-position">{{ egoPosition() | number:'1.1-1' }} m</strong></div>
-    <div class="hud-item"><span class="hud-label">SPEED</span><strong class="hud-val" data-testid="hud-speed">{{ egoSpeed() | number:'1.0-0' }} km/h</strong></div>
-    <div class="hud-item"><span class="hud-label">ACCEL</span><strong class="hud-val" data-testid="hud-accel">{{ (egoAcceleration() >= 0 ? '+' : '') + (egoAcceleration() | number:'1.1-1') }} m/s²</strong></div>
-    <div class="hud-item"><span class="hud-label">STATE</span><strong class="hud-val hud-badge" [attr.data-state]="drivingState()">{{ drivingState() }}</strong></div>
-    <div class="hud-item"><span class="hud-label">LANE</span><strong class="hud-val" data-testid="hud-lane">{{ currentLane() }}</strong></div>
-    <div class="hud-item"><span class="hud-label">INDICATOR</span><strong class="hud-val hud-badge" [attr.data-indicator]="indicatorName()" data-testid="hud-indicator">{{ indicatorName() }}</strong></div>
-    <div class="hud-item"><span class="hud-label">STEERING</span><strong class="hud-val" data-testid="hud-steering">{{ steeringName() }}</strong></div>
-    <div class="hud-item">
-      <span class="hud-label">RADAR FOV</span>
-      <strong class="hud-val" data-testid="hud-radar-fov">{{ ranges().radarRangeMeters | number:'1.0-0' }} m</strong>
-    </div>
-  </div>
 
   <!-- ============ legend ============ -->
   <div class="legend" aria-hidden="true">

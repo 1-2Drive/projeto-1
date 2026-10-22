@@ -4,6 +4,15 @@
   flex: 0 0 auto;
 }
 
+:host-context(.road-map-tab) {
+  height: 100%;
+  margin-top: 0;
+}
+
+:host-context(.road-map-tab) .road-map {
+  min-height: 100%;
+}
+
 .road-map {
   display: grid;
   gap: 0.5rem;

@@ -1,6 +1,7 @@
 :host {
   display: block;
   width: 100%;
+  height: 100%;
   min-height: 0;
   flex: 1 1 auto;
 }
@@ -10,6 +11,7 @@
   position: relative;
   width: 100%;
   height: 100%;
+  aspect-ratio: auto;
   min-height: 0;
   max-height: none;
   border: 1px solid var(--ds-border);
@@ -22,10 +24,13 @@
 }
 
 @media (max-width: 1100px) {
-  :host { flex: 0 0 auto; }
+  :host {
+    height: auto;
+    flex: 0 0 auto;
+  }
   .road {
     height: auto;
-    aspect-ratio: 16 / 9;
+    aspect-ratio: 10 / 3;
     max-height: 40rem;
     min-height: clamp(12rem, 56vw, 20rem);
   }
@@ -36,7 +41,7 @@
   .road {
     height: auto;
     min-height: 14rem;
-    aspect-ratio: 16 / 9;
+    aspect-ratio: 10 / 3;
   }
 }
 
@@ -58,7 +63,7 @@
 
 .rain-overlay {
   position: absolute;
-  inset: 11.5% 0;
+  inset: 0;
   z-index: 1;
   overflow: hidden;
   pointer-events: none;
@@ -105,7 +110,7 @@
 
 .rain-chip {
   position: absolute;
-  top: calc(11.5% + 0.5rem);
+  top: 0.5rem;
   right: 3.4rem;
   z-index: 7;
   padding: 0.2rem 0.45rem;
@@ -122,38 +127,10 @@
   .rain-overlay__drops { animation: none; }
 }
 
-/* ===================== roadside ===================== */
-.verdicts {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-.verdict {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 11.5%;
-  background:
-    repeating-linear-gradient(115deg, #16241d 0 9px, #131f19 9px 18px);
-  border-bottom: 1px solid rgba(120, 160, 140, 0.14);
-}
-
-.verdict--top {
-  top: 0;
-}
-
-.verdict--bottom {
-  bottom: 0;
-  border-bottom: 0;
-  border-top: 1px solid rgba(120, 160, 140, 0.14);
-}
-
 /* ===================== road surface ===================== */
 .surface {
   position: absolute;
-  top: 11.5%;
-  bottom: 11.5%;
+  inset: 0;
   left: 0;
   right: 0;
   pointer-events: none;
@@ -170,19 +147,15 @@
 }
 
 .sensor-edge,
-.scale,
 .lanes,
 .chevrons,
-.verdicts,
 .sensors {
   pointer-events: none;
 }
 
 .surface,
 .sensors,
-.verdicts,
 .chevrons,
-.scale,
 .lanes {
   pointer-events: none;
 }
@@ -254,35 +227,6 @@
   transform: translate(-50%, -50%);
 }
 
-/* ===================== distance scale ===================== */
-.scale {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 11.5%;
-  pointer-events: none;
-  z-index: 4;
-}
-
-.scale__tick {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 0;
-  border-left: 1px solid rgba(150, 180, 205, 0.18);
-}
-
-.scale__tick span {
-  position: absolute;
-  top: 0.35rem;
-  left: 0.3rem;
-  font-family: var(--ds-font-mono);
-  font-size: 0.62rem;
-  color: rgba(184, 203, 219, 0.62);
-  white-space: nowrap;
-}
-
 /* ===================== sensor fields of view ===================== */
 .sensors {
   position: absolute;
@@ -334,8 +278,8 @@
 
 .sensor-edge {
   position: absolute;
-  top: 11.5%;
-  bottom: 11.5%;
+  top: 0;
+  bottom: 0;
   width: 0;
   z-index: 2;
 }
@@ -553,8 +497,8 @@
 
 .crosswalk {
   position: absolute;
-  top: 11.5%;
-  bottom: 11.5%;
+  top: 0;
+  bottom: 0;
   width: clamp(2.8rem, 5vw, 4.4rem);
   transform: translateX(-50%);
   z-index: 4;
@@ -908,77 +852,6 @@
 .car__wheels rect,
 .car__wheels g {
   transition: none !important;
-}
-
-/* ===================== Telemetry HUD Ribbon ===================== */
-.telemetry-hud {
-  position: absolute;
-  bottom: 0.45rem;
-  left: 0.8rem;
-  display: flex;
-  align-items: center;
-  gap: 0.85rem;
-  padding: 0.3rem 0.65rem;
-  border-radius: var(--ds-radius-sm);
-  background: rgba(10, 16, 24, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(4px);
-  z-index: 10;
-  font-family: var(--ds-font-mono);
-  font-size: 0.68rem;
-
-  .hud-item {
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
-  }
-
-  .hud-label {
-    color: rgba(226, 235, 244, 0.5);
-    font-size: 0.58rem;
-    font-weight: 600;
-    letter-spacing: 0.05em;
-  }
-
-  .hud-val {
-    color: #e2e8f0;
-    font-weight: 700;
-  }
-
-  .hud-badge {
-    padding: 0.08rem 0.3rem;
-    border-radius: 3px;
-    font-size: 0.62rem;
-
-    &[data-state='ACCELERATING'],
-    &[data-state='RESUMING'] {
-      background: rgba(52, 211, 153, 0.2);
-      color: #34d399;
-    }
-
-    &[data-state='CRUISING'] {
-      background: rgba(56, 189, 248, 0.2);
-      color: #38bdf8;
-    }
-
-    &[data-state='BRAKING'],
-    &[data-state='STOPPED_FOR_HAZARD'] {
-      background: rgba(248, 113, 113, 0.25);
-      color: #f87171;
-    }
-
-    &[data-state='DECELERATING'] {
-      background: rgba(251, 191, 36, 0.2);
-      color: #fbbf24;
-    }
-
-    &[data-indicator='LEFT'],
-    &[data-indicator='RIGHT'],
-    &[data-indicator='HAZARD'] {
-      background: rgba(255, 194, 51, 0.25);
-      color: #ffc233;
-    }
-  }
 }
 
 .ego__maneuver {

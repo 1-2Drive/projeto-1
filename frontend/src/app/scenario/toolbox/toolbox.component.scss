@@ -6,7 +6,8 @@
   border-radius: var(--ds-radius-lg);
   background: rgba(15, 23, 32, 0.82);
   max-height: 100%;
-  overflow-y: auto;
+  overflow-y: hidden;
+  overflow-x: hidden;
 }
 
 .toolbox__head {
@@ -210,5 +211,50 @@
     width: 100%;
     accent-color: #3f95cf;
     cursor: pointer;
+  }
+}
+
+/* In the lower Scenario Toolbox tab the controls use the available width instead
+   of rebuilding the old vertical sidebar. */
+@media (min-width: 1101px) {
+  .toolbox {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-rows: repeat(4, auto);
+    align-items: start;
+    overflow-y: hidden;
+    overflow-x: hidden;
+  }
+
+  .toolbox__head,
+  .toolbox__lead {
+    grid-column: 1 / -1;
+  }
+
+  .toolbox__lead {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .group {
+    align-self: stretch;
+    min-width: 0;
+    padding: 0 0.45rem;
+    border-top: 0;
+    border-left: 1px dashed var(--ds-border);
+  }
+
+  .group:first-of-type {
+    grid-column: span 2;
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .group--env {
+    grid-column: span 2;
+  }
+
+  .preset__sign {
+    aspect-ratio: 1;
   }
 }

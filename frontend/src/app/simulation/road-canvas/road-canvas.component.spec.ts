@@ -391,7 +391,7 @@ describe('RoadCanvasComponent', () => {
 
       const right = geometry().blindRight;
       expect(right).not.toBeNull();
-      expect(right!.y + right!.height).toBeLessThanOrEqual(88.5);
+      expect(right!.y + right!.height).toBeLessThanOrEqual(100);
     });
 
     it('drops the road-edge pad even when the telemetry reports that side as CLEAR', () => {

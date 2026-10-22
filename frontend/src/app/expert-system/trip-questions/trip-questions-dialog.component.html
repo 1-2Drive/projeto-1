@@ -30,10 +30,11 @@
               [attr.aria-pressed]="mode() === 'HOW'" (click)="setMode('HOW')">HOW</button>
     </div>
 
-    <div class="trip-dialog__actions">
-      <button type="button" class="trip-dialog__secondary" data-testid="open-session-history" (click)="showHistory()">OPEN SESSION HISTORY</button>
-      @if (loading()) { <span class="trip-dialog__hint" role="status" data-testid="trip-loading">Explaining the decision…</span> }
-    </div>
+    @if (loading()) {
+      <div class="trip-dialog__actions">
+        <span class="trip-dialog__hint" role="status" data-testid="trip-loading">Explaining the decision…</span>
+      </div>
+    }
 
     @if (answer(); as result) {
       <section class="trip-answer" data-testid="trip-answer" aria-live="polite">

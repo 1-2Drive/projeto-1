@@ -12,11 +12,11 @@
 
 .trip-dialog {
   display: grid;
-  gap: 0.8rem;
-  width: min(47rem, 100%);
-  max-height: min(90vh, 56rem);
+  gap: 0.95rem;
+  width: min(80rem, 100%);
+  max-height: min(94vh, 64rem);
   overflow: auto;
-  padding: clamp(1rem, 3vw, 1.6rem);
+  padding: clamp(1.15rem, 3vw, 2rem);
   color: #e8f0f6;
   background: linear-gradient(145deg, #111d28, #0b1219 72%);
   border: 1px solid rgba(105, 164, 199, 0.45);
@@ -25,27 +25,25 @@
 }
 
 .trip-dialog__header { display: flex; justify-content: space-between; gap: 1rem; border-bottom: 1px solid rgba(163, 190, 210, 0.18); padding-bottom: 0.8rem; }
-.trip-dialog__eyebrow, .trip-answer__eyebrow { margin: 0 0 0.3rem; color: #75c9eb; font: 600 0.67rem/1.4 var(--ds-font-mono); letter-spacing: 0.11em; }
-.trip-dialog h2 { margin: 0; color: #f5f9fc; font: 700 clamp(1.15rem, 3vw, 1.55rem)/1.2 'Space Grotesk', sans-serif; letter-spacing: 0.06em; }
-.trip-dialog__subtitle { max-width: 38rem; margin: 0.55rem 0 0; color: #a8bac8; font-size: 0.85rem; line-height: 1.5; }
+.trip-dialog__eyebrow, .trip-answer__eyebrow { margin: 0 0 0.3rem; color: #75c9eb; font: 600 0.76rem/1.4 var(--ds-font-mono); letter-spacing: 0.11em; }
+.trip-dialog h2 { margin: 0; color: #f5f9fc; font: 700 clamp(1.35rem, 3vw, 1.8rem)/1.2 'Space Grotesk', sans-serif; letter-spacing: 0.06em; }
+.trip-dialog__subtitle { max-width: 48rem; margin: 0.65rem 0 0; color: #a8bac8; font-size: 0.96rem; line-height: 1.55; }
 .trip-dialog__close { flex: 0 0 auto; width: 2.35rem; height: 2.35rem; border: 1px solid #344653; border-radius: 0.6rem; background: #15232e; color: #dce8ef; font-size: 1.5rem; cursor: pointer; }
-.trip-dialog__label { color: #d8e4ec; font-size: 0.75rem; font-weight: 650; }
-.trip-dialog > select { box-sizing: border-box; width: 100%; border: 1px solid #3a5262; border-radius: 0.6rem; background: #08121a; color: #f1f7fb; padding: 0.75rem 0.85rem; font: 0.9rem/1.5 inherit; outline: none; }
+.trip-dialog__label { color: #d8e4ec; font-size: 0.86rem; font-weight: 650; }
+.trip-dialog > select { box-sizing: border-box; width: 100%; border: 1px solid #3a5262; border-radius: 0.6rem; appearance: none; background-color: #08121a; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='m1 1 5 5 5-5' fill='none' stroke='%23a8bac8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-position: right 1rem center; background-repeat: no-repeat; background-size: 0.8rem 0.55rem; color: #f1f7fb; padding: 0.85rem 2.7rem 0.85rem 1rem; font: 1rem/1.5 inherit; outline: none; }
 .trip-dialog > select:focus { border-color: #51b7e2; box-shadow: 0 0 0 3px rgba(81, 183, 226, 0.15); }
 .trip-dialog__hint { color: #768b9b; font-size: 0.72rem; }
 .trip-dialog__modes { display: flex; gap: 0.45rem; }
-.trip-dialog__modes button { border: 1px solid #354b59; border-radius: 999px; background: #121f29; color: #aebdca; padding: 0.45rem 0.95rem; font: 650 0.72rem var(--ds-font-mono); cursor: pointer; }
+.trip-dialog__modes button { border: 1px solid #354b59; border-radius: 999px; background: #121f29; color: #aebdca; padding: 0.52rem 1.05rem; font: 650 0.82rem var(--ds-font-mono); cursor: pointer; }
 .trip-dialog__modes button.is-selected { border-color: #51b7e2; color: #dcf5ff; background: rgba(45, 132, 172, 0.28); }
 .trip-dialog__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.55rem; }
-.trip-dialog__secondary { border: 1px solid #394b57; border-radius: 0.55rem; padding: 0.62rem 1.15rem; color: #c0ced7; background: #121d25; font: 700 0.72rem var(--ds-font-mono); letter-spacing: 0.04em; cursor: pointer; }
 .trip-dialog__error { margin: 0; color: #ffb2a8; border-left: 3px solid #d9675b; padding: 0.4rem 0.7rem; background: rgba(150, 43, 35, 0.12); font-size: 0.78rem; }
 .trip-answer { display: grid; gap: 0.45rem; padding: 0.85rem; border: 1px solid rgba(80, 163, 196, 0.3); border-radius: 0.7rem; background: rgba(11, 26, 36, 0.84); }
 .trip-answer__eyebrow { margin: 0; }
-.trip-answer__situation { margin: 0; color: #a8bac8; font-size: 0.8rem; }
-.trip-answer app-decision-explanation { font-size: 0.8rem; }
+.trip-answer__situation { margin: 0; color: #a8bac8; font-size: 0.92rem; }
+.trip-answer app-decision-explanation { font-size: 0.92rem; }
 
 @media (max-width: 600px) {
   .trip-dialog__scrim { padding: 0.45rem; align-items: end; }
-  .trip-dialog { width: 100%; max-height: 94dvh; border-radius: 0.9rem 0.9rem 0.35rem 0.35rem; padding: 0.9rem; }
-  .trip-dialog__actions > button { flex: 1 1 auto; }
+  .trip-dialog { width: 100%; max-height: 96dvh; border-radius: 0.9rem 0.9rem 0.35rem 0.35rem; padding: 1rem; }
 }

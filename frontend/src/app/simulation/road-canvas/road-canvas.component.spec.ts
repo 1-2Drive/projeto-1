@@ -794,6 +794,8 @@ describe('RoadCanvasComponent', () => {
   });
 
   it('shows the rain chip with the visibility and grip the backend is using', () => {
+    // The classic overlay (USE_NEW_RAIN = false); the new rain is checked below.
+    fixture.componentRef.setInput('useNewRain', false);
     show({
       ego: { speedKmh: 52, positionMeters: 80 },
       environment: { weatherCondition: 'RAIN', visibilityFactor: 0.7, gripFactor: 0.65 },
@@ -814,6 +816,26 @@ describe('RoadCanvasComponent', () => {
     expect(q('[data-testid="rain-chip"]')).toBeNull();
     expect(q('.road--rain')).toBeNull();
     expect(q('.surface__wet')).toBeNull();
+  });
+
+  it('draws the new rain: a canvas shower, a wet-road sheen and mist, and no classic overlay', () => {
+    fixture.componentRef.setInput('useNewRain', true);
+    show({
+      ego: { speedKmh: 52, positionMeters: 80 },
+      environment: { weatherCondition: 'RAIN', visibilityFactor: 0.7, gripFactor: 0.65 },
+      sensors: { environment: { condition: 'RAIN', effectiveRangeMeters: 84, gripPercent: 65, rain: true } }
+    });
+
+    expect(q('[data-testid="rain-canvas"]')).toBeTruthy();
+    expect(q('[data-testid="rain-sheen"]')).toBeTruthy();
+    expect(q('[data-testid="rain-mist"]')).toBeTruthy();
+    expect(q('[data-testid="rain-overlay"]')).toBeNull();
+    expect(q('[data-testid="rain-chip"]')!.textContent).toContain('VIS 70%');
+
+    show({ ego: { speedKmh: 52, positionMeters: 81 } });
+
+    expect(q('[data-testid="rain-canvas"]')).toBeNull();
+    expect(q('[data-testid="rain-mist"]')).toBeNull();
   });
 
   it('keeps the telemetry HUD and the start invitation', () => {

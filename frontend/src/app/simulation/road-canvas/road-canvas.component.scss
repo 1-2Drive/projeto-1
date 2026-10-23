@@ -175,6 +175,22 @@
   to { transform: rotate(12deg) translateY(0); }
 }
 
+/* New rain: drops, splashes and spray are drawn by RainSimulation (road-rain.ts) on this canvas,
+   over the scene and under the HUD, like the classic overlay. */
+.rain-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.road--rain .surface__sheen,
+.road--rain .rain-mist {
+  pointer-events: none;
+}
+
 .rain-chip {
   position: absolute;
   top: 0.5rem;

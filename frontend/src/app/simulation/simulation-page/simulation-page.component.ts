@@ -6,7 +6,6 @@ import { ToolboxComponent } from '../../scenario/toolbox/toolbox.component';
 import { ScenarioLibraryComponent } from '../../scenario/scenario-library/scenario-library.component';
 import { RoadCanvasComponent } from '../road-canvas/road-canvas.component';
 import { RoadMapComponent } from '../road-map/road-map.component';
-import { SituationPanelComponent } from '../../telemetry/situation-panel/situation-panel.component';
 import { SpeedAdvisorComponent } from '../../telemetry/speed-advisor/speed-advisor.component';
 import { SensorsPanelComponent } from '../../telemetry/sensors-panel/sensors-panel.component';
 import { DecisionPanelComponent } from '../../expert-system/decision-panel/decision-panel.component';
@@ -20,10 +19,9 @@ import {
   ExpertBackend,
   MapCellRequest
 } from '../../core/models/api.models';
-import { WorldStateComponent } from '../world-state/world-state.component';
 import { TripQuestionsDialogComponent } from '../../expert-system/trip-questions/trip-questions-dialog.component';
 
-type EvidenceTab = 'timeline' | 'memory' | 'explanation' | 'world' | 'decision' | 'situation';
+type EvidenceTab = 'timeline' | 'memory' | 'explanation' | 'decision';
 
 @Component({
   selector: 'app-simulation-page',
@@ -35,14 +33,12 @@ type EvidenceTab = 'timeline' | 'memory' | 'explanation' | 'world' | 'decision' 
     ScenarioLibraryComponent,
     RoadCanvasComponent,
     RoadMapComponent,
-    SituationPanelComponent,
     SpeedAdvisorComponent,
     SensorsPanelComponent,
     DecisionPanelComponent,
     RuleTimelineComponent,
     WorkingMemoryComponent,
     ExplanationPanelComponent,
-    WorldStateComponent,
     TripQuestionsDialogComponent
   ],
   templateUrl: './simulation-page.component.html',

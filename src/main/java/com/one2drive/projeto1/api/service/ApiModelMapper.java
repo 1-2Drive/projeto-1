@@ -23,11 +23,35 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
-import java.util.stream.IntStream;
 
 @Component
 public class ApiModelMapper {
+    private record DemoPhase(String id, String label) { }
+
+    private static final Map<String, List<DemoPhase>> DEMO_PROFILES = Map.of(
+        "S12_PRESENTATION_DEMO", List.of(
+            new DemoPhase("normal", "Normal driving"), new DemoPhase("speed-limit", "Speed limit"),
+            new DemoPhase("weather", "Weather"), new DemoPhase("ttc", "TTC safety"),
+            new DemoPhase("pedestrian", "Pedestrian")),
+        "S15_URBAN_CONTROLS_DEMO", List.of(
+            new DemoPhase("normal", "Urban cruise"), new DemoPhase("speed-limit", "Speed limit"),
+            new DemoPhase("stop-sign", "Stop sign"), new DemoPhase("pedestrian", "Crossing"),
+            new DemoPhase("traffic-light", "Traffic light")),
+        "S16_HAZARD_OVERTAKE_DEMO", List.of(
+            new DemoPhase("normal", "Cruise"), new DemoPhase("hazard", "Hazard"),
+            new DemoPhase("ttc", "Slow vehicle"), new DemoPhase("lane-change", "Avoidance"),
+            new DemoPhase("recovery", "Recovery")),
+        "S17_WEATHER_EMERGENCY_DEMO", List.of(
+            new DemoPhase("normal", "Clear road"), new DemoPhase("weather", "Heavy rain"),
+            new DemoPhase("ttc", "Critical TTC"), new DemoPhase("lane-change", "Safe escape"),
+            new DemoPhase("recovery", "Recovery")),
+        "S18_MIXED_SAFETY_DEMO", List.of(
+            new DemoPhase("normal", "Cruise"), new DemoPhase("hazard", "Barrier"),
+            new DemoPhase("lane-change", "Lane change"), new DemoPhase("pedestrian", "Pedestrian"),
+            new DemoPhase("traffic-light", "Red light"))
+    );
     public ApiSimulationSnapshot mapSnapshot(SimulationEngine engine, SimulationSnapshot snapshot) {
         DrivingDecision decision = engine.getCurrentDecision();
         SimulationConfig config = engine.getConfig();
@@ -286,20 +310,20 @@ public class ApiModelMapper {
      * empty list keeps the manual workflow free of demo chrome.
      */
     private List<ApiSimulationSnapshot.DemoPhaseView> demoPhases(SimulationEngine engine) {
-        if (!"S12_PRESENTATION_DEMO".equals(engine.getScenarioId())) {
+        List<DemoPhase> phases = DEMO_PROFILES.get(engine.getScenarioId());
+        if (phases == null) {
             return List.of();
         }
 
-        List<String> ids = List.of("normal", "speed-limit", "weather", "ttc", "pedestrian");
-        List<String> labels = List.of("Normal driving", "Speed limit", "Weather", "TTC safety", "Pedestrian");
         Set<String> evidence = engine.getDemoEvidence();
-        String activeId = ids.stream().filter(id -> !evidence.contains(id)).findFirst().orElse(null);
+        String activeId = phases.stream().map(DemoPhase::id)
+            .filter(id -> !evidence.contains(id)).findFirst().orElse(null);
 
-        return IntStream.range(0, ids.size())
-            .mapToObj(index -> {
-                String id = ids.get(index);
+        return phases.stream()
+            .map(phase -> {
+                String id = phase.id();
                 String status = evidence.contains(id) ? "DONE" : id.equals(activeId) ? "ACTIVE" : "PENDING";
-                return new ApiSimulationSnapshot.DemoPhaseView(id, labels.get(index), status);
+                return new ApiSimulationSnapshot.DemoPhaseView(id, phase.label(), status);
             })
             .toList();
     }

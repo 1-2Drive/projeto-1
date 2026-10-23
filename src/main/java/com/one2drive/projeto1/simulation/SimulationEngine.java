@@ -803,6 +803,10 @@ public class SimulationEngine implements AutoCloseable {
             || event instanceof com.one2drive.projeto1.drools.events.ReducedGripEvent);
         boolean hasTtc = events.stream().anyMatch(TTCEvent.class::isInstance);
         boolean hasPedestrian = events.stream().anyMatch(PedestrianDetectedEvent.class::isInstance);
+        boolean hasStopSign = events.stream().anyMatch(StopSignEvent.class::isInstance);
+        boolean hasTrafficLight = events.stream().anyMatch(TrafficLightEvent.class::isInstance);
+        boolean hasHazard = events.stream().anyMatch(event -> event instanceof PotholeDetectedEvent
+            || event instanceof ObstacleDetectedEvent || event instanceof BarrierDetectedEvent);
         DrivingAction action = currentDecision.getSpeedAction();
 
         if (hasSpeedLimit && action == DrivingAction.REDUCE_SPEED) {
@@ -817,6 +821,27 @@ public class SimulationEngine implements AutoCloseable {
         if (hasPedestrian && (action == DrivingAction.BRAKE || action == DrivingAction.STOP
             || action == DrivingAction.EMERGENCY_BRAKE || action == DrivingAction.REDUCE_SPEED)) {
             demoEvidence.add("pedestrian");
+        }
+        if (hasStopSign && (action == DrivingAction.BRAKE || action == DrivingAction.STOP
+            || action == DrivingAction.REDUCE_SPEED)) {
+            demoEvidence.add("stop-sign");
+        }
+        if (hasTrafficLight && (action == DrivingAction.BRAKE || action == DrivingAction.STOP
+            || action == DrivingAction.REDUCE_SPEED)) {
+            demoEvidence.add("traffic-light");
+        }
+        if (hasHazard && (action == DrivingAction.BRAKE || action == DrivingAction.STOP
+            || action == DrivingAction.EMERGENCY_BRAKE || action == DrivingAction.REDUCE_SPEED
+            || currentDecision.getLaneAction().isLaneManeuver())) {
+            demoEvidence.add("hazard");
+        }
+        if (currentDecision.getLaneAction().isLaneManeuver()
+            || worldState.getEgo().getLaneChangeState() != LaneChangeState.IDLE) {
+            demoEvidence.add("lane-change");
+        }
+        if (simTimeMillis >= 40_000 && demoEvidence.size() >= 2
+            && (action == DrivingAction.CONTINUE || action == DrivingAction.MAINTAIN_SPEED)) {
+            demoEvidence.add("recovery");
         }
     }
 

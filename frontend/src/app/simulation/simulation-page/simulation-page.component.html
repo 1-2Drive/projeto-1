@@ -153,17 +153,9 @@
                 [class.active]="activeTab() === 'explanation'" (click)="setTab('explanation')">
           Explanation
         </button>
-        <button role="tab" [attr.aria-selected]="activeTab() === 'world'"
-                [class.active]="activeTab() === 'world'" (click)="setTab('world')">
-          World State
-        </button>
         <button role="tab" [attr.aria-selected]="activeTab() === 'decision'"
                 [class.active]="activeTab() === 'decision'" (click)="setTab('decision')">
           Decision
-        </button>
-        <button role="tab" [attr.aria-selected]="activeTab() === 'situation'"
-                [class.active]="activeTab() === 'situation'" (click)="setTab('situation')">
-          Situation
         </button>
       </nav>
 
@@ -178,14 +170,8 @@
           @case ('explanation') {
             <app-explanation-panel [snapshot]="snapshot()" />
           }
-          @case ('world') {
-            <app-world-state [snapshot]="snapshot()" />
-          }
           @case ('decision') {
             <app-decision-panel [snapshot]="snapshot()" />
-          }
-          @case ('situation') {
-            <app-situation-panel [snapshot]="snapshot()" />
           }
         }
       </div>

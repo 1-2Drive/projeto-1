@@ -145,7 +145,7 @@ describe('SimulationPageComponent', () => {
     const el = fixture.nativeElement as HTMLElement;
     expect(el.querySelector('.workspace__center app-road-canvas')).toBeTruthy();
     const tabs = Array.from(el.querySelectorAll('.evidence .tabs > [role="tab"]')).map((t) => t.textContent!.trim());
-    expect(tabs).toEqual(['Inference Timeline', 'Working Memory', 'Explanation', 'World State', 'Decision', 'Situation']);
+    expect(tabs).toEqual(['Inference Timeline', 'Working Memory', 'Explanation', 'Decision']);
     expect(el.querySelector('app-speed-advisor')).toBeTruthy();
     expect(el.querySelector('app-sensors-panel')).toBeTruthy();
 
@@ -159,17 +159,13 @@ describe('SimulationPageComponent', () => {
     expect(el.querySelector('app-road-map')).toBeNull();
   });
 
-  it('shows the situation narration and the decision panel from their evidence tabs', () => {
+  it('shows the decision panel from its evidence tab', () => {
     const el = fixture.nativeElement as HTMLElement;
     const tab = (name: string) => Array.from(el.querySelectorAll('.evidence .tabs > [role="tab"]'))
       .find((t) => t.textContent!.trim() === name) as HTMLButtonElement;
-    tab('Situation').click();
-    fixture.detectChanges();
-    expect(el.querySelector('app-situation-panel')).toBeTruthy();
     tab('Decision').click();
     fixture.detectChanges();
     expect(el.querySelector('app-decision-panel')).toBeTruthy();
-    expect(el.querySelector('app-situation-panel')).toBeNull();
   });
 
   it('calls demo action from demo button', () => {

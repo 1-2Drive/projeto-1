@@ -1,0 +1,281 @@
+package rules
+
+import com.one2drive.projeto1.decision.DecisionContext
+import com.one2drive.projeto1.decision.DecisionPriority
+import com.one2drive.projeto1.decision.StoppingPolicy
+import com.one2drive.projeto1.domain.DrivingAction
+import com.one2drive.projeto1.domain.Lane
+import com.one2drive.projeto1.domain.LaneChangeState
+import com.one2drive.projeto1.domain.RiskLevel
+import com.one2drive.projeto1.drools.DroolsSupport
+import com.one2drive.projeto1.drools.facts.FrontVehicleState
+import com.one2drive.projeto1.drools.facts.LaneOccupancyState
+import com.one2drive.projeto1.drools.facts.SafeLaneSide
+import com.one2drive.projeto1.drools.facts.ObstacleStateFact
+import com.one2drive.projeto1.drools.facts.OvertakingStateFact
+import com.one2drive.projeto1.drools.facts.PotholeStateFact
+import com.one2drive.projeto1.drools.facts.VehicleStateFact
+
+global DroolsSupport droolsSupport
+
+// Hazard avoidance: the vehicle steers around a hazard in its own lane when an
+// adjacent lane is verified clear by the blind-spot sensors.
+//
+// Policy lives entirely in this file. Java only executes the selected maneuver.
+// A rule only fires when the hazard is in the vehicle's committed lane, so once
+// the vehicle has steered clear the hazard no longer matches and the maneuver
+// cannot oscillate. The laneChangeState guard stops a new request while the
+// previous maneuver is still physically moving.
+//
+// Every rule that changes lane checks the line it would cross: the line between
+// RIGHT and CENTER is the rightMarking, the one between CENTER and LEFT the
+// leftMarking, and a continuous line is never crossed. The avoidance rules prove
+// it, with the idle maneuver and the clear side, through the safeToChangeLane
+// query (lane-safety.drl). An obstacle blocks the lane,
+// so going around it is collision avoidance; a pothole is a road hazard the vehicle
+// can also drive over slowly, so avoiding it stays at ROAD_HAZARD.
+//
+// A lane change is only a way past a hazard when it takes the vehicle out of the lane
+// before the hazard (StoppingPolicy.roomToLeaveLane): closer than that the manoeuvre
+// would carry the vehicle over it, and the approach rules (road-hazards.drl, barrier.drl)
+// brake for it instead.
+
+// The maintain rules keep the lane change as the decision while it is moving. They
+// also match a driver-requested lane change, so they propose at MANEUVER_SAFETY: at
+// ROAD_HAZARD they would count as a hold and cancel moving off (defaults.drl).
+rule "Maintain ongoing lane change left avoidance"
+agenda-group "decision"
+salience 475
+when
+    $ctx : DecisionContext()
+    VehicleStateFact(laneChangeState == LaneChangeState.REQUESTED || laneChangeState == LaneChangeState.CHANGING,
+                     targetLane == Lane.LEFT || (lane == Lane.RIGHT && targetLane == Lane.CENTER))
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.CHANGE_LANE_LEFT,
+        Double.NaN,
+        RiskLevel.LOW,
+        DecisionPriority.MANEUVER_SAFETY,
+        "Executing ongoing lane change left",
+        drools.getRule().getName(),
+        "maneuver in progress to left lane"
+    );
+end
+
+rule "Maintain ongoing lane change right avoidance"
+agenda-group "decision"
+salience 475
+when
+    $ctx : DecisionContext()
+    VehicleStateFact(laneChangeState == LaneChangeState.REQUESTED || laneChangeState == LaneChangeState.CHANGING,
+                     targetLane == Lane.RIGHT || (lane == Lane.LEFT && targetLane == Lane.CENTER))
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.CHANGE_LANE_RIGHT,
+        Double.NaN,
+        RiskLevel.LOW,
+        DecisionPriority.MANEUVER_SAFETY,
+        "Executing ongoing lane change right",
+        drools.getRule().getName(),
+        "maneuver in progress to right lane"
+    );
+end
+
+rule "Avoid pothole in centre lane by changing right when right is clear"
+agenda-group "decision"
+salience 475
+when
+    $ctx : DecisionContext()
+    VehicleStateFact(lane == Lane.CENTER, $speed : speedKmh)
+    PotholeStateFact(potholeId != "none", lane == Lane.CENTER,
+                     $distance : distanceMeters > 0, distanceMeters <= 50.0,
+                     StoppingPolicy.roomToLeaveLane($speed, distanceMeters))
+    safeToChangeLane(Lane.RIGHT;)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.CHANGE_LANE_RIGHT,
+        Double.NaN,
+        RiskLevel.LOW,
+        DecisionPriority.ROAD_HAZARD,
+        "Avoiding pothole by moving into the clear right lane (rightmost safe lane policy)",
+        drools.getRule().getName(),
+        "pothole " + $distance + "m ahead in own lane, right lane clear"
+    );
+end
+
+rule "Avoid pothole in centre lane by changing left when right is occupied"
+agenda-group "decision"
+salience 470
+when
+    $ctx : DecisionContext()
+    VehicleStateFact(lane == Lane.CENTER, $speed : speedKmh)
+    PotholeStateFact(potholeId != "none", lane == Lane.CENTER,
+                     $distance : distanceMeters > 0, distanceMeters <= 50.0,
+                     StoppingPolicy.roomToLeaveLane($speed, distanceMeters))
+    // Left only when right is not a safe way past: occupied, or clear with no room to
+    // follow the vehicle ahead in it (Art. 35 and 18 CE).
+    not SafeLaneSide(side == Lane.RIGHT)
+    safeToChangeLane(Lane.LEFT;)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.CHANGE_LANE_LEFT,
+        Double.NaN,
+        RiskLevel.LOW,
+        DecisionPriority.ROAD_HAZARD,
+        "Avoiding pothole by moving into the clear left lane",
+        drools.getRule().getName(),
+        "pothole " + $distance + "m ahead in own lane, right occupied, left clear"
+    );
+end
+
+rule "Avoid pothole in left lane by changing right"
+agenda-group "decision"
+salience 470
+when
+    $ctx : DecisionContext()
+    VehicleStateFact(lane == Lane.LEFT, $speed : speedKmh)
+    PotholeStateFact(potholeId != "none", lane == Lane.LEFT,
+                     $distance : distanceMeters > 0, distanceMeters <= 50.0,
+                     StoppingPolicy.roomToLeaveLane($speed, distanceMeters))
+    safeToChangeLane(Lane.RIGHT;)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.CHANGE_LANE_RIGHT,
+        Double.NaN,
+        RiskLevel.LOW,
+        DecisionPriority.ROAD_HAZARD,
+        "Avoiding pothole by moving into the clear right lane",
+        drools.getRule().getName(),
+        "pothole " + $distance + "m ahead in own lane, right lane clear"
+    );
+end
+
+rule "Avoid pothole in right lane by changing left"
+agenda-group "decision"
+salience 470
+when
+    $ctx : DecisionContext()
+    VehicleStateFact(lane == Lane.RIGHT, $speed : speedKmh)
+    PotholeStateFact(potholeId != "none", lane == Lane.RIGHT,
+                     $distance : distanceMeters > 0, distanceMeters <= 50.0,
+                     StoppingPolicy.roomToLeaveLane($speed, distanceMeters))
+    safeToChangeLane(Lane.LEFT;)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.CHANGE_LANE_LEFT,
+        Double.NaN,
+        RiskLevel.LOW,
+        DecisionPriority.ROAD_HAZARD,
+        "Avoiding pothole by moving into the clear left lane",
+        drools.getRule().getName(),
+        "pothole " + $distance + "m ahead in own lane, left lane clear"
+    );
+end
+
+
+// The avoidance is decided at 50 m: inside the 60 m over which the blind-spot sensor
+// reports hazards in the side lanes (BlindSpotSensor.HAZARD_LOOKAHEAD_METERS), so a side
+// found clear is clear for the whole manoeuvre. Deciding from further away would move the
+// vehicle into a lane it cannot yet see into. Until then the obstacle stop rule
+// (road-hazards.drl) keeps the speed on the comfortable braking curve, so the vehicle
+// reaches 50 m at a speed from which it can still stop should no side be clear.
+rule "Avoid obstacle in centre lane by changing left"
+agenda-group "decision"
+salience 470
+when
+    $ctx : DecisionContext()
+    VehicleStateFact(lane == Lane.CENTER, $speed : speedKmh)
+    ObstacleStateFact(obstacleId != "none", lane == Lane.CENTER,
+                      $distance : distanceMeters > 0, distanceMeters <= 50.0,
+                      StoppingPolicy.roomToLeaveLane($speed, distanceMeters))
+    safeToChangeLane(Lane.LEFT;)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.CHANGE_LANE_LEFT,
+        Double.NaN,
+        RiskLevel.LOW,
+        DecisionPriority.COLLISION_AVOIDANCE,
+        "Avoiding obstacle by moving into the clear left lane",
+        drools.getRule().getName(),
+        "obstacle " + $distance + "m ahead in own lane, left lane clear"
+    );
+end
+
+rule "Avoid obstacle in centre lane by changing right when left is occupied"
+agenda-group "decision"
+salience 470
+when
+    $ctx : DecisionContext()
+    VehicleStateFact(lane == Lane.CENTER, $speed : speedKmh)
+    ObstacleStateFact(obstacleId != "none", lane == Lane.CENTER,
+                      $distance : distanceMeters > 0, distanceMeters <= 50.0,
+                      StoppingPolicy.roomToLeaveLane($speed, distanceMeters))
+    // Right only when left is not a safe way past: occupied, or clear with no room to
+    // follow the vehicle ahead in it (Art. 35 and 18 CE).
+    not SafeLaneSide(side == Lane.LEFT)
+    safeToChangeLane(Lane.RIGHT;)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.CHANGE_LANE_RIGHT,
+        Double.NaN,
+        RiskLevel.LOW,
+        DecisionPriority.COLLISION_AVOIDANCE,
+        "Avoiding obstacle by moving into the clear right lane",
+        drools.getRule().getName(),
+        "obstacle " + $distance + "m ahead in own lane, left occupied, right clear"
+    );
+end
+
+rule "Avoid obstacle in left lane by changing right"
+agenda-group "decision"
+salience 470
+when
+    $ctx : DecisionContext()
+    VehicleStateFact(lane == Lane.LEFT, $speed : speedKmh)
+    ObstacleStateFact(obstacleId != "none", lane == Lane.LEFT,
+                      $distance : distanceMeters > 0, distanceMeters <= 50.0,
+                      StoppingPolicy.roomToLeaveLane($speed, distanceMeters))
+    safeToChangeLane(Lane.RIGHT;)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.CHANGE_LANE_RIGHT,
+        Double.NaN,
+        RiskLevel.LOW,
+        DecisionPriority.COLLISION_AVOIDANCE,
+        "Avoiding obstacle by moving into the clear right lane",
+        drools.getRule().getName(),
+        "obstacle " + $distance + "m ahead in own lane, right lane clear"
+    );
+end
+
+rule "Avoid obstacle in right lane by changing left"
+agenda-group "decision"
+salience 470
+when
+    $ctx : DecisionContext()
+    VehicleStateFact(lane == Lane.RIGHT, $speed : speedKmh)
+    ObstacleStateFact(obstacleId != "none", lane == Lane.RIGHT,
+                      $distance : distanceMeters > 0, distanceMeters <= 50.0,
+                      StoppingPolicy.roomToLeaveLane($speed, distanceMeters))
+    safeToChangeLane(Lane.LEFT;)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.CHANGE_LANE_LEFT,
+        Double.NaN,
+        RiskLevel.LOW,
+        DecisionPriority.COLLISION_AVOIDANCE,
+        "Avoiding obstacle by moving into the clear left lane",
+        drools.getRule().getName(),
+        "obstacle " + $distance + "m ahead in own lane, left lane clear"
+    );
+end

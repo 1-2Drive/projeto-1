@@ -1,0 +1,97 @@
+package rules
+
+import com.one2drive.projeto1.decision.DecisionContext
+import com.one2drive.projeto1.decision.DecisionPriority
+import com.one2drive.projeto1.domain.DrivingAction
+import com.one2drive.projeto1.domain.Lane
+import com.one2drive.projeto1.domain.LaneChangeDirection
+import com.one2drive.projeto1.domain.RiskLevel
+import com.one2drive.projeto1.drools.DroolsSupport
+import com.one2drive.projeto1.drools.facts.LaneChangeRequestState
+import com.one2drive.projeto1.drools.facts.LaneOccupancyState
+
+global DroolsSupport droolsSupport
+
+// Lane change requests come from outside the expert system: the operator's LANE LEFT /
+// LANE RIGHT buttons or a scenario's timed action. Art. 35 CE applies to every lane
+// change, so a request is only granted when safeToChangeLane (lane-safety.drl) proves it
+// safe: no maneuver moving, no continuous line to cross and that side clear.
+rule "Block lane change when target lane occupied"
+agenda-group "decision"
+salience 430
+when
+    $ctx : DecisionContext()
+    LaneChangeRequestState(active == true, direction == LaneChangeDirection.LEFT)
+    LaneOccupancyState(lane == Lane.LEFT, occupied == true, $distance : nearestDistanceMeters)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.KEEP_LANE,
+        Double.NaN,
+        RiskLevel.MODERATE,
+        DecisionPriority.MANEUVER_SAFETY,
+        "Cannot change lane left; lane occupied",
+        drools.getRule().getName(),
+        "left lane occupied at " + $distance + "m"
+    );
+end
+
+rule "Allow lane change left when lane safe"
+agenda-group "decision"
+salience 420
+when
+    $ctx : DecisionContext()
+    LaneChangeRequestState(active == true, direction == LaneChangeDirection.LEFT)
+    safeToChangeLane(Lane.LEFT;)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.CHANGE_LANE_LEFT,
+        Double.NaN,
+        RiskLevel.LOW,
+        DecisionPriority.MANEUVER_SAFETY,
+        "Lane change left is safe",
+        drools.getRule().getName(),
+        "left lane clear"
+    );
+end
+
+rule "Block lane change right when target lane occupied"
+agenda-group "decision"
+salience 430
+when
+    $ctx : DecisionContext()
+    LaneChangeRequestState(active == true, direction == LaneChangeDirection.RIGHT)
+    LaneOccupancyState(lane == Lane.RIGHT, occupied == true, $distance : nearestDistanceMeters)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.KEEP_LANE,
+        Double.NaN,
+        RiskLevel.MODERATE,
+        DecisionPriority.MANEUVER_SAFETY,
+        "Cannot change lane right; lane occupied",
+        drools.getRule().getName(),
+        "right lane occupied at " + $distance + "m"
+    );
+end
+
+rule "Allow lane change right when lane safe"
+agenda-group "decision"
+salience 420
+when
+    $ctx : DecisionContext()
+    LaneChangeRequestState(active == true, direction == LaneChangeDirection.RIGHT)
+    safeToChangeLane(Lane.RIGHT;)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.CHANGE_LANE_RIGHT,
+        Double.NaN,
+        RiskLevel.LOW,
+        DecisionPriority.MANEUVER_SAFETY,
+        "Lane change right is safe",
+        drools.getRule().getName(),
+        "right lane clear"
+    );
+end

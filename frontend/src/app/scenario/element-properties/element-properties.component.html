@@ -1,0 +1,122 @@
+@if (definition(); as def) {
+  <div class="backdrop" (click)="close()" aria-hidden="true"></div>
+
+  <aside class="drawer" role="dialog" aria-modal="true" [attr.aria-label]="def.title" data-testid="config-panel">
+    <header class="drawer__head">
+      <div>
+        <span class="drawer__eyebrow">World mutation</span>
+        <h3 data-testid="config-title">{{ def.title }}</h3>
+      </div>
+      <button type="button" class="drawer__close" (click)="close()" aria-label="Close">✕</button>
+    </header>
+
+    <p class="drawer__hint">{{ def.hint }}</p>
+
+    <div class="drawer__body">
+      @if (def.needsSpeedLimit) {
+        <label class="field">
+          <span>Speed limit</span>
+          <div class="field__control">
+            <input data-testid="limit-input" type="number" min="20" max="130" step="5"
+                   [ngModel]="speedLimitKmh()" (ngModelChange)="setSpeedLimit($event)" />
+            <em>km/h</em>
+          </div>
+        </label>
+      }
+
+      <label class="field">
+        <span>Distance ahead</span>
+        <div class="field__control">
+          <input data-testid="drawer-distance-input" type="number" min="1" max="1000" step="5"
+                 [ngModel]="distanceAheadMeters()" (ngModelChange)="setDistance($event)" />
+          <em>m</em>
+        </div>
+        @if (distanceError(); as error) {
+          <small class="field__error" role="alert">{{ error }}</small>
+        }
+      </label>
+
+      @if (def.needsActorSpeed) {
+        <label class="field">
+          <span>Speed</span>
+          <div class="field__control">
+            <input data-testid="actor-speed-input" type="number" [min]="minActorSpeedKmh()" [max]="selectedAction() === 'PEDESTRIAN' ? 6 : 180" step="0.5"
+                   [ngModel]="actorSpeedKmh()" (ngModelChange)="setActorSpeed($event)" />
+            <em>km/h</em>
+          </div>
+          @if (selectedAction() === 'PEDESTRIAN') {
+            <small class="field__note">Walking pace: 4.5 km/h by default, capped at 6 km/h.</small>
+          } @else {
+            <small class="field__note">From {{ minActorSpeedKmh() }} to 180 km/h.</small>
+          }
+        </label>
+      }
+
+      @if (def.needsLane) {
+        <label class="field">
+          <span>Lane</span>
+          <div class="field__control">
+            <select data-testid="lane-select" [ngModel]="lane()" (ngModelChange)="setLane($event)">
+              <option value="LEFT">Left</option>
+              <option value="CENTER">Center</option>
+              <option value="RIGHT">Right</option>
+            </select>
+          </div>
+        </label>
+      }
+
+      @if (def.needsLightState) {
+        <label class="field">
+          <span>State</span>
+          <div class="field__control">
+            <select data-testid="light-state-select"
+                    [ngModel]="trafficLightState()" (ngModelChange)="setTrafficLightState($event)">
+              <option value="RED">Red</option>
+              <option value="YELLOW">Yellow</option>
+              <option value="GREEN">Green</option>
+            </select>
+          </div>
+        </label>
+      }
+
+      @if (def.needsBarrierState) {
+        <label class="field">
+          <span>State</span>
+          <div class="field__control">
+            <select data-testid="barrier-state-select"
+                    [ngModel]="barrierOpen() ? 'true' : 'false'" (ngModelChange)="setBarrierOpen($event)">
+              <option value="false">Closed</option>
+              <option value="true">Open</option>
+            </select>
+          </div>
+        </label>
+      }
+
+      @if (def.needsSeverity) {
+        <label class="field">
+          <span>Severity</span>
+          <div class="field__control">
+            <select data-testid="severity-select"
+                    [ngModel]="hazardSeverity()" (ngModelChange)="setSeverity($event)">
+              <option value="LOW">Low</option>
+              <option value="MEDIUM">Medium</option>
+              <option value="HIGH">High</option>
+            </select>
+          </div>
+        </label>
+      }
+
+      @if (def.needsSpeedLimit || def.needsActorSpeed) {
+        @if (speedError(); as error) {
+          <small class="field__error" role="alert">{{ error }}</small>
+        }
+      }
+    </div>
+
+    <footer class="drawer__actions">
+      <button type="button" class="drawer__btn drawer__btn--ghost" (click)="close()">Cancel</button>
+      <button type="button" class="drawer__btn drawer__btn--primary"
+              data-testid="apply-config" (click)="confirm()">Add to road</button>
+    </footer>
+  </aside>
+}

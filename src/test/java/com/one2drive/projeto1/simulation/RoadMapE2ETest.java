@@ -1,0 +1,199 @@
+package com.one2drive.projeto1.simulation;
+
+import com.one2drive.projeto1.config.SimulationConfig;
+import com.one2drive.projeto1.domain.DrivingAction;
+import com.one2drive.projeto1.domain.Lane;
+import com.one2drive.projeto1.domain.WeatherCondition;
+import com.one2drive.projeto1.inference.ExpertBackendType;
+import com.one2drive.projeto1.scenario.ScenarioDefinition;
+import com.one2drive.projeto1.scenario.ScenarioLibrary;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.ParameterizedTest;
+
+import java.util.EnumSet;
+import java.util.Set;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/**
+ * The road map end to end: matrix cells are what the sensors see, the road loops back
+ * to row 0, and Drools steers around or stops for what the matrix holds.
+ */
+class RoadMapE2ETest {
+
+    private static SimulationEngine engine(double speedKmh, int[][] cells) {
+        return engine(ExpertBackendType.DROOLS, speedKmh, cells);
+    }
+
+    private static SimulationEngine engine(ExpertBackendType backend, double speedKmh, int[][] cells) {
+        ScenarioDefinition scenario = new ScenarioDefinition();
+        scenario.setId("MAP_TEST");
+        scenario.setName("Road map test");
+        scenario.setLoopWorldObjects(true);
+        scenario.setInitialSpeedKmh(speedKmh);
+        scenario.setInitialWeather(WeatherCondition.CLEAR);
+        scenario.setInitialLane(Lane.CENTER);
+        scenario.setMap(cells);
+        SimulationEngine engine = BackendTestSupport.engine(scenario, backend);
+        engine.start();
+        return engine;
+    }
+
+    @Test
+    @Timeout(30)
+    @DisplayName("after the last row the car continues at row 0 and meets the same cell again")
+    void roadLoopsBackToTheFirstRow() {
+        int[][] cells = new int[40][3];
+        cells[20][Lane.CENTER.ordinal()] = 9;
+
+        try (SimulationEngine engine = engine(50, cells)) {
+            boolean wasVisible = false;
+            int sightings = 0;
+            for (int i = 0; i < 500 && (sightings < 2 || engine.roadMapSnapshot().lap() < 1); i++) {
+                boolean visible = engine.tick().cameraDetectedObjectIds().contains("r20-CENTER");
+                if (visible && !wasVisible) {
+                    sightings++;
+                }
+                wasVisible = visible;
+            }
+
+            assertTrue(engine.getWorldState().getEgo().getPositionMeters() > 200.0,
+                "The car must drive past the end of the 200 m map instead of stopping there");
+            assertTrue(engine.roadMapSnapshot().lap() >= 1);
+            assertTrue(sightings >= 2, "The same sign should come into view again on the next lap, saw " + sightings);
+        }
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
+    @Timeout(30)
+    @DisplayName("an obstacle across every lane stops the car; opening one cell lets it steer through")
+    void wallOfObstaclesStopsTheCarUntilALaneOpens(ExpertBackendType backend) {
+        int[][] cells = new int[100][3];
+        cells[30] = new int[] {1, 1, 1};
+
+        try (SimulationEngine engine = engine(backend, 70, cells)) {
+            boolean stopRuleSeen = false;
+            boolean swerved = false;
+            for (int i = 0; i < 300; i++) {
+                engine.tick();
+                // Prolog rule ids append the outcome variant, e.g. "... (brake)".
+                String rule = engine.getCurrentDecision().getSourceRule();
+                stopRuleSeen |= rule != null && rule.startsWith("Stop before obstacle ahead while still in its lane");
+                DrivingAction action = engine.getCurrentDecision().getAction();
+                double distToWall = engine.getWorldState().distanceAhead(150.0);
+                if (distToWall <= 60.0) {
+                    swerved |= action == DrivingAction.CHANGE_LANE_LEFT || action == DrivingAction.CHANGE_LANE_RIGHT;
+                }
+            }
+
+            double gap = engine.getWorldState().distanceAhead(150.0);
+            assertTrue(stopRuleSeen, "the rule engine should explain the stop with the obstacle-in-lane rule");
+            assertFalse(swerved, "No lane is free, so the car must not try to change lane");
+            assertEquals(0.0, engine.getWorldState().getEgo().getSpeedKmh(), 0.5);
+            assertTrue(gap > 8.0 && gap <= 20.0,
+                "The car should stop short of the wall but outside the emergency zone, gap was " + gap + " m");
+
+            engine.setMapCell(30, Lane.LEFT, 0);
+            boolean usedLeftLane = false;
+            for (int i = 0; i < 300 && engine.getWorldState().getEgo().getPositionMeters() < 170.0; i++) {
+                engine.tick();
+                if (engine.getWorldState().getEgo().getLane() == Lane.LEFT) {
+                    usedLeftLane = true;
+                }
+            }
+
+            assertTrue(usedLeftLane, "The car should use the opened lane");
+            assertTrue(engine.getWorldState().getEgo().getPositionMeters() >= 170.0, "The car should drive past the wall");
+        }
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(ExpertBackendType.class)
+    @Timeout(60)
+    @DisplayName("the matrix obstacle course is driven lap after lap without touching an obstacle")
+    void obstacleCourseIsDrivenWithoutCollisions(ExpertBackendType backend) {
+        ScenarioDefinition course = ScenarioLibrary.loadFromClasspath("/scenarios/scenarios.json")
+            .findById("S13_MATRIX_COURSE").orElseThrow();
+
+        try (SimulationEngine engine = BackendTestSupport.engine(course, backend)) {
+            engine.start();
+            RoadMap map = engine.getWorldState().getRoadMap();
+            Set<Lane> lanesUsed = EnumSet.noneOf(Lane.class);
+            int firstObstacleAvoidances = 0;
+            DrivingAction previous = null;
+            // The course slows the car for the pothole and nothing accelerates it again
+            // (that is a driver request), so a lap takes a while.
+            for (int i = 0; i < 2500 && engine.roadMapSnapshot().lap() < 1; i++) {
+                engine.tick();
+                var ego = engine.getWorldState().getEgo();
+                Lane physicalLane = Lane.fromLateralPosition(ego.getLateralPositionMeters());
+                int row = map.rowAt(ego.getPositionMeters());
+            lanesUsed.add(ego.getLane());
+                assertFalse(map.get(row, physicalLane) == 1,
+                    "Drove into the obstacle at row " + row + ", lane " + physicalLane);
+
+                DrivingAction action = engine.getCurrentDecision().getAction();
+                if (action == DrivingAction.CHANGE_LANE_LEFT && previous != action && row < 24) {
+                    firstObstacleAvoidances++;
+                }
+                previous = action;
+            }
+
+            assertTrue(engine.roadMapSnapshot().lap() >= 1, "The course should loop back to row 0");
+            assertTrue(firstObstacleAvoidances >= 1, "The first obstacle must be avoided");
+            assertEquals(EnumSet.of(Lane.LEFT, Lane.CENTER, Lane.RIGHT), lanesUsed, "The slalom uses every physical lane");
+        }
+    }
+
+    @Test
+    @Timeout(30)
+    @DisplayName("painting a cell while running puts a hazard in front of the camera, painting 0 removes it")
+    void paintingACellChangesWhatTheCameraSees() {
+        try (SimulationEngine engine = engine(50, new int[100][3])) {
+            for (int i = 0; i < 5; i++) {
+                engine.tick();
+            }
+            RoadMap map = engine.getWorldState().getRoadMap();
+            int row = (map.rowAt(engine.getWorldState().getEgo().getPositionMeters()) + 16) % map.rows();
+            String id = RoadMap.cellId(row, Lane.CENTER);
+
+            engine.setMapCell(row, Lane.CENTER, 1);
+            boolean seen = false;
+            for (int i = 0; i < 5 && !seen; i++) {
+                seen = engine.tick().cameraDetectedObjectIds().contains(id);
+            }
+            assertTrue(seen, "The painted obstacle should be detected by the camera");
+
+            engine.setMapCell(row, Lane.CENTER, 0);
+            engine.tick();
+            assertTrue(engine.getWorldState().findRoadElementById(id).isEmpty());
+        }
+    }
+
+    @Test
+    // The first engine created in the JVM compiles the whole rule base, which alone can
+    // take over 15 s on a loaded machine; the siblings allow 30 s for the same reason.
+    @Timeout(30)
+    @DisplayName("from an outer lane the road edge counts as an occupied side")
+    void roadEdgeIsAnOccupiedSide() {
+        try (SimulationEngine engine = engine(50, new int[100][3])) {
+            var world = engine.getWorldState();
+            world.getEgo().setLane(Lane.LEFT);
+
+            WorldState.LaneOccupancy left = world.sideLaneOccupancy(
+                com.one2drive.projeto1.domain.LaneChangeDirection.LEFT, 30, 60);
+            WorldState.LaneOccupancy right = world.sideLaneOccupancy(
+                com.one2drive.projeto1.domain.LaneChangeDirection.RIGHT, 30, 60);
+
+            assertTrue(left.occupied() && left.roadEdge());
+            assertFalse(right.occupied() || right.roadEdge());
+            assertEquals(Lane.RIGHT, right.lane(), "Occupancy is reported by side, as the rules read it");
+        }
+    }
+}

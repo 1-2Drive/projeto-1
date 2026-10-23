@@ -1,0 +1,137 @@
+package rules
+
+import com.one2drive.projeto1.decision.DecisionContext
+import com.one2drive.projeto1.decision.DecisionPriority
+import com.one2drive.projeto1.domain.DrivingAction
+import com.one2drive.projeto1.domain.RiskLevel
+import com.one2drive.projeto1.domain.WeatherCondition
+import com.one2drive.projeto1.drools.DroolsSupport
+import com.one2drive.projeto1.drools.FuzzySupport
+import com.one2drive.projeto1.drools.facts.FuzzyConclusion
+import com.one2drive.projeto1.drools.facts.FuzzyMembership
+import com.one2drive.projeto1.drools.facts.WeatherStateFact
+import java.util.List
+
+global DroolsSupport droolsSupport
+
+// Fuzzy weather controller (Mamdani). Visibility and grip are vague ("reduced visibility",
+// "slippery road"), so instead of crisp thresholds each reading belongs, to some degree, to
+// the terms poor / reduced / fair / good. Four steps, one group of rules each:
+//   1. fuzzification   (salience 360): WeatherStateFact -> FuzzyMembership
+//   2. inference       (salience 355): one rule per fuzzy rule, AND = min, OR = max
+//                                      -> FuzzyConclusion
+//   3. composition and 4. defuzzification (salience 350): the conclusions are joined (max)
+//                                      and their centroid is the recommended speed.
+// Memberships and conclusions are inserted logically (truth maintenance): when the weather
+// reading changes, the old ones lose their justification and are retracted by the engine.
+//
+// The result is one speed ceiling at ROAD_HAZARD, like the three crisp rules it replaces:
+// the arbitration keeps the lowest ceiling, so it never raises the speed above the legal
+// limit. It is proposed only when a restrictive term holds, i.e. never in clear weather
+// with visibility and grip at 0.85 or above. The sets are in FuzzySupport.
+
+rule "Fuzzify visibility"
+agenda-group "decision"
+salience 360
+when
+    WeatherStateFact($visibility : visibilityFactor)
+then
+    for (String term : FuzzySupport.INPUT_TERMS) {
+        insertLogical(new FuzzyMembership("visibility", term, FuzzySupport.inputDegree(term, $visibility)));
+    }
+end
+
+rule "Fuzzify grip"
+agenda-group "decision"
+salience 360
+when
+    WeatherStateFact($grip : gripFactor)
+then
+    for (String term : FuzzySupport.INPUT_TERMS) {
+        insertLogical(new FuzzyMembership("grip", term, FuzzySupport.inputDegree(term, $grip)));
+    }
+end
+
+rule "Fuzzy: poor visibility or poor grip -> very slow"
+agenda-group "decision"
+salience 355
+when
+    FuzzyMembership(variable == "visibility", term == "poor", $v : degree)
+    FuzzyMembership(variable == "grip", term == "poor", $g : degree)
+    eval(Math.max($v, $g) > 0.0)
+then
+    insertLogical(new FuzzyConclusion("very_slow", Math.max($v, $g)));
+end
+
+rule "Fuzzy: reduced visibility or reduced grip -> slow"
+agenda-group "decision"
+salience 355
+when
+    FuzzyMembership(variable == "visibility", term == "reduced", $v : degree)
+    FuzzyMembership(variable == "grip", term == "reduced", $g : degree)
+    eval(Math.max($v, $g) > 0.0)
+then
+    insertLogical(new FuzzyConclusion("slow", Math.max($v, $g)));
+end
+
+rule "Fuzzy: fair visibility or fair grip -> moderate"
+agenda-group "decision"
+salience 355
+when
+    FuzzyMembership(variable == "visibility", term == "fair", $v : degree)
+    FuzzyMembership(variable == "grip", term == "fair", $g : degree)
+    eval(Math.max($v, $g) > 0.0)
+then
+    insertLogical(new FuzzyConclusion("moderate", Math.max($v, $g)));
+end
+
+// Rain is crisp (the sensor reports RAIN or CLEAR): it enters the rule with degree 1 or 0.
+rule "Fuzzy: rain with good visibility and good grip -> prudent"
+agenda-group "decision"
+salience 355
+when
+    WeatherStateFact(condition == WeatherCondition.RAIN)
+    FuzzyMembership(variable == "visibility", term == "good", $v : degree)
+    FuzzyMembership(variable == "grip", term == "good", $g : degree)
+    eval(Math.min($v, $g) > 0.0)
+then
+    insertLogical(new FuzzyConclusion("prudent", Math.min($v, $g)));
+end
+
+// "light" only refines a ceiling another term already set: alone it proposes nothing.
+rule "Fuzzy: no rain with good visibility and good grip -> light"
+agenda-group "decision"
+salience 355
+when
+    WeatherStateFact(condition != WeatherCondition.RAIN)
+    FuzzyMembership(variable == "visibility", term == "good", $v : degree)
+    FuzzyMembership(variable == "grip", term == "good", $g : degree)
+    eval(Math.min($v, $g) > 0.0)
+then
+    insertLogical(new FuzzyConclusion("light", Math.min($v, $g)));
+end
+
+rule "Defuzzify weather speed ceiling"
+agenda-group "decision"
+salience 350
+when
+    $ctx : DecisionContext()
+    WeatherStateFact($condition : condition, $visibility : visibilityFactor, $grip : gripFactor)
+    $conclusions : List() from collect( FuzzyConclusion() )
+    eval(FuzzySupport.restricts($conclusions))
+then
+    double target = FuzzySupport.centroid($conclusions);
+    // Rain alone (prudent) is a moderate risk; reduced visibility or grip is a high one.
+    RiskLevel risk = "prudent".equals(FuzzySupport.strongestTerm($conclusions))
+        ? RiskLevel.MODERATE : RiskLevel.HIGH;
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.REDUCE_SPEED,
+        target,
+        risk,
+        DecisionPriority.ROAD_HAZARD,
+        "Weather conditions (fuzzy) require a reduced speed",
+        drools.getRule().getName(),
+        FuzzySupport.evidence($visibility, $grip, $condition == WeatherCondition.RAIN, $conclusions, target)
+    );
+end

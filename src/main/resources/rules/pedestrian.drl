@@ -1,0 +1,150 @@
+package rules
+
+import com.one2drive.projeto1.decision.DecisionContext
+import com.one2drive.projeto1.decision.DecisionPriority
+import com.one2drive.projeto1.domain.DrivingAction
+import com.one2drive.projeto1.domain.PedestrianCrossingState
+import com.one2drive.projeto1.domain.RiskLevel
+import com.one2drive.projeto1.drools.DroolsSupport
+import com.one2drive.projeto1.drools.facts.CruiseTargetFact
+import com.one2drive.projeto1.drools.facts.PedestrianBrakingState
+import com.one2drive.projeto1.drools.facts.PedestrianStateFact
+import com.one2drive.projeto1.drools.facts.VehicleStateFact
+
+global DroolsSupport droolsSupport
+
+// A pedestrian is perceived in one of three ways (PedestrianStateFact):
+//   - no conflict: on the road but neither in the ego's trajectory nor crossing; it is
+//     tracked in working memory and nothing more;
+//   - crossing (crossingState CROSSING): walking across the road ahead and not yet at the
+//     far side. The crossing is occupied and the ego gives way for as long as that lasts,
+//     in whatever lane the pedestrian is: leaving the ego's lane does not end a crossing;
+//   - crossed (crossingState CROSSED): it has reached the far side; only then do these
+//     rules stop holding the vehicle.
+// A pedestrian in the ego's trajectory (inPath) conflicts whether it is crossing or not.
+//
+// Stopping for a pedestrian is a mandatory stop, the same priority as a red light or a
+// stop sign. At the collision-avoidance priority these rules lost to the approach to a red
+// light or a stop sign, which may propose keeping the current speed while there is still
+// room before the line, and the vehicle only reacted to the pedestrian at the 6 m
+// emergency distance. On equal priority the lower speed wins, so the pedestrian prevails
+// over an approach that still allows speed and loses only to a harder stop. These rules
+// fire after the red light and stop sign rules: where both ask for a standstill, the
+// signal's own proposal (which may be an emergency brake) stays.
+//
+// The approach follows a braking curve that ends 18 m short of the pedestrian, like the
+// approach to a red light ends short of the line. Above the 2.0 m/s2 curve the vehicle
+// starts braking; it keeps braking until it is below the 1.4 m/s2 curve, and from then on
+// holds its speed, so that it never speeds up again towards the pedestrian, until the
+// upper curve catches it and it brakes again (PedestrianBrakingState: NONE, BRAKING,
+// HOLDING). A vehicle that has not braked yet is held between the two curves and left
+// alone below the lower one, where there is still room. With the two curves read without
+// that memory the vehicle rode the upper one, a brake and a hold alternating at every
+// tick. A curve, rather than a fixed distance, brakes early at speed (87 m at
+// 60 km/h, where a fixed 45 m left the 6 m emergency brake as the first effective
+// reaction) and still lets a slow or stopped vehicle close in, so that it comes to rest
+// near the pedestrian and not far behind.
+
+rule "Stop for pedestrian in crossing zone"
+agenda-group "decision"
+salience 600
+when
+    $ctx : DecisionContext()
+    PedestrianStateFact(inPath == true || crossingState == PedestrianCrossingState.CROSSING, $distance : distanceMeters > 6.0, distanceMeters <= 32.0)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.STOP,
+        0.0,
+        RiskLevel.HIGH,
+        DecisionPriority.LEGAL_MANDATORY_STOP,
+        "Pedestrian detected in trajectory",
+        drools.getRule().getName(),
+        "distance=" + $distance + "m"
+    );
+end
+
+// The braking state is settled before the proposal of the cycle is made (higher salience).
+rule "Start braking for pedestrian above the braking curve"
+agenda-group "decision"
+salience 607
+when
+    $state : PedestrianBrakingState(phase != PedestrianBrakingState.Phase.BRAKING)
+    VehicleStateFact($speed : speedKmh, $now : timestamp)
+    PedestrianStateFact(inPath == true || crossingState == PedestrianCrossingState.CROSSING, $distance : distanceMeters > 32.0)
+    eval($speed / 3.6 > Math.sqrt(2.0 * 2.0 * Math.max(0.0, $distance - 18.0)))
+then
+    modify($state) { setPhase(PedestrianBrakingState.Phase.BRAKING), setTimestamp($now) }
+end
+
+rule "Hold speed for pedestrian once under the lower curve"
+agenda-group "decision"
+salience 607
+when
+    $state : PedestrianBrakingState(phase == PedestrianBrakingState.Phase.BRAKING)
+    VehicleStateFact($speed : speedKmh)
+    PedestrianStateFact(inPath == true || crossingState == PedestrianCrossingState.CROSSING, $distance : distanceMeters > 32.0)
+    eval($speed / 3.6 <= Math.sqrt(2.0 * 1.4 * Math.max(0.0, $distance - 18.0)))
+then
+    modify($state) { setPhase(PedestrianBrakingState.Phase.HOLDING) }
+end
+
+// The pedestrian is gone, no longer in conflict, or within the stop zone (32 m), where the
+// stop rule takes over: the approach is over either way.
+rule "End the pedestrian approach once no pedestrian is approached"
+agenda-group "decision"
+salience 607
+when
+    $state : PedestrianBrakingState(phase != PedestrianBrakingState.Phase.NONE)
+    not PedestrianStateFact((inPath == true || crossingState == PedestrianCrossingState.CROSSING) && distanceMeters > 32.0)
+then
+    modify($state) { setPhase(PedestrianBrakingState.Phase.NONE) }
+end
+
+rule "Brake for pedestrian proximity"
+agenda-group "decision"
+salience 605
+when
+    $ctx : DecisionContext()
+    VehicleStateFact($speed : speedKmh)
+    PedestrianStateFact(inPath == true || crossingState == PedestrianCrossingState.CROSSING, $inPath : inPath, $distance : distanceMeters > 32.0)
+    PedestrianBrakingState($phase : phase)
+    eval($phase != PedestrianBrakingState.Phase.NONE
+        || $speed / 3.6 > Math.sqrt(2.0 * 1.4 * Math.max(0.0, $distance - 18.0)))
+then
+    boolean brake = $phase == PedestrianBrakingState.Phase.BRAKING;
+    droolsSupport.proposeDecision(
+        $ctx,
+        brake ? DrivingAction.BRAKE : DrivingAction.MAINTAIN_SPEED,
+        brake ? 20.0 : $speed,
+        brake ? RiskLevel.HIGH : RiskLevel.MODERATE,
+        DecisionPriority.LEGAL_MANDATORY_STOP,
+        $inPath ? "Pedestrian ahead in path; prepare stop" : "Pedestrian still crossing the road ahead; giving way",
+        drools.getRule().getName(),
+        "distance=" + $distance + "m"
+    );
+end
+
+// A vehicle that has stopped for a crossing pedestrian stays stopped until the crossing is
+// free. Without this, a vehicle that came to rest further back than the stop zone would be
+// below the braking curve, nothing would hold it, and it would move off again towards a
+// crossing that is still occupied.
+rule "Hold for pedestrian still crossing"
+agenda-group "decision"
+salience 602
+when
+    $ctx : DecisionContext()
+    VehicleStateFact(speedKmh < 1.0)
+    PedestrianStateFact(crossingState == PedestrianCrossingState.CROSSING, $distance : distanceMeters > 32.0, distanceMeters <= 45.0)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.STOP,
+        0.0,
+        RiskLevel.HIGH,
+        DecisionPriority.LEGAL_MANDATORY_STOP,
+        "Stopped for a pedestrian that is still crossing; waiting for the crossing to be free",
+        drools.getRule().getName(),
+        "distance=" + $distance + "m"
+    );
+end

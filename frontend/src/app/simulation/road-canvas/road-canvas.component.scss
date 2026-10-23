@@ -1,0 +1,700 @@
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+/* ===================== road shell ===================== */
+/* The dashboard gives the road the whole upper-left cell; on narrow screens the page scrolls
+   and the road keeps a wide 10:3 shape so the perspective still has room. */
+.road {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  min-height: 0;
+  max-height: none;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-lg);
+  background: #0a1319;
+  overflow: hidden;
+  box-shadow: var(--ds-shadow);
+  contain: paint;
+}
+
+@media (max-width: 1100px) {
+  :host {
+    height: auto;
+    flex: 0 0 auto;
+  }
+  .road {
+    height: auto;
+    aspect-ratio: 10 / 3;
+    max-height: 40rem;
+    min-height: clamp(12rem, 56vw, 20rem);
+  }
+}
+
+/* The scene is drawn in canvas pixels (see road-projection.ts), so it never stretches. */
+.scene {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: hidden;
+  font-family: var(--ds-font-mono);
+  pointer-events: none;
+}
+
+/* ===================== sky, horizon, ground ===================== */
+.hills {
+  fill: #0f1d27;
+}
+
+.hills--far {
+  fill: #17293a;
+}
+
+.tree__trunk { fill: #2a2118; }
+.tree__leaf { fill: #12261e; }
+.tree__leaf--2 { fill: #163025; }
+
+/* ===================== road surface ===================== */
+.surface__bands {
+  fill: rgba(255, 255, 255, 0.03);
+}
+
+.surface__edge {
+  fill: rgba(228, 236, 244, 0.78);
+}
+
+.surface__lane--dashed {
+  fill: rgba(224, 233, 242, 0.78);
+}
+
+.surface__lane--continuous {
+  fill: #ffffff;
+}
+
+.surface__arrows {
+  fill: rgba(226, 235, 244, 0.16);
+}
+
+.surface__post {
+  fill: #c5d0d8;
+  opacity: 0.8;
+}
+
+.surface__wet {
+  mix-blend-mode: screen;
+}
+
+.scale__tick {
+  fill: none;
+  stroke: rgba(150, 180, 205, 0.2);
+  stroke-width: 1;
+}
+
+.scale__label {
+  font-size: 9px;
+  fill: rgba(184, 203, 219, 0.55);
+}
+
+/* ===================== rain ===================== */
+/* Rain darkens and cools the scene, then adds two layers of streaks (near: long and bright,
+   far: short and faint) so the shower has depth. Nothing is drawn over the HUD. */
+.road--rain {
+  background: #08101a;
+}
+
+.road--rain .surface__lane--dashed,
+.road--rain .surface__lane--continuous {
+  opacity: 0.6;
+}
+
+.road--rain .surface__bands {
+  fill: rgba(150, 190, 220, 0.04);
+}
+
+.road--rain .sky,
+.road--rain .ground,
+.road--rain .scenery {
+  opacity: 0.8;
+}
+
+.rain-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(14, 28, 44, 0.32), rgba(14, 28, 44, 0.12) 60%, rgba(10, 22, 36, 0.28));
+}
+
+/* Vertical hairlines chopped into short dashes by the mask, then tilted 12 degrees.
+   The animation moves one mask period along the tilt, so the loop is seamless.
+   The layer is a square sized from the width and centred on the overlay, so the rotation and
+   the travel never reveal a corner for any canvas shape. */
+.rain-overlay__drops {
+  position: absolute;
+  top: 50%;
+  left: -10%;
+  width: 120%;
+  aspect-ratio: 1;
+  margin-top: -60%;
+  background-image:
+    repeating-linear-gradient(90deg, transparent 0 22px, rgba(191, 224, 245, 0.2) 22px 23px, transparent 23px 34px),
+    repeating-linear-gradient(90deg, transparent 0 41px, rgba(191, 224, 245, 0.13) 41px 42px, transparent 42px 57px);
+  background-position: 0 0, 17px 0;
+  -webkit-mask-image: repeating-linear-gradient(180deg, #000 0 16px, transparent 16px 54px);
+  mask-image: repeating-linear-gradient(180deg, #000 0 16px, transparent 16px 54px);
+  transform: rotate(12deg) translateY(-54px);
+  animation: rain-drops 0.9s linear infinite;
+}
+
+.rain-overlay__drops--far {
+  background-image:
+    repeating-linear-gradient(90deg, transparent 0 9px, rgba(191, 224, 245, 0.12) 9px 10px, transparent 10px 17px),
+    repeating-linear-gradient(90deg, transparent 0 14px, rgba(191, 224, 245, 0.08) 14px 15px, transparent 15px 23px);
+  -webkit-mask-image: repeating-linear-gradient(180deg, #000 0 7px, transparent 7px 20px);
+  mask-image: repeating-linear-gradient(180deg, #000 0 7px, transparent 7px 20px);
+  transform: rotate(12deg) translateY(-20px);
+  animation: rain-drops-far 1.5s linear infinite;
+}
+
+@keyframes rain-drops {
+  from { transform: rotate(12deg) translateY(-54px); }
+  to { transform: rotate(12deg) translateY(0); }
+}
+
+@keyframes rain-drops-far {
+  from { transform: rotate(12deg) translateY(-20px); }
+  to { transform: rotate(12deg) translateY(0); }
+}
+
+/* New rain: drops, splashes and spray are drawn by RainSimulation (road-rain.ts) on this canvas,
+   over the scene and under the HUD, like the classic overlay. */
+.rain-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.road--rain .surface__sheen,
+.road--rain .rain-mist {
+  pointer-events: none;
+}
+
+.rain-chip {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.8rem;
+  z-index: 7;
+  padding: 0.2rem 0.45rem;
+  border: 1px solid rgba(144, 199, 229, 0.55);
+  border-radius: 0.25rem;
+  background: rgba(13, 35, 51, 0.9);
+  color: #b9e5fa;
+  font: 600 0.58rem var(--ds-font-mono);
+  letter-spacing: 0.1em;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rain-overlay__drops { animation: none; }
+}
+
+/* ===================== solids: flat-shaded faces ===================== */
+/* Every face of a 3D model is a path whose class names its part and the side it shows.
+   The part sets the colour (--c); the side only lightens or darkens it, as a light from the
+   upper left would. */
+.f {
+  --fill: color-mix(in srgb, color-mix(in srgb, var(--c, #8a96a3), #fff var(--lite, 0%)), #000 var(--dark, 0%));
+  fill: var(--fill);
+  stroke: rgba(0, 0, 0, 0.28);
+  stroke-width: 0.5px;
+  stroke-linejoin: round;
+}
+
+.f--rear { --dark: 8%; }
+.f--front { --dark: 30%; }
+.f--left { --dark: 46%; }
+.f--right { --dark: 32%; }
+.f--top { --lite: 24%; }
+.f--bottom { --dark: 65%; }
+
+.f--glass { --c: #1a3348; stroke: rgba(160, 200, 230, 0.25); }
+.f--glass.f--top { --lite: 8%; }
+.f--wheel { --c: #0c1015; }
+.f--plate { --c: #e6edf2; stroke: none; }
+.f--bumper { --c: #1f262d; stroke: none; }
+.f--lens { --c: #7a3a14; stroke: none; }
+.f--tail { --c: #9b2a26; stroke: none; }
+.f--roof-shine { fill: rgba(255, 255, 255, 0.16); stroke: none; }
+
+.f--post { --c: #dfe5ea; }
+.f--beacon { --c: #f0443d; stroke: rgba(255, 212, 201, 0.6); }
+.f--arm-red { --c: #d83431; }
+.f--arm-white { --c: #f2f5f6; }
+.f--hazard-stripe { fill: #15181b; stroke: none; }
+.f--obstacle { --c: #e08a2e; }
+.f--gantry { --c: #56626e; }
+.f--head { --c: #1a222b; }
+.f--head-plate { --c: #0d1319; stroke: none; }
+.f--lamp-off { --c: #29313a; stroke: rgba(0, 0, 0, 0.6); }
+.f--lamp-red { --c: #ff4d42; stroke: none; --dark: 0%; }
+.f--lamp-yellow { --c: #ffc83d; stroke: none; --dark: 0%; }
+.f--lamp-green { --c: #47e08c; stroke: none; --dark: 0%; }
+
+.glow { pointer-events: none; }
+
+/* ===================== sensor fields of view (on the road) ===================== */
+.sensor-camera {
+  fill: url(#sensorCameraFill);
+  stroke: rgba(122, 190, 232, 0.5);
+  stroke-width: 1px;
+  stroke-linejoin: round;
+}
+
+/* range the camera lost to rain or fog: drawn hollow so it reads as "not seen" */
+.sensor-camera-lost {
+  fill: rgba(96, 176, 226, 0.07);
+  stroke: rgba(96, 176, 226, 0.5);
+  stroke-width: 1px;
+  stroke-dasharray: 4 3;
+}
+
+.sensor-radar {
+  fill: url(#sensorRadarFill);
+  stroke: rgba(94, 214, 148, 0.55);
+  stroke-width: 1px;
+}
+
+.sensor-blind {
+  fill: rgba(198, 212, 226, 0.16);
+  stroke: rgba(198, 212, 226, 0.5);
+  stroke-width: 1px;
+  stroke-dasharray: 4 2;
+  transition: fill 160ms ease, stroke 160ms ease;
+}
+
+.sensor-blind--occupied {
+  fill: rgba(240, 138, 58, 0.3);
+  stroke: rgba(240, 138, 58, 0.9);
+}
+
+.sensor-edge path {
+  fill: none;
+  stroke-width: 1.2px;
+  stroke-dasharray: 5 3;
+}
+
+.sensor-edge--camera path { stroke: rgba(96, 176, 226, 0.8); }
+.sensor-edge--radar path { stroke: rgba(94, 214, 148, 0.75); }
+
+.sensor-edge--ghost {
+  opacity: 0.45;
+}
+
+.sensor-edge--ghost path {
+  stroke-dasharray: 2 3;
+}
+
+.sensor-edge__label {
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  paint-order: stroke;
+  stroke: rgba(6, 12, 18, 0.85);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+
+.sensor-edge--camera .sensor-edge__label { fill: #a5d3f2; }
+.sensor-edge--radar .sensor-edge__label { fill: #9fe3bd; }
+
+/* ===================== lane tags ===================== */
+.lane-tag {
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  fill: rgba(190, 210, 226, 0.5);
+}
+
+/* ===================== vehicles ===================== */
+.car__shadow {
+  fill: rgba(0, 0, 0, 0.5);
+  filter: blur(2.5px);
+}
+
+.car__reflection,
+.car__brake-glow {
+  pointer-events: none;
+}
+
+.car__reflection {
+  opacity: 0.55;
+}
+
+.car__brake-glow {
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.ego--braking .car__brake-glow {
+  opacity: 0.9;
+}
+
+/* Ego: a deep metallic red electric fastback, so it never reads as traffic. Its rounded body is shaded
+   face by face (--lite / --dark, set from each face's angle to the light and the camera), and a smooth
+   face is outlined in its own colour so the facets blend into one surface. */
+.f.f--smooth {
+  stroke: var(--fill);
+  stroke-width: 0.8px;
+}
+
+.car--ego .f--body { --c: #a61b29; }
+.car--ego .f--tail { --c: #e0372f; }
+.car--ego .f--glass { --c: #0b1722; }
+.car--ego .f--roof-glass { --c: #05090e; }
+.car--ego .f--rim { --c: #6d7680; }
+.car--ego .f--hub { --c: #2a3138; }
+.car--ego .f--wheel { --c: #0d1116; }
+.car--ego .f--bumper { --c: #0d1015; stroke: none; }
+.car--ego .f--lens,
+.car--ego .f--plate { stroke: none; }
+
+/* Other traffic: cool steel tones. */
+.car--other .f--body { --c: #5f7f9f; }
+.car--other .f--roof { --c: #6a8aa9; }
+.car--other .f--tail { --c: #a63a35; }
+.car--tone-1 .f--body { --c: #566270; }
+.car--tone-1 .f--roof { --c: #606d7c; }
+.car--tone-2 .f--body { --c: #aab6c2; }
+.car--tone-2 .f--roof { --c: #b8c3ce; }
+.car--other .f--glass { --c: #1b2c3b; }
+
+/* Brake lights only mirror backend state; the UI never decides that the vehicle is braking. */
+.ego--braking .brake-lamp {
+  fill: #ff3b30;
+}
+
+/* Blinkers are only drawn while active: off, the lamps are hidden. */
+.car__indicator .indicator-light {
+  fill: #ffb000;
+  stroke: #fff3c4;
+  stroke-width: 0.5px;
+  opacity: 0;
+}
+
+/* Lit and dark halves of each period, as a real flasher (about 85 flashes a minute). */
+.indicator-light--on {
+  animation: indicator-blink 700ms steps(1, end) infinite;
+}
+
+/* ===================== objects ===================== */
+.obj--passed {
+  opacity: 0.55;
+}
+
+/* Detection: a ring on the road under the object (not colour-only: the tag says it too). */
+.halo {
+  fill: rgba(96, 176, 226, 0.14);
+  stroke: rgba(122, 205, 245, 0.85);
+  stroke-width: 1.2px;
+}
+
+.halo--radar {
+  fill: rgba(94, 214, 148, 0.14);
+  stroke: rgba(120, 224, 163, 0.85);
+}
+
+.obj__badge rect {
+  fill: rgba(56, 130, 180, 0.92);
+  stroke: rgba(140, 208, 244, 0.85);
+  stroke-width: 1px;
+}
+
+.obj__badge text {
+  fill: #eaf6ff;
+  font-size: 8.5px;
+  letter-spacing: 0.08em;
+}
+
+.obj__badge--radar rect {
+  fill: rgba(38, 122, 80, 0.92);
+  stroke: rgba(126, 224, 165, 0.8);
+}
+
+.obj__badge--radar text {
+  fill: #e9fff3;
+}
+
+.obj__distance text {
+  fill: rgba(206, 224, 238, 0.92);
+  font-size: 10px;
+  paint-order: stroke;
+  stroke: rgba(4, 10, 16, 0.85);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+
+.obj__distance--passed text {
+  fill: rgba(176, 196, 212, 0.75);
+}
+
+/* ===================== painted on the road ===================== */
+.crosswalk__bars {
+  fill: rgba(243, 247, 250, 0.9);
+}
+
+.stop-line {
+  fill: rgba(243, 247, 250, 0.92);
+}
+
+.paint-ring {
+  fill: none;
+  stroke: rgba(240, 244, 248, 0.82);
+  stroke-width: 0.17px;
+}
+
+.paint-value {
+  fill: rgba(240, 244, 248, 0.88);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.25px;
+  font-weight: 700;
+  text-anchor: middle;
+}
+
+.pothole__outer { fill: rgba(8, 12, 16, 0.55); stroke: rgba(130, 142, 155, 0.6); stroke-width: 1px; }
+.pothole__inner { fill: #0a0e12; }
+.pothole__deep { fill: #030507; }
+
+/* ===================== signs ===================== */
+.sign__pole { fill: #8a96a3; }
+.sign__shadow { fill: rgba(0, 0, 0, 0.4); }
+
+.sign--speed .sign__disc { fill: #f4f6f8; }
+
+.sign--speed .sign__ring {
+  fill: none;
+  stroke: #d0332f;
+  stroke-width: 0.09px;
+}
+
+.sign__value {
+  fill: #1a1f24;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.5px;
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.sign--stop .sign__disc {
+  fill: #c92f28;
+  stroke: #f3f5f7;
+  stroke-width: 0.05px;
+  stroke-linejoin: round;
+}
+
+.sign__word {
+  fill: #fff;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.2px;
+  font-weight: 700;
+  text-anchor: middle;
+}
+
+/* ===================== roadside radar ===================== */
+.radar-unit__pole { fill: #7c8894; }
+.radar-unit__box { fill: #cfd6dc; stroke: #4a5560; stroke-width: 0.04px; }
+.radar-unit__lens { fill: #16212b; stroke: #5a6b79; stroke-width: 0.04px; }
+.radar-unit__beacon { fill: #f0443d; }
+
+/* ===================== pedestrian ===================== */
+.person__head { fill: #f0c9a6; }
+.person__shadow { fill: rgba(0, 0, 0, 0.42); }
+
+.person__body {
+  fill: #3d8fd4;
+  stroke: #8ec4ec;
+  stroke-width: 0.025px;
+  stroke-linejoin: round;
+}
+
+.person__legs,
+.person__arms {
+  stroke: #2c6d9f;
+  stroke-width: 0.13px;
+  stroke-linecap: round;
+  fill: none;
+}
+
+.person__arms { stroke: #3d8fd4; stroke-width: 0.1px; }
+
+/* ===================== first-run invitation ===================== */
+.await {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: 7;
+  pointer-events: none;
+  padding: 1rem;
+}
+
+.await__card {
+  display: grid;
+  gap: 0.35rem;
+  justify-items: center;
+  text-align: center;
+  max-width: 27rem;
+  padding: 1.35rem 1.6rem;
+  border-radius: var(--ds-radius-md);
+  border: 1px solid var(--ds-border-strong);
+  background: rgba(10, 17, 24, 0.9);
+  backdrop-filter: blur(3px);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55);
+}
+
+.await__eyebrow {
+  font-family: var(--ds-font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ds-text-muted);
+}
+
+.await__card strong {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.22rem;
+  letter-spacing: 0.01em;
+  color: var(--ds-text-primary);
+}
+
+.await__card span:last-child {
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--ds-text-secondary);
+}
+
+/* ===================== legend ===================== */
+.legend {
+  position: absolute;
+  left: 0.6rem;
+  top: 0.5rem;
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  padding: 0.16rem 0.4rem;
+  border-radius: 3px;
+  border: 1px solid rgba(70, 92, 112, 0.75);
+  background: rgba(9, 15, 21, 0.8);
+  color: #a9bfd2;
+  font-size: 0.62rem;
+}
+
+.dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+}
+
+.dot--camera { background: #60b0e2; }
+.dot--radar { background: #5ed694; }
+.dot--blind { background: #c6d6e2; }
+
+/* ===================== Telemetry HUD Ribbon ===================== */
+.telemetry-hud {
+  position: absolute;
+  bottom: 0.45rem;
+  left: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: var(--ds-radius-sm);
+  background: rgba(10, 16, 24, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(4px);
+  z-index: 10;
+  font-family: var(--ds-font-mono);
+  font-size: 0.68rem;
+
+  .hud-item {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+
+  .hud-label {
+    color: rgba(226, 235, 244, 0.5);
+    font-size: 0.58rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+  }
+
+  .hud-val {
+    color: #e2e8f0;
+    font-weight: 700;
+  }
+
+  .hud-badge {
+    padding: 0.08rem 0.3rem;
+    border-radius: 3px;
+    font-size: 0.62rem;
+
+    &[data-state='ACCELERATING'],
+    &[data-state='RESUMING'] {
+      background: rgba(52, 211, 153, 0.2);
+      color: #34d399;
+    }
+
+    &[data-state='CRUISING'] {
+      background: rgba(56, 189, 248, 0.2);
+      color: #38bdf8;
+    }
+
+    &[data-state='BRAKING'],
+    &[data-state='STOPPED_FOR_HAZARD'] {
+      background: rgba(248, 113, 113, 0.25);
+      color: #f87171;
+    }
+
+    &[data-state='DECELERATING'] {
+      background: rgba(251, 191, 36, 0.2);
+      color: #fbbf24;
+    }
+
+    &[data-indicator='LEFT'],
+    &[data-indicator='RIGHT'],
+    &[data-indicator='HAZARD'] {
+      background: rgba(255, 194, 51, 0.25);
+      color: #ffc233;
+    }
+  }
+}
+
+/* Without motion the active side stays lit instead of flashing. */
+@media (prefers-reduced-motion: reduce) {
+  .ego--indicator-left .car__indicator--left .indicator-light,
+  .ego--indicator-right .car__indicator--right .indicator-light,
+  .ego--indicator-hazard .car__indicator--left .indicator-light,
+  .ego--indicator-hazard .car__indicator--right .indicator-light {
+    animation: none;
+    opacity: 1;
+  }
+}

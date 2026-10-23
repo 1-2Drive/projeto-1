@@ -1,0 +1,258 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.gauge {
+  display: grid;
+  /* The card is as tall as its content: head, gauge, legend. The page grid must not stretch it. */
+  align-content: start;
+  gap: 0.5rem;
+  padding: 0.7rem 0.8rem 0.75rem;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-lg);
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(35, 74, 102, 0.42) 0%, rgba(13, 20, 28, 0.9) 68%),
+    rgba(13, 20, 28, 0.9);
+  box-sizing: border-box;
+  overflow: hidden;
+  /* The legend below adapts to the width of the card, not of the screen. */
+  container-type: inline-size;
+}
+
+.gauge__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem 0.4rem;
+  flex-wrap: wrap;
+
+  > * {
+    min-width: 0;
+  }
+
+  h3 {
+    margin: 0;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ds-text-secondary);
+  }
+}
+
+.gauge__action {
+  padding: 0.14rem 0.42rem;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-bg-muted);
+  font-family: var(--ds-font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.1em;
+  color: var(--ds-text-secondary);
+}
+
+.gauge__dial {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  margin-top: 0.15rem;
+
+  /* Gauge and readout share one cell: the number always sits inside the arc, never drifts. */
+  > * {
+    grid-area: 1 / 1;
+  }
+}
+
+.dial {
+  display: block;
+  width: 100%;
+  max-width: 22rem;
+  overflow: visible;
+
+  path {
+    fill: none;
+    stroke-linecap: round;
+  }
+}
+
+.dial__track {
+  stroke: #1d2a36;
+  stroke-width: 11;
+}
+
+.dial__value {
+  stroke: #46b7e8;
+  stroke-width: 11;
+  filter: drop-shadow(0 0 5px rgba(70, 183, 232, 0.45));
+  transition: stroke-dasharray 200ms ease;
+}
+
+.dial__legal {
+  stroke: #e2b23c;
+  stroke-width: 3;
+  opacity: 0.95;
+}
+
+.gauge--over {
+  .dial__value {
+    stroke: #ef5f57;
+    filter: drop-shadow(0 0 6px rgba(239, 95, 87, 0.5));
+  }
+
+  .gauge__action {
+    border-color: #7d3232;
+    color: #ffc9c9;
+  }
+}
+
+.gauge__readout {
+  align-self: end;
+  display: grid;
+  justify-items: center;
+  padding-bottom: 0.1rem;
+
+  strong {
+    font-family: var(--ds-font-mono);
+    font-size: 2.1rem;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--ds-text-primary);
+  }
+
+  span {
+    font-size: 0.6rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ds-text-muted);
+  }
+}
+
+.pin {
+  rect {
+    stroke-width: 0.8;
+  }
+
+  text {
+    font-family: var(--ds-font-mono);
+    font-size: 7.6px;
+    font-weight: 600;
+  }
+
+  &--legal rect {
+    fill: #2a2410;
+    stroke: #6c5a1e;
+  }
+
+  &--legal text {
+    fill: #f2d582;
+  }
+
+  &--rec rect {
+    fill: #0d2b36;
+    stroke: #1f5f77;
+  }
+
+  &--rec text {
+    fill: #9fe3f5;
+  }
+}
+
+.gauge__legend {
+  display: grid;
+  /* One column per metric, each as wide as its own text, so labels never collide. */
+  grid-template-columns: repeat(3, max-content);
+  justify-content: space-between;
+  column-gap: 0.5rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid var(--ds-border);
+}
+
+.legend {
+  display: grid;
+  gap: 0.2rem;
+  align-content: start;
+  white-space: nowrap;
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ds-text-muted);
+
+  strong {
+    font-family: var(--ds-font-mono);
+    font-size: 0.78rem;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--ds-text-primary);
+  }
+
+  &--limit {
+    justify-items: start;
+    text-align: left;
+  }
+
+  &--rec {
+    justify-items: center;
+    text-align: center;
+  }
+
+  &--delta {
+    justify-items: end;
+    text-align: right;
+  }
+
+  &--limit strong {
+    color: #f2d582;
+  }
+
+  &--rec strong {
+    color: #9fe3f5;
+  }
+
+  &--above strong {
+    color: #ffb3b3;
+  }
+
+  &--below strong {
+    color: #a7dfbc;
+  }
+}
+
+/* A wide card (large screens) gets a larger gauge and number, so it stays full instead of stretched. */
+@container (min-width: 19rem) {
+  .gauge__readout strong {
+    font-size: 2.7rem;
+  }
+
+  .gauge__readout span {
+    font-size: 0.68rem;
+  }
+}
+
+/* A card too narrow for three columns lists the metrics as label / value rows instead. */
+@container (max-width: 13.75rem) {
+  .gauge__legend {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 0.25rem;
+  }
+
+  .legend {
+    grid-auto-flow: column;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+
+  .legend--limit,
+  .legend--rec,
+  .legend--delta {
+    justify-items: stretch;
+    text-align: left;
+  }
+}
+
+.empty {
+  margin: 0;
+  font-size: 0.7rem;
+  color: var(--ds-text-muted);
+}

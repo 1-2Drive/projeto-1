@@ -1,0 +1,153 @@
+package rules
+
+import com.one2drive.projeto1.decision.DecisionContext
+import com.one2drive.projeto1.decision.DecisionPriority
+import com.one2drive.projeto1.decision.StoppingPolicy
+import com.one2drive.projeto1.domain.DrivingAction
+import com.one2drive.projeto1.domain.RiskLevel
+import com.one2drive.projeto1.drools.DroolsSupport
+import com.one2drive.projeto1.drools.facts.AccelerationRequestState
+import com.one2drive.projeto1.drools.facts.CurrentSpeedLimit
+import com.one2drive.projeto1.drools.facts.PendingSpeedLimit
+import com.one2drive.projeto1.drools.facts.VehicleStateFact
+
+global DroolsSupport droolsSupport
+
+// 0.1 km/h deadband around the limit. Without it the km/h <-> m/s round trip in the
+// actuator leaves the fact a few ulp above the limit, "exceeding" never deactivates and
+// the decision sticks on REDUCE_SPEED instead of settling on MAINTAIN_SPEED. The actuator
+// holds the target inside a +/-0.5 km/h dead band (SPEED_DEAD_BAND_KMH in DecisionActuator),
+// so this 0.1 km/h rule threshold sits inside that band.
+// "exceeding" and "compliant" must stay exact complements so one of them always wins.
+rule "Reduce speed when exceeding detected limit"
+agenda-group "decision"
+salience 300
+when
+    $ctx : DecisionContext()
+    VehicleStateFact( $speed : speedKmh )
+    CurrentSpeedLimit( $limit : limitKmh )
+    eval($speed > $limit + 0.1)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.REDUCE_SPEED,
+        $limit,
+        RiskLevel.MODERATE,
+        DecisionPriority.SPEED_COMPLIANCE,
+        "Vehicle exceeds current legal speed limit",
+        drools.getRule().getName(),
+        "speed=" + $speed + " km/h, limit=" + $limit + " km/h"
+    );
+end
+
+// A lower limit ahead is not in force yet, but the vehicle has to be down to it when it
+// gets to the sign. StoppingPolicy.approachSpeedKmh is the fastest it may still be going
+// at this distance: far from the sign that is above any speed and this rule stays out, so
+// the vehicle keeps the current limit and only starts to slow where it has to. From there
+// the recommendation follows that speed down to the new limit, and holds it over the last
+// metres before the sign.
+rule "Slow down in time for the speed limit ahead"
+agenda-group "decision"
+salience 310
+when
+    $ctx : DecisionContext()
+    PendingSpeedLimit( signId != PendingSpeedLimit.NONE, $next : limitKmh, $signPosition : positionMeters )
+    CurrentSpeedLimit( $limit : limitKmh )
+    VehicleStateFact( $speed : speedKmh, $position : positionMeters )
+    eval(StoppingPolicy.approachSpeedKmh($next, $signPosition - $position) <= $speed + 1.0)
+then
+    double distance = $signPosition - $position;
+    double approach = Math.min($limit, StoppingPolicy.approachSpeedKmh($next, distance));
+    boolean slowing = $speed > approach + 0.1;
+    droolsSupport.proposeDecision(
+        $ctx,
+        slowing ? DrivingAction.REDUCE_SPEED : DrivingAction.MAINTAIN_SPEED,
+        approach,
+        slowing ? RiskLevel.MODERATE : RiskLevel.LOW,
+        DecisionPriority.SPEED_COMPLIANCE,
+        "Speed limit " + $next + " km/h ahead; slowing to reach it at the sign",
+        drools.getRule().getName(),
+        "next limit=" + $next + " km/h in " + Math.round(distance) + "m, current limit=" + $limit
+            + " km/h, speed=" + Math.round($speed) + " km/h"
+    );
+end
+
+// The limit a sign posted stays in force after the sign has passed, so a limit above the
+// current speed is a target the vehicle may build up to: that is what "approaching a
+// limit from below" means. The session's seed fact (sourceId "default") is not a sign:
+// it only says "no sign seen yet", and letting it nominate a target would send every
+// vehicle towards 120 km/h as soon as it starts. When no sign governs the road, the
+// scenario cruise speed below is the only target that can speed the vehicle up again.
+rule "Maintain speed when compliant with detected limit"
+agenda-group "decision"
+salience 210
+when
+    $ctx : DecisionContext()
+    VehicleStateFact( $speed : speedKmh )
+    CurrentSpeedLimit( $limit : limitKmh, sourceId != CurrentSpeedLimit.DEFAULT_SOURCE )
+    eval($speed <= $limit + 0.1)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.MAINTAIN_SPEED,
+        $limit,
+        RiskLevel.LOW,
+        DecisionPriority.COMFORT_PROGRESS,
+        "Vehicle is compliant with legal limit",
+        drools.getRule().getName(),
+        "speed=" + $speed + " km/h, limit=" + $limit + " km/h"
+    );
+end
+
+// Every other rule can only slow the vehicle down, so without a target the vehicle would
+// freeze at whatever speed a brake, an overtake or a stop left it at, even with a clear
+// road ahead. The scenario's initial speed is the cruise speed of this road: the vehicle
+// builds back up to it: the proposal is a speed ceiling, so any stricter ceiling in the
+// cycle (a hazard, a vehicle ahead) is what wins, and a mandatory stop or an emergency
+// overrides it. The seed limit (sourceId "default") is not a sign, so this rule steps
+// aside the moment a sign posts a limit and lets the sign's own rules keep the vehicle
+// compliant.
+rule "Build back up to the scenario cruise speed when no sign governs the road"
+agenda-group "decision"
+salience 208
+when
+    $ctx : DecisionContext()
+    CruiseTargetFact( $target : targetKmh, targetKmh > 0 )
+    CurrentSpeedLimit( $limit : limitKmh, sourceId == CurrentSpeedLimit.DEFAULT_SOURCE )
+    VehicleStateFact( $speed : speedKmh )
+    eval($speed < Math.min($target, $limit) - 0.5)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.MAINTAIN_SPEED,
+        Math.min($target, $limit),
+        RiskLevel.LOW,
+        DecisionPriority.SPEED_COMPLIANCE,
+        "Road is clear; building back up to the scenario cruise speed",
+        drools.getRule().getName(),
+        "cruise=" + $target + " km/h, limit=" + $limit + " km/h, current=" + $speed + " km/h"
+    );
+end
+
+// A driver request is comfort: it only applies when no ceiling, hold or maneuver speed
+// holds in the cycle, which the arbitration settles, so the rule needs no guard.
+rule "Allow acceleration request when safe context"
+agenda-group "decision"
+salience 205
+when
+    $ctx : DecisionContext()
+    AccelerationRequestState( $target : targetSpeedKmh, $ts : timestamp )
+    VehicleStateFact( $now : timestamp )
+    eval($target > 0 && ($now - $ts) < 1500)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.ACCELERATE,
+        $target,
+        RiskLevel.LOW,
+        DecisionPriority.COMFORT_PROGRESS,
+        "Driver acceleration request accepted",
+        drools.getRule().getName(),
+        "target=" + $target + " km/h"
+    );
+end

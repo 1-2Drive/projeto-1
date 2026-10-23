@@ -1,0 +1,683 @@
+package rules
+
+import com.one2drive.projeto1.decision.StoppingPolicy
+import com.one2drive.projeto1.domain.Lane
+import com.one2drive.projeto1.domain.PedestrianCrossingState
+import com.one2drive.projeto1.domain.TrafficLightState
+import com.one2drive.projeto1.drools.events.*
+import com.one2drive.projeto1.drools.facts.*
+
+// Reading a sign is not being under it: the camera reads a limit up to 120 m ahead, and the
+// limit only starts at the sign. Until the vehicle gets there the sign is kept as pending,
+// with its position on the road, and the limit in force stays the one of the last sign
+// passed. Making it the current limit on sight slowed the vehicle to a lower limit far too
+// early, and a higher limit behind a lower one was never taken up.
+rule "Track the speed limit sign ahead as pending"
+agenda-group "perception"
+salience 1000
+no-loop true
+when
+    $e : SpeedLimitDetectedEvent() from entry-point "ROAD_STREAM"
+    $pending : PendingSpeedLimit()
+    VehicleStateFact($position : positionMeters)
+    eval($e.getTimestamp() > $pending.getTimestamp())
+then
+    $pending.setSignId($e.getSignId());
+    $pending.setLimitKmh($e.getLimitKmh());
+    $pending.setPositionMeters($position + $e.getDistanceMeters());
+    $pending.setTimestamp($e.getTimestamp());
+    update($pending);
+end
+
+// Runs before the rule above, so a sign just passed takes effect before the camera's
+// reading of the next sign replaces it as the pending one.
+rule "Activate the pending speed limit at its sign"
+agenda-group "perception"
+salience 1010
+no-loop true
+when
+    $pending : PendingSpeedLimit(signId != PendingSpeedLimit.NONE, $signPosition : positionMeters)
+    VehicleStateFact(positionMeters >= $signPosition, $now : timestamp)
+    $limit : CurrentSpeedLimit()
+then
+    $limit.setLimitKmh($pending.getLimitKmh());
+    $limit.setSourceId($pending.getSignId());
+    $limit.setTimestamp($now);
+    update($limit);
+    $pending.clear();
+    update($pending);
+end
+
+// The camera reports the sign on every reading until the vehicle is past it. A sign that
+// stops being reported while still ahead is gone or out of sight (rain shortens the
+// camera range), so it is not left waiting to take effect.
+rule "Drop a pending speed limit the camera no longer sees"
+agenda-group "perception"
+no-loop true
+salience 900
+when
+    $pending : PendingSpeedLimit(signId != PendingSpeedLimit.NONE, $timestamp : timestamp)
+    VehicleStateFact($now : timestamp)
+    eval($now - $timestamp > 1000)
+then
+    $pending.clear();
+    update($pending);
+end
+
+rule "Update vehicle state from speed sensor"
+agenda-group "perception"
+salience 1000
+no-loop true
+when
+    $e : VehicleSpeedEvent() from entry-point "VEHICLE_STREAM"
+    $state : VehicleStateFact()
+    eval($e.getTimestamp() >= $state.getTimestamp()
+        && ($e.getTimestamp() > $state.getTimestamp() || Math.abs($e.getSpeedKmh() - $state.getSpeedKmh()) > 0.01))
+then
+    $state.setSpeedKmh($e.getSpeedKmh());
+    $state.setTimestamp($e.getTimestamp());
+    update($state);
+end
+
+rule "Update traffic light state"
+agenda-group "perception"
+salience 1000
+no-loop true
+when
+    $e : TrafficLightEvent() from entry-point "TRAFFIC_STREAM"
+    $state : TrafficLightStateFact()
+    eval($e.getTimestamp() >= $state.getTimestamp()
+        && ($e.getTimestamp() > $state.getTimestamp()
+            || $state.getState() != $e.getState()
+            || Math.abs($state.getDistanceMeters() - $e.getDistanceMeters()) > 0.01))
+then
+    // A decision to stop or to drive on is about one light and one yellow/red phase.
+    if (!$e.getLightId().equals($state.getLightId()) || $e.getState() == TrafficLightState.GREEN) {
+        $state.setCommitment(TrafficLightCommitment.NONE);
+    }
+    $state.setLightId($e.getLightId());
+    $state.setState($e.getState());
+    $state.setDistanceMeters($e.getDistanceMeters());
+    $state.setTimestamp($e.getTimestamp());
+    update($state);
+end
+
+// The camera measures to the sign, but the vehicle has to stop at the stop line, which lies
+// StoppingPolicy.STOP_SIGN_OFFSET_METERS before it. The state keeps the distance to that
+// line, so every stop sign rule brings the vehicle to rest short of the sign instead of on it.
+rule "Update stop sign state"
+agenda-group "perception"
+salience 1000
+no-loop true
+when
+    $e : StopSignEvent() from entry-point "ROAD_STREAM"
+    $state : StopSignState()
+    eval($e.getTimestamp() >= $state.getDetectedTimestamp()
+        && ($e.getTimestamp() > $state.getDetectedTimestamp()
+            || Math.abs($state.getDistanceMeters()
+                - ($e.getDistanceMeters() - StoppingPolicy.STOP_SIGN_OFFSET_METERS)) > 0.01
+            || !$state.getSignId().equals($e.getSignId())))
+then
+    double toStopLine = $e.getDistanceMeters() - StoppingPolicy.STOP_SIGN_OFFSET_METERS;
+    $state.setSignId($e.getSignId());
+    $state.setDistanceMeters(toStopLine);
+    $state.setDetectedTimestamp($e.getTimestamp());
+    if (toStopLine > 8) {
+        $state.setSatisfied(false);
+    }
+    update($state);
+end
+
+rule "Update weather state"
+agenda-group "perception"
+salience 1000
+no-loop true
+when
+    $e : WeatherEvent() from entry-point "ENVIRONMENT_STREAM"
+    $state : WeatherStateFact()
+    eval($e.getTimestamp() >= $state.getTimestamp()
+        && ($e.getTimestamp() > $state.getTimestamp()
+            || $state.getCondition() != $e.getCondition()
+            || Math.abs($state.getVisibilityFactor() - $e.getVisibilityFactor()) > 0.001
+            || Math.abs($state.getGripFactor() - $e.getGripFactor()) > 0.001))
+then
+    $state.setCondition($e.getCondition());
+    $state.setVisibilityFactor($e.getVisibilityFactor());
+    $state.setGripFactor($e.getGripFactor());
+    $state.setTimestamp($e.getTimestamp());
+    update($state);
+end
+
+rule "Update front vehicle from distance"
+agenda-group "perception"
+salience 1000
+no-loop true
+when
+    $e : FrontDistanceEvent() from entry-point "PERCEPTION_STREAM"
+    $state : FrontVehicleState()
+    eval($e.getTimestamp() >= $state.getTimestamp()
+        && ($e.getTimestamp() > $state.getTimestamp()
+            || !$e.getTargetId().equals($state.getTargetId())
+            || Math.abs($state.getDistanceMeters() - $e.getDistanceMeters()) > 0.01))
+then
+    if ($e.getDistanceMeters() <= 0 || "none".equals($e.getTargetId()) || Double.isInfinite($e.getDistanceMeters())) {
+        $state.setTargetId("none");
+        $state.setDistanceMeters(Double.POSITIVE_INFINITY);
+        $state.setRelativeSpeedMps(0.0);
+        $state.setTtcSeconds(Double.POSITIVE_INFINITY);
+    } else {
+        $state.setTargetId($e.getTargetId());
+        $state.setDistanceMeters($e.getDistanceMeters());
+    }
+    $state.setTimestamp($e.getTimestamp());
+    update($state);
+end
+
+rule "Update front vehicle from relative speed"
+agenda-group "perception"
+salience 1000
+no-loop true
+when
+    $e : RelativeSpeedEvent() from entry-point "PERCEPTION_STREAM"
+    // Only the distance rule may adopt a new target. Matching a fact reset to "none" here
+    // would re-adopt the target after a 0 m radar sample reset it, the distance rule would
+    // reset it again, and the two rules would re-trigger each other without end.
+    $state : FrontVehicleState(targetId == $e.getTargetId())
+    eval($e.getTimestamp() >= $state.getTimestamp()
+        && ($e.getTimestamp() > $state.getTimestamp()
+            || Math.abs($state.getRelativeSpeedMps() - $e.getRelativeSpeedMps()) > 0.01))
+then
+    $state.setTargetId($e.getTargetId());
+    $state.setRelativeSpeedMps($e.getRelativeSpeedMps());
+    $state.setTimestamp($e.getTimestamp());
+    update($state);
+end
+
+rule "Update front vehicle from ttc"
+agenda-group "perception"
+salience 1000
+no-loop true
+when
+    $e : TTCEvent() from entry-point "PERCEPTION_STREAM"
+    // Only the distance rule may adopt a new target. Matching a fact reset to "none" here
+    // would re-adopt the target after a 0 m radar sample reset it, the distance rule would
+    // reset it again, and the two rules would re-trigger each other without end.
+    $state : FrontVehicleState(targetId == $e.getTargetId())
+    eval($e.getTimestamp() >= $state.getTimestamp()
+        && ($e.getTimestamp() > $state.getTimestamp()
+            || (Double.isInfinite($state.getTtcSeconds()) && !Double.isInfinite($e.getTtcSeconds()))
+            || (!Double.isInfinite($state.getTtcSeconds()) && Double.isInfinite($e.getTtcSeconds()))
+            || Math.abs($state.getTtcSeconds() - $e.getTtcSeconds()) > 0.01))
+then
+    $state.setTargetId($e.getTargetId());
+    $state.setTtcSeconds($e.getTtcSeconds());
+    $state.setTimestamp($e.getTimestamp());
+    update($state);
+end
+
+rule "Update pedestrian state"
+agenda-group "perception"
+salience 1000
+no-loop true
+when
+    $e : PedestrianDetectedEvent() from entry-point "PERCEPTION_STREAM"
+    $state : PedestrianStateFact()
+    eval($e.getTimestamp() >= $state.getTimestamp()
+        && ($e.getTimestamp() > $state.getTimestamp()
+            || !$e.getPedestrianId().equals($state.getPedestrianId())
+            || Math.abs($state.getDistanceMeters() - $e.getDistanceMeters()) > 0.01
+            || $state.isInPath() != $e.isInPath()
+            || $state.getCrossingState() != $e.getCrossingState()))
+then
+    if ($e.getDistanceMeters() <= 0 || "none".equals($e.getPedestrianId()) || Double.isInfinite($e.getDistanceMeters())) {
+        $state.setPedestrianId("none");
+        $state.setDistanceMeters(Double.POSITIVE_INFINITY);
+        $state.setInPath(false);
+        $state.setCrossingState(PedestrianCrossingState.WAITING);
+    } else {
+        $state.setPedestrianId($e.getPedestrianId());
+        $state.setDistanceMeters($e.getDistanceMeters());
+        $state.setInPath($e.isInPath());
+        $state.setCrossingState($e.getCrossingState());
+    }
+    $state.setTimestamp($e.getTimestamp());
+    update($state);
+end
+
+rule "Update pothole state"
+agenda-group "perception"
+salience 1000
+no-loop true
+when
+    $e : PotholeDetectedEvent() from entry-point "ROAD_STREAM"
+    $state : PotholeStateFact()
+    eval($e.getTimestamp() >= $state.getTimestamp()
+        && ($e.getTimestamp() > $state.getTimestamp()
+            || !$e.getPotholeId().equals($state.getPotholeId())
+            || Math.abs($state.getDistanceMeters() - $e.getDistanceMeters()) > 0.01
+            || $state.getSeverity() != $e.getSeverity()))
+then
+    if ($e.getDistanceMeters() <= 0 || "none".equals($e.getPotholeId()) || Double.isInfinite($e.getDistanceMeters())) {
+        $state.setPotholeId("none");
+        $state.setDistanceMeters(Double.POSITIVE_INFINITY);
+    } else {
+        $state.setPotholeId($e.getPotholeId());
+        $state.setDistanceMeters($e.getDistanceMeters());
+        $state.setSeverity($e.getSeverity());
+        $state.setLane($e.getLane());
+    }
+    $state.setTimestamp($e.getTimestamp());
+    update($state);
+end
+
+rule "Update barrier state"
+agenda-group "perception"
+salience 1000
+no-loop true
+when
+    $e : BarrierDetectedEvent() from entry-point "ROAD_STREAM"
+    $state : BarrierStateFact()
+    eval($e.getTimestamp() >= $state.getTimestamp()
+        && ($e.getTimestamp() > $state.getTimestamp()
+            || !$e.getBarrierId().equals($state.getBarrierId())
+            || Math.abs($state.getDistanceMeters() - $e.getDistanceMeters()) > 0.01
+            || $state.getLane() != $e.getLane()
+            || $state.isOpen() != $e.isOpen()))
+then
+    if ($e.getDistanceMeters() <= 0 || "none".equals($e.getBarrierId()) || Double.isInfinite($e.getDistanceMeters())) {
+        $state.setBarrierId("none");
+        $state.setDistanceMeters(Double.POSITIVE_INFINITY);
+        $state.setOpen(true);
+        $state.setLane(Lane.CENTER);
+    } else {
+        $state.setBarrierId($e.getBarrierId());
+        $state.setDistanceMeters($e.getDistanceMeters());
+        $state.setOpen($e.isOpen());
+        $state.setLane($e.getLane());
+    }
+    $state.setTimestamp($e.getTimestamp());
+    update($state);
+end
+
+rule "Update lane occupancy left"
+agenda-group "perception"
+salience 1000
+no-loop true
+when
+    $e : LaneOccupancyEvent(lane == Lane.LEFT) from entry-point "PERCEPTION_STREAM"
+    $state : LaneOccupancyState(lane == Lane.LEFT)
+    eval($e.getTimestamp() >= $state.getTimestamp()
+        && ($e.getTimestamp() > $state.getTimestamp()
+            || $state.isOccupied() != $e.isOccupied()
+            || $state.isSafeToEnter() != $e.isSafeToEnter()
+            || Math.abs($state.getNearestDistanceMeters() - $e.getNearestDistanceMeters()) > 0.01))
+then
+    $state.setOccupied($e.isOccupied());
+    $state.setNearestDistanceMeters($e.getNearestDistanceMeters());
+    $state.setSafeToEnter($e.isSafeToEnter());
+    $state.setFrontDistanceMeters($e.getFrontDistanceMeters());
+    $state.setRearDistanceMeters($e.getRearDistanceMeters());
+    $state.setRearTtcSeconds($e.getRearTtcSeconds());
+    $state.setTimestamp($e.getTimestamp());
+    update($state);
+end
+
+rule "Update lane occupancy right"
+agenda-group "perception"
+salience 1000
+no-loop true
+when
+    $e : LaneOccupancyEvent(lane == Lane.RIGHT) from entry-point "PERCEPTION_STREAM"
+    $state : LaneOccupancyState(lane == Lane.RIGHT)
+    eval($e.getTimestamp() >= $state.getTimestamp()
+        && ($e.getTimestamp() > $state.getTimestamp()
+            || $state.isOccupied() != $e.isOccupied()
+            || $state.isSafeToEnter() != $e.isSafeToEnter()
+            || Math.abs($state.getNearestDistanceMeters() - $e.getNearestDistanceMeters()) > 0.01))
+then
+    $state.setOccupied($e.isOccupied());
+    $state.setNearestDistanceMeters($e.getNearestDistanceMeters());
+    $state.setSafeToEnter($e.isSafeToEnter());
+    $state.setFrontDistanceMeters($e.getFrontDistanceMeters());
+    $state.setRearDistanceMeters($e.getRearDistanceMeters());
+    $state.setRearTtcSeconds($e.getRearTtcSeconds());
+    $state.setTimestamp($e.getTimestamp());
+    update($state);
+end
+
+rule "Update acceleration request"
+agenda-group "perception"
+salience 1000
+no-loop true
+when
+    $e : AccelerationRequestEvent() from entry-point "COMMAND_STREAM"
+    $state : AccelerationRequestState()
+    eval($e.getTimestamp() >= $state.getTimestamp()
+        && ($e.getTimestamp() > $state.getTimestamp() || Math.abs($state.getTargetSpeedKmh() - $e.getTargetSpeedKmh()) > 0.01))
+then
+    $state.setTargetSpeedKmh($e.getTargetSpeedKmh());
+    $state.setTimestamp($e.getTimestamp());
+    update($state);
+end
+
+rule "Update lane change request"
+agenda-group "perception"
+salience 1000
+no-loop true
+when
+    $e : LaneChangeRequestEvent() from entry-point "COMMAND_STREAM"
+    $state : LaneChangeRequestState()
+    // Only a newer request (or a new direction in the same tick) activates the state. Re-activating on
+    // active == false would fight "Expire lane change request" while the 3s event is still alive.
+    eval($e.getTimestamp() >= $state.getTimestamp()
+        && ($e.getTimestamp() > $state.getTimestamp() || $state.getDirection() != $e.getDirection()))
+then
+    $state.setActive(true);
+    $state.setDirection($e.getDirection());
+    $state.setTimestamp($e.getTimestamp());
+    update($state);
+end
+
+rule "Expire lane change request"
+agenda-group "perception"
+no-loop true
+salience 900
+when
+    $state : LaneChangeRequestState(active == true, $ts : timestamp)
+    VehicleStateFact($now : timestamp)
+    eval($now - $ts > 1500)
+then
+    $state.setActive(false);
+    update($state);
+end
+
+// The front radar reports every 100 ms while a vehicle is ahead in the ego lane, so two
+// missed samples mean it is gone (the ego changed lane, or the vehicle did). Holding the
+// old target for a full second made the rules keep reacting to a vehicle that was no
+// longer in front.
+rule "Clear stale front vehicle perception"
+agenda-group "perception"
+no-loop true
+salience 900
+when
+    $state : FrontVehicleState(targetId != "none", $timestamp : timestamp)
+    VehicleStateFact($now : timestamp)
+    eval($now - $timestamp > 250)
+then
+    $state.setTargetId("none");
+    $state.setDistanceMeters(Double.POSITIVE_INFINITY);
+    $state.setRelativeSpeedMps(0.0);
+    $state.setTtcSeconds(Double.POSITIVE_INFINITY);
+    $state.setTimestamp($now);
+    update($state);
+end
+
+rule "Update left lane vehicle state"
+agenda-group "perception"
+salience 1000
+no-loop true
+when
+    $e : LeftLaneVehicleEvent() from entry-point "PERCEPTION_STREAM"
+    $state : LeftLaneVehicleState()
+    eval($e.getTimestamp() >= $state.getTimestamp()
+        && ($e.getTimestamp() > $state.getTimestamp()
+            || !$e.getTargetId().equals($state.getTargetId())
+            || Math.abs($state.getDistanceMeters() - $e.getDistanceMeters()) > 0.01))
+then
+    $state.setTargetId($e.getTargetId());
+    $state.setDistanceMeters($e.getDistanceMeters());
+    $state.setRelativeSpeedMps($e.getRelativeSpeedMps());
+    $state.setTimestamp($e.getTimestamp());
+    update($state);
+end
+
+// The lane to the right, from the same front radar.
+rule "Update right lane vehicle state"
+agenda-group "perception"
+salience 1000
+no-loop true
+when
+    $e : RightLaneVehicleEvent() from entry-point "PERCEPTION_STREAM"
+    $state : RightLaneVehicleState()
+    eval($e.getTimestamp() >= $state.getTimestamp()
+        && ($e.getTimestamp() > $state.getTimestamp()
+            || !$e.getTargetId().equals($state.getTargetId())
+            || Math.abs($state.getDistanceMeters() - $e.getDistanceMeters()) > 0.01))
+then
+    $state.setTargetId($e.getTargetId());
+    $state.setDistanceMeters($e.getDistanceMeters());
+    $state.setRelativeSpeedMps($e.getRelativeSpeedMps());
+    $state.setTimestamp($e.getTimestamp());
+    update($state);
+end
+
+rule "Clear stale right lane vehicle perception"
+agenda-group "perception"
+no-loop true
+salience 900
+when
+    $state : RightLaneVehicleState(targetId != "none", $timestamp : timestamp)
+    VehicleStateFact($now : timestamp)
+    eval($now - $timestamp > 250)
+then
+    $state.setTargetId(RightLaneVehicleState.NO_TARGET);
+    $state.setDistanceMeters(Double.POSITIVE_INFINITY);
+    $state.setRelativeSpeedMps(0.0);
+    $state.setTimestamp($now);
+    update($state);
+end
+
+// The lane two to the left (LEFT, seen from RIGHT), from the same front radar.
+rule "Update far left lane vehicle state"
+agenda-group "perception"
+salience 1000
+no-loop true
+when
+    $e : FarLeftLaneVehicleEvent() from entry-point "PERCEPTION_STREAM"
+    $state : FarLeftLaneVehicleState()
+    eval($e.getTimestamp() >= $state.getTimestamp()
+        && ($e.getTimestamp() > $state.getTimestamp()
+            || !$e.getTargetId().equals($state.getTargetId())
+            || Math.abs($state.getDistanceMeters() - $e.getDistanceMeters()) > 0.01))
+then
+    $state.setTargetId($e.getTargetId());
+    $state.setDistanceMeters($e.getDistanceMeters());
+    $state.setRelativeSpeedMps($e.getRelativeSpeedMps());
+    $state.setTimestamp($e.getTimestamp());
+    update($state);
+end
+
+rule "Clear stale far left lane vehicle perception"
+agenda-group "perception"
+no-loop true
+salience 900
+when
+    $state : FarLeftLaneVehicleState(targetId != "none", $timestamp : timestamp)
+    VehicleStateFact($now : timestamp)
+    eval($now - $timestamp > 250)
+then
+    $state.setTargetId(FarLeftLaneVehicleState.NO_TARGET);
+    $state.setDistanceMeters(Double.POSITIVE_INFINITY);
+    $state.setRelativeSpeedMps(0.0);
+    $state.setTimestamp($now);
+    update($state);
+end
+
+// Same two-sample rule as the front vehicle: the radar reports every 100 ms.
+rule "Clear stale left lane vehicle perception"
+agenda-group "perception"
+no-loop true
+salience 900
+when
+    $state : LeftLaneVehicleState(targetId != "none", $timestamp : timestamp)
+    VehicleStateFact($now : timestamp)
+    eval($now - $timestamp > 250)
+then
+    $state.setTargetId(LeftLaneVehicleState.NO_TARGET);
+    $state.setDistanceMeters(Double.POSITIVE_INFINITY);
+    $state.setRelativeSpeedMps(0.0);
+    $state.setTimestamp($now);
+    update($state);
+end
+
+rule "Clear stale pedestrian perception"
+agenda-group "perception"
+no-loop true
+salience 900
+when
+    $state : PedestrianStateFact(pedestrianId != "none", $timestamp : timestamp)
+    VehicleStateFact($now : timestamp)
+    eval($now - $timestamp > 1000)
+then
+    $state.setPedestrianId("none");
+    $state.setDistanceMeters(Double.POSITIVE_INFINITY);
+    $state.setInPath(false);
+    $state.setCrossingState(PedestrianCrossingState.WAITING);
+    $state.setTimestamp($now);
+    update($state);
+end
+
+// Once the vehicle has passed a traffic light the camera no longer reports it, and that
+// light has nothing more to say about this passage. Without this the last state seen, a
+// yellow or a red included, stayed in working memory and kept its rules firing behind the
+// light. The camera reports a light every 200 ms for as long as it is ahead, so two missed
+// readings are enough to know it is behind: waiting longer kept a vehicle that was braking
+// for a red light braking after it had passed it.
+rule "Clear stale traffic light perception"
+agenda-group "perception"
+no-loop true
+salience 900
+when
+    $state : TrafficLightStateFact(lightId != "none", $timestamp : timestamp)
+    VehicleStateFact($now : timestamp)
+    eval($now - $timestamp > 400)
+then
+    $state.setLightId("none");
+    $state.setState(TrafficLightState.GREEN);
+    $state.setDistanceMeters(Double.POSITIVE_INFINITY);
+    $state.setCommitment(TrafficLightCommitment.NONE);
+    $state.setTimestamp($now);
+    update($state);
+end
+
+rule "Clear stale stop sign perception"
+agenda-group "perception"
+no-loop true
+salience 900
+when
+    // Past the stop line the camera loses the sign once the vehicle drives by it; a stop still
+    // owed there is kept until it is made, so a vehicle that reached the line too fast stops.
+    $state : StopSignState(signId != "none", satisfied == true || distanceMeters > 4.0, $timestamp : detectedTimestamp)
+    VehicleStateFact($now : timestamp)
+    eval($now - $timestamp > 1500)
+then
+    $state.setSignId("none");
+    $state.setDistanceMeters(Double.POSITIVE_INFINITY);
+    $state.setDetectedTimestamp($now);
+    $state.setSatisfied(false);
+    update($state);
+end
+
+rule "Clear stale pothole perception"
+agenda-group "perception"
+no-loop true
+salience 900
+when
+    $state : PotholeStateFact(potholeId != "none", $timestamp : timestamp)
+    VehicleStateFact($now : timestamp)
+    eval($now - $timestamp > 1000)
+then
+    $state.setPotholeId("none");
+    $state.setDistanceMeters(Double.POSITIVE_INFINITY);
+    $state.setLane(com.one2drive.projeto1.domain.Lane.CENTER);
+    $state.setTimestamp($now);
+    update($state);
+end
+
+rule "Clear stale barrier perception"
+agenda-group "perception"
+no-loop true
+salience 900
+when
+    $state : BarrierStateFact(barrierId != "none", $timestamp : timestamp)
+    VehicleStateFact($now : timestamp)
+    eval($now - $timestamp > 1000)
+then
+    $state.setBarrierId("none");
+    $state.setDistanceMeters(Double.POSITIVE_INFINITY);
+    $state.setOpen(true);
+    $state.setTimestamp($now);
+    update($state);
+end
+
+rule "Update obstacle state"
+agenda-group "perception"
+salience 1000
+no-loop true
+when
+    $e : ObstacleDetectedEvent() from entry-point "ROAD_STREAM"
+    $state : ObstacleStateFact()
+    eval($e.getTimestamp() >= $state.getTimestamp())
+then
+    if ($e.getDistanceMeters() <= 0 || "none".equals($e.getObstacleId()) || Double.isInfinite($e.getDistanceMeters())) {
+        $state.setObstacleId("none");
+        $state.setDistanceMeters(Double.POSITIVE_INFINITY);
+    } else {
+        $state.setObstacleId($e.getObstacleId());
+        $state.setDistanceMeters($e.getDistanceMeters());
+        $state.setSeverity($e.getSeverity());
+        $state.setLane($e.getLane());
+    }
+    $state.setTimestamp($e.getTimestamp());
+    update($state);
+end
+
+rule "Clear stale obstacle perception"
+agenda-group "perception"
+no-loop true
+salience 900
+when
+    $state : ObstacleStateFact(obstacleId != "none", $timestamp : timestamp)
+    VehicleStateFact($now : timestamp)
+    eval($now - $timestamp > 1000)
+then
+    $state.setObstacleId("none");
+    $state.setDistanceMeters(Double.POSITIVE_INFINITY);
+    $state.setLane(com.one2drive.projeto1.domain.Lane.CENTER);
+    $state.setTimestamp($now);
+    update($state);
+end
+
+// The sides the vehicle may change lane to, derived once the readings above are in: each one
+// is the safeToChangeLane query (lane-safety.drl) holding for that side. Inserted logically,
+// so a side stops being safe as soon as any of the sub-goals stops holding. Rules that
+// need "no safe side" (a closed barrier, a pothole or an obstacle that cannot be gone round
+// on one side) test for its absence: negating the query itself makes Drools 8.44 fail inside
+// the network (PhreakSubnetworkNotExistsNode) when the query's facts change.
+//
+// The four sub-goals are spelled out here instead of calling the query: called from this
+// rule, the query's answer only reached the logical fact one cycle after its facts changed
+// (the fact was still there a tick after the left lane had a vehicle too close to follow,
+// and still missing a tick after a side became free), so "no safe side" rules stopped the
+// vehicle for up to two seconds where the Prolog engine, which proves the goal live, changed
+// lane. The sub-goals are the same as in lane-safety.drl, which stays the explained goal.
+rule "Derive the sides that are safe to change lane to"
+agenda-group "perception"
+salience 800
+when
+    $side : Lane() from java.util.List.of(Lane.LEFT, Lane.RIGHT)
+    // maneuverIdle and noContinuousLine
+    VehicleStateFact(laneChangeState == com.one2drive.projeto1.domain.LaneChangeState.IDLE, $lane : lane, $speed : speedKmh,
+                     $left : leftMarking, $right : rightMarking)
+    eval(($side == Lane.LEFT && $lane == Lane.RIGHT && $right != com.one2drive.projeto1.domain.RoadMarkingType.CONTINUOUS)
+        || ($side == Lane.LEFT && $lane == Lane.CENTER && $left != com.one2drive.projeto1.domain.RoadMarkingType.CONTINUOUS)
+        || ($side == Lane.RIGHT && $lane == Lane.CENTER && $right != com.one2drive.projeto1.domain.RoadMarkingType.CONTINUOUS)
+        || ($side == Lane.RIGHT && $lane == Lane.LEFT && $left != com.one2drive.projeto1.domain.RoadMarkingType.CONTINUOUS))
+    // sideClear
+    LaneOccupancyState(lane == $side, occupied == false)
+    // roomToFollow
+    LeftLaneVehicleState($side != Lane.LEFT || StoppingPolicy.roomToFollow($speed, distanceMeters, relativeSpeedMps))
+    RightLaneVehicleState($side != Lane.RIGHT || StoppingPolicy.roomToFollow($speed, distanceMeters, relativeSpeedMps))
+then
+    insertLogical(new SafeLaneSide($side));
+end

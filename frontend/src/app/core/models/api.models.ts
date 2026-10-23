@@ -1,0 +1,471 @@
+export type SimulationStatus = 'RUNNING' | 'PAUSED' | 'STOPPED';
+export type StreamStatus = 'LIVE' | 'RECONNECTING' | 'DISCONNECTED';
+export type DemoPhaseStatus = 'DONE' | 'ACTIVE' | 'PENDING';
+
+export interface ScenarioSummary {
+  id: string;
+  name: string;
+  initialSpeedKmh: number;
+  initialWeather: string;
+  roadElementCount: number;
+  actorCount: number;
+  timedActionCount: number;
+}
+
+export interface CommandResponse {
+  success: boolean;
+  message: string;
+}
+
+export interface WorldMutationResponse {
+  success: boolean;
+  objectId: string;
+  message: string;
+}
+
+export interface ApiRoadElement {
+  id: string;
+  type: string;
+  positionMeters: number;
+  lane: 'LEFT' | 'CENTER' | 'RIGHT';
+  details: string;
+  worldPositionMeters?: number;
+  /** Metres from the centre line for a pedestrian, which walks across the lanes; null otherwise. */
+  lateralPositionMeters?: number | null;
+}
+
+export interface ApiWorkingMemoryRow {
+  type: string;
+  value: string;
+  source: string;
+  timestamp: number | null;
+  stream: string;
+}
+
+export interface ApiTimelineEntry {
+  timestamp: number;
+  type: string;
+  message: string;
+}
+
+export interface ApiSessionSummary {
+  id: string;
+  startedAt: string;
+  stoppedAt: string | null;
+  durationMillis: number;
+  startedAtSimulationMillis: number;
+  scenarioId: string;
+  backend: ExpertBackend;
+  eventCount: number;
+  decisionCount: number;
+}
+
+export interface ApiSessionDetail extends ApiSessionSummary {
+  initialWorld: string[];
+  initialWorldObjects: ApiRoadElement[];
+  events: { sequence: number; simulationTimeMillis: number; recordedAt: string; type: string; message: string }[];
+  vehicleSamples: {
+    simulationTimeMillis: number; speedKmh: number; positionMeters: number; lane: LaneName;
+    accelerationMps2: number; lateralPositionMeters: number; targetLane: LaneName;
+    laneChangeState: LaneChangeStateName; laneChangeProgress: number; drivingState: string;
+    indicatorState: string; steeringState: string; headingDegrees: number; action: string;
+    reason: string; sourceRule: string; recommendedSpeedKmh: number;
+  }[];
+  decisionSnapshots: ApiDecisionSnapshot[];
+  decisionEventSequences: Record<string, number[]>;
+}
+
+export interface ApiDecisionSnapshot {
+  simulationTimeMillis: number;
+  vehicle: ApiSimulationSnapshot['egoVehicle'];
+  environment: ApiSimulationSnapshot['environment'];
+  sensors: ApiSensorTelemetryView;
+  worldObjects: ApiRoadElement[];
+  workingMemory: ApiWorkingMemoryRow[];
+  timeline: ApiTimelineEntry[];
+  decision: {
+    action: string; speedAction: string; laneAction: string; reason: string; sourceRule: string;
+    speedSourceRule: string; laneSourceRule: string; recommendedSpeedKmh: number;
+    evidence: string[]; actuatorResult: string;
+    /** Per-channel fields; absent (null) in sessions saved before they were recorded. */
+    speedReason?: string | null; laneReason?: string | null;
+    speedPriority?: number | null; lanePriority?: number | null;
+    speedEvidence?: string[]; laneEvidence?: string[];
+    proposals: { rule: string; action: string; channel: string; priority: number; recommendedSpeedKmh: number | null;
+      outcome: string; detail: string; reason: string; evidence: string[]; conditions: string }[];
+    laneChecks: { side: string; allowed: boolean; explanation: string;
+      subGoals: { goal: string; holds: boolean; detail: string }[] }[];
+  };
+}
+
+export type DecisionChannelName = 'LONGITUDINAL' | 'LATERAL';
+
+/**
+ * The explanation of one recorded decision, per channel: why the speed (longitudinal) and the
+ * lane (lateral) decisions were made, why each alternative was not, and the path through the
+ * decision flowchart. Built by the backend from the saved cycle; the UI only presents it.
+ */
+export interface ApiWhyAnswer {
+  sessionId: string;
+  timestampMillis: number;
+  engine: ExpertBackend;
+  situation: ApiWhySituation | null;
+  why: ApiChannelWhy[];
+  whyNot: ApiAlternative[];
+  how: ApiChannelFlow[];
+}
+
+export interface ApiWhySituation {
+  speedKmh: number;
+  lane: LaneName;
+  laneChangeState: string;
+  recommendedSpeedKmh: number;
+  actuatorResult: string;
+}
+
+/** One rule's proposal in the cycle and what the arbitration did with it. */
+export interface ApiRuleRef {
+  rule: string;
+  action: string;
+  channel: DecisionChannelName;
+  recommendedSpeedKmh: number | null;
+  priority: number;
+  rung: string;
+  outcome: string;
+  detail: string;
+  reason: string;
+  evidence: string[];
+}
+
+/** A condition an explanation rests on; holds is null when the cycle does not record it. */
+export interface ApiCondition {
+  text: string;
+  holds: boolean | null;
+}
+
+export interface ApiChannelWhy {
+  channel: DecisionChannelName;
+  title: string;
+  action: string;
+  effect: string;
+  /** False for an untouched default decision: shown as one line. */
+  relevant: boolean;
+  summary: string;
+  decidingRule: ApiRuleRef;
+  conditions: string[];
+  arbitration: string;
+  alsoConsidered: ApiRuleRef[];
+}
+
+export type AlternativeStatus = 'CONDITION_NOT_MET' | 'OVERRIDDEN_BY_PRIORITY' | 'NOT_APPLICABLE' | 'INSUFFICIENT_DATA';
+
+export interface ApiAlternative {
+  channel: DecisionChannelName;
+  option: string;
+  label: string;
+  status: AlternativeStatus;
+  summary: string;
+  requiredConditions: ApiCondition[];
+  blockingRules: ApiRuleRef[];
+  prevailing: string;
+}
+
+export type FlowBranch = 'YES' | 'NO' | 'NOT_REACHED';
+
+export interface ApiFlowStep {
+  nodeId: string;
+  docRef: string;
+  question: string;
+  branch: FlowBranch;
+  yesLabel: string;
+  noLabel: string;
+  takenLabel: string;
+  decisive: boolean;
+  rules: ApiRuleRef[];
+  supportingRules: string[];
+  conditions: ApiCondition[];
+  observed: string[];
+}
+
+export interface ApiChannelFlow {
+  channel: DecisionChannelName;
+  title: string;
+  decision: string;
+  steps: ApiFlowStep[];
+  outcome: string;
+}
+
+export type WhyMode = 'WHY' | 'WHY_NOT' | 'HOW';
+
+export interface StopResponse extends CommandResponse {
+  sessionId: string | null;
+}
+
+export interface ApiDecisionView {
+  /** Headline: the lane maneuver while one executes, the speed action otherwise. */
+  action: string;
+  recommendedSpeedKmh: number;
+  riskLevel: string;
+  reason: string;
+  sourceRule: string;
+  timestamp: number;
+  evidence: string[];
+  speedAction?: string;
+  speedReason?: string;
+  speedSourceRule?: string;
+  laneAction?: string;
+  laneReason?: string;
+  laneSourceRule?: string;
+  proposals?: ApiProposalView[];
+  /** "Why not change lane?" for each side: the sub-goals of the safeToChangeLane query. */
+  laneChecks?: ApiLaneCheckView[];
+}
+
+/** Whether a lane change to one side is safe, and which sub-goal fails when it is not. */
+export interface ApiLaneCheckView {
+  side: 'LEFT' | 'RIGHT';
+  allowed: boolean;
+  explanation: string;
+  subGoals: { goal: string; holds: boolean; detail: string }[];
+}
+
+/** One rule's proposal in the last cycle and what the arbitration did with it. */
+export interface ApiProposalView {
+  rule: string;
+  action: string;
+  channel: 'LONGITUDINAL' | 'LATERAL';
+  priority: number;
+  recommendedSpeedKmh: number | null;
+  outcome: 'PENDING' | 'WON' | 'LOST_TO' | 'VETOED_BY' | 'REJECTED_BY' | 'CAPPED';
+  detail: string;
+  reason: string;
+}
+
+export interface ApiSimulationSnapshot {
+  simulationTimeMillis: number;
+  status: SimulationStatus;
+  egoVehicle: {
+    speedKmh: number;
+    positionMeters: number;
+    lane: LaneName;
+    accelerationMps2: number;
+    /** Authoritative lateral coordinate the road view renders. */
+    lateralPositionMeters: number;
+    targetLane: LaneName;
+    laneChangeState: LaneChangeStateName;
+    laneChangeProgress: number;
+    drivingState?: string;
+    indicatorState?: string;
+    steeringState?: string;
+    headingDegrees?: number;
+  };
+  environment: {
+    weatherCondition: string;
+    visibilityFactor: number;
+    gripFactor: number;
+  };
+  speedAdvisor: {
+    currentKmh: number;
+    legalLimitKmh: number;
+    recommendedKmh: number;
+    action: string;
+  };
+  currentDecision: ApiDecisionView;
+  sensorReadings: Record<string, string>;
+  worldObjects: ApiRoadElement[];
+  workingMemory: ApiWorkingMemoryRow[];
+  recentTimeline: ApiTimelineEntry[];
+  recentRules: string[];
+  recentFacts: string[];
+  activeStage: string;
+  tickMillis: number;
+  detectedObjectIds: string[];
+  cameraDetectedObjectIds: string[];
+  radarDetectedObjectIds: string[];
+  sensorRanges: {
+    cameraRangeMeters: number;
+    radarRangeMeters: number;
+    blindSpotRangeMeters: number;
+    cameraRateMillis: number;
+    radarRateMillis: number;
+  };
+  demoPhases: { id: string; label: string; status: DemoPhaseStatus }[];
+  maneuver?: ApiManeuverView;
+  sensors?: ApiSensorTelemetryView;
+  inference?: ApiInferenceSummaryView;
+  roadMap?: ApiRoadMapView;
+  roadMarks?: {
+    leftMarking: 'DASHED' | 'CONTINUOUS' | string;
+    rightMarking: 'DASHED' | 'CONTINUOUS' | string;
+  };
+  laneSafety?: Array<{ lane: LaneName; safe: boolean }>;
+  /** Rule engine deciding this simulation. */
+  expertBackend?: ExpertBackend;
+  /** Why that engine stopped deciding (the simulation is then paused); null while it works. */
+  expertBackendError?: string | null;
+}
+
+export type ExpertBackend = 'DROOLS' | 'PROLOG';
+
+/**
+ * The road as a matrix: cells[row][lane], rows going forward along a looping road and
+ * lanes in the `lanes` order. 0 is a free cell, any other number is a legend code.
+ */
+export interface ApiRoadMapView {
+  rows: number;
+  lanes: LaneName[];
+  blockLengthMeters: number;
+  egoRow: number;
+  lap: number;
+  cells: number[][];
+  legend: ApiMapLegendEntry[];
+}
+
+/** Meaning of one map code; detail is the limit, light colour, severity or barrier state. */
+export interface ApiMapLegendEntry {
+  code: number;
+  type: string;
+  label: string;
+  detail: string;
+}
+
+export interface MapCellRequest {
+  row: number;
+  lane: LaneName;
+  code: number;
+}
+
+export type LaneName = 'LEFT' | 'CENTER' | 'RIGHT';
+export type LaneChangeStateName = 'IDLE' | 'REQUESTED' | 'CHANGING' | 'COMPLETED';
+
+/** Physical execution state of the maneuver Drools selected. */
+export interface ApiManeuverView {
+  state: LaneChangeStateName;
+  fromLane: LaneName;
+  targetLane: LaneName;
+  progress: number;
+  lateralPositionMeters: number;
+  indicatorsLeft: boolean;
+  indicatorsRight: boolean;
+  braking: boolean;
+  steering?: string;
+}
+
+/** NO LANE: a blind-spot side past the road edge. */
+export type SensorStatus = 'CLEAR' | 'TRACKING' | 'DETECTED' | 'WARNING' | 'CRITICAL' | 'OCCUPIED' | 'NO LANE';
+
+export interface ApiRadarTelemetryView {
+  rangeMeters: number;
+  targetId: string;
+  distanceMeters: number;
+  relativeSpeedKmh: number;
+  ttcSeconds: number;
+  status: SensorStatus;
+}
+
+export interface ApiCameraDetectionView {
+  objectId: string;
+  label: string;
+  distanceMeters: number;
+  lane: string;
+}
+
+export interface ApiCameraTelemetryView {
+  rangeMeters: number;
+  detections: ApiCameraDetectionView[];
+  status: SensorStatus;
+}
+
+export interface ApiBlindSpotTelemetryView {
+  rangeMeters: number;
+  occupied: boolean;
+  targetId: string;
+  distanceMeters: number;
+  status: SensorStatus;
+}
+
+export interface ApiEnvironmentTelemetryView {
+  condition: string;
+  effectiveRangeMeters: number;
+  gripPercent: number;
+  rain: boolean;
+}
+
+export interface ApiSensorTelemetryView {
+  frontRadar: ApiRadarTelemetryView;
+  frontCamera: ApiCameraTelemetryView;
+  blindSpotLeft: ApiBlindSpotTelemetryView;
+  blindSpotRight: ApiBlindSpotTelemetryView;
+  environment: ApiEnvironmentTelemetryView;
+}
+
+/**
+ * Presentation summary of the latest inference cycle, produced by the backend from
+ * evidence the engine and Drools already emitted. Angular formats it; it never
+ * derives conclusions from sensor values.
+ */
+export interface ApiInferenceSummaryView {
+  previousDecision: string | null;
+  decisionChangedAtMillis: number;
+  situationSteps: string[];
+  lastImportantEvent: ApiImportantEventView | null;
+  activeRule: string | null;
+}
+
+export interface ApiImportantEventView {
+  timestampMillis: number;
+  category: 'PERCEPTION' | 'MANEUVER' | 'DECISION' | 'RULE' | 'INFO';
+  title: string;
+  detail: string;
+}
+
+export interface ApiSystemStatus {
+  backend: string;
+  /** ACTIVE while the deciding rule engine, whichever it is, works. */
+  drools: string;
+  simulation: string;
+  expertBackend?: ExpertBackend;
+}
+
+export interface SnapshotStreamMessage {
+  event: 'snapshot';
+  payload: ApiSimulationSnapshot;
+}
+
+export interface CreateRoadElementRequest {
+  type: string;
+  lane: string;
+  distanceAheadMeters: number;
+  speedLimitKmh?: number;
+  trafficLightState?: string;
+  severity?: string;
+  barrierOpen?: boolean;
+}
+
+export interface CreateActorRequest {
+  type: string;
+  lane: string;
+  distanceAheadMeters: number;
+  speedKmh: number;
+}
+
+export interface EnvironmentUpdateRequest {
+  visibilityFactor?: number;
+  gripFactor?: number;
+  rain?: boolean;
+}
+
+export interface UiStatus {
+  backendConnected: boolean;
+  droolsActive: boolean;
+  simulationStatus: SimulationStatus;
+  streamStatus: StreamStatus;
+}
+
+export interface UiModel {
+  snapshot: ApiSimulationSnapshot | null;
+  scenarios: ScenarioSummary[];
+  connection: UiStatus;
+  error: string | null;
+  loading: boolean;
+}

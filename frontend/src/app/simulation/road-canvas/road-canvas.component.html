@@ -1,0 +1,499 @@
+<section class="road" [class.road--running]="running()" [class.road--rain]="raining()">
+
+  <!-- Chase-camera perspective view. Everything inside is projected from the same world state
+       the road-map matrix shows (see road-projection.ts); canvas pixels are the SVG units. -->
+  <svg class="scene" [attr.viewBox]="viewBox()" preserveAspectRatio="none" role="group"
+       aria-label="Driving view" data-testid="road-scene">
+    <defs>
+      <linearGradient id="roadSky" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#070d15" />
+        <stop offset="62%" stop-color="#14263a" />
+        <stop offset="100%" stop-color="#2a4560" />
+      </linearGradient>
+      <linearGradient id="roadGround" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#1b2c28" />
+        <stop offset="40%" stop-color="#14221d" />
+        <stop offset="100%" stop-color="#0d1713" />
+      </linearGradient>
+      <linearGradient id="roadAsphalt" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#37434f" />
+        <stop offset="35%" stop-color="#27313b" />
+        <stop offset="100%" stop-color="#171d25" />
+      </linearGradient>
+      <linearGradient id="roadShoulder" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#46505a" />
+        <stop offset="100%" stop-color="#252d36" />
+      </linearGradient>
+      <linearGradient id="roadWet" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#8fb9d8" stop-opacity="0.34" />
+        <stop offset="55%" stop-color="#5f8bb0" stop-opacity="0.12" />
+        <stop offset="100%" stop-color="#3b5a78" stop-opacity="0.2" />
+      </linearGradient>
+      <linearGradient id="roadFog" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#2a4560" stop-opacity="0.9" />
+        <stop offset="100%" stop-color="#2a4560" stop-opacity="0" />
+      </linearGradient>
+      <linearGradient id="sensorCameraFill" x1="0" y1="1" x2="0" y2="0">
+        <stop offset="0%" stop-color="#60b0e2" stop-opacity="0.46" />
+        <stop offset="100%" stop-color="#60b0e2" stop-opacity="0.1" />
+      </linearGradient>
+      <linearGradient id="sensorRadarFill" x1="0" y1="1" x2="0" y2="0">
+        <stop offset="0%" stop-color="#5ed694" stop-opacity="0.55" />
+        <stop offset="100%" stop-color="#5ed694" stop-opacity="0.12" />
+      </linearGradient>
+      <!-- New rain: sky reflected in the wet asphalt, strongest towards the horizon. -->
+      <linearGradient id="roadSheen" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#a9cbe6" stop-opacity="0.3" />
+        <stop offset="30%" stop-color="#7fa6c6" stop-opacity="0.1" />
+        <stop offset="100%" stop-color="#7fa6c6" stop-opacity="0" />
+      </linearGradient>
+      <!-- New rain: a taillight smeared along the wet road towards the camera. It fades out in
+           every direction (brightest just under the lamp), so it reads as a soft glow on the water
+           rather than a painted shape. -->
+      <radialGradient id="roadReflectRed" cx="0.5" cy="0.5" r="0.5" fx="0.5" fy="0.3">
+        <stop offset="0%" stop-color="#ff4a3d" stop-opacity="0.6" />
+        <stop offset="50%" stop-color="#ff4a3d" stop-opacity="0.22" />
+        <stop offset="100%" stop-color="#ff4a3d" stop-opacity="0" />
+      </radialGradient>
+      @if (newRain()) {
+        <linearGradient id="roadMist" gradientUnits="userSpaceOnUse" x1="0" [attr.y1]="rainMist().top"
+                        x2="0" [attr.y2]="rainMist().bottom">
+          <stop offset="0" stop-color="#5b7790" stop-opacity="0" />
+          <stop [attr.offset]="rainMist().horizonOffset" stop-color="#5b7790" [attr.stop-opacity]="rainMist().peak" />
+          <stop [attr.offset]="rainMist().rangeOffset" stop-color="#4d6880" [attr.stop-opacity]="rainMist().half" />
+          <stop offset="1" stop-color="#4d6880" stop-opacity="0" />
+        </linearGradient>
+      }
+      <radialGradient id="roadGlowRed">
+        <stop offset="0%" stop-color="#ff4a3d" stop-opacity="0.85" />
+        <stop offset="100%" stop-color="#ff4a3d" stop-opacity="0" />
+      </radialGradient>
+      <radialGradient id="roadGlowGreen">
+        <stop offset="0%" stop-color="#44e08a" stop-opacity="0.85" />
+        <stop offset="100%" stop-color="#44e08a" stop-opacity="0" />
+      </radialGradient>
+      <radialGradient id="roadGlowYellow">
+        <stop offset="0%" stop-color="#ffc83d" stop-opacity="0.85" />
+        <stop offset="100%" stop-color="#ffc83d" stop-opacity="0" />
+      </radialGradient>
+      <g id="road-tree">
+        <rect x="-0.18" y="-1" width="0.36" height="1" class="tree__trunk" />
+        <polygon points="-1.7,-0.9 0,-3.4 1.7,-0.9" class="tree__leaf" />
+        <polygon points="-1.35,-2.3 0,-4.9 1.35,-2.3" class="tree__leaf tree__leaf--2" />
+        <polygon points="-0.95,-3.8 0,-6.3 0.95,-3.8" class="tree__leaf" />
+      </g>
+    </defs>
+
+    <!-- ============ sky, horizon, ground ============ -->
+    <g class="sky" aria-hidden="true">
+      <rect x="0" y="0" [attr.width]="camera().width" [attr.height]="camera().horizonY + 2" fill="url(#roadSky)" />
+      <path class="hills hills--far" [attr.d]="surface().hillsFar" />
+      <path class="hills" [attr.d]="surface().hills" />
+    </g>
+    <rect class="ground" x="0" [attr.y]="camera().horizonY" [attr.width]="camera().width"
+          [attr.height]="camera().height - camera().horizonY" fill="url(#roadGround)" aria-hidden="true" />
+
+    <g class="scenery" aria-hidden="true">
+      @for (tree of markings().trees; track tree.id) {
+        <use href="#road-tree" class="tree" [attr.transform]="tree.transform" [attr.opacity]="tree.opacity" />
+      }
+    </g>
+
+    <!-- ============ road surface ============ -->
+    <g class="surface" aria-hidden="true">
+      <path class="surface__shoulder" [attr.d]="surface().shoulderLeft" fill="url(#roadShoulder)" />
+      <path class="surface__shoulder" [attr.d]="surface().shoulderRight" fill="url(#roadShoulder)" />
+      <path class="surface__asphalt" [attr.d]="surface().asphalt" fill="url(#roadAsphalt)" />
+      <path class="surface__bands" [attr.d]="markings().bands" />
+      @if (raining()) {
+        <path class="surface__wet" [attr.d]="surface().asphalt" fill="url(#roadWet)" />
+      }
+      @if (newRain()) {
+        <path class="surface__sheen" [attr.d]="surface().asphalt" fill="url(#roadSheen)" data-testid="rain-sheen" />
+      }
+      <path class="surface__edge" [attr.d]="surface().edgeLeft" />
+      <path class="surface__edge" [attr.d]="surface().edgeRight" />
+      <path class="surface__lane surface__lane--1"
+            [class.surface__lane--continuous]="markings().dividerLeft.continuous"
+            [class.surface__lane--dashed]="!markings().dividerLeft.continuous"
+            [attr.d]="markings().dividerLeft.d" />
+      <path class="surface__lane surface__lane--2"
+            [class.surface__lane--continuous]="markings().dividerRight.continuous"
+            [class.surface__lane--dashed]="!markings().dividerRight.continuous"
+            [attr.d]="markings().dividerRight.d" />
+      <path class="surface__arrows" [attr.d]="markings().arrows" />
+      <path class="surface__post" [attr.d]="markings().postsLeft" />
+      <path class="surface__post" [attr.d]="markings().postsRight" />
+    </g>
+
+    <!-- ============ distance scale ============ -->
+    <g class="scale" aria-hidden="true">
+      @for (tick of markings().ticks; track tick.text) {
+        <path class="scale__tick" [attr.d]="tick.d" />
+        <text class="scale__label" [attr.x]="tick.x" [attr.y]="tick.y" text-anchor="end">{{ tick.text }}</text>
+      }
+    </g>
+
+    <!-- Distance haze: far road dissolves into the horizon. -->
+    <rect class="fog" x="0" [attr.y]="camera().horizonY - 4" [attr.width]="camera().width"
+          [attr.height]="camera().height * 0.2" fill="url(#roadFog)" aria-hidden="true" />
+
+    <!-- ============ sensor fields of view (drawn on the road) ============ -->
+    <g class="sensors" aria-hidden="true">
+      <!-- Nothing to draw before the first snapshot: without ranges every shape would sit on the car. -->
+      @if (snapshot()) {
+        <g data-testid="canvas-sensor-layer">
+          <path class="sensor-camera" [attr.d]="sensors().cameraD" data-testid="canvas-sensor-camera" />
+          @if (sensors().cameraLostD; as lost) {
+            <path class="sensor-camera-lost" [attr.d]="lost" data-testid="canvas-sensor-camera-lost" />
+          }
+          <path class="sensor-radar" [attr.d]="sensors().radarD" data-testid="canvas-sensor-radar" />
+          @if (sensors().blindLeft; as pad) {
+            <path class="sensor-blind" [class.sensor-blind--occupied]="pad.occupied" [attr.d]="pad.d"
+                  data-testid="canvas-sensor-blind-left" />
+          }
+          @if (sensors().blindRight; as pad) {
+            <path class="sensor-blind" [class.sensor-blind--occupied]="pad.occupied" [attr.d]="pad.d"
+                  data-testid="canvas-sensor-blind-right" />
+          }
+        </g>
+
+        @if (sensors().cameraEdge; as edge) {
+          <g class="sensor-edge sensor-edge--camera" data-testid="camera-fov" [attr.data-ahead]="edge.ahead.toFixed(1)">
+            <path [attr.d]="edge.d" />
+            <text class="sensor-edge__label" [attr.x]="edge.x" [attr.y]="edge.y" [attr.text-anchor]="edge.anchor">{{ edge.text }}</text>
+          </g>
+        }
+        @if (sensors().cameraNominalEdge; as edge) {
+          <g class="sensor-edge sensor-edge--camera sensor-edge--ghost" data-testid="camera-fov-nominal" [attr.data-ahead]="edge.ahead.toFixed(1)">
+            <path [attr.d]="edge.d" />
+          </g>
+        }
+        @if (sensors().radarEdge; as edge) {
+          <g class="sensor-edge sensor-edge--radar" data-testid="radar-fov" [attr.data-ahead]="edge.ahead.toFixed(1)">
+            <path [attr.d]="edge.d" />
+            <text class="sensor-edge__label" [attr.x]="edge.x" [attr.y]="edge.y" [attr.text-anchor]="edge.anchor">{{ edge.text }}</text>
+          </g>
+        }
+      }
+    </g>
+
+    <!-- ============ lane names ============ -->
+    <g class="lanes" aria-hidden="true">
+      @for (tag of markings().laneTags; track tag.lane) {
+        <text class="lane-tag" [attr.x]="tag.x" [attr.y]="tag.y" text-anchor="middle">{{ tag.lane }}</text>
+      }
+    </g>
+
+    <!-- ============ painted on the road ============ -->
+    @for (item of flatItems(); track trackById($index, item)) {
+      <ng-container *ngTemplateOutlet="objectTpl; context: { $implicit: item }" />
+    }
+
+    <!-- ============ things standing on the road, far to near ============ -->
+    @for (item of standingItems(); track trackById($index, item)) {
+      @switch (item.shape) {
+        @case ('ego') {
+          <g class="ego"
+             [class.ego--braking]="braking()"
+             [class.ego--indicator-left]="indicatorLeft()"
+             [class.ego--indicator-right]="indicatorRight()"
+             [class.ego--indicator-hazard]="indicatorHazard()"
+             data-testid="road-ego"
+             [attr.data-lane]="snapshot()?.egoVehicle?.lane"
+             [attr.data-lateral]="snapshot()?.egoVehicle?.lateralPositionMeters?.toFixed(2)"
+             [attr.data-depth]="item.depth.toFixed(2)"
+             [attr.data-maneuver]="maneuverState()">
+            <path class="car__shadow" [attr.d]="item.shadow" />
+            @if (raining() && item.lamps; as lamps) {
+              @if (newRain()) {
+                <ellipse class="car__reflection car__reflection--streak" [attr.cx]="lamps.x" [attr.cy]="lamps.y + lamps.r * 4"
+                         [attr.rx]="lamps.r * 2.6" [attr.ry]="lamps.r * 4.5" fill="url(#roadReflectRed)" />
+              } @else {
+                <ellipse class="car__reflection" [attr.cx]="lamps.x" [attr.cy]="lamps.y + lamps.r * 2.1"
+                         [attr.rx]="lamps.r * 2.6" [attr.ry]="lamps.r * 2.2" fill="url(#roadGlowRed)" />
+              }
+            }
+            @if (item.car; as car) {
+              <g class="car car--ego" role="img" aria-label="Ego vehicle">
+                <g class="car__wheels">
+                  @for (wheel of car.wheels; track $index) {
+                    <g [class]="wheel.cls">
+                      @for (face of wheel.faces; track $index) {
+                        <path [attr.d]="face.d" [class]="face.cls" [attr.style]="face.style" />
+                      }
+                    </g>
+                  }
+                </g>
+                @for (face of car.faces; track $index) {
+                  <path [attr.d]="face.d" [class]="face.cls" [attr.style]="face.style" />
+                }
+                @if (item.lamps; as lamps) {
+                  <circle class="car__brake-glow" [attr.cx]="lamps.x" [attr.cy]="lamps.y" [attr.r]="lamps.r * 1.25"
+                          fill="url(#roadGlowRed)" />
+                }
+                <!-- Turn indicators: rear lamp, flank repeater and mirror lamp on each side. -->
+                <g class="car__indicators">
+                  <g class="car__indicator car__indicator--left" data-testid="ego-indicator-left">
+                    @for (face of car.indicatorLeft; track $index) {
+                      <path [attr.d]="face.d" [class]="face.cls" [attr.style]="face.style" [class.indicator-light--on]="indicatorLeft() || indicatorHazard()" />
+                    }
+                  </g>
+                  <g class="car__indicator car__indicator--right" data-testid="ego-indicator-right">
+                    @for (face of car.indicatorRight; track $index) {
+                      <path [attr.d]="face.d" [class]="face.cls" [attr.style]="face.style" [class.indicator-light--on]="indicatorRight() || indicatorHazard()" />
+                    }
+                  </g>
+                </g>
+              </g>
+            }
+          </g>
+        }
+        @case ('gantry') {
+          <g class="gantry" [attr.data-object-id]="item.id" data-object-kind="trafficLight"
+             [attr.data-depth]="item.depth.toFixed(2)" [attr.opacity]="item.opacity">
+            <g class="gantry__structure" aria-hidden="true">
+              @for (face of item.faces; track $index) {
+                <path [attr.d]="face.d" [class]="face.cls" />
+              }
+            </g>
+            @for (head of item.heads; track head.lane) {
+              <g class="obj obj--trafficLight"
+                 [class.obj--detected]="item.detectedByCamera || item.detectedByRadar"
+                 [class.obj--camera]="item.detectedByCamera"
+                 [class.obj--radar]="item.detectedByRadar"
+                 [class.obj--passed]="item.passed"
+                 [attr.data-state]="item.state"
+                 [attr.data-lane]="head.lane"
+                 [attr.data-depth]="item.depth.toFixed(2)"
+                 [attr.data-object-id]="item.id"
+                 data-object-kind="trafficLight"
+                 [attr.data-testid]="head.main ? 'road-traffic-light' : 'road-traffic-light-copy'"
+                 [attr.aria-hidden]="head.main ? null : 'true'"
+                 [attr.role]="head.main ? 'img' : null"
+                 [attr.aria-label]="head.main ? item.ariaLabel : null">
+                @for (face of head.faces; track $index) {
+                  <path [attr.d]="face.d" [class]="face.cls" />
+                }
+                @if (head.glow; as glow) {
+                  <circle [class]="glow.cls" [attr.cx]="glow.x" [attr.cy]="glow.y" [attr.r]="glow.r"
+                          [attr.fill]="'url(#roadGlow' + (item.state === 'RED' ? 'Red' : item.state === 'GREEN' ? 'Green' : 'Yellow') + ')'" />
+                }
+                @if (head.tag; as tag) {
+                  <ng-container *ngTemplateOutlet="tagTpl; context: { $implicit: tag }" />
+                }
+              </g>
+            }
+          </g>
+        }
+        @default {
+          <ng-container *ngTemplateOutlet="objectTpl; context: { $implicit: item }" />
+        }
+      }
+    }
+
+    <!-- New rain: the shower thickens with distance, so the far road fades into it. -->
+    @if (newRain()) {
+      <rect class="rain-mist" x="0" [attr.y]="rainMist().top" [attr.width]="camera().width"
+            [attr.height]="rainMist().height" fill="url(#roadMist)" aria-hidden="true" data-testid="rain-mist" />
+    }
+
+  <!-- Distance and detection plate above an object. -->
+  <ng-template #tagTpl let-tag>
+    <g class="tag" [attr.transform]="'translate(' + tag.x.toFixed(1) + ' ' + tag.y.toFixed(1) + ')'">
+      @if (tag.badge) {
+        <g class="obj__badge" [class.obj__badge--radar]="tag.badge === 'RADAR'">
+          <rect [attr.x]="-tag.badgeWidth / 2" y="-25" [attr.width]="tag.badgeWidth" height="12" rx="2" />
+          <text x="0" y="-16" text-anchor="middle">{{ tag.badge }}</text>
+        </g>
+      }
+      @if (tag.text) {
+        <g class="obj__distance" [class.obj__distance--passed]="tag.passed">
+          <text x="0" y="-3" text-anchor="middle">{{ tag.text }}</text>
+        </g>
+      }
+    </g>
+  </ng-template>
+
+  <!-- One world object (or one copy of a road-wide one) with its state, lane and depth on the element. -->
+  <ng-template #objectTpl let-item>
+    <g [class]="item.shape === 'crosswalk' ? 'crosswalk' : 'obj obj--' + item.kind"
+       [class.obj--detected]="item.shape !== 'crosswalk' && (item.detectedByCamera || item.detectedByRadar)"
+       [class.obj--camera]="item.shape !== 'crosswalk' && item.detectedByCamera"
+       [class.obj--radar]="item.shape !== 'crosswalk' && item.detectedByRadar"
+       [class.obj--passed]="item.shape !== 'crosswalk' && item.passed"
+       [attr.data-state]="item.state"
+       [attr.data-lane]="item.lane"
+       [attr.data-lateral]="item.lateral.toFixed(2)"
+       [attr.data-depth]="item.depth.toFixed(2)"
+       [attr.opacity]="item.opacity"
+       [attr.aria-label]="item.role === 'decor' ? null : item.ariaLabel"
+       [attr.aria-hidden]="item.role === 'decor' ? 'true' : null"
+       [attr.role]="item.role === 'decor' ? null : 'img'"
+       [attr.data-testid]="testIdFor(item)"
+       [attr.data-object-id]="item.id"
+       [attr.data-object-kind]="item.kind">
+      @if (item.halo) {
+        <path class="halo" [class.halo--radar]="item.detectedByRadar && !item.detectedByCamera" [attr.d]="item.halo" />
+      }
+      @switch (item.shape) {
+        @case ('crosswalk') {
+          <path class="crosswalk__bars" [attr.d]="item.d" />
+        }
+        @case ('stopLine') {
+          <path class="stop-line" [attr.d]="item.d" />
+        }
+        @case ('pothole') {
+          <g class="pothole">
+            <path class="pothole__outer" [attr.d]="item.rings?.[0]" />
+            <path class="pothole__inner" [attr.d]="item.rings?.[1]" />
+            <path class="pothole__deep" [attr.d]="item.rings?.[2]" />
+          </g>
+        }
+        @case ('speedMark') {
+          <g class="limit-mark" [attr.transform]="item.transform">
+            <circle class="paint-ring" r="1.12" />
+            <text class="paint-value" x="0" y="0.42">{{ item.label }}</text>
+          </g>
+        }
+        @case ('speedSign') {
+          <g [attr.transform]="item.transform" class="sign sign--speed">
+            <rect class="sign__pole" x="-0.05" y="-2.4" width="0.1" height="2.4" />
+            <g transform="translate(0 -2.85)">
+              <circle class="sign__disc" r="0.55" />
+              <circle class="sign__ring" r="0.43" />
+              <text class="sign__value" x="0" y="0.02">{{ item.label }}</text>
+            </g>
+          </g>
+        }
+        @case ('stopSign') {
+          <g [attr.transform]="item.transform" class="sign sign--stop">
+            <ellipse class="sign__shadow" cx="0" cy="0" rx="0.45" ry="0.1" />
+            <rect class="sign__pole" x="-0.045" y="-2.4" width="0.09" height="2.4" />
+            <g transform="translate(0 -2.85)">
+              <polygon class="sign__disc"
+                       points="0.462,-0.191 0.191,-0.462 -0.191,-0.462 -0.462,-0.191 -0.462,0.191 -0.191,0.462 0.191,0.462 0.462,0.191" />
+              <text class="sign__word" x="0" y="0.07">STOP</text>
+            </g>
+          </g>
+        }
+        @case ('radar') {
+          <g [attr.transform]="item.transform" class="radar-unit">
+            <ellipse class="sign__shadow" cx="0" cy="0" rx="0.5" ry="0.11" />
+            <rect class="radar-unit__pole" x="-0.07" y="-4.1" width="0.14" height="4.1" />
+            <g transform="translate(0 -4.45)">
+              <rect class="radar-unit__box" x="-0.55" y="-0.38" width="1.1" height="0.76" rx="0.1" />
+              <circle class="radar-unit__lens" cx="-0.12" cy="0" r="0.22" />
+              <circle class="radar-unit__beacon" cx="0.36" cy="-0.5" r="0.08" />
+            </g>
+          </g>
+        }
+        @case ('obstacle') {
+          <g class="obstacle">
+            @for (face of item.faces; track $index) {
+              <path [attr.d]="face.d" [class]="face.cls" />
+            }
+          </g>
+        }
+        @case ('barrier') {
+          <g class="barrier" [class.barrier--open]="item.open">
+            @for (face of item.faces; track $index) {
+              <path [attr.d]="face.d" [class]="face.cls" />
+            }
+          </g>
+        }
+        @case ('pedestrian') {
+          <g [attr.transform]="item.transform" class="person">
+            <ellipse class="person__shadow" cx="0" cy="0" rx="0.34" ry="0.09" />
+            <path class="person__legs"
+                  [attr.d]="'M-0.09 -0.9L' + (-0.1 + (item.swing ?? 0) * 0.2) + ' -0.02M0.09 -0.9L' + (0.1 - (item.swing ?? 0) * 0.2) + ' -0.02'" />
+            <path class="person__arms"
+                  [attr.d]="'M-0.23 -1.5L' + (-0.28 - (item.swing ?? 0) * 0.14) + ' -0.95M0.23 -1.5L' + (0.28 + (item.swing ?? 0) * 0.14) + ' -0.95'" />
+            <path class="person__body" d="M-0.24 -0.82L-0.2 -1.56Q0 -1.66 0.2 -1.56L0.24 -0.82Z" />
+            <circle class="person__head" cx="0" cy="-1.72" r="0.14" />
+          </g>
+        }
+        @case ('vehicle') {
+          @if (item.car; as car) {
+            <path class="car__shadow" [attr.d]="item.shadow" />
+            @if (raining()) {
+              @if (car.lamps; as lamps) {
+                @if (newRain()) {
+                  <ellipse class="car__reflection car__reflection--streak" [attr.cx]="lamps.x" [attr.cy]="lamps.y + lamps.r * 4"
+                           [attr.rx]="lamps.r * 2.6" [attr.ry]="lamps.r * 4.5" fill="url(#roadReflectRed)" />
+                } @else {
+                  <ellipse class="car__reflection" [attr.cx]="lamps.x" [attr.cy]="lamps.y + lamps.r * 2.1"
+                           [attr.rx]="lamps.r * 2.6" [attr.ry]="lamps.r * 2.2" fill="url(#roadGlowRed)" />
+                }
+              }
+            }
+            <g [class]="'car car--other car--tone-' + item.tone">
+              <g class="car__wheels">
+                @for (wheel of car.wheels; track $index) {
+                  <g [class]="wheel.cls">
+                    @for (face of wheel.faces; track $index) {
+                      <path [attr.d]="face.d" [class]="face.cls" />
+                    }
+                  </g>
+                }
+              </g>
+              @for (face of car.faces; track $index) {
+                <path [attr.d]="face.d" [class]="face.cls" />
+              }
+            </g>
+          }
+        }
+      }
+      @if (item.tag; as tag) {
+        <ng-container *ngTemplateOutlet="tagTpl; context: { $implicit: tag }" />
+      }
+    </g>
+  </ng-template>
+  </svg>
+
+  @if (raining()) {
+    @if (newRain()) {
+      <canvas #rainCanvas class="rain-canvas" aria-hidden="true" data-testid="rain-canvas"></canvas>
+    } @else {
+      <div class="rain-overlay" aria-hidden="true" data-testid="rain-overlay">
+        <div class="rain-overlay__drops rain-overlay__drops--far"></div>
+        <div class="rain-overlay__drops"></div>
+      </div>
+    }
+    <span class="rain-chip" data-testid="rain-chip">{{ rainChipText() }}</span>
+  }
+
+  <!-- ============ first-run invitation ============ -->
+  @if (awaitingStart()) {
+    <div class="await" data-testid="road-await-start">
+      <div class="await__card">
+        <span class="await__eyebrow">Simulation ready</span>
+        <strong>Press START to begin</strong>
+        <span>The road is empty and the vehicle is stationary. Add road conditions once the
+          simulation is running.</span>
+      </div>
+    </div>
+  }
+
+  <!-- ============ Telemetry HUD Ribbon ============ -->
+  <div class="telemetry-hud" data-testid="telemetry-hud">
+    <div class="hud-item"><span class="hud-label">POSITION</span><strong class="hud-val" data-testid="hud-position">{{ egoPosition().toFixed(1) }} m</strong></div>
+    <div class="hud-item"><span class="hud-label">SPEED</span><strong class="hud-val" data-testid="hud-speed">{{ egoSpeed().toFixed(0) }} km/h</strong></div>
+    <div class="hud-item"><span class="hud-label">ACCEL</span><strong class="hud-val" data-testid="hud-accel">{{ (egoAcceleration() >= 0 ? '+' : '') + egoAcceleration().toFixed(1) }} m/s²</strong></div>
+    <div class="hud-item"><span class="hud-label">STATE</span><strong class="hud-val hud-badge" [attr.data-state]="drivingState()">{{ drivingState() }}</strong></div>
+    <div class="hud-item"><span class="hud-label">LANE</span><strong class="hud-val" data-testid="hud-lane">{{ currentLane() }}</strong></div>
+    <div class="hud-item"><span class="hud-label">INDICATOR</span><strong class="hud-val hud-badge" [attr.data-indicator]="indicatorName()" data-testid="hud-indicator">{{ indicatorName() }}</strong></div>
+    <div class="hud-item"><span class="hud-label">STEERING</span><strong class="hud-val" data-testid="hud-steering">{{ steeringName() }}</strong></div>
+    <div class="hud-item">
+      <span class="hud-label">RADAR FOV</span>
+      <strong class="hud-val" data-testid="hud-radar-fov">{{ ranges().radarRangeMeters.toFixed(0) }} m</strong>
+    </div>
+  </div>
+
+  <!-- ============ legend ============ -->
+  <div class="legend" aria-hidden="true">
+    <span><i class="dot dot--camera"></i>Camera FOV</span>
+    <span><i class="dot dot--radar"></i>Front radar</span>
+    <span><i class="dot dot--blind"></i>Blind spot</span>
+  </div>
+</section>

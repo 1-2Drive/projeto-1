@@ -1,0 +1,82 @@
+<section class="road-map" data-testid="road-map" (pointerup)="endStroke()" (pointerleave)="endStroke()">
+  <header class="road-map__head">
+    <h3>Road map</h3>
+    @if (map(); as m) {
+      <span class="road-map__meta" data-testid="road-map-meta">
+        {{ m.rows }} × {{ m.lanes.length }} · {{ m.blockLengthMeters }} m blocks · row {{ m.egoRow }} · lap {{ m.lap + 1 }}
+      </span>
+    }
+  </header>
+
+  @if (map(); as m) {
+    <div class="palette" role="radiogroup" aria-label="Value to paint on the map">
+      @for (entry of legend(); track entry.code) {
+        <button type="button" class="brush" role="radio"
+                [class.brush--active]="brush() === entry.code"
+                [attr.aria-checked]="brush() === entry.code"
+                [attr.data-testid]="'map-brush-' + entry.code"
+                [title]="entry.code + ' = ' + entry.label"
+                (click)="selectBrush(entry.code)">
+          <i class="swatch" [class]="'swatch swatch--' + toneFor(entry.code)"></i>
+          <b>{{ entry.code }}</b>
+          <span>{{ entry.label }}</span>
+        </button>
+      }
+    </div>
+
+    <div class="lane-placement" role="group" aria-label="Place a hazard in a lane">
+      <span>Place at row {{ m.egoRow }} +</span>
+      @for (choice of laneColumns(); track choice.lane) {
+        <button type="button" class="lane-placement__button"
+                [attr.data-testid]="'place-lane-' + choice.lane"
+                [disabled]="choice.index < 0"
+                (click)="placeAhead(choice.lane)">+ {{ choice.lane }}</button>
+      }
+    </div>
+    <p class="infrastructure-hint">Speed limits, traffic lights, crosswalks and stop signs govern the whole road: one marker covers all three lanes.</p>
+
+    <div class="matrix">
+      <div class="matrix__lanes" aria-hidden="true">
+        @for (row of laneRows(); track row.lane) {
+          <span>{{ row.lane }}</span>
+        }
+      </div>
+
+      <div class="matrix__body">
+        <div class="grid" role="grid" [attr.aria-label]="'Road map, ' + m.rows + ' blocks by ' + m.lanes.length + ' lanes'"
+             [style.grid-template-columns]="'repeat(' + m.rows + ', minmax(0, 1fr))'">
+          @for (laneRow of laneRows(); track laneRow.lane) {
+            @for (cell of laneRow.cells; track cell.row) {
+              <div class="cell" role="gridcell"
+                   [class]="'cell cell--' + toneFor(cell.code)"
+                   [class.cell--ego-row]="cell.row === m.egoRow"
+                   [attr.data-testid]="'map-cell-' + cell.row + '-' + cell.lane"
+                   [attr.data-code]="cell.code"
+                   [title]="cellTitle(cell)"
+                   (pointerdown)="startStroke(cell, $event)"
+                   (pointerenter)="continueStroke(cell)"></div>
+            }
+          }
+
+          @if (ego(); as car) {
+            <span class="ego" data-testid="road-map-ego"
+                  [style.left.%]="car.xPercent" [style.top.%]="car.yPercent"></span>
+          }
+        </div>
+
+        <div class="axis" aria-hidden="true">
+          @for (tick of rowTicks(); track tick) {
+            <span [style.left.%]="(tick / m.rows) * 100">{{ tick }}</span>
+          }
+        </div>
+      </div>
+    </div>
+
+    <p class="road-map__hint">
+      Click or drag over cells to paint the selected value; start on a cell that already has it to erase.
+      After row {{ m.rows - 1 }} the road continues at row 0.
+    </p>
+  } @else {
+    <p class="road-map__hint">Waiting for the first snapshot.</p>
+  }
+</section>

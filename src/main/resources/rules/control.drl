@@ -1,0 +1,21 @@
+package rules
+
+import com.one2drive.projeto1.decision.DecisionContext
+
+// Meta-knowledge: knowledge about the rules themselves, not about driving, that controls
+// the inference. Every rule belongs to one phase (agenda-group) of the decision cycle:
+//   perception  01-state-updates.drl: sensor events become the current state of the world;
+//   decision    the driving rules (fuzzy weather and the move-off state included), which
+//               propose decisions;
+//   fallback    the two baseline proposals of defaults.drl, once every other rule has had
+//               its say. The API wrapper sets these agenda groups once per cycle; this rule
+//               is the explicit control phase and is kept out of MAIN to avoid a late repeat.
+rule "Control: perceive, then decide, then fall back"
+agenda-group "control"
+salience 10000
+no-loop true
+when
+    $ctx : DecisionContext(controlDispatched == false)
+then
+    modify($ctx) { setControlDispatched(true) }
+end

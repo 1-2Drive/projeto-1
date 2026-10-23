@@ -1,0 +1,11 @@
+target/
+.idea/
+.vscode/
+*.iml
+out/
+frontend/node_modules/
+frontend/dist/
+playwright-report/
+frontend/test-results/
+.playwright-mcp/
+.dev-logs/

@@ -1,0 +1,222 @@
+package rules
+
+import com.one2drive.projeto1.decision.DecisionContext
+import com.one2drive.projeto1.decision.DecisionPriority
+import com.one2drive.projeto1.decision.StoppingPolicy
+import com.one2drive.projeto1.domain.DrivingAction
+import com.one2drive.projeto1.domain.Lane
+import com.one2drive.projeto1.domain.LaneChangeState
+import com.one2drive.projeto1.domain.RiskLevel
+import com.one2drive.projeto1.drools.DroolsSupport
+import com.one2drive.projeto1.drools.facts.BarrierStateFact
+import com.one2drive.projeto1.drools.facts.SafeLaneSide
+import com.one2drive.projeto1.drools.facts.VehicleStateFact
+
+global DroolsSupport droolsSupport
+
+// A closed barrier blocks the lane, so going around it is collision avoidance. Each
+// rule proves the lane change safe through safeToChangeLane (lane-safety.drl): no
+// maneuver moving, no continuous line on the line it would cross (the line between
+// RIGHT and CENTER is the rightMarking, the one between CENTER and LEFT the leftMarking)
+// and that side reported clear by the blind-spot sensor. The rules only know what the
+// sensors perceive (Art. 35 and 38 CE: the driver makes sure the maneuver is safe);
+// otherwise the vehicle stops. A lane change is only a way past the barrier when it takes
+// the vehicle out of the lane before it (StoppingPolicy.roomToLeaveLane); closer than that
+// the approach rule below brakes for it.
+rule "Avoid closed barrier by changing left when safe"
+agenda-group "decision"
+salience 650
+when
+    $ctx : DecisionContext()
+    VehicleStateFact(lane == Lane.RIGHT, $speed : speedKmh)
+    safeToChangeLane(Lane.LEFT;)
+    BarrierStateFact(barrierId != "none", open == false, lane == Lane.RIGHT,
+                     $distance : distanceMeters > 0, distanceMeters <= 55.0,
+                     StoppingPolicy.roomToLeaveLane($speed, distanceMeters))
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.CHANGE_LANE_LEFT,
+        Double.NaN,
+        RiskLevel.HIGH,
+        DecisionPriority.COLLISION_AVOIDANCE,
+        "Closed barrier ahead; changing left to a verified clear lane",
+        drools.getRule().getName(),
+        "barrier " + $distance + "m ahead in RIGHT, CENTER clear"
+    );
+end
+
+rule "Avoid closed barrier by changing left from centre when safe"
+agenda-group "decision"
+salience 650
+when
+    $ctx : DecisionContext()
+    VehicleStateFact(lane == Lane.CENTER, $speed : speedKmh)
+    safeToChangeLane(Lane.LEFT;)
+    BarrierStateFact(barrierId != "none", open == false, lane == Lane.CENTER,
+                     $distance : distanceMeters > 0, distanceMeters <= 55.0,
+                     StoppingPolicy.roomToLeaveLane($speed, distanceMeters))
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.CHANGE_LANE_LEFT,
+        Double.NaN,
+        RiskLevel.HIGH,
+        DecisionPriority.COLLISION_AVOIDANCE,
+        "Closed barrier ahead; changing left to a verified clear lane",
+        drools.getRule().getName(),
+        "barrier " + $distance + "m ahead in CENTER, LEFT clear"
+    );
+end
+
+rule "Avoid closed barrier by changing right from centre when safe"
+agenda-group "decision"
+salience 650
+when
+    $ctx : DecisionContext()
+    VehicleStateFact(lane == Lane.CENTER, $speed : speedKmh)
+    // Right only when left is not a safe way past: occupied, or clear with no room to follow.
+    not SafeLaneSide(side == Lane.LEFT)
+    safeToChangeLane(Lane.RIGHT;)
+    BarrierStateFact(barrierId != "none", open == false, lane == Lane.CENTER,
+                     $distance : distanceMeters > 0, distanceMeters <= 55.0,
+                     StoppingPolicy.roomToLeaveLane($speed, distanceMeters))
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.CHANGE_LANE_RIGHT,
+        Double.NaN,
+        RiskLevel.HIGH,
+        DecisionPriority.COLLISION_AVOIDANCE,
+        "Closed barrier ahead; changing right to a verified clear lane",
+        drools.getRule().getName(),
+        "barrier " + $distance + "m ahead in CENTER, RIGHT clear"
+    );
+end
+
+rule "Avoid closed barrier by changing right when safe"
+agenda-group "decision"
+salience 650
+when
+    $ctx : DecisionContext()
+    VehicleStateFact(lane == Lane.LEFT, $speed : speedKmh)
+    safeToChangeLane(Lane.RIGHT;)
+    BarrierStateFact(barrierId != "none", open == false, lane == Lane.LEFT,
+                     $distance : distanceMeters > 0, distanceMeters <= 55.0,
+                     StoppingPolicy.roomToLeaveLane($speed, distanceMeters))
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.CHANGE_LANE_RIGHT,
+        Double.NaN,
+        RiskLevel.HIGH,
+        DecisionPriority.COLLISION_AVOIDANCE,
+        "Closed barrier ahead; changing right to a verified clear lane",
+        drools.getRule().getName(),
+        "barrier " + $distance + "m ahead in LEFT, CENTER clear"
+    );
+end
+
+// A closed barrier in the vehicle's path (VehicleStateFact.pathLane: its lane, or the lane
+// it is moving into while a lane change is under way) is approached as an obstacle is
+// (road-hazards.drl): the rule binds from the distance a comfortable stop needs at the
+// current speed (never less than 55 m), holds the speed above the braking curve, brakes to
+// the anticipation curve on it, and brakes hard when the room left needs more than
+// comfortable braking; it stops 10 m before the barrier
+// (StoppingPolicy.BARRIER_STOP_OFFSET_METERS). It is a ceiling, so it holds while the
+// avoidance above is decided and vetoes nothing: once the lane change moves the path out of
+// the barrier's lane the rule stops holding. Whether a side is safe is not its concern;
+// without it, a barrier that appears close, or one in the lane being entered, was only
+// seen by the mandatory stop below once no side was safe, and the vehicle reached it at
+// speed.
+rule "Stop before closed barrier while still in its lane"
+agenda-group "decision"
+salience 645
+when
+    $ctx : DecisionContext()
+    VehicleStateFact($lane : pathLane, $speed : speedKmh)
+    BarrierStateFact(barrierId != "none", open == false, lane == $lane,
+                     $distance : distanceMeters > 0,
+                     distanceMeters <= Math.max(55.0, StoppingPolicy.requiredDistanceMeters($speed, StoppingPolicy.COMFORT_DECELERATION_MPS2, StoppingPolicy.BARRIER_STOP_OFFSET_METERS)))
+then
+    double room = Math.max(0.0, $distance - StoppingPolicy.BARRIER_STOP_OFFSET_METERS);
+    double speedMps = $speed / 3.6;
+    DrivingAction action = DrivingAction.BRAKE;
+    double target = StoppingPolicy.curveSpeedKmh(0.0, StoppingPolicy.ANTICIPATION_DECELERATION_MPS2, room);
+    if (room <= 0.5) {
+        action = DrivingAction.STOP;
+        target = 0.0;
+    } else if (speedMps * speedMps / (2.0 * room) > StoppingPolicy.COMFORT_DECELERATION_MPS2 * 1.1) {
+        action = DrivingAction.EMERGENCY_BRAKE;
+        target = 0.0;
+    } else if (target >= $speed) {
+        action = DrivingAction.MAINTAIN_SPEED;
+        target = $speed;
+    }
+    droolsSupport.proposeDecision(
+        $ctx,
+        action,
+        target,
+        action == DrivingAction.MAINTAIN_SPEED ? RiskLevel.MODERATE : RiskLevel.HIGH,
+        DecisionPriority.COLLISION_AVOIDANCE,
+        "Closed barrier ahead in the path; stopping unless a lane change takes the vehicle out of its way",
+        drools.getRule().getName(),
+        "closed barrier " + $distance + "m ahead in the vehicle's path"
+    );
+end
+
+// The vehicle stops whenever it cannot go around the barrier safely, for whatever reason
+// safeToChangeLane fails on both sides (a side reported clear with no room to follow the
+// vehicle ahead in it is not a safe side either): the avoidance rules above and this one
+// ask the same question, so the vehicle always does one or the other. It holds only while
+// the vehicle has not started to move out of the lane (during the avoidance the question
+// fails on both sides, and a stop here would veto it). It binds from the distance a
+// comfortable stop needs at the current speed (never less than 55 m), and brakes hard when
+// comfortable braking would no longer stop the vehicle before the barrier.
+rule "Closed barrier requires stop"
+agenda-group "decision"
+salience 640
+when
+    $ctx : DecisionContext()
+    VehicleStateFact($egoLane : lane, $speed : speedKmh, laneChangeState == LaneChangeState.IDLE)
+    not SafeLaneSide(side == Lane.LEFT)
+    not SafeLaneSide(side == Lane.RIGHT)
+    BarrierStateFact(barrierId != "none", open == false, lane == $egoLane,
+                     $distance : distanceMeters >= 0,
+                     distanceMeters <= Math.max(55.0, StoppingPolicy.requiredDistanceMeters($speed, StoppingPolicy.COMFORT_DECELERATION_MPS2, 0.0)))
+then
+    double speedMps = $speed / 3.6;
+    boolean hard = speedMps * speedMps / (2.0 * Math.max(0.1, $distance)) > StoppingPolicy.COMFORT_DECELERATION_MPS2 * 1.1;
+    droolsSupport.proposeDecision(
+        $ctx,
+        hard ? DrivingAction.EMERGENCY_BRAKE : DrivingAction.STOP,
+        0.0,
+        RiskLevel.HIGH,
+        DecisionPriority.LEGAL_MANDATORY_STOP,
+        hard ? "Closed barrier ahead, no adjacent lane is safe and comfortable braking no longer stops in time"
+            : "Closed barrier ahead and no adjacent lane is safe",
+        drools.getRule().getName(),
+        "distance=" + $distance + "m, no adjacent lane is safe to change into"
+    );
+end
+
+// Comfort proposal: it loses to any speed ceiling, hold or maneuver speed in the cycle,
+// so it needs no guard on what else was proposed.
+rule "Open barrier allows continue if no higher priority"
+agenda-group "decision"
+salience 170
+when
+    $ctx : DecisionContext()
+    BarrierStateFact(barrierId != "none", open == true, distanceMeters >= 0, distanceMeters <= 35.0)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.CONTINUE,
+        35.0,
+        RiskLevel.LOW,
+        DecisionPriority.COMFORT_PROGRESS,
+        "Barrier open and crossing allowed",
+        drools.getRule().getName(),
+        "barrier open"
+    );
+end

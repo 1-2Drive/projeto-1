@@ -1,0 +1,48 @@
+<div class="trip-dialog__scrim" (click)="dismiss()" (keydown)="onKeydown($event)">
+  <section class="trip-dialog" role="dialog" aria-modal="true" aria-labelledby="trip-dialog-title"
+           data-testid="trip-questions-dialog" [attr.data-session-id]="sessionId()" (click)="$event.stopPropagation()" (keydown)="onKeydown($event)">
+    <header class="trip-dialog__header">
+      <div>
+        <p class="trip-dialog__eyebrow">SESSION SAVED · {{ session()?.backend ?? 'RULE ENGINE' }}</p>
+        <h2 id="trip-dialog-title">ASK ABOUT THIS TRIP</h2>
+        <p class="trip-dialog__subtitle">The simulation has been stopped and saved. Pick a decision to see why it was made, why the alternatives were not, and how the rules reached it, for the speed and for the lane.</p>
+      </div>
+      <button type="button" class="trip-dialog__close" aria-label="Close" data-testid="close-trip-dialog" (click)="dismiss()">×</button>
+    </header>
+
+    @if (error()) { <p class="trip-dialog__error" role="alert" data-testid="trip-dialog-error">{{ error() }}</p> }
+
+    <label class="trip-dialog__label" for="trip-decision">Decision context</label>
+    <select #decisionSelect id="trip-decision" data-testid="trip-decision-select" [disabled]="!decisions().length"
+            (change)="chooseTimestamp($any($event.target).value)">
+      @if (!session()) { <option value="">Loading the saved decisions…</option> }
+      @for (item of decisions(); track $index) {
+        <option [value]="item.simulationTimeMillis" [selected]="item.simulationTimeMillis === selectedTimestamp()">{{ decisionLabel(item) }}</option>
+      }
+    </select>
+
+    <div class="trip-dialog__modes" role="group" aria-label="Explanation mode">
+      <button type="button" data-testid="why-mode" [class.is-selected]="mode() === 'WHY'"
+              [attr.aria-pressed]="mode() === 'WHY'" (click)="setMode('WHY')">WHY</button>
+      <button type="button" data-testid="why-not-mode" [class.is-selected]="mode() === 'WHY_NOT'"
+              [attr.aria-pressed]="mode() === 'WHY_NOT'" (click)="setMode('WHY_NOT')">WHY NOT</button>
+      <button type="button" data-testid="how-mode" [class.is-selected]="mode() === 'HOW'"
+              [attr.aria-pressed]="mode() === 'HOW'" (click)="setMode('HOW')">HOW</button>
+    </div>
+
+    <div class="trip-dialog__actions">
+      <button type="button" class="trip-dialog__secondary" data-testid="open-session-history" (click)="showHistory()">OPEN SESSION HISTORY</button>
+      @if (loading()) { <span class="trip-dialog__hint" role="status" data-testid="trip-loading">Explaining the decision…</span> }
+    </div>
+
+    @if (answer(); as result) {
+      <section class="trip-answer" data-testid="trip-answer" aria-live="polite">
+        <p class="trip-answer__eyebrow">{{ modeLabel() }} · {{ formatTime(result.timestampMillis) }} · {{ result.engine }}</p>
+        @if (result.situation; as situation) {
+          <p class="trip-answer__situation">Vehicle at {{ situation.speedKmh | number:'1.0-0' }} km/h in the {{ situation.lane }} lane · lane change {{ situation.laneChangeState }}</p>
+        }
+        <app-decision-explanation [answer]="result" [mode]="mode()" />
+      </section>
+    }
+  </section>
+</div>

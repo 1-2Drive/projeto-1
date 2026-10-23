@@ -1,0 +1,36 @@
+<section class="memory" data-testid="working-memory-panel">
+  <header class="head">
+    <div class="head__title">
+      <h3>Working Memory</h3>
+      <span class="head__count">{{ visibleRows().length }} / {{ totalFacts() }} facts</span>
+    </div>
+    <input type="text" class="search" placeholder="Filter by type, value, source…"
+           aria-label="Filter working memory facts"
+           (input)="setFilter($any($event.target).value)" />
+  </header>
+
+  <div class="facts">
+    @for (row of visibleRows(); track row.type + row.value + row.timestamp) {
+      <article class="fact" [class]="'fact fact--' + statusFor(row.timestamp).toLowerCase()">
+        <div class="fact__head">
+          <span class="fact__type">{{ row.type }}</span>
+          <span class="fact__status">{{ statusFor(row.timestamp) }}</span>
+        </div>
+        <p class="fact__value">{{ row.value }}</p>
+        <div class="fact__foot">
+          <span>{{ row.source }}</span>
+          <span class="fact__stream">{{ row.stream }}</span>
+          <time>{{ row.timestamp ?? 'static' }}</time>
+        </div>
+      </article>
+    } @empty {
+      <p class="empty">
+        @if (totalFacts() > 0) {
+          No fact matches “{{ filter() }}”.
+        } @else {
+          Working memory is empty. Press START to insert perception facts.
+        }
+      </p>
+    }
+  </div>
+</section>

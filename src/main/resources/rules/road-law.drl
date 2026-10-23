@@ -1,0 +1,62 @@
+package rules
+
+import com.one2drive.projeto1.decision.DecisionContext
+import com.one2drive.projeto1.decision.DecisionPriority
+import com.one2drive.projeto1.domain.DrivingAction
+import com.one2drive.projeto1.domain.PedestrianCrossingState
+import com.one2drive.projeto1.domain.Lane
+import com.one2drive.projeto1.domain.LaneChangeState
+import com.one2drive.projeto1.domain.RiskLevel
+import com.one2drive.projeto1.drools.DroolsSupport
+import com.one2drive.projeto1.drools.facts.BarrierStateFact
+import com.one2drive.projeto1.drools.facts.FrontVehicleState
+import com.one2drive.projeto1.drools.facts.LaneChangeRequestState
+import com.one2drive.projeto1.drools.facts.LaneOccupancyState
+import com.one2drive.projeto1.drools.facts.ObstacleStateFact
+import com.one2drive.projeto1.drools.facts.OvertakingStateFact
+import com.one2drive.projeto1.drools.facts.PedestrianStateFact
+import com.one2drive.projeto1.drools.facts.PotholeStateFact
+import com.one2drive.projeto1.drools.facts.VehicleStateFact
+
+global DroolsSupport droolsSupport
+
+// Portuguese Highway Code Art. 13 (Keep-Right Rule):
+// Vehicles must drive on the rightmost available safe lane. CENTER and LEFT are temporary
+// maneuver lanes. Once overtaking or obstacle avoidance is complete and the right lane
+// is verified safe and clear, the vehicle must return right.
+//
+// Supports multi-lane return: LEFT -> CENTER -> RIGHT. Each lane change completes before
+// the next begins.
+
+rule "Enforce keep right road law when right lane is safe"
+agenda-group "decision"
+salience 460
+no-loop true
+when
+    $ctx : DecisionContext()
+    VehicleStateFact(lane != Lane.RIGHT, presentationDemo == false, laneChangeState == LaneChangeState.IDLE, rightLaneBlockedAhead == false, timestamp >= 4000, $settled : laneSettledAtMillis, $now : timestamp)
+    // A lane change the driver asked for is not undone at once: the lane settled within 4.5 s
+    // of the request (1.5 s for it to be granted + a 3 s manoeuvre), so keep right waits 5 s.
+    not LaneChangeRequestState(timestamp >= 0, timestamp <= $settled, timestamp >= $settled - 4500, $now - $settled < 5000)
+    noContinuousLine(Lane.RIGHT;)
+    LaneOccupancyState(lane == Lane.RIGHT, occupied == false, frontDistanceMeters > 80.0, timestamp > $settled)
+    not MoveOffState(active == true)
+    not ObstacleStateFact(obstacleId != "none", distanceMeters > 0)
+    not PotholeStateFact(potholeId != "none", distanceMeters > 0)
+    not BarrierStateFact(barrierId != "none", open == false, distanceMeters > 0)
+    not PedestrianStateFact(pedestrianId != "none", inPath == true || crossingState == PedestrianCrossingState.CROSSING, distanceMeters > 0)
+    not FrontVehicleState(targetId != "none", distanceMeters > 0, distanceMeters <= 80.0)
+    not LaneChangeRequestState(active == true)
+    not OvertakingStateFact(active == true)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.RETURN_RIGHT,
+        Double.NaN,
+        RiskLevel.LOW,
+        DecisionPriority.MANEUVER_SAFETY,
+        "Portuguese Highway Code Art. 13: Drive on the rightmost available safe lane",
+        drools.getRule().getName(),
+        "Right lane is clear and safe; returning to rightmost lane"
+    );
+end

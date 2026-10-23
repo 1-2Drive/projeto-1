@@ -1,0 +1,110 @@
+package rules
+
+import com.one2drive.projeto1.decision.DecisionContext
+import com.one2drive.projeto1.decision.DecisionPriority
+import com.one2drive.projeto1.decision.DrivingDecision
+import com.one2drive.projeto1.domain.DrivingAction
+import com.one2drive.projeto1.domain.LaneChangeState
+import com.one2drive.projeto1.domain.RiskLevel
+import com.one2drive.projeto1.drools.DroolsSupport
+import com.one2drive.projeto1.drools.facts.CurrentSpeedLimit
+import com.one2drive.projeto1.drools.facts.LaneChangeRequestState
+import com.one2drive.projeto1.drools.facts.MoveOffState
+import com.one2drive.projeto1.drools.facts.VehicleStateFact
+
+global DroolsSupport droolsSupport
+
+// Fallback for a cycle in which nothing else proposed anything: keep the speed the
+// driver already set. Two guards are needed because Drools only re-checks a pattern
+// when the fact it reads is update()d, and the DecisionContext is mutated in place by
+// every proposal instead. So the constraint below can still match after a rule fired at
+// a higher salience and already proposed: without the RHS guard the baseline would then
+// re-propose the current speed at the same priority, its lower recommendation would win
+// the tie-break, and the proposal that told the vehicle to build up to a detected limit
+// or to answer a driver acceleration request would be discarded in silence.
+rule "Default maintain speed baseline"
+agenda-group "fallback"
+salience -100
+when
+    $ctx : DecisionContext(priority <= 0)
+    VehicleStateFact($speed : speedKmh)
+then
+    if ($ctx.getPriority() == 0) {
+        droolsSupport.proposeDecision(
+            $ctx,
+            DrivingAction.MAINTAIN_SPEED,
+            $speed,
+            RiskLevel.LOW,
+            DecisionPriority.COMFORT_PROGRESS,
+            "No restrictive condition detected",
+            drools.getRule().getName(),
+            "baseline speed=" + $speed + " km/h"
+        );
+    }
+end
+
+// Moving off: a stopped vehicle that nothing holds any more (a lane opened next to an
+// obstacle, the light turned green, the pedestrian left) drives off gently up to
+// 30 km/h, or the speed limit when it is lower. The intent is a MoveOffState fact so it
+// survives a driver lane change in between, and a car that merely slowed down is never
+// sped up.
+//
+// It starts from a standstill when nothing holds the vehicle any more. A decision that
+// only reaches the maneuver safety priority (a stop sign's own proceed proposal, a lane
+// change) is permission to move rather than a hold, so it counts too: without that a
+// vehicle stopped for a stop sign could never start again, because the stop rules that
+// ended MoveOffState leave the proceed proposal as the winner and it sits exactly on
+// that priority. Only a hazard or mandatory stop above it keeps the vehicle standing.
+// It ends when a hazard or hold wins a cycle, or once the car is within 1 km/h of the
+// target, where the actuator settles.
+rule "Start moving off after a standstill"
+agenda-group "decision"
+salience 60
+when
+    $state : MoveOffState(active == false)
+    VehicleStateFact(speedKmh < 3.0, laneChangeState == LaneChangeState.IDLE, $now : timestamp)
+    DrivingDecision(priority <= DecisionPriority.MANEUVER_SAFETY)
+then
+    modify($state) { setActive(true), setTimestamp($now) }
+end
+
+rule "Stop moving off once held or at speed"
+agenda-group "decision"
+salience 60
+when
+    $state : MoveOffState(active == true)
+    VehicleStateFact($speed : speedKmh)
+    CurrentSpeedLimit($limit : limitKmh)
+    DrivingDecision($priority : priority)
+    eval($speed >= Math.min(30.0, $limit) - 1.0 || $priority > DecisionPriority.MANEUVER_SAFETY)
+then
+    modify($state) { setActive(false) }
+end
+
+// Every rule that still requires the stop proposes with a higher priority and wins; a
+// stop sign's own "proceed" proposal is slower and wins the tie. While the driver asks
+// for a lane change this proposal steps aside: the driver's request is answered first.
+// A vehicle going around a stationary vehicle needs no such step: the lane change is
+// arbitrated in its own channel and moves off at the same time.
+rule "Move off when stopped and nothing holds the vehicle"
+agenda-group "fallback"
+salience -90
+when
+    $ctx : DecisionContext()
+    MoveOffState(active == true)
+    VehicleStateFact($speed : speedKmh)
+    CurrentSpeedLimit($limit : limitKmh)
+    not LaneChangeRequestState(active == true)
+then
+    double target = Math.min(30.0, $limit);
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.CONTINUE,
+        target,
+        RiskLevel.LOW,
+        DecisionPriority.MANEUVER_SAFETY,
+        "Vehicle was stopped and no rule holds it any more",
+        drools.getRule().getName(),
+        "speed=" + $speed + " km/h, moving off to " + target + " km/h"
+    );
+end

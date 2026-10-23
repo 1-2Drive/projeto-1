@@ -1,0 +1,170 @@
+package rules
+
+import com.one2drive.projeto1.drools.events.AccelerationRequestEvent
+import com.one2drive.projeto1.drools.events.BarrierDetectedEvent
+import com.one2drive.projeto1.drools.events.FrontDistanceEvent
+import com.one2drive.projeto1.drools.events.LaneChangeRequestEvent
+import com.one2drive.projeto1.drools.events.LaneOccupancyEvent
+import com.one2drive.projeto1.drools.events.LeftLaneVehicleEvent
+import com.one2drive.projeto1.drools.events.RightLaneVehicleEvent
+import com.one2drive.projeto1.drools.events.FarLeftLaneVehicleEvent
+import com.one2drive.projeto1.drools.events.ObstacleDetectedEvent
+import com.one2drive.projeto1.drools.events.PedestrianDetectedEvent
+import com.one2drive.projeto1.drools.events.PotholeDetectedEvent
+import com.one2drive.projeto1.drools.events.CrosswalkDetectedEvent
+import com.one2drive.projeto1.drools.events.RelativeSpeedEvent
+import com.one2drive.projeto1.drools.events.RoadGripEvent
+import com.one2drive.projeto1.drools.events.ReducedGripEvent
+import com.one2drive.projeto1.drools.events.ReducedVisibilityEvent
+import com.one2drive.projeto1.drools.events.SpeedLimitDetectedEvent
+import com.one2drive.projeto1.drools.events.StopSignEvent
+import com.one2drive.projeto1.drools.events.TTCEvent
+import com.one2drive.projeto1.drools.events.TrafficLightEvent
+import com.one2drive.projeto1.drools.events.StoppedAtStopLineEvent
+import com.one2drive.projeto1.drools.events.VehicleSpeedEvent
+import com.one2drive.projeto1.drools.events.VisibilityEvent
+import com.one2drive.projeto1.drools.events.WeatherEvent
+
+declare VehicleSpeedEvent
+    @role( event )
+    @timestamp( timestamp )
+    @expires( 10s )
+end
+
+declare FrontDistanceEvent
+    @role( event )
+    @timestamp( timestamp )
+    @expires( 10s )
+end
+
+declare RelativeSpeedEvent
+    @role( event )
+    @timestamp( timestamp )
+    @expires( 10s )
+end
+
+declare TTCEvent
+    @role( event )
+    @timestamp( timestamp )
+    @expires( 10s )
+end
+
+declare SpeedLimitDetectedEvent
+    @role( event )
+    @timestamp( timestamp )
+    @expires( 30s )
+end
+
+declare TrafficLightEvent
+    @role( event )
+    @timestamp( timestamp )
+    @expires( 20s )
+end
+
+declare StopSignEvent
+    @role( event )
+    @timestamp( timestamp )
+    @expires( 20s )
+end
+
+declare PedestrianDetectedEvent
+    @role( event )
+    @timestamp( timestamp )
+    @expires( 10s )
+end
+
+declare ObstacleDetectedEvent
+    @role( event )
+    @timestamp( timestamp )
+    @expires( 15s )
+end
+
+declare PotholeDetectedEvent
+    @role( event )
+    @timestamp( timestamp )
+    @expires( 20s )
+end
+
+declare BarrierDetectedEvent
+    @role( event )
+    @timestamp( timestamp )
+    @expires( 20s )
+end
+
+declare CrosswalkDetectedEvent
+    @role( event )
+    @timestamp( timestamp )
+    @expires( 20s )
+end
+
+declare LeftLaneVehicleEvent
+    @role( event )
+    @timestamp( timestamp )
+    @expires( 10s )
+end
+
+declare RightLaneVehicleEvent
+    @role( event )
+    @timestamp( timestamp )
+    @expires( 10s )
+end
+
+declare FarLeftLaneVehicleEvent
+    @role( event )
+    @timestamp( timestamp )
+    @expires( 10s )
+end
+
+declare LaneOccupancyEvent
+    @role( event )
+    @timestamp( timestamp )
+    @expires( 8s )
+end
+
+declare WeatherEvent
+    @role( event )
+    @timestamp( timestamp )
+    @expires( 30s )
+end
+
+declare VisibilityEvent
+    @role( event )
+    @timestamp( timestamp )
+    @expires( 30s )
+end
+
+declare RoadGripEvent
+    @role( event )
+    @timestamp( timestamp )
+    @expires( 30s )
+end
+
+declare ReducedVisibilityEvent
+    @role( event )
+    @timestamp( timestamp )
+    @expires( 30s )
+end
+
+declare ReducedGripEvent
+    @role( event )
+    @timestamp( timestamp )
+    @expires( 30s )
+end
+
+declare AccelerationRequestEvent
+    @role( event )
+    @timestamp( timestamp )
+    @expires( 3s )
+end
+
+declare LaneChangeRequestEvent
+    @role( event )
+    @timestamp( timestamp )
+    @expires( 3s )
+end
+
+declare StoppedAtStopLineEvent
+    @role( event )
+    @timestamp( timestamp )
+    @expires( 30s )
+end

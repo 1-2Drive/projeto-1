@@ -1,0 +1,233 @@
+package rules
+
+import com.one2drive.projeto1.decision.DecisionContext
+import com.one2drive.projeto1.decision.DecisionPriority
+import com.one2drive.projeto1.decision.StoppingPolicy
+import com.one2drive.projeto1.domain.DrivingAction
+import com.one2drive.projeto1.domain.RiskLevel
+import com.one2drive.projeto1.domain.TrafficLightState
+import com.one2drive.projeto1.drools.DroolsSupport
+import com.one2drive.projeto1.drools.facts.CurrentSpeedLimit
+import com.one2drive.projeto1.drools.facts.TrafficLightCommitment
+import com.one2drive.projeto1.drools.facts.TrafficLightStateFact
+import com.one2drive.projeto1.drools.facts.VehicleStateFact
+
+global DroolsSupport droolsSupport
+
+// What to do about a yellow or a red light is decided once, when it is first seen in that
+// state, and kept (TrafficLightStateFact.commitment) until the light turns green, another
+// light takes its place or the light is behind the vehicle.
+//   - yellow (art. 69 of the Regulamento de Sinalizacao do Transito: stop, unless the
+//     vehicle is so close that it can no longer stop safely). A light can be created
+//     already yellow, so the first time it is seen yellow stands for the moment it turned
+//     yellow, and the decision is made right then, however far away the light is: if the
+//     distance still allows a comfortable stop before the line, the vehicle commits to
+//     stop; if it is already too close for that, or already past the stop line, it commits
+//     to drive on and clear the light, and does not brake its way across it. The test is
+//     whether it can stop safely, not whether it would clear the light before the yellow
+//     ends. Committing to stop is not braking at once: the approach stays progressive;
+//   - red: the vehicle commits to stop for as long as the light is still ahead of it,
+//     wherever it is when the light is first seen red, the stop line included: a red light
+//     in front of a moving vehicle is never left without an answer. Only a vehicle that
+//     had committed to drive on at yellow keeps going when that yellow turns red.
+// Because the decision is kept, it cannot swing between stopping and driving on as the
+// speed and the distance change, and a yellow turning red changes nothing for a vehicle
+// that had already decided. A commitment to drive on only keeps this light from braking the
+// vehicle: pedestrians, vehicles ahead and emergencies still stop it.
+rule "Commit to stop or to proceed at traffic light"
+agenda-group "decision"
+salience 700
+no-loop true
+when
+    $light : TrafficLightStateFact(lightId != "none", state != TrafficLightState.GREEN,
+                                   commitment == TrafficLightCommitment.NONE,
+                                   $state : state, $distance : distanceMeters)
+    VehicleStateFact($speed : speedKmh)
+then
+    boolean canStop = $state == TrafficLightState.RED
+        || $distance >= StoppingPolicy.requiredDistanceMeters(
+            $speed, StoppingPolicy.COMFORT_DECELERATION_MPS2, StoppingPolicy.RED_LIGHT_STOP_LINE_OFFSET_METERS);
+    $light.setCommitment(canStop ? TrafficLightCommitment.COMMITTED_TO_STOP : TrafficLightCommitment.COMMITTED_TO_PROCEED);
+    update($light);
+end
+
+// The vehicle must be at rest at the stop line, StoppingPolicy.RED_LIGHT_STOP_LINE_OFFSET_METERS
+// short of the light, not merely have been told to stop there: a STOP takes distance to
+// execute, and what the vehicle knows about the light is one camera reading old. So the
+// approach is decided on the distance the vehicle needs from its current speed,
+//   reaction distance + braking distance + the offset of the stop line,
+// and no longer on a braking curve that ended 5 m from the light and that the vehicle,
+// braking exactly as hard as the curve assumed, followed late and overran.
+//   - within the distance needed at the anticipation deceleration: hold the speed, so the
+//     vehicle stops gaining speed towards the light;
+//   - within the distance needed at the comfortable deceleration: brake;
+//   - if even that no longer stops it by the line (the light turned red, or was first
+//     seen, too close): emergency brake.
+rule "Red traffic light progressive approach"
+agenda-group "decision"
+salience 620
+when
+    $ctx : DecisionContext()
+    TrafficLightStateFact(lightId != "none", state == TrafficLightState.RED, commitment == TrafficLightCommitment.COMMITTED_TO_STOP,
+                         $distance : distanceMeters, distanceMeters <= 125.0)
+    VehicleStateFact($speed : speedKmh)
+    CurrentSpeedLimit($limit : limitKmh)
+    eval($distance > StoppingPolicy.RED_LIGHT_STOP_LINE_OFFSET_METERS + StoppingPolicy.STOP_LINE_TOLERANCE_METERS
+        && $distance <= StoppingPolicy.requiredDistanceMeters(
+            $speed, StoppingPolicy.ANTICIPATION_DECELERATION_MPS2, StoppingPolicy.RED_LIGHT_STOP_LINE_OFFSET_METERS))
+then
+    double room = $distance - StoppingPolicy.RED_LIGHT_STOP_LINE_OFFSET_METERS;
+    double shortfall = StoppingPolicy.brakingDistanceMeters($speed, StoppingPolicy.COMFORT_DECELERATION_MPS2) - room;
+    boolean mustBrake = $distance <= StoppingPolicy.requiredDistanceMeters(
+        $speed, StoppingPolicy.COMFORT_DECELERATION_MPS2, StoppingPolicy.RED_LIGHT_STOP_LINE_OFFSET_METERS);
+    DrivingAction action = shortfall > 2.0 ? DrivingAction.EMERGENCY_BRAKE
+        : (mustBrake ? DrivingAction.REDUCE_SPEED : DrivingAction.MAINTAIN_SPEED);
+    double target = action == DrivingAction.EMERGENCY_BRAKE ? 0.0 : Math.min($speed, $limit);
+    droolsSupport.proposeDecision(
+        $ctx,
+        action,
+        target,
+        action == DrivingAction.EMERGENCY_BRAKE ? RiskLevel.HIGH : RiskLevel.MODERATE,
+        DecisionPriority.LEGAL_MANDATORY_STOP,
+        "Red traffic light ahead; decelerating to stop before the line",
+        drools.getRule().getName(),
+        "red signal at " + Math.round($distance) + "m, current speed=" + Math.round($speed)
+            + " km/h, stop line " + Math.round(StoppingPolicy.RED_LIGHT_STOP_LINE_OFFSET_METERS) + "m before the light"
+    );
+end
+
+// At the stop line, or past it with the light still ahead. A vehicle that arrives here from
+// a normal approach is almost at rest and is simply held.
+//   - Still before the line: as in the approach, a vehicle moving faster than a comfortable
+//     stop can deal with in the room left before the line brakes as hard as it can.
+//   - Already past the line (a light first seen red this close): the line is lost, and what
+//     is left to protect is the light itself. The room is then the distance to the light,
+//     less the stop line tolerance: if a comfortable stop fits in it the vehicle stops
+//     comfortably, short of the light; only if it does not fit is the emergency brake used.
+// This is a fallback for a line already passed; the rule that the vehicle stops before the
+// line is the approach's, and is unchanged.
+rule "Hold at red traffic light"
+agenda-group "decision"
+salience 640
+when
+    $ctx : DecisionContext()
+    TrafficLightStateFact(lightId != "none", state == TrafficLightState.RED, commitment == TrafficLightCommitment.COMMITTED_TO_STOP,
+                         $distance : distanceMeters)
+    VehicleStateFact($speed : speedKmh)
+    eval($distance <= StoppingPolicy.RED_LIGHT_STOP_LINE_OFFSET_METERS + StoppingPolicy.STOP_LINE_TOLERANCE_METERS)
+then
+    double comfortableStop = StoppingPolicy.brakingDistanceMeters($speed, StoppingPolicy.COMFORT_DECELERATION_MPS2);
+    double distanceToStopLine = $distance - StoppingPolicy.RED_LIGHT_STOP_LINE_OFFSET_METERS;
+    boolean critical = distanceToStopLine > 0.0
+        ? comfortableStop - distanceToStopLine > 2.0
+        : comfortableStop > Math.max(0.0, $distance - StoppingPolicy.STOP_LINE_TOLERANCE_METERS);
+    droolsSupport.proposeDecision(
+        $ctx,
+        critical ? DrivingAction.EMERGENCY_BRAKE : DrivingAction.STOP,
+        0.0,
+        RiskLevel.HIGH,
+        DecisionPriority.LEGAL_MANDATORY_STOP,
+        critical ? "Red traffic light ahead and no room left for a comfortable stop; braking hard"
+            : "Stopped before red traffic light; waiting for green",
+        drools.getRule().getName(),
+        "red signal at " + Math.round($distance) + "m, current speed=" + Math.round($speed) + " km/h"
+            + (critical ? "; emergency braking" : "; hold position")
+    );
+end
+
+rule "Red traffic light requires full stop and hold"
+agenda-group "decision"
+salience 635
+when
+    $ctx : DecisionContext()
+    TrafficLightStateFact(lightId != "none", state == TrafficLightState.RED, commitment == TrafficLightCommitment.COMMITTED_TO_STOP,
+                         $distance : distanceMeters >= 0, distanceMeters <= 4.0)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.STOP,
+        0.0,
+        RiskLevel.HIGH,
+        DecisionPriority.LEGAL_MANDATORY_STOP,
+        "Red traffic light; vehicle must remain stopped before the line",
+        drools.getRule().getName(),
+        "red signal at " + Math.round($distance) + "m, full stop and hold until green"
+    );
+end
+
+// A vehicle that committed to stop at a yellow light approaches it like a red one: it
+// holds its speed, then brakes, on the distance it needs, and stays at the stop line. There
+// is no emergency brake here: the commitment was only made with room for a comfortable stop.
+// A vehicle that committed to drive on gets no proposal from the light at all.
+rule "Yellow traffic light: stop before the line"
+agenda-group "decision"
+salience 625
+when
+    $ctx : DecisionContext()
+    TrafficLightStateFact(lightId != "none", state == TrafficLightState.YELLOW, commitment == TrafficLightCommitment.COMMITTED_TO_STOP,
+                         $distance : distanceMeters)
+    VehicleStateFact($speed : speedKmh)
+    CurrentSpeedLimit($limit : limitKmh)
+    eval($distance <= StoppingPolicy.RED_LIGHT_STOP_LINE_OFFSET_METERS + StoppingPolicy.STOP_LINE_TOLERANCE_METERS
+        || $distance <= StoppingPolicy.requiredDistanceMeters(
+            $speed, StoppingPolicy.ANTICIPATION_DECELERATION_MPS2, StoppingPolicy.RED_LIGHT_STOP_LINE_OFFSET_METERS))
+then
+    boolean atLine = $distance <= StoppingPolicy.RED_LIGHT_STOP_LINE_OFFSET_METERS + StoppingPolicy.STOP_LINE_TOLERANCE_METERS;
+    boolean mustBrake = $distance <= StoppingPolicy.requiredDistanceMeters(
+        $speed, StoppingPolicy.COMFORT_DECELERATION_MPS2, StoppingPolicy.RED_LIGHT_STOP_LINE_OFFSET_METERS);
+    DrivingAction action = atLine ? DrivingAction.STOP
+        : (mustBrake ? DrivingAction.REDUCE_SPEED : DrivingAction.MAINTAIN_SPEED);
+    droolsSupport.proposeDecision(
+        $ctx,
+        action,
+        atLine ? 0.0 : Math.min($speed, $limit),
+        atLine ? RiskLevel.HIGH : RiskLevel.MODERATE,
+        DecisionPriority.LEGAL_MANDATORY_STOP,
+        "Yellow traffic light with room to stop; stopping before the line",
+        drools.getRule().getName(),
+        "yellow signal at " + Math.round($distance) + "m, current speed=" + Math.round($speed)
+            + " km/h, stop line " + Math.round(StoppingPolicy.RED_LIGHT_STOP_LINE_OFFSET_METERS) + "m before the light"
+    );
+end
+
+// Comfort proposal: it loses to any speed ceiling, hold or maneuver speed in the cycle,
+// so it needs no guard on what else was proposed.
+rule "Green traffic light allows progression when no higher hazard"
+agenda-group "decision"
+salience 180
+when
+    $ctx : DecisionContext()
+    TrafficLightStateFact(lightId != "none", state == TrafficLightState.GREEN, distanceMeters <= 40.0)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.CONTINUE,
+        50.0,
+        RiskLevel.LOW,
+        DecisionPriority.COMFORT_PROGRESS,
+        "Green light and no higher-priority hazard",
+        drools.getRule().getName(),
+        "green light observed"
+    );
+end
+
+rule "Green traffic light releases red-light hold"
+agenda-group "decision"
+salience 610
+when
+    $ctx : DecisionContext()
+    TrafficLightStateFact(lightId != "none", state == TrafficLightState.GREEN,
+                         distanceMeters >= 0, distanceMeters <= 40.0)
+    VehicleStateFact(speedKmh < 1.0)
+then
+    droolsSupport.proposeDecision(
+        $ctx,
+        DrivingAction.RESUME,
+        30.0,
+        RiskLevel.LOW,
+        DecisionPriority.MANEUVER_SAFETY,
+        "Traffic light is green; releasing the red-light hold",
+        drools.getRule().getName(),
+        "green signal observed; resume smoothly"
+    );
+end

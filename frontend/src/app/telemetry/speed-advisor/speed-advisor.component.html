@@ -1,0 +1,58 @@
+@if (snapshot(); as s) {
+  <section class="gauge" data-testid="speed-advisor" [class.gauge--over]="!withinLimit()">
+    <header class="gauge__head">
+      <h3>Speed Advisor</h3>
+      <span class="gauge__action" data-testid="speed-action">{{ action() }}</span>
+    </header>
+
+    <div class="gauge__dial">
+      <svg viewBox="0 0 180 100" class="dial" aria-hidden="true">
+        <path d="M 20 90 A 70 70 0 0 1 160 90" class="dial__track" />
+
+        <path d="M 20 90 A 70 70 0 0 1 160 90" class="dial__value"
+              [style.stroke-dasharray]="valueDash() + ' ' + arcLength" />
+
+        <path d="M 20 90 A 70 70 0 0 1 160 90" class="dial__legal"
+              [style.stroke-dasharray]="limitDash() + ' ' + arcLength" />
+
+        <!-- Markers sit on the arc's own circle, so they stay on it at any card width. -->
+        <g class="pin pin--legal" [attr.transform]="'translate(' + pinX(limitAngle(), 85) + ' ' + pinY(limitAngle(), 85) + ')'">
+          <rect x="-11" y="-5.5" width="22" height="11" rx="2.5" />
+          <text y="2.6" text-anchor="middle">{{ legalLimitKmh() | number: '1.0-0' }}</text>
+        </g>
+
+        @if (!idle()) {
+          <g class="pin pin--rec" [attr.transform]="'translate(' + pinX(recommendedAngle(), 53) + ' ' + pinY(recommendedAngle(), 53) + ')'">
+            <rect x="-11" y="-5.5" width="22" height="11" rx="2.5" />
+            <text y="2.6" text-anchor="middle" data-testid="speed-recommended">{{ recommendedKmh() | number: '1.0-0' }}</text>
+          </g>
+        }
+      </svg>
+
+      <div class="gauge__readout">
+        <strong data-testid="speed-current">{{ currentKmh() | number: '1.0-0' }}</strong>
+        <span>km/h</span>
+      </div>
+    </div>
+
+    <footer class="gauge__legend">
+      <span class="legend legend--limit">
+        Legal limit
+        <strong data-testid="speed-limit">{{ legalLimitKmh() | number: '1.0-0' }} km/h</strong>
+      </span>
+      <span class="legend legend--rec">
+        Recommended
+        <strong data-testid="speed-recommended-value">{{ recommendedLabel() }}</strong>
+      </span>
+      <span class="legend" [class]="'legend legend--delta legend--' + deltaClass()">
+        Delta
+        <strong data-testid="speed-delta">{{ deltaLabel() }}</strong>
+      </span>
+    </footer>
+  </section>
+} @else {
+  <section class="gauge gauge--empty">
+    <header class="gauge__head"><h3>Speed Advisor</h3></header>
+    <p class="empty">Waiting for the first snapshot.</p>
+  </section>
+}

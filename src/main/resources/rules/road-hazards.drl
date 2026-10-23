@@ -1,0 +1,183 @@
+package rules
+
+import com.one2drive.projeto1.decision.DecisionContext
+import com.one2drive.projeto1.decision.DecisionPriority
+import com.one2drive.projeto1.decision.StoppingPolicy
+import com.one2drive.projeto1.domain.DrivingAction
+import com.one2drive.projeto1.domain.HazardSeverity
+import com.one2drive.projeto1.domain.Lane
+import com.one2drive.projeto1.domain.LaneChangeState
+import com.one2drive.projeto1.domain.RiskLevel
+import com.one2drive.projeto1.domain.RoadMarkingType
+import com.one2drive.projeto1.drools.DroolsSupport
+import com.one2drive.projeto1.drools.facts.LaneOccupancyState
+import com.one2drive.projeto1.drools.facts.ObstacleStateFact
+import com.one2drive.projeto1.drools.facts.PotholeStateFact
+import com.one2drive.projeto1.drools.facts.SafeLaneSide
+import com.one2drive.projeto1.drools.facts.VehicleStateFact
+
+global DroolsSupport droolsSupport
+
+// A pothole in the vehicle's path (its lane, or the lane it is moving into) that is not
+// being gone round is driven over slowly (Art. 24 CE: speed is adapted to the hazards of the
+// lane being driven, not of the others). It is not gone round while no side is a safe way past
+// (occupied, the road edge, or clear with no room to follow the vehicle ahead in it), while it
+// is too close for a lane change to leave the lane before it (StoppingPolicy.roomToLeaveLane),
+// or while it is still beyond the 50 m at which the avoidance is decided (avoidance.drl).
+// The rule binds from the distance a comfortable slow-down to the crossing speed needs (never
+// less than 40 m): beyond 40 m it brings the speed down along the anticipation curve that
+// reaches the crossing speed at the pothole, and holds it when already under that curve;
+// inside 40 m it asks for the crossing speed, 20 km/h in the last 15 m. A severe pothole
+// (HazardSeverity.HIGH) is braked hard for when comfortable braking (with 10% to spare)
+// would no longer bring the vehicle down to the crossing speed by the pothole; a lighter
+// one is only slowed for as comfort allows, as the vehicle can take it. The reason given
+// names the situation: a way round not yet decidable, no free lane, or too close to go round.
+rule "Pothole ahead reduce speed"
+agenda-group "decision"
+salience 460
+when
+    $ctx : DecisionContext()
+    VehicleStateFact($lane : pathLane, $speed : speedKmh)
+    $pothole : PotholeStateFact(potholeId != "none", lane == $lane, $severity : severity, $distance : distanceMeters > 0,
+                     distanceMeters <= Math.max(40.0, StoppingPolicy.slowingDistanceMeters($speed, StoppingPolicy.POTHOLE_CROSSING_SPEED_KMH, StoppingPolicy.COMFORT_DECELERATION_MPS2)))
+    not ( SafeLaneSide() and PotholeStateFact(this == $pothole, distanceMeters <= 50.0, StoppingPolicy.roomToLeaveLane($speed, distanceMeters)) )
+then
+    double crossing = StoppingPolicy.POTHOLE_CROSSING_SPEED_KMH;
+    double target = crossing;
+    DrivingAction action = DrivingAction.REDUCE_SPEED;
+    double speedMps = $speed / 3.6;
+    double crossingMps = crossing / 3.6;
+    boolean hard = $severity == HazardSeverity.HIGH
+        && speedMps > crossingMps
+        && (speedMps * speedMps - crossingMps * crossingMps) / (2.0 * Math.max(0.1, $distance)) > StoppingPolicy.COMFORT_DECELERATION_MPS2 * 1.1;
+    if (hard) {
+        action = DrivingAction.EMERGENCY_BRAKE;
+    } else if ($distance < 15) {
+        target = 20.0;
+    } else if ($distance > 40.0) {
+        target = Math.max(target, StoppingPolicy.curveSpeedKmh(target, StoppingPolicy.ANTICIPATION_DECELERATION_MPS2, $distance));
+        if (target >= $speed) {
+            action = DrivingAction.MAINTAIN_SPEED;
+            target = $speed;
+        }
+    }
+    String situation = $distance > 50.0 ? "a way round is decided at 50 m"
+        : !StoppingPolicy.roomToLeaveLane($speed, $distance) ? "too close to go round"
+        : "no free lane to go round it";
+    String reason = hard
+        ? "Severe pothole ahead; braking hard to reach its crossing speed (Art. 24 CE)"
+        : $distance > 50.0
+            ? "Pothole ahead; coming down to its crossing speed until a way round is decided (Art. 24 CE)"
+            : !StoppingPolicy.roomToLeaveLane($speed, $distance)
+                ? "Pothole too close to go round; crossing it slowly (Art. 24 CE)"
+                : "No free lane to go round the pothole; crossing it slowly (Art. 24 CE)";
+    droolsSupport.proposeDecision(
+        $ctx,
+        action,
+        target,
+        hard ? RiskLevel.HIGH : RiskLevel.MODERATE,
+        DecisionPriority.ROAD_HAZARD,
+        reason,
+        drools.getRule().getName(),
+        "pothole " + $distance + "m ahead, severity " + $severity + ", " + situation
+    );
+end
+
+// An obstacle in the vehicle's path (VehicleStateFact.pathLane: its lane, or the lane it is
+// moving into while a lane change is under way) is stopped for as long as it stays in that
+// path: whether no side is free, or the avoidance was vetoed by a mandatory stop or refused
+// by the actuator, the vehicle must still be able to stop 10 m before it
+// (StoppingPolicy.OBSTACLE_STOP_OFFSET_METERS). A lane change away from it takes the
+// obstacle out of the path and the rule stops holding; one towards a lane with an obstacle
+// brings that obstacle into the path, and the vehicle brakes for it during the manoeuvre.
+// The rule binds from the distance a comfortable stop needs at the current speed (never
+// less than 60 m), so a fast vehicle is held as soon as it could no longer stop early:
+//   - above the comfortable braking curve, the speed is held, so the vehicle stops gaining
+//     speed towards the obstacle;
+//   - on the curve, it brakes to the curve's speed, which brings it to the 50 m where the
+//     avoidance is decided (avoidance.drl) at a speed from which it can still stop. The
+//     curve followed is the anticipation one (2.0 m/s2): the actuator brakes at the
+//     comfortable rate towards it, so the vehicle stays under the comfortable curve with a
+//     margin, instead of riding that curve and tipping over it at every tick;
+//   - when the comfortable braking the room left allows is exceeded by more than 10% (the
+//     obstacle appeared too close), it brakes hard.
+// With a fixed 60 m window, a vehicle at 70 km/h, which needs 77 m, was first seen too
+// close and braked hard before the avoidance could start.
+rule "Stop before obstacle ahead while still in its lane"
+agenda-group "decision"
+salience 465
+when
+    $ctx : DecisionContext()
+    VehicleStateFact($lane : pathLane, $speed : speedKmh)
+    ObstacleStateFact(obstacleId != "none", lane == $lane,
+                      $distance : distanceMeters > 0,
+                      distanceMeters <= Math.max(60.0, StoppingPolicy.requiredDistanceMeters($speed, StoppingPolicy.COMFORT_DECELERATION_MPS2, StoppingPolicy.OBSTACLE_STOP_OFFSET_METERS)))
+then
+    double room = Math.max(0.0, $distance - StoppingPolicy.OBSTACLE_STOP_OFFSET_METERS);
+    double speedMps = $speed / 3.6;
+    DrivingAction action = DrivingAction.BRAKE;
+    double target = Math.sqrt(2.0 * StoppingPolicy.ANTICIPATION_DECELERATION_MPS2 * room) * 3.6;
+    if (room <= 0.5) {
+        action = DrivingAction.STOP;
+        target = 0.0;
+    } else if (speedMps * speedMps / (2.0 * room) > StoppingPolicy.COMFORT_DECELERATION_MPS2 * 1.1) {
+        action = DrivingAction.EMERGENCY_BRAKE;
+        target = 0.0;
+    } else if (target >= $speed) {
+        action = DrivingAction.MAINTAIN_SPEED;
+        target = $speed;
+    }
+    droolsSupport.proposeDecision(
+        $ctx,
+        action,
+        target,
+        action == DrivingAction.MAINTAIN_SPEED ? RiskLevel.MODERATE : RiskLevel.HIGH,
+        DecisionPriority.COLLISION_AVOIDANCE,
+        "Obstacle ahead in own lane; stopping unless a lane change takes the vehicle out of its way",
+        drools.getRule().getName(),
+        "obstacle " + $distance + "m ahead in the vehicle's path"
+    );
+end
+
+// The obstacle fills the ego lane and no side can be entered (the blind-spot occupancy
+// already counts a continuous line, like the road edge, as a closed side), and a
+// continuous line is what closes at least one of them: the explanation names the law,
+// not just the traffic. The line a change crosses follows WorldState.getMarkingBetween:
+// leftMarking lies between LEFT and CENTER, rightMarking between CENTER and RIGHT.
+rule "Stop before obstacle when lane change prohibited by continuous line"
+agenda-group "decision"
+salience 466
+when
+    $ctx : DecisionContext()
+    VehicleStateFact($lane : lane, $speed : speedKmh, $left : leftMarking, $right : rightMarking)
+    ObstacleStateFact(obstacleId != "none", lane == $lane,
+                      $distance : distanceMeters > 0,
+                      distanceMeters <= Math.max(60.0, StoppingPolicy.requiredDistanceMeters($speed, StoppingPolicy.COMFORT_DECELERATION_MPS2, StoppingPolicy.OBSTACLE_STOP_OFFSET_METERS)))
+    LaneOccupancyState(lane == Lane.LEFT, $leftSafe : safeToEnter)
+    LaneOccupancyState(lane == Lane.RIGHT, $rightSafe : safeToEnter)
+    eval(!$leftSafe && !$rightSafe
+        && (($lane == Lane.CENTER && ($left == RoadMarkingType.CONTINUOUS || $right == RoadMarkingType.CONTINUOUS))
+            || ($lane == Lane.RIGHT && $right == RoadMarkingType.CONTINUOUS)
+            || ($lane == Lane.LEFT && $left == RoadMarkingType.CONTINUOUS)))
+then
+    double room = Math.max(0.0, $distance - StoppingPolicy.OBSTACLE_STOP_OFFSET_METERS);
+    DrivingAction action = DrivingAction.BRAKE;
+    double target = Math.sqrt(2.0 * StoppingPolicy.ANTICIPATION_DECELERATION_MPS2 * room) * 3.6;
+    if (room <= 0.5) {
+        action = DrivingAction.STOP;
+        target = 0.0;
+    } else if (target >= $speed) {
+        action = DrivingAction.MAINTAIN_SPEED;
+        target = $speed;
+    }
+    droolsSupport.proposeDecision(
+        $ctx,
+        action,
+        target,
+        RiskLevel.HIGH,
+        DecisionPriority.COLLISION_AVOIDANCE,
+        "Continuous line prohibits lane change; stopping before obstacle",
+        drools.getRule().getName(),
+        "continuous line closes the free side, obstacle " + $distance + "m ahead"
+    );
+end

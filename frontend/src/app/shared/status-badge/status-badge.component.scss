@@ -1,0 +1,55 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: var(--ds-radius-sm);
+  border: 1px solid var(--ds-border);
+  padding: 0.25rem 0.5rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+  font-family: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  background: rgba(17, 27, 37, 0.7);
+
+  .dot {
+    width: 0.52rem;
+    height: 0.52rem;
+    border-radius: 50%;
+    background: #8f9aa6;
+  }
+
+  .label {
+    color: var(--ds-text-muted);
+    font-weight: 600;
+  }
+
+  .value {
+    color: var(--ds-text-primary);
+    font-weight: 700;
+  }
+
+  &.connected {
+    border-color: #4f8f61;
+
+    .dot {
+      background: #4ad07d;
+      box-shadow: 0 0 0.35rem rgba(74, 208, 125, 0.8);
+    }
+
+    .value {
+      color: #a4e5bd;
+    }
+  }
+
+  &.disconnected {
+    border-color: #a5535b;
+
+    .dot {
+      background: #d65858;
+      box-shadow: 0 0 0.35rem rgba(214, 88, 88, 0.8);
+    }
+
+    .value {
+      color: #f0b8b8;
+    }
+  }
+}

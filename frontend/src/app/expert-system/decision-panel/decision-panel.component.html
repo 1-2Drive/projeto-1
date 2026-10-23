@@ -1,0 +1,132 @@
+@if (idle() || !decision()) {
+  <section class="decision decision--idle" data-testid="decision-panel">
+    <header class="decision__head">
+      <span class="decision__source">{{ source() }}</span>
+      <span class="risk risk--low" data-testid="decision-risk">IDLE</span>
+    </header>
+
+    <div class="decision__main">
+      <span class="decision__eyebrow">Current action</span>
+      <strong class="decision__action decision__action--idle" data-testid="decision-action">AWAITING_DECISION</strong>
+    </div>
+
+    <p class="hint">Press <strong>START</strong> to let the rule base reach its first decision.</p>
+  </section>
+} @else {
+  @if (decision(); as d) {
+    <section class="decision" [class]="'decision decision--' + tone()" data-testid="decision-panel">
+      <header class="decision__head">
+        <span class="decision__source">{{ source() }}</span>
+        <span class="risk" [class]="'risk ' + riskClass()" data-testid="decision-risk">{{ d.riskLevel }}</span>
+      </header>
+
+      <div class="decision__main">
+        <span class="decision__eyebrow">Current action</span>
+        <strong class="decision__action" data-testid="decision-action">{{ d.action }}</strong>
+      </div>
+
+      @if (previousDecision() && previousDecision() !== d.action) {
+        <div class="transition" data-testid="decision-transition">
+          <span>Previous</span>
+          <strong>{{ previousDecision() }}</strong>
+          <span class="transition__arrow" aria-hidden="true">→</span>
+          <span>Current</span>
+          <strong class="transition__current">{{ d.action }}</strong>
+        </div>
+      }
+
+      <div class="channels" data-testid="decision-channels">
+        @if (speedChannel(); as speed) {
+          <div class="channel" data-testid="decision-speed-channel">
+            <span class="channel__label">Speed</span>
+            <strong class="channel__action" data-testid="decision-speed-action">{{ speed.action }}</strong>
+            <span class="channel__value">{{ speed.recommendedSpeedKmh | number: '1.0-0' }} km/h</span>
+            <span class="channel__rule" data-testid="decision-speed-rule" title="Rule that set the speed">— {{ speed.sourceRule }}</span>
+          </div>
+        }
+        @if (laneChannel(); as lane) {
+          <div class="channel" data-testid="decision-lane-channel">
+            <span class="channel__label">Lane</span>
+            <strong class="channel__action" data-testid="decision-lane-action">{{ lane.action }}</strong>
+            <span class="channel__rule" data-testid="decision-lane-rule" title="Rule that set the lane maneuver">— {{ lane.sourceRule }}</span>
+          </div>
+        }
+      </div>
+
+      <div class="decision__grid">
+        <div class="cell">
+          <span>Recommended</span>
+          <strong data-testid="decision-recommended">{{ d.recommendedSpeedKmh | number: '1.0-0' }} <em>km/h</em></strong>
+        </div>
+        <div class="cell">
+          <span>Gap to current</span>
+          <strong [class.negative]="speedGapKmh() > 0">
+            {{ speedGapKmh() > 0 ? '+' : '' }}{{ speedGapKmh() | number: '1.0-1' }} <em>km/h</em>
+          </strong>
+        </div>
+      </div>
+
+      <p class="decision__reason">{{ d.reason }}</p>
+
+      <div class="proposals" data-testid="decision-proposals">
+        <button type="button" class="proposals__toggle" [class.active]="proposalsOpen()"
+                [attr.aria-expanded]="proposalsOpen()" (click)="toggleProposals()"
+                data-testid="decision-proposals-toggle">
+          <span class="proposals__chevron" aria-hidden="true">{{ proposalsOpen() ? '▾' : '▸' }}</span>
+          Proposals
+          <em>{{ proposals().length }}</em>
+        </button>
+
+        @if (proposalsOpen()) {
+          <ul class="proposals__list" data-testid="decision-proposals-list">
+            @for (proposal of proposals(); track proposal.rule + proposal.channel) {
+              <li class="proposal" [class]="'proposal ' + proposal.outcomeClass"
+                  data-testid="decision-proposal-row">
+                <span class="proposal__outcome" data-testid="decision-proposal-outcome">{{ proposal.outcomeLabel }}</span>
+                <span class="proposal__channel">{{ proposal.channel === 'LATERAL' ? 'LANE' : 'SPEED' }}</span>
+                <span class="proposal__rule" [title]="proposal.reason">{{ proposal.rule }}</span>
+                <span class="proposal__action">
+                  {{ proposal.action }}
+                  @if (proposal.recommendedSpeedKmh !== null) {
+                    <em>{{ proposal.recommendedSpeedKmh | number: '1.0-0' }} km/h</em>
+                  }
+                </span>
+                <span class="proposal__priority" title="Decision priority">p{{ proposal.priority }}</span>
+                @if (proposal.detailLabel) {
+                  <span class="proposal__detail" data-testid="decision-proposal-detail">{{ proposal.detailLabel }}</span>
+                }
+              </li>
+            } @empty {
+              <li class="proposals__empty">No rule proposed anything in the last cycle.</li>
+            }
+          </ul>
+        }
+      </div>
+
+      @if (laneChecks().length) {
+        <div class="lane-checks" data-testid="decision-lane-checks">
+          <span class="lane-checks__title">Lane change: safe?</span>
+          @for (check of laneChecks(); track check.side) {
+            <div class="lane-check" [class.lane-check--blocked]="!check.allowed" data-testid="decision-lane-check">
+              <span class="lane-check__side">{{ check.side }}</span>
+              <span class="lane-check__verdict" data-testid="decision-lane-check-verdict">{{ check.allowed ? '✓' : '✗' }}</span>
+              <span class="lane-check__why" data-testid="decision-lane-check-why">{{ check.explanation }}</span>
+              <span class="lane-check__goals">
+                @for (goal of check.subGoals; track goal.goal) {
+                  <span class="lane-check__goal" [class.lane-check__goal--fails]="!goal.holds" [title]="goal.detail">
+                    {{ goal.holds ? '✓' : '✗' }} {{ goal.goal }}
+                  </span>
+                }
+              </span>
+            </div>
+          }
+        </div>
+      }
+
+      <footer class="decision__foot">
+        <span class="decision__rule" title="Rule that reached the decision">{{ d.sourceRule }}</span>
+        <span class="decision__age">active {{ decisionAge() }}</span>
+      </footer>
+    </section>
+  }
+}

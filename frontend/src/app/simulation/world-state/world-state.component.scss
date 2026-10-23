@@ -1,0 +1,38 @@
+.panel {
+  background: #0f1823;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  padding: 0.7rem;
+  color: var(--ds-text-primary);
+
+  h3 {
+    margin: 0 0 0.65rem;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    color: var(--ds-text-secondary);
+    letter-spacing: 0.06em;
+  }
+
+  h4 {
+    margin: 0.6rem 0 0.3rem;
+    font-size: 0.74rem;
+    color: #aac1d5;
+  }
+
+  p {
+    margin: 0.2rem 0;
+    font-size: 0.75rem;
+  }
+
+  ul {
+    margin: 0;
+    padding-left: 1rem;
+    max-height: 12rem;
+    overflow: auto;
+
+    li {
+      font-size: 0.73rem;
+      margin: 0.15rem 0;
+    }
+  }
+}

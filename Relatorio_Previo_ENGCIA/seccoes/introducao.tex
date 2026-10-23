@@ -1,15 +1,174 @@
 \chapter{Introdução}
 \label{cap:introducao}
 
-\section{Contexto}
+\section{Contexto e motivação}
+\label{sec:contexto}
 
-\preencher{Secção por redigir}
+O presente trabalho, ainda em fase de desenvolvimento, tem como principal
+objetivo explorar a utilização do conhecimento especializado, através da
+troca de ideias com um perito e regras do domínio, no contexto da tomada de
+decisão aplicada à condução autónoma. Uma vez que o foco do trabalho são os
+sistemas periciais, há que ter em conta não só a base de conhecimento que
+descreve factos, relações e regras do domínio, mas também o motor de
+inferência que avalia esse conhecimento, determina as regras a utilizar e
+permite desenvolver novas conclusões. Neste
+sentido, o objetivo do sistema pericial vai para além de dar uma resposta ao
+utilizador: é compreender e justificar as decisões tomadas.
 
-\section{Motivação}
+O trabalho desenvolvido ao longo destas quatro semanas parte do princípio
+referido anteriormente e foca-se em processar, em tempo real, os dados
+provenientes de determinados sensores simulados. Procurou-se diferenciar o
+trabalho desenvolvido através do uso de um domínio dinâmico, ou seja, em vez
+de consultar o utilizador através de uma sequência estática de perguntas, o
+sistema recebe continuamente informação proveniente dos sensores, transforma
+essas observações em factos e mantém na memória de trabalho (\emph{working memory}) o conhecimento
+relevante para o estado atual do veículo e do ambiente envolvente. De
+momento, encontra-se em implementação um motor de regras Drools, integrado
+numa aplicação, a partir da qual é possível fazer a simulação de cenários e
+processar os dados contínuos dos sensores. A utilização de sessões
+\emph{stateful}, juntamente com o processamento temporal de eventos, permite
+manter a informação relevante entre diferentes ciclos de decisão e, desta
+forma, ter em conta a evolução do ambiente ao longo do tempo. A partir da
+informação disponível, o motor de inferência avalia as regras cujas condições
+se encontram satisfeitas e apresenta propostas de decisão que podem,
+posteriormente, ser comparadas de acordo com os critérios de prioridade
+definidos para o sistema.
 
-\preencher{Secção por redigir}
+Uma das principais dificuldades do projeto resulta da possibilidade de várias
+regras serem válidas em simultâneo e conduzirem a propostas de ação
+diferentes. Neste sentido, foram considerados mecanismos de prioridade e de
+resolução de conflitos, que permitem definir uma ordem entre as diferentes
+propostas, em que as situações de maior risco têm maior importância na
+tomada de decisão. A explicabilidade das decisões é, igualmente, uma
+componente central do sistema: para além de o sistema apresentar uma ação,
+deve ser possível compreender por que razão essa ação foi escolhida, como foi
+concluída e qual o motivo pelo qual as outras alternativas não foram
+selecionadas.
+
+No final do Desafio~I, espera-se que, com a abordagem descrita, seja possível
+explorar alguns dos principais princípios associados aos sistemas periciais,
+nos quais o conhecimento e o processo de inferência devem estar acessíveis
+para análise e validação. No decorrer do desenvolvimento do trabalho, foram
+consideradas abordagens focadas nas medidas temporais de segurança como, por
+exemplo, o tempo até à colisão (\emph{time to collision}, TTC), bem como abordagens complementares,
+entre as quais a Teoria dos Jogos, analisada como possibilidade de evolução
+futura para determinadas situações de interação entre veículos. Importa ainda
+referir que o objetivo do presente projeto não consiste em desenvolver ou
+reproduzir um sistema completo de condução autónoma, mas sim em estudar o
+processo de decisão e a forma como este pode ser estruturado, acompanhado,
+analisado e justificado.
+
+\section{Problemática e questões orientadoras}
+\label{sec:problematica}
+
+O problema abordado neste projeto diz respeito à forma como a informação
+recolhida, continuamente, pelos sensores de um veículo autónomo pode ser
+utilizada por um sistema pericial para apoiar a tomada de decisão durante a
+condução. Ao longo do percurso, o veículo recebe diferentes tipos de
+informação sobre o ambiente/cenário como, por exemplo, reconhecer a
+velocidade atual, identificar um veículo à frente, detetar um peão ou
+reconhecer determinadas condições meteorológicas. Contudo, esta informação
+não é necessariamente recebida em simultâneo, uma vez que os diferentes
+sensores têm alcances e frequências de atualização distintos.
+
+Os dados recolhidos pelos sensores são transformados em eventos e factos que
+representam aquilo que o sistema conhece sobre a situação atual. Alguns
+desses factos podem manter-se durante várias leituras como, por exemplo, o
+limite de velocidade, enquanto outros podem sofrer alterações entre
+diferentes leituras, como a distância a um obstáculo ou o tempo estimado até
+uma possível colisão. Com base nesta informação, o motor de inferência
+verifica quais são as regras da base de conhecimento cujas condições são
+satisfeitas em cada situação. Tendo em conta que mais do que uma regra pode
+ser válida no mesmo ciclo de inferência, o sistema deve, neste sentido,
+comparar as diferentes propostas e selecionar a ação que deverá prevalecer,
+tendo em conta as prioridades definidas para a tomada de decisão.
+
+Após a tomada de decisão, o sistema poderá determinar diferentes ações como,
+por exemplo, manter a velocidade, desacelerar, travar ou realizar uma mudança
+de via. Como essas ações podem alterar o estado do veículo e,
+consequentemente, a situação observada, os sensores continuam a recolher nova
+informação sobre o ambiente. Estes novos dados são novamente encaminhados
+para o processo de inferência, para dar início a um novo ciclo de decisão. É
+esta interação contínua que permite ao sistema acompanhar a evolução da
+situação ao longo do tempo. Neste sentido, o funcionamento pretendido pode
+ser representado, de uma forma simplificada, através do seguinte processo,
+como representado na \cref{fig:ciclo-decisao}.
+
+\begin{figure}[H]
+  \centering
+  \begin{tikzpicture}[
+      node distance=7mm and 6mm,
+      etapa/.style={draw=corEscura, fill=corFundo, thick, rounded corners=2pt,
+        text width=2.9cm, minimum height=1.3cm, align=center, font=\small},
+      seta/.style={-latex, thick, draw=corEscura}]
+    \node[etapa] (sensores) {Leitura dos\\sensores};
+    \node[etapa, right=of sensores] (factos) {Eventos e factos na memória de trabalho};
+    \node[etapa, right=of factos] (motor) {Motor de\\inferência:\\avaliação das regras};
+    \node[etapa, right=of motor] (propostas) {Propostas de\\decisão};
+    \node[etapa, below=of propostas] (selecao) {Seleção da decisão segundo as prioridades};
+    \node[etapa, left=of selecao] (acao) {Ação sobre o\\veículo};
+    \node[etapa, left=of acao] (estado) {Novo estado do veículo e do ambiente};
+    \draw[seta] (sensores) -- (factos);
+    \draw[seta] (factos) -- (motor);
+    \draw[seta] (motor) -- (propostas);
+    \draw[seta] (propostas) -- (selecao);
+    \draw[seta] (selecao) -- (acao);
+    \draw[seta] (acao) -- (estado);
+    \draw[seta] (estado.west) -| node[pos=0.3, below, font=\footnotesize,
+      text=corCinza] {nova leitura} (sensores.south);
+  \end{tikzpicture}
+  \caption{Processo de inferência e tomada de decisão do sistema pericial}
+  \label{fig:ciclo-decisao}
+\end{figure}
+
+A partir do problema apresentado, foi definida a seguinte questão para
+orientar o desenvolvimento do projeto:
+
+\begin{quote}
+  \itshape De que forma pode um motor de inferência utilizar, continuamente,
+  dados provenientes de diferentes sensores para propor decisões na tomada de
+  decisão, na condução, tendo em conta a evolução temporal da informação?
+\end{quote}
+
+Tendo em conta esta questão central, foram definidas algumas questões
+orientadoras mais específicas, nomeadamente:
+\begin{itemize}
+  \item De que forma podemos utilizar os dados provenientes de diferentes
+    sensores para manter uma representação atualizada da situação do veículo
+    e do ambiente?
+  \item Até que ponto a análise de várias leituras ao longo do tempo pode
+    ajudar a distinguir uma situação pontual de uma situação de perigo
+    persistente?
+  \item Como pode o sistema selecionar uma decisão quando várias regras são
+    aplicáveis em simultâneo e apresentam propostas de ação diferentes?
+  \item Como pode o sistema explicar o processo que o levou a uma determinada
+    conclusão ou ação, através da identificação de factos e respetivas regras
+    (\emph{How})?
+  \item Como pode o sistema explicar por que razão uma determinada decisão foi
+    tomada e por que motivo não foram escolhidas outras alternativas
+    (\emph{Why} e \emph{Why Not})?
+  \item De que forma o conhecimento adquirido através da pesquisa e contacto
+    com o perito pode ser transformado em factos e regras e, posteriormente,
+    validado e melhorado?
+\end{itemize}
 
 \section{Estrutura do relatório}
+\label{sec:estrutura}
 
-\preencher{Secção por redigir}
+Este relatório descreve o trabalho realizado até ao momento e distingue duas
+camadas que convém não confundir: o modelo de conhecimento, construído a
+partir da pesquisa e das sessões com o perito, que define o comportamento
+pretendido para o sistema, e o protótipo atual, desenvolvido em Drools, que
+implementa já uma parte desse modelo. Ao longo do texto, o que já existe no
+protótipo é descrito no presente, enquanto o que está apenas previsto é
+assinalado como tal, e o estado de cada mecanismo é resumido no
+\cref{cap:implementacao}.
 
+O relatório começa por apresentar os objetivos do projeto e o processo de
+aquisição de conhecimento, incluindo as fontes utilizadas e as sessões com o
+perito. Descreve depois os sensores considerados e a forma como as suas
+leituras dão origem a factos, a representação desse conhecimento e o modo
+como o sistema raciocina ao longo do tempo, resolve conflitos entre propostas
+de decisão e explica as escolhas que faz. Seguem-se a arquitetura e a
+implementação do protótipo, os cenários e critérios utilizados para o
+validar e, por fim, as limitações, o trabalho futuro e as conclusões.

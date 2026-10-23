@@ -24,7 +24,15 @@
 \usepackage{caption}
 \usepackage{float}
 \usepackage{listings}
+% Bibliografia no índice, com a página e a ligação corretas (no início da
+% bibliografia), sem acrescentar o próprio índice nem as listas.
+\usepackage[nottoc,notlof,notlot]{tocbibind}
 \usepackage{csquotes}
+% Aspas: \enquote{texto} produz “texto” (aspas duplas tipográficas).
+\setquotestyle{english}
+% O babel-portuguese torna " um atalho que «come» o carácter seguinte;
+% desativa-se, para que aspas escritas diretamente não estraguem o texto.
+\AtBeginDocument{\shorthandoff{"}}
 \usepackage{icomma}        % vírgula decimal em modo matemático: $1,5$
 \usepackage[most]{tcolorbox}
 \usetikzlibrary{positioning}  % diagramas TikZ (o tcolorbox já carrega o tikz)
@@ -88,6 +96,14 @@
   {\normalfont\large\bfseries\color{corEscura}}{\thesection}{0.8em}{}
 \titleformat{\subsection}
   {\normalfont\normalsize\bfseries\color{corEscura}}{\thesubsection}{0.8em}{}
+
+% Uma secção não começa no fundo da página: se restar pouco espaço,
+% passa para a página seguinte (no máximo ~1/5 da página fica em branco).
+\usepackage{needspace}
+\usepackage{placeins}  % \FloatBarrier: impede uma figura de passar para a secção seguinte
+\usepackage{etoolbox}
+\pretocmd{\section}{\Needspace{10\baselineskip}}{}{}
+\pretocmd{\subsection}{\Needspace{6\baselineskip}}{}{}
 
 % --- Legendas --------------------------------------------------
 \captionsetup{font=small,labelfont={bf,color=corEscura},skip=6pt}
@@ -165,6 +181,25 @@
 
 \newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
 \newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+
+% --- Grelha das tabelas -----------------------------------------
+% V: linha vertical fina e cinzenta entre colunas, p. ex.
+%    \begin{tabularx}{\textwidth}{@{}L{3cm}VX@{}}
+% \linhasep: linha horizontal clara entre linhas de dados, a usar
+%    depois de \\ (exceto na última linha, antes do \bottomrule).
+\newcolumntype{V}{!{\color{corCinza}\vrule width 0.4pt}}
+\newcommand{\linhasep}{%
+  \arrayrulecolor{corCinza!45}\specialrule{0.3pt}{0pt}{0pt}%
+  \arrayrulecolor{black}}
+% Sem o espaço que o booktabs deixa junto às regras, para que as linhas
+% verticais fiquem contínuas; o \extrarowheight compensa esse espaço.
+% Aplica-se só às tabelas de conteúdo (a capa usa tabular).
+\newcommand{\grelhatabelas}{%
+  \setlength{\aboverulesep}{0pt}%
+  \setlength{\belowrulesep}{0pt}%
+  \setlength{\extrarowheight}{2pt}}
+\AtBeginEnvironment{tabularx}{\grelhatabelas}
+\AtBeginEnvironment{longtable}{\grelhatabelas}
 
 % Margem extra que o TeX pode usar como ultimo recurso antes de deixar
 % uma linha a transbordar. Evita \emph{overfull boxes} pontuais em

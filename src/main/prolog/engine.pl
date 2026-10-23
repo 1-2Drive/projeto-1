@@ -63,7 +63,10 @@ set_dependency_index(Flag) :-
     assertz(use_dependency_index(Flag)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Memória de trabalho
+% Memória de trabalho.
+%
+% Nota: WM retém tanto percepção (sensor readings, etc) como
+% conclusões intermédias para aumentar a performance.
 
 reset_working_memory :-
     retractall(wm_fact(_, _)),
@@ -71,6 +74,7 @@ reset_working_memory :-
     retractall(activation(_, _, _, _, _)),
     retractall(fired(_, _)),
     retractall(wm_next_id(_)),
+    % Reinicia contador
     assertz(wm_next_id(1)).
 
 % A consulta usada pelas condições das regras e pelos predicados auxiliares.
@@ -83,9 +87,13 @@ add_fact(Fact) :-
     store_fact(Fact, perceived, _).
 
 % store_fact(+Fact, +Support, -New): New é true quando o facto ainda não era conhecido.
+
+% store_fact(...) para percepção
 store_fact(Fact, _, false) :-
     wm_fact(_, Known),
     Known == Fact, !.
+
+% store_fact(...) para factos derivados (para explicações)
 store_fact(Fact, Support, true) :-
     retract(wm_next_id(Id)),
     Next is Id + 1,
@@ -394,3 +402,4 @@ conjuncts(Goal, [Goal]).
 
 subgoal_result(Goal, Goal-Holds) :-
     (   once(prove_goal(Goal, _)) -> Holds = true ; Holds = false ).
+

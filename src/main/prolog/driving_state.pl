@@ -17,26 +17,26 @@
            overtaking_state/5, last_decision/2, last_priority/1, move_off/2, cruise/1,
            param/2, priority_value/2, lane_settled/1, physical_lane/1, pedestrian_braking/2.
 
-% Janela da regra de TTC persistente (window:time(2s) no Drools).
+% Janela da regra de TTC persistente (2s).
 ttc_window_ms(2000).
-% Um TTC baixo conta quando há uma leitura de chuva a menos disto (coincides[400ms] no Drools).
+% Um TTC baixo conta quando há uma leitura de chuva a menos disto.
 rain_coincidence_ms(400).
-% Leituras em falta após as quais um objeto deixa de ser considerado (Drools: 1000/400).
+% Leituras em falta após as quais um objeto deixa de ser considerado.
 pedestrian_validity_ms(1000).
 light_validity_ms(400).
 stop_validity_ms(1500).
 % Sem leitura do radar há mais de 250 ms, o veículo da frente deixa de estar à frente.
 front_validity_ms(250).
-% Janela das distâncias ao veículo da frente (window:time(2s) no Drools).
+% Janela das distâncias ao veículo da frente.
 front_distance_window_ms(2000).
 left_vehicle_validity_ms(250).
 % Obstáculos, buracos e barreiras: esquecidos 1 s após a última leitura.
 hazard_validity_ms(1000).
-% Janela da travagem de emergência para um obstáculo (window:time(300ms) no Drools).
+% Janela da travagem de emergência para um obstáculo.
 obstacle_window_ms(300).
 % Um sinal de limite de velocidade pendente que a câmara deixa de reportar ainda à frente é descartado.
 pending_limit_validity_ms(1000).
-% Um pedido do condutor dura 1,5 s.
+% Um pedido do condutor dura 1,5s.
 request_validity_ms(1500).
 
 state_predicates([ego_state/3, lane_change/1, markings/2, target_lane_state/1, safe_lanes/2,
@@ -640,3 +640,4 @@ load_boxed_in :-
     ->  add_fact(boxed_in(Lane, Since))
     ;   true
     ).
+

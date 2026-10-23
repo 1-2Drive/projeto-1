@@ -2290,3 +2290,4 @@ fuzzy_stronger(Conclusions, Term, Best0-Degree0, Best-Degree) :-
 current_boxed_in(Since) :-
     \+ known(boxed_in_cleared),
     known(boxed_in(_, Since)).
+

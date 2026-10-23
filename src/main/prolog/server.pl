@@ -146,3 +146,4 @@ fact_json(Id, Fact, _{n: Id, fact: Text, rule: Rule}) :-
 
 text(Term, Text) :-
     format(atom(Text), '~w', [Term]).
+

@@ -25,8 +25,7 @@ metaconhecimento e fica para o \cref{cap:metaconhecimento}.
 \section{Representação e organização}
 \label{sec:base-representacao}
 
-No Drools, cada domínio tem o seu ficheiro DRL, os factos são objetos Java e os
-eventos entram pelos \emph{entry points}. No Prolog, regras e factos são termos,
+No Prolog, regras e factos são termos,
 como \cod{rule/4} ou \cod{traffic_light(Id, red|yellow|green, DistanceM)}, e as
 conclusões de decisão são factos \cod{proposal/5}. A \cref{lst:regra-limite-pl}
 e a \cref{lst:regra-limite-drl} mostram a mesma regra nas duas linguagens.
@@ -41,35 +40,11 @@ rule('Reduce speed when exceeding detected limit',
                        'Vehicle exceeds current legal speed limit')) ]).
 \end{lstlisting}
 
-Para comparação, segue-se a regra equivalente em Drools. Note-se a diferença de
-expressividade das regras.
-
-\begin{lstlisting}[language=Drools,caption={A mesma regra em Drools (\texttt{speed.drl})},label=lst:regra-limite-drl]
-rule "Reduce speed when exceeding detected limit"
-agenda-group "decision"
-salience 300
-when
-    $ctx : DecisionContext()
-    VehicleStateFact( $speed : speedKmh )
-    CurrentSpeedLimit( $limit : limitKmh )
-    eval($speed > $limit + 0.1)
-then
-    droolsSupport.proposeDecision($ctx, DrivingAction.REDUCE_SPEED, $limit,
-        RiskLevel.MODERATE, DecisionPriority.SPEED_COMPLIANCE,
-        "Vehicle exceeds current legal speed limit",
-        drools.getRule().getName(), "speed=" + $speed + " km/h, limit=" +
-        $limit + " km/h");
-end
-\end{lstlisting}
-
 Ou seja, se a velocidade passar o limite em vigor em mais de 0,1\,km/h,
 propõe-se reduzir para o limite, com risco moderado e prioridade de cumprimento
 de velocidade (20).
 
-No Prolog, 75 regras têm o nome de uma regra Drools, 43 resultam de dividir 16
-regras Drools por resultado e 2 calculam uma conclusão intermédia que só existe
-em Prolog. A perceção não tem regras Prolog, porque é tratada em
-\cod{driving_state.pl}.
+A perceção não tem regras Prolog, porque é tratada em \cod{driving_state.pl}.
 
 \section{Alguns exemplos}
 \label{sec:base-exemplos}
@@ -88,8 +63,7 @@ Para a meteorologia recorre-se a lógica difusa. O ficheiro
 inferência (E como mínimo, OU como máximo), composição e desfuzificação pelo
 centroide. Uma regra típica diz que, com visibilidade ou aderência fracas, se
 deve andar muito devagar, e o resultado é um teto \cod{REDUCE_SPEED} de
-prioridade 40. Como estas conclusões entram com \cod{insertLogical}, o Drools
-retira-as sozinho quando a meteorologia muda.
+prioridade 40.
 
 Já a \emph{query} \cod{safeToChangeLane} exprime um objetivo. Mudar de faixa é
 seguro se não houver outra manobra nem linha contínua, se o ângulo morto estiver
@@ -99,8 +73,7 @@ livre e se houver espaço para seguir o carro dessa faixa, com 12\,m de folga
 \section{Acesso e manutenção}
 \label{sec:base-manutencao}
 
-O Drools avalia os padrões contra a memória de trabalho e os \emph{entry
-points}. No Prolog, os padrões são unificados com \cod{wm_fact/2} e os
+Os padrões são unificados com \cod{wm_fact/2} e os
 auxiliares leem factos com \cod{known/1}. Em execução, as crenças mantêm-se
 atualizadas porque as regras de perceção esquecem o que deixou de ser
 observado, os eventos expiram e as conclusões difusas são retiradas pela

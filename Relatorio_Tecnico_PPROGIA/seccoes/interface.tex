@@ -17,8 +17,8 @@ por um WebSocket (\cod{/api/ws/simulation}). O servidor publica um
 API REST devolve. Se a ligação cair ou deixar de receber dados, o cliente volta
 a ligar-se.
 
-A interface mostra a estrada em perspetiva, com o veículo, os outros atores, a
-sinalização e a meteorologia. Mostra também a decisão atual e as propostas
+A interface (\cref{fig:interface-web}) mostra a estrada em perspetiva, com o
+veículo, os outros atores, a sinalização e a meteorologia. Mostra também a decisão atual e as propostas
 concorrentes, cada uma com o seu resultado na arbitragem. Os restantes painéis
 apresentam a regra de origem, a razão e a evidência, a linha temporal das regras
 e dos factos, a memória de trabalho e as leituras dos sensores.
@@ -31,3 +31,10 @@ Quando a simulação para, abre-se um diálogo para fazer perguntas \emph{Why},
 \emph{Why not} e \emph{How} sobre as decisões registadas.
 
 Ver também o \cref{cap:demonstracao}.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\textwidth]{figuras/screenshot-web-ui.png}
+  \caption{Interface Web com o motor Prolog ativo, durante uma ultrapassagem com chuva.}
+  \label{fig:interface-web}
+\end{figure}

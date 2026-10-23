@@ -28,7 +28,10 @@
 \tableofcontents
 \clearpage
 \listoffigures
-\listoftables
+% A lista de tabelas é um \chapter*, que mudaria de página: sem o \clearpage,
+% fica na mesma página que a lista de figuras.
+\vspace{1.5cm}
+{\let\clearpage\relax\listoftables}
 \clearpage
 
 \pagenumbering{arabic}

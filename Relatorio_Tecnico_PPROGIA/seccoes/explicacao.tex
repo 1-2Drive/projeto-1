@@ -149,12 +149,3 @@ do utilizador:
 {"ok":true, "rule":"Pothole ahead reduce speed",
  "failedConditions":["not(test(pothole_avoidable_now(50,40)))"]}
 \end{lstlisting}
-
-\section{Linha temporal e memória de trabalho}
-\label{sec:expl-linha-temporal}
-
-O \cod{PrologBackend} regista eventos dos sensores como \cod{FACT INSERTED} e
-conclusões como \cod{RULE FIRED}. O \cod{factViews} converte a memória Prolog em
-linhas com functor, conteúdo, origem, instante, \emph{backend} e representação
-\cod{wm_fact}. A interface apresenta estas estruturas sem recalcular condições.
-A explicação permanece responsabilidade do \emph{backend}.

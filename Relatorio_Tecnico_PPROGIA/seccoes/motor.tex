@@ -1,25 +1,12 @@
 \chapter{Implementação do Motor de Inferência}
 \label{cap:motor}
 
-O motor de inferência foi desenvolvido em SWI-Prolog com o objetivo de analisar
-o estado do veículo e produzir propostas de decisão relacionadas com a condução
-autónoma. Através da aplicação de um conjunto de regras, o sistema interpreta a
-informação recolhida pelos sensores e identifica as ações mais adequadas às
-condições atuais da simulação.
-
-\section{Papel do motor e ciclo de decisão}
-\label{sec:papel-motor}
-
-O funcionamento do motor está organizado em diferentes componentes,
-responsáveis pela gestão dos factos, execução das regras e manutenção do estado
-de condução. Esta separação permite estruturar o processo de inferência e
-facilitar a manutenção e evolução do sistema.
-
-Em cada ciclo de simulação, a informação relativa ao veículo, ao ambiente e aos
-eventos detetados pelos sensores é disponibilizada ao motor. Estes dados são
-utilizados para avaliar as condições das regras e gerar propostas de decisão.
-Posteriormente, as propostas são encaminhadas para o mecanismo de arbitragem,
-que determina quais devem ser aplicadas ao veículo (\cref{fig:arquitetura-motores}).
+O motor de inferência é um motor de regras de produção desenvolvido em
+SWI-Prolog. Em cada ciclo de 100\,ms recebe o estado do veículo e os eventos dos
+sensores, dispara as regras e devolve propostas de decisão, que a arbitragem em
+Java transforma numa única decisão (\cref{fig:arquitetura-motores}). As secções
+seguintes descrevem as regras, a memória de trabalho e o ciclo do motor, e
+comparam-no com o motor da unidade curricular.
 
 \begin{figure}[H]
   \centering
@@ -28,20 +15,6 @@ que determina quais devem ser aplicadas ao veículo (\cref{fig:arquitetura-motor
     cada sessão, e ambos devolvem propostas, nunca ações.}
   \label{fig:arquitetura-motores}
 \end{figure}
-
-\section{Motor de inferência próprio para SWI-Prolog}
-\label{sec:motor-proprio}
-
-O motor utiliza regras de produção constituídas por condições e ações. As
-condições são avaliadas com base nos factos disponíveis na memória de trabalho
-e, quando são satisfeitas, as ações correspondentes são executadas.
-
-A memória de trabalho armazena os factos observados e inferidos, permitindo que
-as conclusões de determinadas regras contribuam para a ativação de outras. A
-execução segue uma ordem de precedência, permitindo estabelecer prioridades
-entre regras concorrentes. Adicionalmente, o motor utiliza um mecanismo de
-dependências para reavaliar as regras afetadas pelas alterações nos factos,
-evitando avaliações desnecessárias.
 
 \section{O motor de regras}
 \label{sec:motor-regras}
@@ -93,7 +66,7 @@ subobjetivos (\cod{maneuver_idle}, \cod{no_continuous_line}, \cod{side_clear},
     \cod{store_conclusions/0} grava-o no fim do ciclo.
 \end{itemize}
 
-\section{Motor de inferência próprio e comparação com o motor da unidade curricular}
+\section{Comparação com o motor da unidade curricular}
 \label{sec:comparacao-motor-uc}
 
 O sistema não usa o motor da unidade curricular (\cod{sp_exp1.pl},

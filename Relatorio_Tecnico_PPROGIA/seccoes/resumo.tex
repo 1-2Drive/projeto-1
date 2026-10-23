@@ -1,0 +1,48 @@
+\chapter*{Resumo}
+\markboth{Resumo}{Resumo}
+
+O sistema pericial de condução decide, a cada 100\,ms, a velocidade e a faixa
+de um veículo simulado. A simulação (física, sensores e mundo) está em Java. A
+política de condução vive num motor de regras, e existem dois motores
+intermutáveis: Drools e SWI-Prolog. Ambos implementam a interface
+\cod{ExpertSystemBackend}, pelo que o \cod{SimulationEngine} não sabe qual está
+ativo. O motor escolhe-se no arranque (\cod{expert.backend}) ou durante a
+execução (\cod{POST /api/simulation/backend/prolog}).
+
+A base de conhecimento Prolog replica todas as regras de decisão do Drools com
+os mesmos nomes e com a saliência do Drools como precedência. Tem 120 regras:
+75 com o nome exato de uma regra Drools, 43 variantes por resultado de 16 regras
+Drools (por exemplo \cod{'Hold at red traffic light (emergency)'}) e 2 regras
+intermédias só do Prolog. Este documento descreve o motor Prolog, a sua ligação
+ao resto do sistema, o metaconhecimento dinâmico e as explicações.
+
+Este relatório descreve um sistema pericial de apoio à condução que recebe
+observações de sensores, mantém estado temporal e produz decisões explicáveis
+sobre velocidade e mudança de faixa. A componente central analisada é o
+\emph{backend} SWI-Prolog. O projeto não utiliza apenas o mecanismo de resolução
+nativo para responder a consultas: implementa um motor próprio de regras de
+produção com memória de trabalho, agenda, precedência, refração, encadeamento
+para a frente e reavaliação seletiva através de um índice de dependências.
+
+A base de conhecimento contém 120 regras declarativas que cobrem travagem de
+emergência, peões, semáforos, sinais STOP, limites de velocidade, seguimento de
+veículos, ultrapassagem, obstáculos, buracos, barreiras e condições
+meteorológicas com lógica difusa. O motor combina estas regras com 38 tipos de
+estado dinâmico. Cada ciclo da simulação envia ao processo Prolog o estado do
+veículo e os eventos sensoriais em JSON. O Prolog devolve propostas, factos
+derivados, verificações de segurança lateral e métricas do motor; a camada Java
+arbitra as propostas em dois canais independentes, longitudinal e lateral.
+
+A explicabilidade resulta do registo da proveniência de cada facto e de cada
+proposta. O sistema responde a perguntas do tipo como foi obtida a decisão, por
+que motivo venceu uma regra e por que motivo uma alternativa não foi aplicada. A
+validação inclui testes unitários, testes de sequências temporais e testes de
+equivalência entre Prolog e Drools. Na execução verificada para este relatório,
+o \emph{build} Maven executou 598 testes sem falhas (2 ignorados).
+
+\vspace{0.8cm}
+\noindent\textbf{Palavras-chave:} sistemas periciais; Prolog; motor de
+inferência; regras de produção; metaconhecimento; explicabilidade; apoio à
+condução.
+
+\clearpage

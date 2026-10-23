@@ -1,0 +1,109 @@
+\chapter{Base de Conhecimento}
+\label{cap:base-conhecimento}
+
+A base de conhecimento é sobretudo um conjunto de regras de produção sobre
+condução: 123 regras em DRL (\cod{src/main/resources/rules}) e 120 em Prolog
+(\cod{driving_rules.pl}), que replicam as primeiras.
+
+\section{O que a base contém}
+\label{sec:base-conteudo}
+
+O objetivo é que o comportamento do veículo fique descrito nas regras, e não
+espalhado pelo código de controlo. A base cobre emergências, peões, veículo da
+frente e ultrapassagens, limites de velocidade, STOP, semáforos, perigos na via,
+mudanças de faixa, barreiras e meteorologia. Algumas regras seguem diretamente o
+Código da Estrada, como o Art.~13 (circular pela direita), em \cod{road-law.drl}.
+
+Há sete tipos de conhecimento. Os eventos de perceção (24 classes, como
+\cod{TTCEvent}) e os factos de estado, que são as crenças do sistema (27
+classes, como \cod{CurrentSpeedLimit}), alimentam 33 regras de perceção, 87 de
+decisão e 2 de recurso (\emph{fallback}). Há ainda 6 \emph{queries} que
+servem de objetivos, conhecimento difuso (\cod{FuzzySupport} e 8 regras) e
+constantes numéricas (\cod{StoppingPolicy}). A regra de controlo é
+metaconhecimento e fica para o \cref{cap:metaconhecimento}.
+
+\section{Representação e organização}
+\label{sec:base-representacao}
+
+No Drools, cada domínio tem o seu ficheiro DRL, os factos são objetos Java e os
+eventos entram pelos \emph{entry points}. No Prolog, regras e factos são termos,
+como \cod{rule/4} ou \cod{traffic_light(Id, red|yellow|green, DistanceM)}, e as
+conclusões de decisão são factos \cod{proposal/5}. A \cref{lst:regra-limite-pl}
+e a \cref{lst:regra-limite-drl} mostram a mesma regra nas duas linguagens.
+
+\begin{lstlisting}[caption={Regra de excesso de velocidade em Prolog (\texttt{driving\_rules.pl})},label=lst:regra-limite-pl]
+rule('Reduce speed when exceeding detected limit',
+     300,
+     [ ego_speed(V),
+       speed_limit(Limit),
+       test(V > Limit + 0.1) ],
+     [ assert(proposal(reduce_speed, Limit, moderate, speed_compliance,
+                       'Vehicle exceeds current legal speed limit')) ]).
+\end{lstlisting}
+
+Para comparação, segue-se a regra equivalente em Drools. Note-se a diferença de
+expressividade das regras.
+
+\begin{lstlisting}[language=Drools,caption={A mesma regra em Drools (\texttt{speed.drl})},label=lst:regra-limite-drl]
+rule "Reduce speed when exceeding detected limit"
+agenda-group "decision"
+salience 300
+when
+    $ctx : DecisionContext()
+    VehicleStateFact( $speed : speedKmh )
+    CurrentSpeedLimit( $limit : limitKmh )
+    eval($speed > $limit + 0.1)
+then
+    droolsSupport.proposeDecision($ctx, DrivingAction.REDUCE_SPEED, $limit,
+        RiskLevel.MODERATE, DecisionPriority.SPEED_COMPLIANCE,
+        "Vehicle exceeds current legal speed limit",
+        drools.getRule().getName(), "speed=" + $speed + " km/h, limit=" +
+        $limit + " km/h");
+end
+\end{lstlisting}
+
+Ou seja, se a velocidade passar o limite em vigor em mais de 0,1\,km/h,
+propõe-se reduzir para o limite, com risco moderado e prioridade de cumprimento
+de velocidade (20).
+
+No Prolog, 75 regras têm o nome de uma regra Drools, 43 resultam de dividir 16
+regras Drools por resultado e 2 calculam uma conclusão intermédia que só existe
+em Prolog. A perceção não tem regras Prolog, porque é tratada em
+\cod{driving_state.pl}.
+
+\section{Alguns exemplos}
+\label{sec:base-exemplos}
+
+O sinal de limite de velocidade é um bom exemplo de encadeamento. A câmara
+deteta-o até 120\,m à frente e emite um \cod{SpeedLimitDetectedEvent}, que a
+regra \cod{"Track the speed limit sign ahead as pending"} guarda como
+\cod{PendingSpeedLimit}. Só quando o veículo chega ao sinal é que
+\cod{"Activate the pending speed limit at its sign"} o passa para
+\cod{CurrentSpeedLimit}, e a regra acima pode propor \cod{REDUCE_SPEED}. Os dois
+limites estão separados porque, aplicado logo que o sinal era visto, o limite
+fazia o veículo abrandar demasiado cedo.
+
+Para a meteorologia recorre-se a lógica difusa. O ficheiro
+\cod{fuzzy-weather.drl} implementa um controlador de Mamdani, com fuzificação,
+inferência (E como mínimo, OU como máximo), composição e desfuzificação pelo
+centroide. Uma regra típica diz que, com visibilidade ou aderência fracas, se
+deve andar muito devagar, e o resultado é um teto \cod{REDUCE_SPEED} de
+prioridade 40. Como estas conclusões entram com \cod{insertLogical}, o Drools
+retira-as sozinho quando a meteorologia muda.
+
+Já a \emph{query} \cod{safeToChangeLane} exprime um objetivo. Mudar de faixa é
+seguro se não houver outra manobra nem linha contínua, se o ângulo morto estiver
+livre e se houver espaço para seguir o carro dessa faixa, com 12\,m de folga
+(\cod{StoppingPolicy.roomToFollow}).
+
+\section{Acesso e manutenção}
+\label{sec:base-manutencao}
+
+O Drools avalia os padrões contra a memória de trabalho e os \emph{entry
+points}. No Prolog, os padrões são unificados com \cod{wm_fact/2} e os
+auxiliares leem factos com \cod{known/1}. Em execução, as crenças mantêm-se
+atualizadas porque as regras de perceção esquecem o que deixou de ser
+observado, os eventos expiram e as conclusões difusas são retiradas pela
+manutenção de verdade. As regras em si não mudam durante a execução. A
+manutenção faz-se editando os ficheiros, e o \cod{PrologDroolsEquivalenceTest}
+confirma que as duas bases continuam coerentes.

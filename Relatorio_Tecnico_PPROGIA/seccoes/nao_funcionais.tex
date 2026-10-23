@@ -1,0 +1,81 @@
+\chapter{Características não funcionais do sistema}
+\label{cap:nao-funcionais}
+
+\section{Desempenho}
+\label{sec:performance}
+
+O sistema decide a cada 100\,ms, pelo que o motor de inferência tem de responder
+com folga dentro desse intervalo, em qualquer situação. Para medir o custo do
+motor Prolog e o ganho do metaconhecimento dinâmico usou-se o teste
+\cod{DependencyIndexBenchmarkTest}. O teste corre os 14 cenários da biblioteca,
+150 ciclos cada (2\,100 ciclos no total), em dois processos Prolog lado a lado:
+um com o índice de dependências (\cref{sec:meta-indice}) e outro sem ele. Sem o índice, todas as regras são
+reavaliadas após cada disparo, como num ciclo reconhecer-atuar ingénuo. Em cada
+ciclo, o teste verifica que as duas execuções tomam exatamente a mesma decisão e
+disparam as mesmas regras. A decisão inclui a ação, a velocidade, as regras e o
+resultado de cada proposta na arbitragem. O teste regista o número de avaliações
+de regras e o tempo de inferência que o próprio motor mede (\cod{cycle_stats/3}).
+A \cref{tab:desempenho} resume os resultados.
+
+\begin{table}[H]
+  \centering
+  \caption{Efeito do índice de dependências (14 cenários, 2\,100 ciclos)}
+  \label{tab:desempenho}
+  \small
+  \begin{tabularx}{\textwidth}{@{}XVC{2.6cm}VC{2.6cm}VC{2.2cm}@{}}
+    \toprule
+    & \textbf{Com índice} & \textbf{Sem índice} & \textbf{Redução} \\
+    \midrule
+    Avaliações de regras (2\,100 ciclos) & 258\,894 & 1\,479\,720 & 82,5\,\% \\ \linhasep
+    Avaliações por ciclo & 123 & 705 & 82,6\,\% \\ \linhasep
+    Tempo médio por ciclo & 1,47\,ms & 6,41\,ms & 77,0\,\% \\ \linhasep
+    Pior cenário (S10, chuva) & 2,64\,ms & 9,62\,ms & 72,6\,\% \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+As decisões foram idênticas em todos os ciclos, e o índice só alterou o custo.
+Os números explicam-se pela estrutura do motor. Em cada ciclo, todas as 120
+regras são avaliadas uma vez, e houve em média cerca de 4,9 disparos por ciclo
+(10\,231 no total). Sem o índice, cada disparo obriga a reavaliar as 120 regras,
+o que dá perto de 705 avaliações por ciclo. Com o índice, só são reavaliadas as
+poucas regras que leem os tipos de facto acabados de concluir: cerca de 3 por
+ciclo, além da avaliação inicial. O custo restante é quase todo a avaliação
+inicial das regras, pelo que um ganho adicional exigiria manter as
+correspondências de um ciclo para o seguinte, como faz a rede Rete do Drools.
+Com a margem atual, isso não é necessário.
+
+Com o índice, a inferência ocupa em média cerca de 1,5\,\% do intervalo de
+decisão, e menos de 3\,\% no pior cenário. O cenário S10 é o mais exigente por
+causa das regras de lógica difusa do tempo meteorológico, que estão ativas
+durante a chuva. Mesmo sem o índice, o motor caberia no intervalo, mas cada
+ciclo seria cerca de quatro vezes mais lento. Entre execuções repetidas, a média
+variou apenas na segunda casa decimal (entre 1,46\,ms e 1,47\,ms).
+
+Estas medições cobrem apenas a inferência dentro do Prolog. Não incluem a
+serialização JSON, a comunicação entre o Java e o processo \cod{swipl}, nem o
+arranque do processo. O arranque demora cerca de 150 a 250\,ms, mas só acontece
+ao iniciar uma sessão ou ao trocar de motor de inferência. Os valores são
+indicativos: foram obtidos numa única máquina de desenvolvimento (Intel Core
+Ultra 7 258V, SWI-Prolog 9.2.9), com o teste a correr no Maven. Não foi feita
+uma comparação de desempenho com o \emph{backend} Drools, devido à sua reduzida
+relevância para o presente relatório. Também não foi feita uma medição de
+utilização de memória RAM, já que esta não é significativa.
+
+\section{Tolerância a falhas}
+\label{sec:tolerancia}
+
+O \cod{PrologProcess} verifica, antes de cada pedido, se o processo SWI-Prolog
+está vivo. Lança uma \cod{PrologEngineException} em quatro casos:
+
+\begin{itemize}
+  \item uma resposta com \cod{ok} a \cod{false};
+  \item um processo que terminou;
+  \item uma saída fechada;
+  \item uma resposta que não chega em 2\,s.
+\end{itemize}
+
+Depois de um \emph{timeout}, o processo é destruído, para que uma resposta
+atrasada não seja tomada pela do pedido seguinte. Perante uma falha, a simulação
+é pausada e a mensagem aparece na interface. O sistema nunca aplica uma decisão
+por omissão que nenhum motor tenha inferido.

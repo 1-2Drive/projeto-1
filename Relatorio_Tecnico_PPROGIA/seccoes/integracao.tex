@@ -1,0 +1,90 @@
+\chapter{Integração do motor Prolog com o sistema Java}
+\label{cap:integracao}
+
+\cod{ExpertSystemBackend} define o ciclo comum aos motores: avançar o relógio,
+iniciar o ciclo, inserir eventos, atualizar o veículo, decidir e expor a memória
+e a explicação. \cod{PrologBackend} implementa esse contrato e permite trocar o
+motor sem modificar o \cod{SimulationEngine}.
+
+\paragraph{Comunicação.} O motor corre num processo \cod{swipl} persistente,
+gerido pela classe \cod{PrologProcess}. O Java copia os ficheiros Prolog para
+uma pasta de trabalho e arranca o processo com
+\cod{swipl -q -g main -t halt server.pl}. O arranque acontece quando o motor é
+iniciado, num RESET ou numa troca de motor. Os dois lados trocam mensagens JSON
+pela entrada e saída padrão: um pedido por linha, e exatamente uma resposta por
+linha, mesmo quando o pedido falha. Lançar o interpretador custa cerca de 150 a
+250\,ms, o que é incompatível com uma decisão a cada 100\,ms. Além disso, o lado
+Prolog tem de guardar estado entre ciclos. Por isso o processo é mantido vivo
+durante toda a sessão. O pedido \cod{reset} inicia a sessão com a velocidade de
+cruzeiro do cenário e com as constantes de paragem e as prioridades definidas no
+Java, para que não haja valores duplicados nos dois lados. A
+\cref{tab:pedidos-json} resume as mensagens JSON.
+
+\begin{table}[H]
+  \centering
+  \caption{Pedidos JSON aceites pelo \texttt{server.pl}}
+  \label{tab:pedidos-json}
+  \small
+  \begin{tabularx}{\textwidth}{@{}L{2.9cm}VL{5.0cm}VX@{}}
+    \toprule
+    \textbf{Comando} & \textbf{Entrada principal} & \textbf{Resposta} \\
+    \midrule
+    \cod{tick} & Veículo, eventos e decisão anterior
+      & Propostas, factos, limite, verificações e métricas \\ \linhasep
+    \cod{reset} & Cruzeiro, parâmetros e prioridades
+      & Confirmação e reinicialização do estado \\ \linhasep
+    \cod{whynot} & Identificador da regra
+      & Condições que impediram a correspondência \\ \linhasep
+    \cod{dependencyIndex} & Booleano
+      & Estado do índice para \emph{benchmark} \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+O \cod{server.pl} lê uma linha, converte o JSON num \emph{dict} Prolog e
+responde sempre com outra linha. O \emph{stdout} contém apenas respostas.
+Eventuais mensagens de aviso ou erro seguem para o \emph{stderr}. O \emph{flush}
+explícito evita que o Java fique à espera de dados retidos no \emph{buffer}.
+
+\paragraph{Pedidos e respostas.} Durante o ciclo, o \cod{PrologBackend} acumula
+os eventos dos sensores e os comandos do condutor. Preenche também um
+\cod{VehicleInput} com o que o Drools lê do facto do veículo: velocidade,
+posição, faixa, estado da manobra e faixa de destino, marcações da estrada,
+segurança das faixas adjacentes (calculada pela perceção em Java) e se há um
+perigo à frente na faixa da direita. Tudo segue num único pedido \cod{tick}, com
+a decisão anterior (ações, regra e prioridade). A resposta traz:
+
+\begin{itemize}
+  \item as propostas, cada uma com a ação, a velocidade, o risco, a prioridade,
+    a razão, a regra e a evidência;
+  \item os factos do ciclo;
+  \item o limite de velocidade em vigor;
+  \item os subobjetivos da segurança de mudança de faixa nos dois lados;
+  \item as métricas do motor.
+\end{itemize}
+
+\paragraph{Arbitragem e aplicação.} O Java não decide nada por si: entrega as
+propostas ao \cod{DecisionContext}, a mesma arbitragem usada com o Drools. A
+arbitragem trata em separado a velocidade e a faixa.
+
+\begin{itemize}
+  \item Na velocidade, as emergências e as paragens obrigatórias (prioridade 60
+    ou mais) sobrepõem-se a tudo. Entre elas vence a mais prioritária e, em
+    empate, a mais lenta. Abaixo disso, cada teto de velocidade que se verifica
+    limita a velocidade de base, e decide o mais baixo, se ficar abaixo dessa
+    base.
+  \item Na faixa, vence a maior prioridade. Em empate, regressar à direita vence
+    mudar de faixa.
+  \item Uma mudança de faixa só é vetada quando uma paragem de prioridade
+    superior está de facto a travar o veículo.
+  \item Sem propostas, o veículo mantém a velocidade e a faixa.
+\end{itemize}
+
+Cada proposta fica com o seu resultado: venceu, perdeu, foi vetada ou foi
+limitada. O \cod{DecisionActuator} aplica a decisão ao veículo. Pode recusar uma
+mudança de faixa que não consiga executar, e essa recusa fica registada. O ciclo
+é então guardado para o módulo de explicação.
+
+\paragraph{Tratamento de erros.} As falhas na comunicação com o processo Prolog,
+e a forma como a simulação reage a elas, estão descritas na
+\cref{sec:tolerancia}.

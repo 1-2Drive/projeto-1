@@ -1,0 +1,58 @@
+% ===============================================================
+%  Relatório Técnico — Sistema Pericial de Apoio à Condução
+%  PPROGIA
+%
+%  Compilação:  ./build.sh
+%          ou:  latexmk -pdf relatorio.tex
+%          ou:  pdflatex relatorio && bibtex relatorio && pdflatex relatorio x2
+% ===============================================================
+
+\documentclass[11pt,a4paper,oneside]{report}
+
+\input{metadados}
+\input{preambulo}
+
+\title{\tituloprincipal}
+\author{\autoresmeta}
+\date{\datarelatorio}
+
+\begin{document}
+
+\input{capa}
+
+\pagenumbering{roman}
+\setcounter{page}{1}
+
+\input{seccoes/resumo}
+
+\tableofcontents
+\clearpage
+\listoffigures
+\listoftables
+\clearpage
+
+\pagenumbering{arabic}
+\setcounter{page}{1}
+
+\input{seccoes/perito}
+\input{seccoes/motor}
+\input{seccoes/integracao}
+\input{seccoes/base_conhecimento}
+\input{seccoes/metaconhecimento}
+\input{seccoes/explicacao}
+\input{seccoes/interface}
+\input{seccoes/nao_funcionais}
+\input{seccoes/demonstracao}
+\input{seccoes/dificuldades}
+\input{seccoes/conclusao}
+
+% As entradas de referencias.bib não são citadas no texto, mas fazem parte
+% da lista de referências do relatório.
+\nocite{*}
+\bibliographystyle{plain}
+\bibliography{referencias}
+
+\appendix
+\input{seccoes/anexos}
+
+\end{document}

@@ -1,0 +1,160 @@
+\chapter{Implementação do Módulo de Explicação}
+\label{cap:explicacao}
+
+As explicações assentam num princípio: a justificação de cada conclusão é
+registada no momento da inferência, e não reconstruída depois. É a ideia do
+motor da unidade curricular (\cod{justifica/3} e \cod{como/1} em
+\cod{sp_exp2.pl}), aplicada a dois níveis. No motor Prolog, cada facto guarda
+como foi obtido. Na aplicação, cada ciclo de decisão guarda as propostas das
+regras e o resultado da arbitragem. A interface nunca deduz condições nem volta
+a avaliar regras: mostra apenas o que o motor registou. Por isso as explicações
+funcionam da mesma forma com o Prolog e com o Drools.
+
+\section{O que fica registado}
+\label{sec:expl-registo}
+
+Em cada ciclo, o motor Prolog regista:
+
+\begin{itemize}
+  \item para cada facto derivado, \texttt{wm\_support(Id, Regra, Evidência)}: a
+    regra que o concluiu, os factos em que assentou e os padrões negados que se
+    verificaram;
+  \item para cada proposta, a ação, a velocidade, o risco, a prioridade, a
+    razão, a regra e a evidência. A evidência é a lista desses factos, e cada
+    facto derivado indica a regra que o concluiu, por exemplo
+    \cod{pedestrian_conflict(p1) (by rule '...')};
+  \item os quatro subobjetivos de \cod{safe_to_change_lane/1}
+    (\cod{maneuver_idle}, \cod{no_continuous_line}, \cod{side_clear},
+    \cod{room_to_follow}), provados um a um nos dois lados por
+    \cod{subgoal_results/2}, mesmo quando nenhuma regra propõe mudar de faixa;
+  \item uma entrada na linha temporal por cada leitura dos sensores
+    (\cod{FACT INSERTED}) e por cada regra que concluiu algo
+    (\cod{RULE FIRED}).
+\end{itemize}
+
+A camada Java junta a cada proposta o seu resultado na arbitragem: venceu,
+perdeu para outra, foi vetada por uma paragem obrigatória, foi limitada por um
+teto de velocidade, ou foi recusada pelo atuador. Junta também um detalhe que
+identifica a regra vencedora ou o motivo da recusa.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.82\textwidth]{figuras/explicacao-duas-vias.png}
+  \caption{Percurso da informação no módulo de explicação: duas vias.}
+  \label{fig:explicacao-duas-vias}
+\end{figure}
+
+As duas vias da \cref{fig:explicacao-duas-vias} partem do mesmo registo. Na via
+de tempo real, o estado de cada ciclo chega à interface pelo WebSocket. O painel
+de decisão mostra cada proposta com o seu resultado na arbitragem, e outros
+painéis mostram a razão, a regra, a evidência, a linha temporal e a memória de
+trabalho. Na via histórica, guarda-se um registo completo do ciclo
+(\cod{SessionSnapshot}) sempre que a decisão muda. Ao parar a simulação, a
+viagem fica gravada e abre-se um diálogo em que o utilizador escolhe uma das
+decisões registadas. A aplicação responde, para a velocidade e para a faixa, com
+as três explicações descritas a seguir.
+
+\paragraph{Exemplo.} Nas secções seguintes usa-se a mesma situação, executada no
+motor Prolog. O veículo segue a 50\,km/h na faixa da direita, há um buraco na
+mesma faixa 40\,m à frente, e a faixa da esquerda está livre. A regra
+\cod{'Avoid pothole in right lane by changing left'} (prioridade 40) propõe
+\cod{CHANGE_LANE_LEFT}, e a regra de base mantém a velocidade.
+
+\section{How}
+\label{sec:expl-how}
+
+No motor, \cod{explain/2} percorre as justificações \cod{wm_support/3}
+recursivamente e devolve a árvore de derivação como um termo. Cada facto
+derivado é um nó \cod{derived(Facto, Regra, Porque)}, cada facto percebido é uma
+folha \cod{perceived(Facto)}, e cada padrão negado é \texttt{absent(Padrão)}. A
+\cref{lst:arvore-how} mostra a árvore da proposta do exemplo.
+
+\begin{lstlisting}[caption={Árvore de derivação devolvida por \texttt{explain/2} para a proposta do exemplo},label=lst:arvore-how]
+derived(proposal(change_lane_left, no_target, low, road_hazard,
+                 'Avoiding pothole by moving into the clear left lane'),
+        'Avoid pothole in right lane by changing left',
+        [ perceived(ego_lane(right)),       perceived(pothole(p1,40,high,right)),
+          perceived(ego_speed(50)),         perceived(lane_change_state(idle)),
+          perceived(right_marking(dashed)), perceived(lane_occupancy(left,false,inf)) ])
+\end{lstlisting}
+
+A árvore tem seis factos, embora as condições da regra só nomeiem três
+(\cod{ego_lane}, \cod{pothole} e \cod{ego_speed}). Os outros três vêm da prova de
+\cod{safe_to_change_lane(left)}, feita por encadeamento inverso
+(\cod{prove/1}): a prova regista os factos que lê com \cod{known/1}, e estes
+passam a fazer parte da evidência. Quando a decisão depende de conclusões
+intermédias, a árvore desce por elas. Numa travagem de emergência por um peão,
+por exemplo, a proposta assenta em \cod{pedestrian_conflict(p1)}, que é ele
+próprio um nó \cod{derived(...)} com a regra que o concluiu e os factos
+percebidos em que esta assentou.
+
+Na aplicação, o \emph{How} mostra o caminho que o ciclo escolhido percorreu no
+fluxograma de decisão, um para a velocidade e outro para a faixa. Cada pergunta
+do fluxograma está associada às regras que lhe respondem. Segue o ramo
+\enquote{sim} quando uma dessas regras fez uma proposta nesse ciclo, e o ramo
+\enquote{não} caso contrário. O caminho termina onde a arbitragem fixou a
+decisão. Na velocidade, isso acontece numa paragem de emergência ou obrigatória
+que venceu. Os tetos de velocidade aplicam-se todos, por isso o caminho passa
+por eles até ao mais baixo. Na faixa, o caminho termina na proposta que venceu.
+As perguntas seguintes aparecem fora do caminho, com o que as suas regras tenham
+proposto.
+
+\section{Why}
+\label{sec:expl-why}
+
+O \emph{Why} responde porque é que o veículo fez o que fez. Para cada canal, a
+aplicação junta a regra que decidiu, a sua razão, a evidência e o resultado da
+arbitragem, bem como as outras propostas que também foram consideradas. No canal
+da faixa, uma mudança de faixa inclui ainda os subobjetivos de segurança desse
+lado. No exemplo, o veículo muda para a esquerda porque
+\cod{'Avoid pothole in right lane by changing left'} se verificou, com a razão
+\enquote{Avoiding pothole by moving into the clear left lane}. A evidência são
+os seis factos acima, e os quatro subobjetivos de
+\cod{safe_to_change_lane(left)} verificaram-se. A velocidade mantém-se porque
+nenhuma regra encontrou motivo para acelerar ou abrandar.
+
+\section{Why not}
+\label{sec:expl-whynot}
+
+O \emph{Why not} tem três mecanismos, do mais próximo do motor ao mais próximo
+do utilizador:
+
+\begin{itemize}
+  \item \textbf{Uma regra que não disparou.} \cod{why_not/2} procura, entre
+    todas as correspondências parciais das condições da regra, da esquerda para
+    a direita, a que avançou mais. Devolve a condição onde parou, com as
+    ligações dessa correspondência, seguida das condições posteriores que também
+    falham. No exemplo, a pergunta \enquote{porque não abrandou para o buraco?}
+    aponta a condição negada que falhou: o buraco ainda pode ser contornado
+    (\cref{lst:whynot}).
+  \item \textbf{Uma mudança de faixa recusada.} Os subobjetivos de
+    \cod{safe_to_change_lane/1} registados em cada ciclo dizem qual deles
+    falhou. Em vez de uma mensagem genérica como \enquote{mudança impossível}, a
+    explicação indica a causa: outra manobra em curso, linha contínua, ângulo
+    morto ocupado, ou falta de distância para seguir o veículo da outra faixa.
+  \item \textbf{Uma alternativa não escolhida.} Para cada alternativa que o
+    ciclo não seguiu, a aplicação explica porquê: acelerar, manter ou abrandar
+    na velocidade, e manter a faixa, mudar para a esquerda ou para a direita, ou
+    regressar à direita na faixa. Cada alternativa é classificada a partir do
+    registo do ciclo. Ou foi proposta mas perdeu na arbitragem (e a resposta diz
+    para que regra, e por que princípio), ou nunca foi proposta porque as suas
+    condições não se verificaram, ou não se aplica naquele estado, ou o ciclo
+    não registou o suficiente. No último caso, a resposta di-lo em vez de
+    adivinhar. No exemplo, \enquote{porque não mudou para a direita?} não se
+    aplica, porque o veículo já está na faixa mais à direita.
+\end{itemize}
+
+\begin{lstlisting}[language=JSON,caption={Pedido \texttt{whynot} e resposta do \texttt{server.pl} no exemplo},label=lst:whynot]
+{"cmd":"whynot", "rule":"Pothole ahead reduce speed"}
+{"ok":true, "rule":"Pothole ahead reduce speed",
+ "failedConditions":["not(test(pothole_avoidable_now(50,40)))"]}
+\end{lstlisting}
+
+\section{Linha temporal e memória de trabalho}
+\label{sec:expl-linha-temporal}
+
+O \cod{PrologBackend} regista eventos dos sensores como \cod{FACT INSERTED} e
+conclusões como \cod{RULE FIRED}. O \cod{factViews} converte a memória Prolog em
+linhas com functor, conteúdo, origem, instante, \emph{backend} e representação
+\cod{wm_fact}. A interface apresenta estas estruturas sem recalcular condições.
+A explicação permanece responsabilidade do \emph{backend}.

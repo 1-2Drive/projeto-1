@@ -1,0 +1,21 @@
+\chapter{Conclusão}
+\label{cap:conclusao}
+
+O projeto cumpre o objetivo de integrar Prolog num sistema pericial interativo e
+explicável. A contribuição técnica principal é o motor de regras de produção
+implementado em \cod{engine.pl}. A agenda determinística, a refração, a
+proveniência e o índice de dependências tornam explícitos mecanismos que, noutros
+motores, permanecem internos.
+
+A base de conhecimento apresenta dimensão e variedade suficientes para
+demonstrar raciocínio reativo, temporal, negativo, difuso e orientado por
+objetivos. A integração com Java preserva todas as propostas e separa os canais
+de controlo, enquanto a interface permite observar factos, regras e decisões. Os
+testes de equivalência com Drools e a execução integral de 598 testes sem falhas
+fornecem evidência de correção no contexto do simulador.
+
+A solução deve ser entendida como um protótipo académico de apoio à decisão.
+Dentro desse âmbito, oferece uma resposta completa aos critérios de avaliação:
+base de conhecimento estruturada, novo motor de inferência, explicações
+\emph{How}, \emph{Why} e \emph{Why not}, metaconhecimento, arquitetura
+cliente-servidor e demonstração prática.

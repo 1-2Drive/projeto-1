@@ -1,0 +1,122 @@
+\chapter{Metaconhecimento}
+\label{cap:metaconhecimento}
+
+\section{Definição e finalidade}
+\label{sec:meta-definicao}
+
+Neste projeto, metaconhecimento é o conhecimento sobre as próprias regras, e não
+sobre a condução em si, usado para controlar e acelerar a inferência. Saber que
+se deve reduzir a velocidade quando o limite é ultrapassado é conhecimento do
+domínio. Saber que a regra que o faz lê os factos \cod{ego_speed/1} e
+\cod{speed_limit/1}, que tem precedência 300 e que já disparou neste ciclo é
+metaconhecimento. É esta a definição que está no cabeçalho de \cod{engine.pl},
+onde cada parte do metaconhecimento está assinalada com comentários
+\enquote{Meta-conhecimento} ou \enquote{Meta-conhecimento dinâmico}.
+
+O metaconhecimento resolve três problemas de controlo do motor de inferência:
+
+\begin{itemize}
+  \item \textbf{resolução de conflitos}: quando várias regras estão prontas a
+    disparar, qual dispara primeiro;
+  \item \textbf{terminação}: a mesma instanciação de uma regra não pode disparar
+    duas vezes no mesmo ciclo;
+  \item \textbf{eficiência}: depois de cada disparo, só se avaliam de novo as
+    regras que o facto acabado de concluir pode afetar.
+\end{itemize}
+
+\section{Representação no motor Prolog}
+\label{sec:meta-representacao}
+
+O metaconhecimento está em predicados dinâmicos de \cod{engine.pl}, separados da
+memória de trabalho (\cod{wm_fact/2}, \cod{wm_support/3}, etc.), cujos
+predicados têm o prefixo \cod{wm_} (\cref{tab:metaconhecimento}).
+
+\begin{table}[H]
+  \centering
+  \caption{Predicados de metaconhecimento do motor}
+  \label{tab:metaconhecimento}
+  \small
+  \begin{tabularx}{\textwidth}{@{}L{4.2cm}VL{4.4cm}VX@{}}
+    \toprule
+    \textbf{Predicado} & \textbf{Conhecimento representado} & \textbf{Utilização} \\
+    \midrule
+    \cod{rule_reads(Nome/Aridade, Regra)} & Tipos de facto que cada regra lê
+      & Avaliar de novo só as regras afetadas (\cod{fire/2}, \cod{rematch/1}) \\ \linhasep
+    \cod{rule_precedence(Regra, P)} & Precedência de cada regra
+      & Escolher a ativação seguinte (\cod{best_activation/2}) \\ \linhasep
+    \cod{rule_rank(Regra, N)} & Posição da regra na base de conhecimento
+      & Desempate determinístico entre regras com a mesma precedência \\ \linhasep
+    \texttt{fired(Regra, Condições)} & Instanciações que já dispararam no ciclo
+      & Refração (\cod{already_fired/2}) \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+Este metaconhecimento é dinâmico, e não escrito à mão, em dois sentidos:
+
+\begin{enumerate}
+  \item \textbf{É derivado das regras durante a execução.} Quando o motor
+    arranca, \cod{ensure_index/0} lê as próprias regras como dados e calcula
+    \cod{rule_reads/2}, \cod{rule_precedence/2} e \cod{rule_rank/2}, que guarda
+    com \cod{assertz}. Quando uma regra é acrescentada ou alterada, o
+    metaconhecimento acompanha-a no arranque seguinte, sem manutenção manual. O
+    mesmo passo verifica que não há duas regras com o mesmo identificador.
+  \item \textbf{Muda durante a inferência.} \cod{fired/2} ganha uma entrada a
+    cada disparo e é apagado no início de cada ciclo.
+\end{enumerate}
+
+\section{Índice de dependências}
+\label{sec:meta-indice}
+
+O índice (\cod{rule_reads/2}) regista, para cada regra, os tipos de facto
+(\cod{Nome/Aridade}) de que depende. \cod{ensure_index/0} obtém-nos por análise
+estática da regra:
+
+\begin{itemize}
+  \item cada padrão e cada padrão negado (\cod{not/1}) contam com o seu
+    \cod{Nome/Aridade};
+  \item em \cod{test/1} e \cod{prove/1}, contam os factos lidos com
+    \cod{known/1}, no próprio objetivo e nas cláusulas dos predicados auxiliares
+    que ele chama, seguidos transitivamente com \cod{clause/2}.
+\end{itemize}
+
+Com a base de conhecimento atual, o índice tem 603 entradas, para 120
+regras e 66 tipos de facto. A regra
+\cod{'Avoid pothole in centre lane by changing right when right is clear'}, por
+exemplo, depende de nove tipos de facto, mas só três aparecem nas suas condições
+(\cod{ego_lane/1}, \cod{pothole/4} e \cod{ego_speed/1}). Os outros seis, como as
+marcações da estrada, a ocupação das faixas e o estado da manobra, vêm dos
+predicados auxiliares, sobretudo de \cod{safe_to_change_lane/1}, chamado através
+de \cod{prove/1}. Um índice feito só com os padrões visíveis da regra não veria
+estas dependências.
+
+Durante a inferência, \cod{fire/2} recolhe os tipos dos factos novos que o
+disparo acrescentou e, através de \cod{rule_reads/2}, avalia de novo apenas as
+regras que os leem (\cod{rematch/1}). As ativações dessas regras aparecem,
+mudam ou são canceladas antes do disparo seguinte, por exemplo quando uma
+condição \cod{not(proposal(...))} deixa de se verificar. Sem o índice, todas as
+regras teriam de ser avaliadas de novo depois de cada disparo. O índice não muda
+nenhuma decisão, só o custo: reduz as avaliações de regras em 82,5\,\% e o tempo
+médio de inferência por ciclo para 1,47\,ms (\cref{sec:performance}).
+
+\section{Conhecimento de controlo}
+\label{sec:meta-controlo}
+
+Entre as ativações prontas, \cod{best_activation/2} escolhe a de maior
+precedência (\cod{rule_precedence/2}). Em empate, escolhe a da regra declarada
+primeiro (\cod{rule_rank/2}) e, depois, a correspondência encontrada primeiro. A
+precedência de cada regra é a \emph{salience} da regra Drools que ela replica,
+para que os dois motores do sistema disparem pela mesma ordem. As únicas
+exceções são as duas regras intermédias de peões, que só existem em Prolog
+(\cod{'Pedestrian conflicts with trajectory (in path)'} e \cod{'(crossing)'}).
+Estas têm precedência 1000, para concluírem \cod{pedestrian_conflict/1} antes de
+qualquer regra que o leia.
+
+A refração usa \cod{fired/2}. Antes de uma instanciação entrar na agenda,
+\cod{already_fired/2} compara as suas condições com as das instanciações que já
+dispararam, por variante (\cod{=@=}), e deixa de fora as repetidas. Como os
+factos nunca são retirados dentro de um ciclo, isto impede que a mesma conclusão
+seja produzida repetidamente. Um limite de 5000 disparos por ciclo
+(\cod{max_firings_per_cycle/1}) protege ainda contra uma base de regras que não
+pare de gerar instanciações novas, devolvendo um erro em vez de bloquear a
+simulação.

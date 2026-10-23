@@ -1,0 +1,70 @@
+\chapter{Procedimento para verificação ou demonstração prática}
+\label{cap:demonstracao}
+
+A demonstração deve tornar visível a ligação entre perceção, inferência e ação.
+O roteiro seguinte cobre os critérios de base de conhecimento, motor,
+explicações, metaconhecimento e produto final.
+
+\begin{enumerate}
+  \item Iniciar o \emph{backend} e o \emph{frontend} usando o \emph{script}
+    adequado ao sistema operativo do utilizador na pasta \cod{scripts}, e
+    selecionar o motor \enquote{Prolog} na interface Web.
+  \item Premir \enquote{Start}.
+  \item Carregar um cenário sem perigos e mostrar a decisão base de manutenção da
+    velocidade.
+  \item Introduzir um peão na trajetória e observar o evento, a regra disparada,
+    a proposta e a travagem.
+  \item Abrir a memória de trabalho e localizar \cod{pedestrian},
+    \cod{pedestrian_conflict} e \cod{proposal}.
+  \item Mostrar a evidência da proposta para responder como e por que a decisão
+    foi obtida.
+  \item Criar um obstáculo com uma faixa adjacente ocupada e mostrar os
+    subobjetivos que explicam por que não ocorreu a mudança.
+  \item Executar três amostras TTC críticas dentro de dois segundos e confirmar a
+    regra temporal de emergência.
+  \item Alterar visibilidade e aderência para demonstrar fuzificação, conclusão
+    difusa e teto de velocidade.
+  \item Trocar para Drools no mesmo cenário e comparar ação, velocidade e regra.
+  \item Apresentar as métricas \cod{rematches}, \cod{firings} e \cod{ruleMillis}
+    do último ciclo.
+\end{enumerate}
+
+\section{Perguntas prováveis e respostas}
+\label{sec:perguntas}
+
+\begin{table}[H]
+  \centering
+  \caption{Perguntas prováveis e respostas}
+  \label{tab:perguntas}
+  \small
+  \begin{tabularx}{\textwidth}{@{}L{4.4cm}VX@{}}
+    \toprule
+    \textbf{Pergunta} & \textbf{Resposta técnica resumida} \\
+    \midrule
+    Usaram o motor nativo do Prolog?
+      & Usámos o SWI-Prolog como ambiente de execução, mas implementámos um motor
+        próprio de produção; a resolução nativa apoia a correspondência e as
+        provas auxiliares. \\ \linhasep
+    O raciocínio é para a frente ou inverso?
+      & A decisão usa encadeamento para a frente; \cod{prove/1} usa encadeamento
+        inverso localizado para objetivos compostos e evidência. \\ \linhasep
+    Como resolvem conflitos?
+      & Agenda por precedência no Prolog e arbitragem por prioridades e canais
+        no Java. \\ \linhasep
+    Como evitam disparos repetidos?
+      & Refração por \cod{fired/2} e comparação por variante das condições. \\ \linhasep
+    Onde está o metaconhecimento?
+      & Em \cod{rule_reads}, \cod{rule_precedence}, \cod{rule_rank}, \cod{fired}
+        e \cod{cycle_stats}. \\ \linhasep
+    Como explicam o \emph{Why not}?
+      & Procuramos a correspondência parcial mais profunda e devolvemos as
+        condições bloqueadoras. \\ \linhasep
+    Porque existe estado fora da memória?
+      & A memória é refeita por ciclo; leituras, janelas e compromissos precisam
+        de persistir entre ciclos. \\ \linhasep
+    Como validaram a tradução?
+      & Testes Prolog e testes parametrizados de equivalência com Drools,
+        incluindo sequências temporais. \\
+    \bottomrule
+  \end{tabularx}
+\end{table}

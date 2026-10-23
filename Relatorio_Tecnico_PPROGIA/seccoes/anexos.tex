@@ -1,0 +1,28 @@
+\chapter{Mapeamento entre código e relatório}
+\label{anx:mapeamento}
+
+\begin{table}[H]
+  \centering
+  \caption{Localização no código de cada tema do relatório}
+  \label{tab:mapeamento}
+  \small
+  \begin{tabularx}{\textwidth}{@{}L{5.0cm}VX@{}}
+    \toprule
+    \textbf{Tema} & \textbf{Localização principal} \\
+    \midrule
+    Motor de inferência com suporte para explicações
+      & \cod{src/main/prolog/engine.pl} \\ \linhasep
+    Estado temporal & \cod{src/main/prolog/driving_state.pl} \\ \linhasep
+    Implementação da base de conhecimento para condução autónoma
+      & \cod{src/main/prolog/driving_rules.pl} \\ \linhasep
+    Interface JSON com o resto do sistema & \cod{src/main/prolog/server.pl} \\ \linhasep
+    Integração Java & \cod{src/main/java/com/one2drive/projeto1/prolog} \\ \linhasep
+    Contrato dos motores
+      & \cod{src/main/java/com/one2drive/projeto1/inference/ExpertSystemBackend.java} \\ \linhasep
+    Arbitragem de decisões
+      & \cod{src/main/java/com/one2drive/projeto1/decision/DecisionContext.java} \\ \linhasep
+    Testes Prolog & \cod{src/test/java/com/one2drive/projeto1/prolog} \\ \linhasep
+    Interface gráfica Web & \cod{frontend/src/app} \\
+    \bottomrule
+  \end{tabularx}
+\end{table}

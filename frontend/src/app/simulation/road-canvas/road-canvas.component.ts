@@ -1,13 +1,14 @@
 import { NgTemplateOutlet } from '@angular/common';
 import {
   AfterViewInit, ChangeDetectionStrategy, ChangeDetectorRef, Component, DestroyRef, ElementRef, NgZone, computed,
-  inject, input, signal
+  effect, inject, input, signal, viewChild
 } from '@angular/core';
 import { ApiSimulationSnapshot } from '../../core/models/api.models';
 import {
   blendKinematics, EMPTY_KINEMATICS, isContinuation, Kinematics, kinematicsOf
 } from './road-kinematics';
 import { createCamera, Viewport } from './road-projection';
+import { RainFrame, RainOccluder, rainIntensity, RainSimulation } from './road-rain';
 import {
   buildEgo, buildItems, buildMarkings, buildRoadSurface, buildSensors, RoadItemView, RoadObjectKind
 } from './road-scene';
@@ -27,6 +28,21 @@ const DEFAULT_VIEWPORT: Viewport = { width: 960, height: 420 };
 const MIN_USABLE_SIZE_PX = 80;
 /** Undetected objects get a distance plate only when this close, so a busy road stays readable. */
 const TAG_RANGE_METRES = 70;
+
+/**
+ * Which rain the view draws: true, the new one (drops in perspective, splashes, spray, wet-road
+ * sheen and mist, road-rain.ts); false, the classic CSS overlay.
+ */
+export const USE_NEW_RAIN = true;
+
+/** Size of what stands on the road, for hiding the splashes behind it (halves, metres). */
+const OCCLUDER_SIZE: Partial<Record<RoadItemView['shape'], Omit<RainOccluder, 'lateral' | 'ahead'>>> = {
+  ego: { halfWidth: 0.95, halfLength: 2.4, height: 1.45 },
+  vehicle: { halfWidth: 0.9, halfLength: 2.2, height: 1.5 },
+  pedestrian: { halfWidth: 0.3, halfLength: 0.2, height: 1.8 },
+  barrier: { halfWidth: 1.6, halfLength: 0.2, height: 1.2 },
+  obstacle: { halfWidth: 0.8, halfLength: 0.6, height: 0.9 }
+};
 
 /** A snapshot arrives about every tick; the drawn state slides to it over the observed gap. */
 const MIN_BLEND_MILLIS = 60;
@@ -89,6 +105,16 @@ export class RoadCanvasComponent implements AfterViewInit {
       this.destroyed = true;
       if (this.frameHandle) {
         cancelAnimationFrame(this.frameHandle);
+      }
+      this.stopRain();
+    });
+    // The rain canvas exists only while the new rain is shown: start its loop with it.
+    effect(() => {
+      const canvas = this.rainCanvas()?.nativeElement;
+      if (canvas) {
+        this.startRain(canvas);
+      } else {
+        this.stopRain();
       }
     });
   }
@@ -244,6 +270,36 @@ export class RoadCanvasComponent implements AfterViewInit {
       || snapshot?.sensors?.environment?.rain === true;
   });
 
+  /** The new rain is drawn while it rains (USE_NEW_RAIN); otherwise the classic overlay. */
+  readonly useNewRain = input(USE_NEW_RAIN);
+  protected readonly newRain = computed(() => this.raining() && this.useNewRain());
+
+  /** How hard it rains, from the visibility the backend reports. Drawing only. */
+  protected readonly rainIntensity = computed(() => rainIntensity(this.snapshot()?.environment?.visibilityFactor));
+
+  /**
+   * Distance haze of the new rain: thick at the horizon and gone well before the ego, reaching
+   * about half its strength where the camera stops seeing (the effective range).
+   */
+  protected readonly rainMist = computed(() => {
+    const camera = this.camera();
+    const yAt = (ahead: number) => camera.horizonY + (camera.eye * camera.focal) / (Math.max(1, ahead) + camera.back);
+    const range = Math.max(20, this.effectiveCameraRange());
+    const top = Math.max(0, camera.horizonY - camera.height * 0.14);
+    const bottom = Math.min(camera.egoBaseY - 4, yAt(range * 0.3));
+    const span = Math.max(1, bottom - top);
+    const intensity = this.rainIntensity();
+    return {
+      top,
+      bottom,
+      height: span,
+      horizonOffset: ((camera.horizonY - top) / span).toFixed(3),
+      rangeOffset: Math.min(0.98, Math.max(0.05, (yAt(range) - top) / span)).toFixed(3),
+      peak: (0.42 + 0.4 * intensity).toFixed(2),
+      half: (0.2 + 0.25 * intensity).toFixed(2)
+    };
+  });
+
   /** "RAIN · VIS 70% · GRIP 65%": the factors the knowledge base is reasoning with. */
   protected readonly rainChipText = computed(() => {
     const env = this.snapshot()?.environment;
@@ -299,6 +355,80 @@ export class RoadCanvasComponent implements AfterViewInit {
     });
     return [...this.items().standing, ego].sort((a, b) => b.depth - a.depth);
   });
+
+  // ----- the new rain: a canvas animated on its own, outside Angular --------------------------
+
+  private readonly rainCanvas = viewChild<ElementRef<HTMLCanvasElement>>('rainCanvas');
+  private rainHandle = 0;
+  private rainCanvasEl: HTMLCanvasElement | null = null;
+  private rain: RainSimulation | null = null;
+  private rainLast = 0;
+
+  /** What the rain needs this instant: the camera, the ego's motion and what hides the road. */
+  private rainFrame(): RainFrame {
+    const occluders: RainOccluder[] = [];
+    for (const item of this.standingItems()) {
+      const size = OCCLUDER_SIZE[item.shape];
+      if (size && item.role !== 'copy') {
+        occluders.push({ lateral: item.lateral, ahead: item.ahead, ...size });
+      }
+    }
+    return {
+      camera: this.camera(),
+      egoPos: this.kin().egoPos,
+      egoLateral: this.kin().egoLateral,
+      speedMps: this.running() ? Math.max(0, this.egoSpeed()) / 3.6 : 0,
+      intensity: this.rainIntensity(),
+      occluders
+    };
+  }
+
+  private startRain(canvas: HTMLCanvasElement): void {
+    if (this.rainCanvasEl === canvas && this.rainHandle) {
+      return;
+    }
+    this.stopRain();
+    const ctx = canvas.getContext('2d');
+    if (!ctx || typeof requestAnimationFrame === 'undefined') {
+      return;
+    }
+    this.rainCanvasEl = canvas;
+    this.rain ??= new RainSimulation();
+    const reduced = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    this.rainLast = 0;
+    const tick = (now: number) => {
+      this.rainHandle = 0;
+      if (this.destroyed || this.rainCanvasEl !== canvas || !this.rain) {
+        return;
+      }
+      const frame = this.rainFrame();
+      const ratio = Math.min(2, globalThis.devicePixelRatio || 1);
+      const width = Math.round(frame.camera.width * ratio);
+      const height = Math.round(frame.camera.height * ratio);
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+      }
+      // Reduced motion: the shower is drawn, but stands still.
+      const dt = reduced || !this.rainLast ? 0 : (now - this.rainLast) / 1000;
+      this.rainLast = now;
+      this.rain.step(frame, dt);
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      this.rain.draw(ctx, frame);
+      if (!reduced) {
+        this.rainHandle = requestAnimationFrame(tick);
+      }
+    };
+    this.zone.runOutsideAngular(() => (this.rainHandle = requestAnimationFrame(tick)));
+  }
+
+  private stopRain(): void {
+    if (this.rainHandle) {
+      cancelAnimationFrame(this.rainHandle);
+      this.rainHandle = 0;
+    }
+    this.rainCanvasEl = null;
+  }
 
   protected testIdFor(item: RoadItemView): string | null {
     if (item.role === 'decor') {

@@ -41,6 +41,29 @@
         <stop offset="0%" stop-color="#5ed694" stop-opacity="0.55" />
         <stop offset="100%" stop-color="#5ed694" stop-opacity="0.12" />
       </linearGradient>
+      <!-- New rain: sky reflected in the wet asphalt, strongest towards the horizon. -->
+      <linearGradient id="roadSheen" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#a9cbe6" stop-opacity="0.3" />
+        <stop offset="30%" stop-color="#7fa6c6" stop-opacity="0.1" />
+        <stop offset="100%" stop-color="#7fa6c6" stop-opacity="0" />
+      </linearGradient>
+      <!-- New rain: a taillight smeared along the wet road towards the camera. It fades out in
+           every direction (brightest just under the lamp), so it reads as a soft glow on the water
+           rather than a painted shape. -->
+      <radialGradient id="roadReflectRed" cx="0.5" cy="0.5" r="0.5" fx="0.5" fy="0.3">
+        <stop offset="0%" stop-color="#ff4a3d" stop-opacity="0.6" />
+        <stop offset="50%" stop-color="#ff4a3d" stop-opacity="0.22" />
+        <stop offset="100%" stop-color="#ff4a3d" stop-opacity="0" />
+      </radialGradient>
+      @if (newRain()) {
+        <linearGradient id="roadMist" gradientUnits="userSpaceOnUse" x1="0" [attr.y1]="rainMist().top"
+                        x2="0" [attr.y2]="rainMist().bottom">
+          <stop offset="0" stop-color="#5b7790" stop-opacity="0" />
+          <stop [attr.offset]="rainMist().horizonOffset" stop-color="#5b7790" [attr.stop-opacity]="rainMist().peak" />
+          <stop [attr.offset]="rainMist().rangeOffset" stop-color="#4d6880" [attr.stop-opacity]="rainMist().half" />
+          <stop offset="1" stop-color="#4d6880" stop-opacity="0" />
+        </linearGradient>
+      }
       <radialGradient id="roadGlowRed">
         <stop offset="0%" stop-color="#ff4a3d" stop-opacity="0.85" />
         <stop offset="100%" stop-color="#ff4a3d" stop-opacity="0" />
@@ -84,6 +107,9 @@
       <path class="surface__bands" [attr.d]="markings().bands" />
       @if (raining()) {
         <path class="surface__wet" [attr.d]="surface().asphalt" fill="url(#roadWet)" />
+      }
+      @if (newRain()) {
+        <path class="surface__sheen" [attr.d]="surface().asphalt" fill="url(#roadSheen)" data-testid="rain-sheen" />
       }
       <path class="surface__edge" [attr.d]="surface().edgeLeft" />
       <path class="surface__edge" [attr.d]="surface().edgeRight" />
@@ -180,8 +206,13 @@
              [attr.data-maneuver]="maneuverState()">
             <path class="car__shadow" [attr.d]="item.shadow" />
             @if (raining() && item.lamps; as lamps) {
-              <ellipse class="car__reflection" [attr.cx]="lamps.x" [attr.cy]="lamps.y + lamps.r * 2.1"
-                       [attr.rx]="lamps.r * 2.6" [attr.ry]="lamps.r * 2.2" fill="url(#roadGlowRed)" />
+              @if (newRain()) {
+                <ellipse class="car__reflection car__reflection--streak" [attr.cx]="lamps.x" [attr.cy]="lamps.y + lamps.r * 4"
+                         [attr.rx]="lamps.r * 2.6" [attr.ry]="lamps.r * 4.5" fill="url(#roadReflectRed)" />
+              } @else {
+                <ellipse class="car__reflection" [attr.cx]="lamps.x" [attr.cy]="lamps.y + lamps.r * 2.1"
+                         [attr.rx]="lamps.r * 2.6" [attr.ry]="lamps.r * 2.2" fill="url(#roadGlowRed)" />
+              }
             }
             @if (item.car; as car) {
               <g class="car car--ego" role="img" aria-label="Ego vehicle">
@@ -259,6 +290,12 @@
           <ng-container *ngTemplateOutlet="objectTpl; context: { $implicit: item }" />
         }
       }
+    }
+
+    <!-- New rain: the shower thickens with distance, so the far road fades into it. -->
+    @if (newRain()) {
+      <rect class="rain-mist" x="0" [attr.y]="rainMist().top" [attr.width]="camera().width"
+            [attr.height]="rainMist().height" fill="url(#roadMist)" aria-hidden="true" data-testid="rain-mist" />
     }
 
   <!-- Distance and detection plate above an object. -->
@@ -381,8 +418,13 @@
             <path class="car__shadow" [attr.d]="item.shadow" />
             @if (raining()) {
               @if (car.lamps; as lamps) {
-                <ellipse class="car__reflection" [attr.cx]="lamps.x" [attr.cy]="lamps.y + lamps.r * 2.1"
-                         [attr.rx]="lamps.r * 2.6" [attr.ry]="lamps.r * 2.2" fill="url(#roadGlowRed)" />
+                @if (newRain()) {
+                  <ellipse class="car__reflection car__reflection--streak" [attr.cx]="lamps.x" [attr.cy]="lamps.y + lamps.r * 4"
+                           [attr.rx]="lamps.r * 2.6" [attr.ry]="lamps.r * 4.5" fill="url(#roadReflectRed)" />
+                } @else {
+                  <ellipse class="car__reflection" [attr.cx]="lamps.x" [attr.cy]="lamps.y + lamps.r * 2.1"
+                           [attr.rx]="lamps.r * 2.6" [attr.ry]="lamps.r * 2.2" fill="url(#roadGlowRed)" />
+                }
               }
             }
             <g [class]="'car car--other car--tone-' + item.tone">
@@ -410,10 +452,14 @@
   </svg>
 
   @if (raining()) {
-    <div class="rain-overlay" aria-hidden="true" data-testid="rain-overlay">
-      <div class="rain-overlay__drops rain-overlay__drops--far"></div>
-      <div class="rain-overlay__drops"></div>
-    </div>
+    @if (newRain()) {
+      <canvas #rainCanvas class="rain-canvas" aria-hidden="true" data-testid="rain-canvas"></canvas>
+    } @else {
+      <div class="rain-overlay" aria-hidden="true" data-testid="rain-overlay">
+        <div class="rain-overlay__drops rain-overlay__drops--far"></div>
+        <div class="rain-overlay__drops"></div>
+      </div>
+    }
     <span class="rain-chip" data-testid="rain-chip">{{ rainChipText() }}</span>
   }
 

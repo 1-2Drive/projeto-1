@@ -36,7 +36,7 @@ rule('Emergency stop for pedestrian extremely close',
 
 O segundo argumento, a precedência (880 na \cref{lst:regra-peao}), só decide a
 ordem de disparo: entre as regras prontas a disparar, dispara primeiro a de
-número maior, como com a \emph{salience} do Drools. Não se confunde com a
+número maior. Não se confunde com a
 prioridade da proposta (\cod{emergency_safety}, 70), que decide qual das
 propostas vence na arbitragem (\cref{cap:integracao}); também aí vence o número
 maior.
@@ -65,8 +65,7 @@ subobjetivos (\cod{maneuver_idle}, \cod{no_continuous_line}, \cod{side_clear},
     pela resolução de conflitos; a refração impede que uma instanciação dispare
     duas vezes no mesmo ciclo (\cref{sec:meta-controlo}). Os factos nunca são
     retirados dentro de um ciclo.
-  \item \textbf{Estado entre ciclos:} fica em \cod{driving_state.pl}, o
-    equivalente das 33 regras de perceção do Drools. Este ficheiro guarda as
+  \item \textbf{Estado entre ciclos:} fica em \cod{driving_state.pl}, que guarda as
     últimas leituras, a janela de TTC, o compromisso perante o semáforo, o
     cronómetro do STOP e o estado da ultrapassagem. No início de cada ciclo
     carrega tudo como factos (\cod{load_cycle_facts/0}). As regras não alteram
@@ -97,8 +96,8 @@ aula~6~\cite{uclecture6} deixa em aberto (\cref{tab:comparacao-motor-uc}).
     \textbf{Aspeto} & \textbf{\texttt{sp\_exp2.pl}} & \textbf{\texttt{engine.pl}} \\
     \midrule
     Regras & \cod{regra N se [...] entao [...]}, com operadores e um número
-      & Termos \texttt{rule(Id, Precedência, Condições, Ações)}, com o nome da
-        regra Drools \\ \linhasep
+      & Termos \texttt{rule(Id, Precedência, Condições, Ações)}, identificados
+        por um nome descritivo \\ \linhasep
     Condições & Factos, \cod{nao} e \cod{avalia/1}, que compara um valor com uma
         constante
       & Padrões, \cod{not/1} sobre padrões e testes, \cod{test/1} (qualquer
@@ -135,8 +134,8 @@ condições chamam, onde estão muitas das dependências (\cref{sec:meta-indice}
 A segunda é a refração: o pseudocódigo da aula pede que cada par facto--regra
 dispare uma vez, mas o código só impede conclusões repetidas. No nosso motor é
 cada instanciação de cada regra que dispara no máximo uma vez por ciclo. A
-terceira é a resolução de conflitos, que a UC não trata e que aqui é necessária
-para disparar as regras pela ordem da \emph{salience} do Drools.
+terceira é a resolução de conflitos, que a UC não trata
+(\cref{sec:meta-controlo}).
 
 As condições do nosso motor exprimem mais do que factos e constantes. A
 \cref{lst:regra-direita}, a regra mais longa da base, aplica o Art.~13 do Código
@@ -179,10 +178,9 @@ rule('Enforce keep right road law when right lane is safe',
 \end{lstlisting}
 \end{minipage}
 
-A condição \cod{not(pedestrian_conflict(_))} lê uma conclusão intermédia. O
-Drools escreve a disjunção \enquote{peão na trajetória ou a atravessar} dentro
-de cada regra de peões. Em Prolog, como a UC aconselha, a disjunção é uma
-conclusão própria, com uma regra por ramo (\cref{lst:regras-ou}). A precedência
+A condição \cod{not(pedestrian_conflict(_))} lê uma conclusão intermédia, a
+disjunção \enquote{peão na trajetória ou a atravessar}. Como a UC aconselha, a
+disjunção é uma conclusão própria, com uma regra por ramo (\cref{lst:regras-ou}). A precedência
 1000 garante que o conflito é conhecido antes de qualquer regra que o leia, e a
 explicação mostra qual dos ramos se verificou.
 

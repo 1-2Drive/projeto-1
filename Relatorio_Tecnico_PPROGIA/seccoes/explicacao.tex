@@ -49,10 +49,11 @@ de tempo real, o estado de cada ciclo chega à interface pelo WebSocket. O paine
 de decisão mostra cada proposta com o seu resultado na arbitragem, e outros
 painéis mostram a razão, a regra, a evidência, a linha temporal e a memória de
 trabalho. Na via histórica, guarda-se um registo completo do ciclo
-(\cod{SessionSnapshot}) sempre que a decisão muda. Ao parar a simulação, a
-viagem fica gravada e abre-se um diálogo em que o utilizador escolhe uma das
-decisões registadas. A aplicação responde, para a velocidade e para a faixa, com
-as três explicações descritas a seguir.
+(\cod{SessionSnapshot}) sempre que a decisão muda. Quando o utilizador carrega
+no botão \enquote{STOP} da interface Web, abre-se um
+diálogo em que pode percorrer as decisões registadas. Para cada uma, a interface
+permite consultar os três tipos de explicação, \emph{How}, \emph{Why} e
+\emph{Why not} (ver também o \cref{cap:interface}).
 
 \paragraph{Exemplo.} Nas secções seguintes usa-se a mesma situação, executada no
 motor Prolog. O veículo segue a 50\,km/h na faixa da direita, há um buraco na

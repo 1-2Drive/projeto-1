@@ -1,7 +1,7 @@
 \chapter{Interface gráfica e arquitetura Web}
 \label{cap:interface}
 
-A aplicação segue uma arquitetura cliente-servidor. O servidor, em Java~17 (ou
+A aplicação segue uma arquitetura cliente-servidor. O servidor, em Java 17 (ou
 superior) com Spring Boot 3.3.4, corre a simulação e o motor de inferência. O
 cliente é uma aplicação Angular~18 que só apresenta o estado e envia comandos. A
 interface nunca avalia condições de condução: as distâncias de segurança, os
@@ -28,7 +28,7 @@ durante a execução: veículos, peões, sinais, semáforos, buracos, obstáculo
 barreiras e chuva. Um seletor troca entre os motores Drools e Prolog,
 recarregando o cenário. Se o motor falhar, um aviso mostra a mensagem de erro.
 O diálogo de perguntas \emph{Why}, \emph{Why not} e \emph{How}, que abre
-quando a simulação para, é descrito na \cref{sec:expl-registo}.
+quando a simulação para (usando o botão \enquote{STOP}), é descrito na \cref{sec:expl-registo}.
 
 \begin{figure}[H]
   \centering

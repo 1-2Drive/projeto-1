@@ -48,7 +48,10 @@
 \input{seccoes/explicacao}
 \input{seccoes/interface}
 \input{seccoes/dificuldades}
-\input{seccoes/conclusao}
+% A Conclusão segue na mesma página das Dificuldades: sem o \clearpage do
+% \chapter, como a lista de tabelas acima.
+\vspace{0.3cm}
+{\let\clearpage\relax\input{seccoes/conclusao}}
 
 % As restantes entradas de referencias.bib não são citadas no texto, mas fazem
 % parte da lista de referências do relatório, pela ordem do ficheiro.

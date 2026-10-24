@@ -84,7 +84,7 @@ USO
     ./build.sh [opcoes]
 
 OPCOES
-    -f, --figures       Regenera os PDF das figuras a partir dos SVG originais
+    -f, --figures       Regenera os PNG das figuras a partir dos SVG originais
                         antes de compilar (requer inkscape, rsvg-convert ou
                         cairosvg). Por omissao, so sao gerados os que faltarem.
     -c, --clean         Remove os ficheiros auxiliares de build/ e termina.
@@ -349,6 +349,29 @@ svg_to_pdf() {
     return 1
 }
 
+svg_to_png() {
+    # $1 = svg de entrada, $2 = png de saida (2592 px de largura, fundo branco).
+    # As figuras do relatorio sao rasterizadas; os logotipos continuam em PDF.
+    src=$1; dst=$2
+    rm -f "$dst"
+    if have inkscape; then
+        HOME=$(ink_home) QT_QPA_PLATFORM=offscreen DISPLAY= inkscape "$src" \
+            --export-type=png --export-width=2592 \
+            --export-background=white --export-background-opacity=1 \
+            --export-filename="$dst" >/dev/null 2>&1
+        [ -s "$dst" ] && return 0
+        rm -f "$dst"
+    fi
+    if have rsvg-convert; then
+        rsvg-convert -f png -w 2592 -b white -o "$dst" "$src" >/dev/null 2>&1 && [ -s "$dst" ] && return 0
+    fi
+    if have cairosvg; then
+        cairosvg "$src" --output-width 2592 -o "$dst" >/dev/null 2>&1 && [ -s "$dst" ] && return 0
+    fi
+    rm -f "$dst"
+    return 1
+}
+
 cleanup() {
     [ -n "$INK_HOME" ] && [ "$INK_HOME" != "$HOME" ] && rm -rf "$INK_HOME"
     return 0
@@ -364,7 +387,7 @@ build_figures() {
     for svg in "$SVGDIR"/*.svg; do
         [ -e "$svg" ] || continue
         base=$(basename "$svg" .svg)
-        if [ "$force" -eq 1 ] || [ ! -f "$FIGDIR/$base.pdf" ]; then
+        if [ "$force" -eq 1 ] || [ ! -f "$FIGDIR/$base.png" ]; then
             todo="$todo $svg"
         fi
     done
@@ -380,16 +403,16 @@ build_figures() {
             esac
             return 1
         fi
-        warn "faltam PDF de figuras e nao ha conversor de SVG instalado"
+        warn "faltam PNG de figuras e nao ha conversor de SVG instalado"
         return 1
     fi
 
-    step "A converter figuras SVG para PDF"
+    step "A converter figuras SVG para PNG"
     failed=0
     for svg in $todo; do
         base=$(basename "$svg" .svg)
-        if svg_to_pdf "$svg" "$FIGDIR/$base.pdf"; then
-            ok "$base.pdf"
+        if svg_to_png "$svg" "$FIGDIR/$base.png"; then
+            ok "$base.png"
         else
             err "falhou a conversao de $base.svg"
             failed=1

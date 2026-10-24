@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Figura: percurso da informação no módulo de explicação (duas vias).
+  Fonte vetorial de figuras/explicacao-duas-vias.png. Para regenerar o PNG: make figuras
+  Coordenadas em px, na mesma grelha da figura original (864 x 621).
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="864" height="621" viewBox="0 0 864 621">
+  <defs>
+    <marker id="seta" viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto">
+      <path d="M1,1 L9,5 L1,9" fill="none" stroke="#b4b4b4" stroke-width="1.6"
+            stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <style>
+      text      { font-family: 'Noto Sans', 'Inter', 'Helvetica Neue', Arial, sans-serif; fill: #1f1f1f; }
+      .titulo   { font-size: 17px; font-weight: 700; }
+      .subtitulo{ font-size: 12.5px; fill: #555; }
+      .nome     { font-size: 14px; font-weight: 700; text-anchor: middle; }
+      .detalhe  { font-size: 12.5px; fill: #333; text-anchor: middle; }
+      .rotulo   { font-size: 12.5px; fill: #444; }
+      .caixa    { fill: #ffffff; stroke: #c9c9c9; stroke-width: 1.4; }
+      .destaque { fill: #eef4fc; stroke: #2f74d0; stroke-width: 2; }
+      .linha    { fill: none; stroke: #b4b4b4; stroke-width: 1.4; }
+    </style>
+  </defs>
+
+  <rect width="864" height="621" fill="#ffffff"/>
+
+  <!-- Título -->
+  <text class="titulo" x="28" y="32">Todas as explicações partem do que o motor registou</text>
+  <text class="subtitulo" x="28" y="55">Via em tempo real a cada ciclo; via histórica sobre viagens gravadas no STOP</text>
+
+  <!-- Registo durante a inferência -->
+  <rect class="destaque" x="216" y="82" width="432" height="99" rx="8"/>
+  <text class="nome" x="432" y="108">Registo durante a inferência</text>
+  <text class="detalhe" x="432" y="128">ExplanationTrace: traço cronológico</text>
+  <text class="detalhe" x="432" y="147">DecisionProposal: resultado e evidência</text>
+  <text class="detalhe" x="432" y="166">LaneChangeCheck: subobjetivos de faixa</text>
+
+  <path class="linha" d="M432,181 V210 H228 V230" marker-end="url(#seta)"/>
+  <path class="linha" d="M432,210 H636 V230" marker-end="url(#seta)"/>
+  <text class="rotulo" x="330" y="204" text-anchor="middle">tempo real</text>
+  <text class="rotulo" x="534" y="204" text-anchor="middle">histórico</text>
+
+  <!-- Via em tempo real -->
+  <rect class="caixa" x="45" y="232" width="365" height="62" rx="8"/>
+  <text class="nome" x="228" y="258">ApiModelMapper</text>
+  <text class="detalhe" x="228" y="278">snapshot por ciclo, últimas 160 entradas</text>
+
+  <path class="linha" d="M228,294 V321" marker-end="url(#seta)"/>
+  <text class="rotulo" x="237" y="313">WebSocket por ciclo</text>
+
+  <rect class="caixa" x="45" y="323" width="365" height="117" rx="8"/>
+  <text class="nome" x="228" y="349">Vistas em tempo real</text>
+  <text class="detalhe" x="228" y="368">decision-panel: propostas e resultados</text>
+  <text class="detalhe" x="228" y="387">explanation-panel: razão, regra, evidência</text>
+  <text class="detalhe" x="228" y="406">rule-timeline: traço com filtros</text>
+  <text class="detalhe" x="228" y="425">working-memory e situation-panel</text>
+
+  <!-- Via histórica -->
+  <rect class="caixa" x="455" y="232" width="363" height="62" rx="8"/>
+  <text class="nome" x="636" y="258">SimulationRuntimeService</text>
+  <text class="detalhe" x="636" y="278">SessionSnapshot quando a decisão muda</text>
+
+  <path class="linha" d="M636,294 V321" marker-end="url(#seta)"/>
+  <text class="rotulo" x="645" y="313">no STOP</text>
+
+  <rect class="caixa" x="455" y="323" width="363" height="62" rx="8"/>
+  <text class="nome" x="636" y="349">SessionHistoryStore</text>
+  <text class="detalhe" x="636" y="369">~/.projeto-1/sessions/&lt;id&gt;.json</text>
+
+  <path class="linha" d="M636,385 V412" marker-end="url(#seta)"/>
+  <text class="rotulo" x="645" y="404">POST …/why</text>
+
+  <rect class="caixa" x="455" y="414" width="363" height="80" rx="8"/>
+  <text class="nome" x="636" y="440">SessionExplanationService</text>
+  <text class="detalhe" x="636" y="460">escolhe o snapshot pela pergunta</text>
+  <text class="detalhe" x="636" y="479">responde WHY, WHY_NOT e HOW</text>
+
+  <path class="linha" d="M636,494 V521" marker-end="url(#seta)"/>
+
+  <rect class="caixa" x="455" y="523" width="363" height="62" rx="8"/>
+  <text class="nome" x="636" y="549">trip-questions-dialog</text>
+  <text class="detalhe" x="636" y="569">resposta e evidência técnica</text>
+</svg>

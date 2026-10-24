@@ -37,6 +37,9 @@
 \pagenumbering{arabic}
 \setcounter{page}{1}
 
+% As fontes do perito abrem a lista de referências, pela ordem em que foram
+% recolhidas (unsrt numera pela ordem da primeira citação).
+\nocite{cienciavitae,isepcontrato,lopes2006,uminhoteses}
 \input{seccoes/perito}
 \input{seccoes/motor}
 \input{seccoes/integracao}
@@ -46,10 +49,10 @@
 \input{seccoes/interface}
 \input{seccoes/conclusao}
 
-% As entradas de referencias.bib não são citadas no texto, mas fazem parte
-% da lista de referências do relatório.
+% As restantes entradas de referencias.bib não são citadas no texto, mas fazem
+% parte da lista de referências do relatório, pela ordem do ficheiro.
 \nocite{*}
-\bibliographystyle{plain}
+\bibliographystyle{unsrt}
 \bibliography{referencias}
 
 \appendix

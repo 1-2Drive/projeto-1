@@ -32,6 +32,13 @@ rule('Emergency stop for pedestrian extremely close',
                        'Pedestrian critical distance in current path')) ]).
 \end{lstlisting}
 
+O segundo argumento, a precedência (880 na \cref{lst:regra-peao}), só decide a
+ordem de disparo: entre as regras prontas a disparar, dispara primeiro a de
+número maior, como com a \emph{salience} do Drools. Não se confunde com a
+prioridade da proposta (\cod{emergency_safety}, 70), que decide qual das
+propostas vence na arbitragem (\cref{cap:integracao}); também aí vence o número
+maior.
+
 Uma condição pode ser um padrão a unificar com um facto, \cod{not(C)} (negação
 por falha), \cod{test(Objetivo)} (aritmética ou um predicado auxiliar que lê os
 factos através de \cod{known/1}) ou \cod{prove(Objetivo)}, provado por

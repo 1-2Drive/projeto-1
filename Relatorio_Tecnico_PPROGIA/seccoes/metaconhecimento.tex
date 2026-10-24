@@ -27,7 +27,7 @@ O metaconhecimento resolve três problemas de controlo do motor de inferência:
 \section{Representação no motor Prolog}
 \label{sec:meta-representacao}
 
-O metaconhecimento está em predicados dinâmicos de \cod{engine.pl}, separados da
+O metaconhecimento está em predicados dinâmicos de \cod{engine.pl}, declarados com \cod{:- dynamic}~\cite{swideclare} e separados da
 memória de trabalho (\cod{wm_fact/2}, \cod{wm_support/3}, etc.), cujos
 predicados têm o prefixo \cod{wm_} (\cref{tab:metaconhecimento}).
 
@@ -59,7 +59,7 @@ Este metaconhecimento é dinâmico, e não escrito à mão, em dois sentidos:
   \item \textbf{É derivado das regras durante a execução.} Quando o motor
     arranca, \cod{ensure_index/0} lê as próprias regras como dados e calcula
     \cod{rule_reads/2}, \cod{rule_precedence/2} e \cod{rule_rank/2}, que guarda
-    com \cod{assertz}. Quando uma regra é acrescentada ou alterada, o
+    com \cod{assertz}~\cite{swidynamic}. Quando uma regra é acrescentada ou alterada, o
     metaconhecimento acompanha-a no arranque seguinte, sem manutenção manual. O
     mesmo passo verifica que não há duas regras com o mesmo identificador.
   \item \textbf{Muda durante a inferência.} \cod{fired/2} ganha uma entrada a

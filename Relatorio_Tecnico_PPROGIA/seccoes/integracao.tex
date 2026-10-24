@@ -41,7 +41,7 @@ Java, para que não haja valores duplicados nos dois lados. A
   \end{tabularx}
 \end{table}
 
-O \cod{server.pl} lê uma linha, converte o JSON num \emph{dict} Prolog e
+O \cod{server.pl} lê uma linha, converte o JSON num \emph{dict} Prolog~\cite{swijson} e
 responde sempre com outra linha. O \emph{stdout} contém apenas respostas.
 Eventuais mensagens de aviso ou erro seguem para o \emph{stderr}. O \emph{flush}
 explícito evita que o Java fique à espera de dados retidos no \emph{buffer}.
@@ -52,7 +52,7 @@ os eventos dos sensores e os comandos do condutor. Preenche também um
 posição, faixa, estado da manobra e faixa de destino, marcações da estrada,
 segurança das faixas adjacentes (calculada pela perceção em Java) e se há um
 perigo à frente na faixa da direita. Tudo segue num único pedido \cod{tick}, com
-a decisão anterior (ações, regra e prioridade). A resposta traz:
+a decisão anterior (ação, regra e prioridade). A resposta traz:
 
 \begin{itemize}
   \item as propostas, cada uma com a ação, a velocidade, o risco, a prioridade,

@@ -123,22 +123,12 @@ nenhuma regra encontrou motivo para acelerar ou abrandar.
 \section{Why not}
 \label{sec:expl-whynot}
 
-O \emph{Why not} tem três mecanismos, do mais próximo do motor ao mais próximo
-do utilizador:
+O \emph{Why not} responde porque é que o veículo não fez outra coisa. Na
+interface, o utilizador pergunta por uma alternativa, por exemplo
+\enquote{porque não abrandou para o buraco?}, e a resposta vem de dois
+mecanismos. Um terceiro, no motor, desce até à condição exata de uma regra:
 
 \begin{itemize}
-  \item \textbf{Uma regra que não disparou.} \cod{why_not/2} procura, entre
-    todas as correspondências parciais das condições da regra, da esquerda para
-    a direita, a que avançou mais. Devolve a condição onde parou, com as
-    ligações dessa correspondência, seguida das condições posteriores que também
-    falham. No exemplo, a pergunta \enquote{porque não abrandou para o buraco?}
-    aponta a condição negada que falhou: o buraco ainda pode ser contornado
-    (\cref{lst:whynot}).
-  \item \textbf{Uma mudança de faixa recusada.} Os subobjetivos de
-    \cod{safe_to_change_lane/1} registados em cada ciclo dizem qual deles
-    falhou. Em vez de uma mensagem genérica como \enquote{mudança impossível}, a
-    explicação indica a causa: outra manobra em curso, linha contínua, ângulo
-    morto ocupado, ou falta de distância para seguir o veículo da outra faixa.
   \item \textbf{Uma alternativa não escolhida.} Para cada alternativa que o
     ciclo não seguiu, a aplicação explica porquê: acelerar, manter ou abrandar
     na velocidade, e manter a faixa, mudar para a esquerda ou para a direita, ou
@@ -147,8 +137,22 @@ do utilizador:
     para que regra, e por que princípio), ou nunca foi proposta porque as suas
     condições não se verificaram, ou não se aplica naquele estado, ou o ciclo
     não registou o suficiente. No último caso, a resposta di-lo em vez de
-    adivinhar. No exemplo, \enquote{porque não mudou para a direita?} não se
-    aplica, porque o veículo já está na faixa mais à direita.
+    adivinhar. No exemplo, \enquote{porque não abrandou?} tem como resposta que
+    nenhuma regra encontrou uma condição que exigisse abrandar, e
+    \enquote{porque não mudou para a direita?} não se aplica, porque o veículo
+    já está na faixa mais à direita.
+  \item \textbf{Uma mudança de faixa recusada.} Os subobjetivos de
+    \cod{safe_to_change_lane/1} registados em cada ciclo dizem qual deles
+    falhou. Em vez de uma mensagem genérica como \enquote{mudança impossível}, a
+    explicação indica a causa: outra manobra em curso, linha contínua, ângulo
+    morto ocupado, ou falta de distância para seguir o veículo da outra faixa.
+  \item \textbf{Uma regra que não disparou.} No motor, \cod{why_not/2} procura,
+    entre todas as correspondências parciais das condições da regra, da esquerda
+    para a direita, a que avançou mais. Devolve a condição onde parou, com as
+    ligações dessa correspondência, seguida das condições posteriores que também
+    falham. Chega-se a ele pelo pedido \cod{whynot} do \cod{server.pl}. No
+    exemplo, para a regra que abranda perante um buraco, aponta a condição
+    negada que falhou: o buraco ainda pode ser contornado (\cref{lst:whynot}).
 \end{itemize}
 
 \begin{lstlisting}[language=JSON,caption={Pedido \texttt{whynot} e resposta do \texttt{server.pl} no exemplo},label=lst:whynot]

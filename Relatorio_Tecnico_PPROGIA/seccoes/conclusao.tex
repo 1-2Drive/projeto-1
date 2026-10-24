@@ -1,27 +1,30 @@
 \chapter{Conclusão}
 \label{cap:conclusao}
 
-O grupo desenvolveu em SWI-Prolog um motor de regras de produção próprio e
-integrou-o num sistema pericial que decide a velocidade e a faixa de um veículo
-simulado a cada 100\,ms. O motor (\cod{engine.pl}) torna explícitos mecanismos
-que noutros motores ficam internos: a agenda com resolução de conflitos, a
-refração, a justificação de cada facto e o índice de dependências. Resolve
-também dois pontos que a aula~6 deixa em aberto: o meta-conhecimento é gerado a
-partir das próprias regras, e cada instanciação de uma regra dispara no máximo
-uma vez por ciclo.
+O grupo desenvolveu em SWI-Prolog um motor de regras de produção próprio e, em
+colaboração com o perito, criou uma base de conhecimento com cerca de 120 regras.
+O motor foi integrado num sistema pericial que decide a velocidade e a via de
+um veículo simulado a cada 100\,ms, e torna explícitos mecanismos que noutros
+motores ficam internos: a agenda com resolução de conflitos, a refração, a
+justificação de cada facto e o índice de dependências (\cod{engine.pl}).
 
-A base de conhecimento tem $\sim$120 regras e replica, com os mesmos nomes e pela
-mesma ordem de disparo, as regras do motor Drools do sistema. Como cada facto
-derivado e cada proposta guardam a regra e a evidência que os produziram, as
-explicações \emph{How}, \emph{Why} e \emph{Why not} são construídas a partir do
-que o motor registou, e não reconstruídas depois.
+O meta-conhecimento é gerado dinamicamente a partir das
+próprias regras, no arranque do motor, e cada instanciação de uma regra dispara
+no máximo uma vez por ciclo. Sem o índice de dependências, cada ciclo de
+processamento demoraria $\sim$4,4 vezes mais tempo.
 
-O sistema tem limitações:
+Como cada facto derivado e cada proposta guardam a regra e a evidência que os
+produziram, as explicações \emph{How}, \emph{Why} e \emph{Why not} são
+construídas a partir do que o motor registou, e não reconstruídas depois. Estas
+explicações podem ser consultadas na interface Web, depois de carregar em
+\enquote{STOP} (\cref{sec:expl-registo}).
+
+No entanto, o sistema tem limitações:
 
 \begin{itemize}
   \item não faz perguntas ao utilizador, porque todos os factos vêm dos sensores
     (\cref{sec:expl-why});
   \item o conhecimento só foi exercitado no simulador, pelo que o sistema é um
-    protótipo académico de apoio à decisão, e não um sistema para um veículo
-    real.
+    protótipo académico de apoio à decisão, e não um sistema usável em veículos
+    reais.
 \end{itemize}

@@ -102,7 +102,13 @@ proposto.
 \section{Why}
 \label{sec:expl-why}
 
-O \emph{Why} responde porque é que o veículo fez o que fez. Para cada canal, a
+Nos materiais da unidade curricular, o \emph{Why} é o do MYCIN: quando o motor
+pergunta um facto ao utilizador, este pode perguntar porquê, e o motor mostra a
+regra que está a tentar provar (o \cod{sp_exp2.pl} não o implementa). Este
+sistema não faz perguntas ao utilizador. Todos os factos vêm dos sensores e do
+estado do veículo, dez vezes por segundo, um ritmo a que nenhum condutor
+conseguiria responder. Por isso, aqui, o \emph{Why} justifica uma decisão já
+tomada: responde porque é que o veículo fez o que fez. Para cada canal, a
 aplicação junta a regra que decidiu, a sua razão, a evidência e o resultado da
 arbitragem, bem como as outras propostas que também foram consideradas. No canal
 da faixa, uma mudança de faixa inclui ainda os subobjetivos de segurança desse

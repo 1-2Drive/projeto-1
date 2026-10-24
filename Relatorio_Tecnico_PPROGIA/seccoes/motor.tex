@@ -61,10 +61,9 @@ subobjetivos (\cod{maneuver_idle}, \cod{no_continuous_line}, \cod{side_clear},
       suporte veio da perceção.
   \end{itemize}
   \item \textbf{Ciclo:} \cod{run_rules/0} avalia todas as regras e enche a
-    agenda. Depois, até a agenda esvaziar, dispara a melhor ativação. A
-    resolução de conflitos escolhe a maior precedência, depois a regra declarada
-    primeiro e depois a correspondência encontrada primeiro. A refração impede
-    que uma instanciação dispare duas vezes no mesmo ciclo. Os factos nunca são
+    agenda. Depois, até a agenda esvaziar, dispara a melhor ativação, escolhida
+    pela resolução de conflitos; a refração impede que uma instanciação dispare
+    duas vezes no mesmo ciclo (\cref{sec:meta-controlo}). Os factos nunca são
     retirados dentro de um ciclo.
   \item \textbf{Estado entre ciclos:} fica em \cod{driving_state.pl}, o
     equivalente das 33 regras de perceção do Drools. Este ficheiro guarda as
@@ -106,8 +105,8 @@ aula~6~\cite{uclecture6} deixa em aberto (\cref{tab:comparacao-motor-uc}).
         objetivo) e \cod{prove/1} (encadeamento inverso) \\ \linhasep
     Controlo & Dispara uma regra assim que um facto a satisfaz, pela ordem do
         \emph{backtracking} sobre factos e regras
-      & Agenda com resolução de conflitos: precedência, depois ordem da regra,
-        depois ordem da correspondência \\ \linhasep
+      & Agenda com resolução de conflitos, a começar pela precedência
+        (\cref{sec:meta-controlo}) \\ \linhasep
     Repetições & \cod{cria_facto} só verifica se a conclusão já existe, e não se
         o par facto--regra já disparou~\cite[diap.~39]{uclecture6}
       & Refração por regra e instanciação (\cod{fired/2}); um facto repetido é

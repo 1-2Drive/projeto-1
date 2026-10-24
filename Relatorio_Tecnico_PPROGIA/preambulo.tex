@@ -165,23 +165,6 @@
 \captionsetup{font=small,labelfont={bf,color=corEscura},skip=6pt}
 
 % --- Listagens de código ---------------------------------------
-% Drools (DRL): sintaxe próxima do Java, com as palavras-chave das regras.
-% Usada apenas na comparação com a regra Prolog equivalente (language=Drools).
-\lstdefinelanguage{Drools}{
-  morekeywords={package,import,global,function,declare,query,rule,when,
-                then,end,salience,agenda-group,activation-group,no-loop,
-                lock-on-active,dialect,and,or,not,exists,forall,from,
-                collect,accumulate,eval,insert,insertLogical,update,modify,
-                retract,delete,new,true,false,null,this,matches,memberOf,
-                contains,extends,if,else,return},
-  otherkeywords={agenda-group,activation-group,no-loop,lock-on-active},
-  sensitive=true,
-  comment=[l]{//},
-  morecomment=[n]{/*}{*/},
-  string=[b]",
-  morestring=[b]'
-}
-
 \lstdefinestyle{codigo}{
   basicstyle=\ttfamily\footnotesize,
   keywordstyle=\color{corEscura}\bfseries,
@@ -202,9 +185,17 @@
   breaklines=true,
   breakatwhitespace=true,
   showstringspaces=false,
-  columns=fullflexible,
+  % Grelha fixa à largura da Latin Mono (0,525em por carácter): o código fica
+  % em colunas, e o alinhamento feito com espaços (como na árvore do How) não
+  % se perde. keepspaces mantém os espaços repetidos.
+  columns=fixed,
+  basewidth=0.525em,
+  keepspaces=true,
+  % Uma linha longa que tem de quebrar continua com uma seta, para não parecer
+  % uma linha nova.
+  postbreak=\mbox{\textcolor{corCinza}{$\hookrightarrow$}\space},
   captionpos=b,
-  language=Drools,
+  language=Prolog,
   literate=%
     {á}{{\'a}}1 {à}{{\`a}}1 {â}{{\^a}}1 {ã}{{\~a}}1
     {é}{{\'e}}1 {ê}{{\^e}}1 {í}{{\'i}}1

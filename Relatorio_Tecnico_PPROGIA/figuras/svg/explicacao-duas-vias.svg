@@ -30,7 +30,7 @@
   <text class="nome" x="432" y="108">Registo durante a inferência</text>
   <text class="detalhe" x="432" y="128">ExplanationTrace: traço cronológico</text>
   <text class="detalhe" x="432" y="147">DecisionProposal: resultado e evidência</text>
-  <text class="detalhe" x="432" y="166">LaneChangeCheck: subobjetivos de faixa</text>
+  <text class="detalhe" x="432" y="166">LaneChangeCheck: subobjetivos de via</text>
 
   <path class="linha" d="M432,181 V210 H228 V230" marker-end="url(#seta)"/>
   <path class="linha" d="M432,210 H636 V230" marker-end="url(#seta)"/>

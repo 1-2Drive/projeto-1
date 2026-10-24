@@ -139,7 +139,7 @@ terceira é a resolução de conflitos, que a UC não trata
 
 As condições do nosso motor exprimem mais do que factos e constantes. A
 \cref{lst:regra-direita}, a regra mais longa da base, aplica o Art.~13 do Código
-da Estrada (circular pela faixa mais à direita). Usa as cinco formas de
+da Estrada (circular pela via mais à direita). Usa as cinco formas de
 condição: padrões (\cod{ego_lane(Lane)}), testes aritméticos
 (\cod{test(Now >= 4000)}), padrões negados (\cod{not(obstacle(_, _, _, _))}),
 testes negados sobre predicados auxiliares
@@ -147,7 +147,7 @@ testes negados sobre predicados auxiliares
 encadeamento inverso (\cod{prove(no_continuous_line(right))}). Só propõe voltar à
 direita quando nada mais exige atenção: nenhum obstáculo, buraco, barreira ou
 peão em conflito, nenhum veículo a menos de 80\,m e nenhuma ultrapassagem ou
-mudança de faixa pedida pelo condutor.
+mudança de via pedida pelo condutor.
 
 \noindent\begin{minipage}{\linewidth}
 \begin{lstlisting}[caption={Uma das regras mais longa da base de conhecimento (\texttt{driving\_rules.pl})},label=lst:regra-direita]

@@ -26,7 +26,7 @@ Em cada ciclo, o motor Prolog regista:
   \item os quatro subobjetivos de \cod{safe_to_change_lane/1}
     (\cod{maneuver_idle}, \cod{no_continuous_line}, \cod{side_clear},
     \cod{room_to_follow}), provados um a um nos dois lados por
-    \cod{subgoal_results/2}, mesmo quando nenhuma regra propõe mudar de faixa;
+    \cod{subgoal_results/2}, mesmo quando nenhuma regra propõe mudar de via;
   \item uma entrada na linha temporal por cada leitura dos sensores
     (\cod{FACT INSERTED}) e por cada regra que concluiu algo
     (\cod{RULE FIRED}).
@@ -40,15 +40,15 @@ identifica a regra vencedora ou o motivo da recusa.
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.82\textwidth]{figuras/explicacao-duas-vias.png}
-  \caption{Percurso da informação no módulo de explicação: a via em tempo real, a cada ciclo, e a via histórica, sobre a viagem gravada ao parar.}
+  \caption{Percurso da informação no módulo de explicação: o percurso em tempo real, a cada ciclo, e o percurso histórico, sobre a viagem gravada ao parar.}
   \label{fig:explicacao-duas-vias}
 \end{figure}
 
-As duas vias da \cref{fig:explicacao-duas-vias} partem do mesmo registo. Na via
-de tempo real, o estado de cada ciclo chega à interface pelo WebSocket. O painel
+Os dois percursos da \cref{fig:explicacao-duas-vias} partem do mesmo registo. No
+percurso em tempo real, o estado de cada ciclo chega à interface pelo WebSocket. O painel
 de decisão mostra cada proposta com o seu resultado na arbitragem, e outros
 painéis mostram a razão, a regra, a evidência, a linha temporal e a memória de
-trabalho. Na via histórica, guarda-se um registo completo do ciclo
+trabalho. No percurso histórico, guarda-se um registo completo do ciclo
 (\cod{SessionSnapshot}) sempre que a decisão muda. Quando o utilizador carrega
 no botão \enquote{STOP} da interface Web, abre-se um
 diálogo em que pode percorrer as decisões registadas. Para cada uma, a interface
@@ -56,8 +56,8 @@ permite consultar os três tipos de explicação, \emph{How}, \emph{Why} e
 \emph{Why not} (ver também o \cref{cap:interface}).
 
 \paragraph{Exemplo.} Nas secções seguintes usa-se a mesma situação, executada no
-motor Prolog. O veículo segue a 50\,km/h na faixa da direita, há um buraco na
-mesma faixa 40\,m à frente, e a faixa da esquerda está livre. A regra
+motor Prolog. O veículo segue a 50\,km/h na via da direita, há um buraco na
+mesma via 40\,m à frente, e a via da esquerda está livre. A regra
 \cod{'Avoid pothole in right lane by changing left'} (prioridade 40) propõe
 \cod{CHANGE_LANE_LEFT}, e a regra de base mantém a velocidade.
 
@@ -90,13 +90,13 @@ próprio um nó \cod{derived(...)} com a regra que o concluiu e os factos
 percebidos em que esta assentou.
 
 Na aplicação, o \emph{How} mostra o caminho que o ciclo escolhido percorreu no
-fluxograma de decisão, um para a velocidade e outro para a faixa. Cada pergunta
+fluxograma de decisão, um para a velocidade e outro para a via. Cada pergunta
 do fluxograma está associada às regras que lhe respondem. Segue o ramo
 \enquote{sim} quando uma dessas regras fez uma proposta nesse ciclo, e o ramo
 \enquote{não} caso contrário. O caminho termina onde a arbitragem fixou a
 decisão. Na velocidade, isso acontece numa paragem de emergência ou obrigatória
 que venceu. Os tetos de velocidade aplicam-se todos, por isso o caminho passa
-por eles até ao mais baixo. Na faixa, o caminho termina na proposta que venceu.
+por eles até ao mais baixo. Na via, o caminho termina na proposta que venceu.
 As perguntas seguintes aparecem fora do caminho, com o que as suas regras tenham
 proposto.
 
@@ -113,7 +113,7 @@ conseguiria responder. Por isso, aqui, o \emph{Why} justifica uma decisão já
 tomada: responde porque é que o veículo fez o que fez. Para cada canal, a
 aplicação junta a regra que decidiu, a sua razão, a evidência e o resultado da
 arbitragem, bem como as outras propostas que também foram consideradas. No canal
-da faixa, uma mudança de faixa inclui ainda os subobjetivos de segurança desse
+da via, uma mudança de via inclui ainda os subobjetivos de segurança desse
 lado. No exemplo, o veículo muda para a esquerda porque
 \cod{'Avoid pothole in right lane by changing left'} se verificou, com a razão
 \enquote{Avoiding pothole by moving into the clear left lane}. A evidência são
@@ -131,9 +131,9 @@ mecanismos. Um terceiro, no motor, desce até à condição exata de uma regra:
 
 \begin{itemize}
   \item \textbf{Uma alternativa não escolhida.} Para cada alternativa que o
-    ciclo não seguiu, a aplicação explica porquê: acelerar, manter ou abrandar
-    na velocidade, e manter a faixa, mudar para a esquerda ou para a direita, ou
-    regressar à direita na faixa. Cada alternativa é classificada a partir do
+    ciclo não seguiu, a aplicação explica porquê: na velocidade, acelerar,
+    manter ou abrandar; na via, mantê-la, mudar para a esquerda ou para a
+    direita, ou regressar à direita. Cada alternativa é classificada a partir do
     registo do ciclo. Ou foi proposta mas perdeu na arbitragem (e a resposta diz
     para que regra, e por que princípio), ou nunca foi proposta porque as suas
     condições não se verificaram, ou não se aplica naquele estado, ou o ciclo
@@ -141,12 +141,12 @@ mecanismos. Um terceiro, no motor, desce até à condição exata de uma regra:
     adivinhar. No exemplo, \enquote{porque não abrandou?} tem como resposta que
     nenhuma regra encontrou uma condição que exigisse abrandar, e
     \enquote{porque não mudou para a direita?} não se aplica, porque o veículo
-    já está na faixa mais à direita.
-  \item \textbf{Uma mudança de faixa recusada.} Os subobjetivos de
+    já está na via mais à direita.
+  \item \textbf{Uma mudança de via recusada.} Os subobjetivos de
     \cod{safe_to_change_lane/1} registados em cada ciclo dizem qual deles
     falhou. Em vez de uma mensagem genérica como \enquote{mudança impossível}, a
     explicação indica a causa: outra manobra em curso, linha contínua, ângulo
-    morto ocupado, ou falta de distância para seguir o veículo da outra faixa.
+    morto ocupado, ou falta de distância para seguir o veículo da outra via.
   \item \textbf{Uma regra que não disparou.} No motor, \cod{why_not/2} procura,
     entre todas as correspondências parciais das condições da regra, da esquerda
     para a direita, a que avançou mais. Devolve a condição onde parou, com as

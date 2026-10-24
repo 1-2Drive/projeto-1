@@ -73,7 +73,7 @@
   <!-- DecisionContext -->
   <rect class="destaque" x="262" y="558" width="340" height="82" rx="8"/>
   <text class="nome" x="432" y="585">DecisionContext</text>
-  <text class="detalhe" x="432" y="605">arbitragem por canal: velocidade e faixa</text>
+  <text class="detalhe" x="432" y="605">arbitragem por canal: velocidade e via</text>
   <text class="detalhe" x="432" y="624">regista WON, LOST_TO, VETOED_BY, CAPPED</text>
 
   <path class="linha" d="M432,640 V675" marker-end="url(#seta)"/>

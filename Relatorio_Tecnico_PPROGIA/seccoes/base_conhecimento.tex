@@ -10,8 +10,8 @@ sistema.
 
 O objetivo é que o comportamento do veículo fique descrito nas regras, e não
 espalhado pelo código de controlo. A base cobre emergências, peões, veículo da
-frente e ultrapassagens, limites de velocidade, STOP, semáforos, perigos na via,
-mudanças de faixa, barreiras e meteorologia. Algumas regras seguem diretamente o
+frente e ultrapassagens, limites de velocidade, STOP, semáforos, perigos na estrada,
+mudanças de via, barreiras e meteorologia. Algumas regras seguem diretamente o
 Código da Estrada~\cite{codigoestrada}, como o Art.~13 (circular pela direita,
 \cref{lst:regra-direita}).
 
@@ -96,7 +96,7 @@ de fuzificação (360) convertem a visibilidade e a aderência de
 como máximo, e concluem \cod{fuzzy_conclusion(Term, Degree)}
 (\cref{lst:regra-difusa}). Uma regra de desfuzificação (350) agrega as
 conclusões e calcula o centroide, que é a velocidade recomendada: um único teto
-\cod{reduce_speed} com prioridade de perigo na via (40). A precedência garante
+\cod{reduce_speed} com prioridade de perigo na estrada (40). A precedência garante
 que cada nível só dispara depois do anterior.
 
 \begin{lstlisting}[caption={Uma regra de inferência difusa (\texttt{driving\_rules.pl})},label=lst:regra-difusa]
@@ -108,12 +108,12 @@ rule('Fuzzy: poor visibility or poor grip -> very slow',
      [ assert(fuzzy_conclusion(very_slow, D)) ]).
 \end{lstlisting}
 
-\paragraph{Mudança de faixa segura.} \cod{safe_to_change_lane/1} é um objetivo,
+\paragraph{Mudança de via segura.} \cod{safe_to_change_lane/1} é um objetivo,
 provado por encadeamento inverso a partir de quatro subobjetivos
 (\cref{lst:safe-lane}). As regras de desvio chamam-no nas condições com
-\cod{prove(safe_to_change_lane(left))}. Mudar de faixa é seguro se não houver
+\cod{prove(safe_to_change_lane(left))}. Mudar de via é seguro se não houver
 outra manobra em curso nem linha contínua, se o ângulo morto estiver livre e se
-houver espaço para seguir o veículo dessa faixa, com 12\,m de folga
+houver espaço para seguir o veículo dessa via, com 12\,m de folga
 (\cod{StoppingPolicy.roomToFollow}).
 
 \begin{lstlisting}[caption={Objetivo provado por encadeamento inverso (\texttt{driving\_rules.pl})},label=lst:safe-lane]

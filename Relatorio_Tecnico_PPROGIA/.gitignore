@@ -15,3 +15,7 @@
 
 # PDF gerado na raiz ao compilar no editor; o oficial é build/relatorio.pdf
 /relatorio.pdf
+
+/figuras/arquitetura-motores.png
+/figuras/explicacao-duas-vias.png
+

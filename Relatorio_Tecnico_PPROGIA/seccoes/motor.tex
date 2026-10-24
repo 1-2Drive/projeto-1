@@ -70,35 +70,122 @@ subobjetivos (\cod{maneuver_idle}, \cod{no_continuous_line}, \cod{side_clear},
 \label{sec:comparacao-motor-uc}
 
 O sistema não usa o motor da unidade curricular (\cod{sp_exp1.pl},
-\cod{sp_exp2.pl}): o motor (\cod{engine.pl}) foi desenvolvido pelo grupo. O
-problema exige decidir a cada 100\,ms sobre uma memória de trabalho que muda em
-cada ciclo, disparar as regras pela mesma ordem que o Drools e devolver
-explicações como dados ao Java, e não como texto na consola. Do motor da UC
-manteve-se a ideia central: registar a justificação de cada facto quando é
-concluído (\cod{justifica/3} corresponde ao nosso \cod{wm_support/3}) e
-explicar a partir desse registo.
+\cod{sp_exp2.pl}~\cite{ucspexp}): o motor (\cod{engine.pl}) foi desenvolvido
+pelo grupo. O problema exige decidir a cada 100\,ms sobre uma memória de trabalho
+que muda em cada ciclo, disparar as regras pela mesma ordem que o Drools e
+devolver explicações como dados ao Java, e não como texto na consola. Do motor da
+UC manteve-se a ideia central: registar a justificação de cada facto quando é
+concluído (\cod{justifica/3} corresponde ao nosso \cod{wm_support/3}) e explicar
+a partir desse registo. As restantes diferenças respondem a pontos que a própria
+aula~6~\cite{uclecture6} deixa em aberto (\cref{tab:comparacao-motor-uc}).
 
-As regras do professor usam operadores e números
-(\cod{regra 7 se [... e ...] entao [cria_facto(...)]}). As nossas são termos
-simples, \texttt{rule(Id, Precedência, Condições, Ações)}, identificados pelo nome
-da regra Drools que replicam e com uma precedência numérica. As condições do
-professor são factos, \cod{nao} e \cod{avalia/1}, que compara um valor com uma
-constante. As nossas acrescentam \cod{test/1}, com qualquer objetivo Prolog (por
-exemplo, comparar a velocidade com o limite), e \cod{prove/1}, que prova o
-objetivo por encadeamento inverso. O controlo também difere. O motor do
-professor dispara uma regra assim que um facto a satisfaz. O nosso junta as
-instanciações numa agenda, escolhe pela precedência e aplica refração.
+\begin{table}[tbp]
+  \centering
+  \caption{Motor da unidade curricular e motor do projeto}
+  \label{tab:comparacao-motor-uc}
+  \small
+  \begin{tabularx}{\textwidth}{@{}L{2.8cm}VL{5.4cm}V>{\raggedright\arraybackslash}X@{}}
+    \toprule
+    \textbf{Aspeto} & \textbf{\texttt{sp\_exp2.pl}} & \textbf{\texttt{engine.pl}} \\
+    \midrule
+    Regras & \cod{regra N se [...] entao [...]}, com operadores e um número
+      & Termos \texttt{rule(Id, Precedência, Condições, Ações)}, com o nome da
+        regra Drools \\ \linhasep
+    Condições & Factos, \cod{nao} e \cod{avalia/1}, que compara um valor com uma
+        constante
+      & Padrões, \cod{not/1} sobre padrões e testes, \cod{test/1} (qualquer
+        objetivo) e \cod{prove/1} (encadeamento inverso) \\ \linhasep
+    Controlo & Dispara uma regra assim que um facto a satisfaz, pela ordem do
+        \emph{backtracking} sobre factos e regras
+      & Agenda com resolução de conflitos: precedência, depois ordem da regra,
+        depois ordem da correspondência \\ \linhasep
+    Repetições & \cod{cria_facto} só verifica se a conclusão já existe, e não se
+        o par facto--regra já disparou~\cite[diap.~39]{uclecture6}
+      & Refração por regra e instanciação (\cod{fired/2}); um facto repetido é
+        ignorado \\ \linhasep
+    Metaconhecimento & \cod{facto_dispara_regras/2} escrito à mão em
+        \cod{veiculos2.txt}; gerá-lo é o exercício proposto~\cite[diap.~47--50]{uclecture6}
+      & Derivado das regras no arranque (\cod{rule_reads/2}), incluindo os factos
+        lidos pelos predicados auxiliares \\ \linhasep
+    Disjunção & Duas regras com a mesma cabeça, e não um OU dentro da
+        regra~\cite[p.~8]{ucajuda}
+      & Igual: \cod{pedestrian_conflict/1} tem uma regra por ramo
+        (\cref{lst:regras-ou}) \\ \linhasep
+    Explicações & \cod{como/1} e \cod{whynot/1} escrevem na consola;
+        \cod{whynot/1} parte de um facto
+      & \cod{explain/2} e \cod{why_not/2} devolvem termos; \cod{why_not/2} parte
+        de uma regra (\cref{cap:explicacao}) \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
 
-A diferença principal está no metaconhecimento. No \cod{sp_exp2.pl},
-\cod{facto_dispara_regras/2} indica que regras cada facto pode disparar, mas é
-estático e escrito manualmente na base de conhecimento. Uma entrada em falta faz
-com que a regra nunca seja tentada, sem qualquer erro. No nosso motor, o
-metaconhecimento é dinâmico. \cod{ensure_index/0} deriva-o das próprias regras
-quando o motor arranca, incluindo os factos lidos pelos predicados auxiliares, e
-guarda-o em predicados dinâmicos (\cod{rule_reads/2}, \cod{rule_precedence/2},
-\cod{rule_rank/2}). \cod{fired/2} muda a cada disparo. Nas explicações,
-\cod{como/1} escreve na consola, enquanto \cod{explain/2} devolve a árvore de
-derivação como termo. \cod{whynot/1} parte de um facto e desce recursivamente
-pelas premissas, enquanto \cod{why_not/2} parte de uma regra e indica a condição
-que a impediu de disparar. O motor do professor não tem explicação do tipo
-\emph{Why}.
+Três destas diferenças merecem nota. A primeira é o metaconhecimento. A aula~6
+mostra como gerar \cod{facto_dispara_regras/2} a partir de uma lista de termos,
+mas deixa às equipas a obtenção automática dessa lista. \cod{ensure_index/0}
+obtém-na de todas as regras e segue também os predicados auxiliares que as
+condições chamam, onde estão muitas das dependências (\cref{sec:meta-indice}).
+A segunda é a refração: o pseudocódigo da aula pede que cada par facto--regra
+dispare uma vez, mas o código só impede conclusões repetidas. No nosso motor é
+cada instanciação de cada regra que dispara no máximo uma vez por ciclo. A
+terceira é a resolução de conflitos, que a UC não trata e que aqui é necessária
+para disparar as regras pela ordem da \emph{salience} do Drools.
+
+As condições do nosso motor exprimem mais do que factos e constantes. A
+\cref{lst:regra-direita}, a regra mais longa da base, aplica o Art.~13 do Código
+da Estrada (circular pela faixa mais à direita). Usa as cinco formas de
+condição: padrões (\cod{ego_lane(Lane)}), testes aritméticos
+(\cod{test(Now >= 4000)}), padrões negados (\cod{not(obstacle(_, _, _, _))}),
+testes negados sobre predicados auxiliares
+(\cod{not(test(front_vehicle_within(80.0)))}) e um subobjetivo provado por
+encadeamento inverso (\cod{prove(no_continuous_line(right))}). Só propõe voltar à
+direita quando nada mais exige atenção: nenhum obstáculo, buraco, barreira ou
+peão em conflito, nenhum veículo a menos de 80\,m e nenhuma ultrapassagem ou
+mudança de faixa pedida pelo condutor.
+
+\noindent\begin{minipage}{\linewidth}
+\begin{lstlisting}[caption={A regra mais longa da base de conhecimento (\texttt{driving\_rules.pl})},label=lst:regra-direita]
+rule('Enforce keep right road law when right lane is safe',
+     460,
+     [ ego_lane(Lane),
+       test(Lane \== right),
+       not(presentation_demo),
+       lane_change_state(idle),
+       prove(no_continuous_line(right)),
+       not(right_lane_blocked_ahead),
+       time_ms(Now),
+       test(Now >= 4000),
+       lane_occupancy(right, false, RightFront),
+       test(RightFront > 80.0),
+       test(fresh_side_reading(right)),
+       not(move_off_state(true, _)),
+       not(obstacle(_, _, _, _)),
+       not(pothole(_, _, _, _)),
+       not(barrier(_, _, false, _)),
+       not(pedestrian_conflict(_)),
+       not(test(front_vehicle_within(80.0))),
+       not(lane_change_request(_)),
+       not(test(driver_lane_change_hold(Now))),
+       not(test(current_overtaking(true, _, _, _, _))) ],
+     [ assert(proposal(return_right, no_target, low, maneuver_safety,
+                       'Portuguese Highway Code Art. 13: Drive on the rightmost available safe lane')) ]).
+\end{lstlisting}
+\end{minipage}
+
+A condição \cod{not(pedestrian_conflict(_))} lê uma conclusão intermédia. O
+Drools escreve a disjunção \enquote{peão na trajetória ou a atravessar} dentro
+de cada regra de peões. Em Prolog, como a UC aconselha, a disjunção é uma
+conclusão própria, com uma regra por ramo (\cref{lst:regras-ou}). A precedência
+1000 garante que o conflito é conhecido antes de qualquer regra que o leia, e a
+explicação mostra qual dos ramos se verificou.
+
+\begin{lstlisting}[caption={Uma disjunção como duas regras (\texttt{driving\_rules.pl})},label=lst:regras-ou]
+rule('Pedestrian conflicts with trajectory (in path)',
+     1000,
+     [ pedestrian_in_path(P) ],
+     [ assert(pedestrian_conflict(P)) ]).
+
+rule('Pedestrian conflicts with trajectory (crossing)',
+     1000,
+     [ crossing_state(P, crossing) ],
+     [ assert(pedestrian_conflict(P)) ]).
+\end{lstlisting}

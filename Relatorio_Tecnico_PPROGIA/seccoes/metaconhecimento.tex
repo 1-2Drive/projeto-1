@@ -95,9 +95,34 @@ disparo acrescentou e, através de \cod{rule_reads/2}, avalia de novo apenas as
 regras que os leem (\cod{rematch/1}). As ativações dessas regras aparecem,
 mudam ou são canceladas antes do disparo seguinte, por exemplo quando uma
 condição \cod{not(proposal(...))} deixa de se verificar. Sem o índice, todas as
-regras teriam de ser avaliadas de novo depois de cada disparo. O índice não muda
-nenhuma decisão, só o custo: reduz as avaliações de regras em 82,5\,\% e o tempo
-médio de inferência por ciclo para 1,47\,ms.
+regras teriam de ser avaliadas de novo depois de cada disparo.
+
+O teste \cod{DependencyIndexBenchmarkTest} mede o efeito do índice. Corre os 14
+cenários da biblioteca durante 150 ciclos cada (2\,100 ciclos) em dois processos
+Prolog lado a lado, um com o índice e outro sem ele. Em todos os ciclos, as duas
+execuções tomaram a mesma decisão e dispararam as mesmas regras (10\,231
+disparos): o índice só muda o custo, que o próprio motor mede
+(\cod{cycle_stats/3}). Com o índice, a inferência ocupa em média cerca de
+1,5\,\% do ciclo de 100\,ms (\cref{tab:desempenho}). Os tempos cobrem só a
+inferência, sem a comunicação JSON, e foram medidos numa única máquina (Intel
+Core Ultra 7 258V, SWI-Prolog 9.2.9).
+
+\begin{table}[H]
+  \centering
+  \caption{Efeito do índice de dependências (14 cenários, 2\,100 ciclos)}
+  \label{tab:desempenho}
+  \small
+  \begin{tabularx}{\textwidth}{@{}XVC{3.1cm}VC{3.1cm}VC{1.9cm}@{}}
+    \toprule
+    & \textbf{Com índice} & \textbf{Sem índice} & \textbf{Redução} \\
+    \midrule
+    Avaliações de regras, total (por ciclo) & 258\,894 (123) & 1\,479\,720 (705)
+      & 82,5\,\% \\ \linhasep
+    Tempo médio por ciclo & 1,47\,ms & 6,41\,ms & 77,0\,\% \\ \linhasep
+    Pior cenário (S10, chuva) & 2,64\,ms & 9,62\,ms & 72,6\,\% \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
 
 \section{Conhecimento de controlo}
 \label{sec:meta-controlo}

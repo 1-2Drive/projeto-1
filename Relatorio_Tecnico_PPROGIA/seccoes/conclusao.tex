@@ -1,21 +1,30 @@
 \chapter{Conclusão}
 \label{cap:conclusao}
 
-O projeto cumpre o objetivo de integrar Prolog num sistema pericial interativo e
-explicável. A contribuição técnica principal é o motor de regras de produção
-implementado em \cod{engine.pl}. A agenda determinística, a refração, a
-proveniência e o índice de dependências tornam explícitos mecanismos que, noutros
-motores, permanecem internos.
+O grupo desenvolveu em SWI-Prolog um motor de regras de produção próprio e
+integrou-o num sistema pericial que decide a velocidade e a faixa de um veículo
+simulado a cada 100\,ms. O motor (\cod{engine.pl}) torna explícitos mecanismos
+que noutros motores ficam internos: a agenda com resolução de conflitos, a
+refração, a justificação de cada facto e o índice de dependências. Resolve
+também dois pontos que a aula~6 deixa em aberto: o metaconhecimento é gerado a
+partir das próprias regras, e cada instanciação de uma regra dispara no máximo
+uma vez por ciclo.
 
-A base de conhecimento apresenta dimensão e variedade suficientes para
-demonstrar raciocínio reativo, temporal, negativo, difuso e orientado por
-objetivos. A integração com Java preserva todas as propostas e separa os canais
-de controlo, enquanto a interface permite observar factos, regras e decisões. Os
-testes de equivalência com Drools e a execução integral de 598 testes sem falhas
-fornecem evidência de correção no contexto do simulador.
+A base de conhecimento tem 120 regras e replica, com os mesmos nomes e pela
+mesma ordem de disparo, as regras do motor Drools do sistema. Como cada facto
+derivado e cada proposta guardam a regra e a evidência que os produziram, as
+explicações \emph{How}, \emph{Why} e \emph{Why not} são construídas a partir do
+que o motor registou, e não reconstruídas depois.
 
-A solução deve ser entendida como um protótipo académico de apoio à decisão.
-Dentro desse âmbito, oferece uma resposta completa aos critérios de avaliação:
-base de conhecimento estruturada, novo motor de inferência, explicações
-\emph{How}, \emph{Why} e \emph{Why not}, metaconhecimento, arquitetura
-cliente-servidor e demonstração prática.
+O sistema tem limitações:
+
+\begin{itemize}
+  \item não faz perguntas ao utilizador, porque todos os factos vêm dos sensores
+    (\cref{sec:expl-why});
+  \item \cod{explain/2} e \cod{why_not/2} funcionam no motor, mas ainda não
+    estão disponíveis na interface, cujas explicações partem do registo de cada
+    ciclo;
+  \item o conhecimento só foi exercitado no simulador, pelo que o sistema é um
+    protótipo académico de apoio à decisão, e não um sistema para um veículo
+    real.
+\end{itemize}

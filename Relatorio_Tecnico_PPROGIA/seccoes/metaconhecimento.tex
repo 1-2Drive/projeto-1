@@ -1,19 +1,19 @@
-\chapter{Metaconhecimento}
+\chapter{Meta-conhecimento}
 \label{cap:metaconhecimento}
 
 \section{Definição e finalidade}
 \label{sec:meta-definicao}
 
-Neste projeto, metaconhecimento é o conhecimento sobre as próprias regras, e não
+Neste projeto, meta-conhecimento é o conhecimento sobre as próprias regras, e não
 sobre a condução em si, usado para controlar e acelerar a inferência. Saber que
 se deve reduzir a velocidade quando o limite é ultrapassado é conhecimento do
 domínio. Saber que a regra que o faz lê os factos \cod{ego_speed/1} e
 \cod{speed_limit/1}, que tem precedência 300 e que já disparou neste ciclo é
-metaconhecimento. É esta a definição que está no cabeçalho de \cod{engine.pl},
-onde cada parte do metaconhecimento está assinalada com comentários
+meta-conhecimento. É esta a definição que está no cabeçalho de \cod{engine.pl},
+onde cada parte do meta-conhecimento está assinalada com comentários
 \enquote{Meta-conhecimento} ou \enquote{Meta-conhecimento dinâmico}.
 
-O metaconhecimento resolve três problemas de controlo do motor de inferência:
+O meta-conhecimento resolve três problemas de controlo do motor de inferência:
 
 \begin{itemize}
   \item \textbf{resolução de conflitos}: quando várias regras estão prontas a
@@ -27,13 +27,13 @@ O metaconhecimento resolve três problemas de controlo do motor de inferência:
 \section{Representação no motor Prolog}
 \label{sec:meta-representacao}
 
-O metaconhecimento está em predicados dinâmicos de \cod{engine.pl}, declarados com \cod{:- dynamic}~\cite{swideclare} e separados da
+O meta-conhecimento está em predicados dinâmicos de \cod{engine.pl}, declarados com \cod{:- dynamic}~\cite{swideclare} e separados da
 memória de trabalho (\cod{wm_fact/2}, \cod{wm_support/3}, etc.), cujos
 predicados têm o prefixo \cod{wm_} (\cref{tab:metaconhecimento}).
 
 \begin{table}[H]
   \centering
-  \caption{Predicados de metaconhecimento do motor}
+  \caption{Predicados de meta-conhecimento do motor}
   \label{tab:metaconhecimento}
   \small
   % Colunas de texto em bandeira (sem justificação), para não abrir espaços.
@@ -53,14 +53,14 @@ predicados têm o prefixo \cod{wm_} (\cref{tab:metaconhecimento}).
   \end{tabularx}
 \end{table}
 
-Este metaconhecimento é dinâmico, e não escrito à mão, em dois sentidos:
+Este meta-conhecimento é dinâmico, e não escrito à mão, em dois sentidos:
 
 \begin{enumerate}
   \item \textbf{É derivado das regras durante a execução.} Quando o motor
     arranca, \cod{ensure_index/0} lê as próprias regras como dados e calcula
     \cod{rule_reads/2}, \cod{rule_precedence/2} e \cod{rule_rank/2}, que guarda
     com \cod{assertz}~\cite{swidynamic}. Quando uma regra é acrescentada ou alterada, o
-    metaconhecimento acompanha-a no arranque seguinte, sem manutenção manual. O
+    meta-conhecimento acompanha-a no arranque seguinte, sem manutenção manual. O
     mesmo passo verifica que não há duas regras com o mesmo identificador.
   \item \textbf{Muda durante a inferência.} \cod{fired/2} ganha uma entrada a
     cada disparo e é apagado no início de cada ciclo.

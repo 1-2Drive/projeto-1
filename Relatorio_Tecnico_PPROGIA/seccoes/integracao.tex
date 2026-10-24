@@ -1,4 +1,4 @@
-\chapter{Integração do motor Prolog com o Java}
+\chapter{Integração do motor Prolog com o componente Java}
 \label{cap:integracao}
 
 \cod{ExpertSystemBackend} define o ciclo comum aos motores: avançar o relógio,
@@ -9,10 +9,11 @@ motor sem modificar o \cod{SimulationEngine}.
 \paragraph{Comunicação.} O motor corre num processo \cod{swipl} persistente,
 gerido pela classe \cod{PrologProcess}. O Java copia os ficheiros Prolog para
 uma pasta de trabalho e arranca o processo com
-\cod{swipl -q -g main -t halt server.pl}. O arranque acontece quando o motor é
-iniciado, num RESET ou numa troca de motor. Os dois lados trocam mensagens JSON
-pela entrada e saída padrão: um pedido por linha, e exatamente uma resposta por
-linha, mesmo quando o pedido falha. Lançar o interpretador custa cerca de 150 a
+\cod{swipl -q -g main -t halt server.pl}, que executa \cod{main/0} em \cod{server.pl}
+e carrega os outros três ficheiros Prolog. O arranque acontece quando o motor é
+iniciado, num RESET ou numa troca de motor de inferência. Os dois lados trocam mensagens
+JSON por \cod{stdin} e \cod{stdout} padrão: um pedido por linha, e exatamente uma resposta
+por linha, mesmo quando o pedido falha. Lançar o interpretador custa cerca de 150 a
 250\,ms, o que é incompatível com uma decisão a cada 100\,ms. Além disso, o lado
 Prolog tem de guardar estado entre ciclos. Por isso o processo é mantido vivo
 durante toda a sessão. O pedido \cod{reset} inicia a sessão com a velocidade de

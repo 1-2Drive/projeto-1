@@ -118,8 +118,10 @@
 }
 
 % --- Títulos ---------------------------------------------------
+% Títulos de capítulo sem hifenização: um título longo passa à linha seguinte
+% numa palavra inteira (e não «com-/ponente»), alinhado à esquerda.
 \titleformat{\chapter}[hang]
-  {\normalfont\huge\bfseries\color{corEscura}}
+  {\normalfont\huge\bfseries\color{corEscura}\raggedright\hyphenpenalty=10000\exhyphenpenalty=10000}
   {\thechapter\hspace{12pt}\textcolor{corCinza}{|}\hspace{12pt}}{0pt}{\huge}
 \titlespacing*{\chapter}{0pt}{-10pt}{24pt}
 

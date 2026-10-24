@@ -110,9 +110,9 @@ aula~6~\cite{uclecture6} deixa em aberto (\cref{tab:comparacao-motor-uc}).
         o par facto--regra já disparou~\cite[diap.~39]{uclecture6}
       & Refração por regra e instanciação (\cod{fired/2}); um facto repetido é
         ignorado \\ \linhasep
-    Metaconhecimento & \cod{facto_dispara_regras/2} escrito à mão em
+    Meta-conhecimento & \cod{facto_dispara_regras/2} escrito à mão em
         \cod{veiculos2.txt}; gerá-lo é o exercício proposto~\cite[diap.~47--50]{uclecture6}
-      & Derivado das regras no arranque (\cod{rule_reads/2}), incluindo os factos
+      & Dinâmico: Derivado das regras no arranque (\cod{rule_reads/2}), incluindo os factos
         lidos pelos predicados auxiliares \\ \linhasep
     Disjunção & Duas regras com a mesma cabeça, e não um OU dentro da
         regra~\cite[p.~8]{ucajuda}
@@ -126,7 +126,7 @@ aula~6~\cite{uclecture6} deixa em aberto (\cref{tab:comparacao-motor-uc}).
   \end{tabularx}
 \end{table}
 
-Três destas diferenças merecem nota. A primeira é o metaconhecimento. A aula~6
+Três destas diferenças merecem nota. A primeira é o meta-conhecimento. A aula~6
 mostra como gerar \cod{facto_dispara_regras/2} a partir de uma lista de termos,
 mas deixa às equipas a obtenção automática dessa lista. \cod{ensure_index/0}
 obtém-na de todas as regras e segue também os predicados auxiliares que as

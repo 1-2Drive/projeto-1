@@ -1,9 +1,10 @@
 \chapter{Base de Conhecimento}
 \label{cap:base-conhecimento}
 
-A base de conhecimento é sobretudo um conjunto de regras de produção sobre
-condução: 123 regras em DRL (\cod{src/main/resources/rules}) e 120 em Prolog
-(\cod{driving_rules.pl}), que replicam as primeiras.
+A base de conhecimento (\cod{driving_rules.pl}) é um conjunto de 120 regras de
+produção sobre condução. Replicam as regras de decisão do motor Drools: 75 têm o
+nome de uma regra Drools, 43 são variantes por resultado de 16 regras Drools, e
+2 são regras intermédias que só existem em Prolog.
 
 \section{O que a base contém}
 \label{sec:base-conteudo}
@@ -12,15 +13,45 @@ O objetivo é que o comportamento do veículo fique descrito nas regras, e não
 espalhado pelo código de controlo. A base cobre emergências, peões, veículo da
 frente e ultrapassagens, limites de velocidade, STOP, semáforos, perigos na via,
 mudanças de faixa, barreiras e meteorologia. Algumas regras seguem diretamente o
-Código da Estrada, como o Art.~13 (circular pela direita), em \cod{road-law.drl}.
+Código da Estrada, como o Art.~13 (circular pela direita,
+\cref{lst:regra-direita}).
 
-Há sete tipos de conhecimento. Os eventos de perceção (24 classes, como
-\cod{TTCEvent}) e os factos de estado, que são as crenças do sistema (27
-classes, como \cod{CurrentSpeedLimit}), alimentam 33 regras de perceção, 87 de
-decisão e 2 de recurso (\emph{fallback}). Há ainda 6 \emph{queries} que
-servem de objetivos, conhecimento difuso (\cod{FuzzySupport} e 8 regras) e
-constantes numéricas (\cod{StoppingPolicy}). A regra de controlo é
-metaconhecimento e fica para o \cref{cap:metaconhecimento}.
+As regras leem 66 tipos de facto, que se agrupam como mostra a
+\cref{tab:tipos-factos}.
+
+\begin{table}[H]
+  \centering
+  \caption{Tipos de facto lidos pelas regras}
+  \label{tab:tipos-factos}
+  \small
+  \begin{tabularx}{\textwidth}{@{}L{3.0cm}V>{\raggedright\arraybackslash}XVL{4.2cm}@{}}
+    \toprule
+    \textbf{Tipo} & \textbf{Exemplos} & \textbf{Origem} \\
+    \midrule
+    Perceção & \cod{ego_speed(Kmh)}, \cod{pothole(Id, DistanceM, Severity, Lane)},
+        \cod{traffic_light(Id, red|yellow|green, DistanceM)},
+        \cod{lane_occupancy(Side, Occupied, FrontDistanceM)}
+      & Sensores e veículo, carregados por \cod{driving_state.pl} no início do
+        ciclo \\ \linhasep
+    Estado anterior & \cod{overtaking/5}, \cod{light_commitment/2},
+        \cod{stop_hold_started/2}, \cod{previous_decision/2}
+      & Estado guardado entre ciclos (38 tipos) e a decisão anterior \\ \linhasep
+    Conclusões intermédias & \cod{pedestrian_conflict(Id)},
+        \cod{fuzzy_membership/3}, \cod{fuzzy_conclusion/2},
+        \cod{overtake_started/3}
+      & Concluídas por regras no próprio ciclo \\ \linhasep
+    Propostas & \cod{proposal(Action, SpeedKmh, Risk, Priority, Reason)}
+      & Concluídas por regras, arbitradas no Java \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+Além das regras e dos factos, a base tem predicados auxiliares, que leem os
+factos através de \cod{known/1} (por exemplo \cod{front_vehicle_within/1}), e
+subobjetivos provados por encadeamento inverso (\cref{sec:base-exemplos}). As
+constantes numéricas, como as distâncias de paragem e o valor de cada
+prioridade, não estão escritas no Prolog: chegam do Java no pedido
+\cod{reset} (\cod{param/2}, \cod{priority_value/2}).
 
 \section{Representação e organização}
 \label{sec:base-representacao}
@@ -49,34 +80,61 @@ A perceção não tem regras Prolog, porque é tratada em \cod{driving_state.pl}
 \section{Alguns exemplos}
 \label{sec:base-exemplos}
 
-O sinal de limite de velocidade é um bom exemplo de encadeamento. A câmara
-deteta-o até 120\,m à frente e emite um \cod{SpeedLimitDetectedEvent}, que a
-regra \cod{"Track the speed limit sign ahead as pending"} guarda como
-\cod{PendingSpeedLimit}. Só quando o veículo chega ao sinal é que
-\cod{"Activate the pending speed limit at its sign"} o passa para
-\cod{CurrentSpeedLimit}, e a regra acima pode propor \cod{REDUCE_SPEED}. Os dois
-limites estão separados porque, aplicado logo que o sinal era visto, o limite
-fazia o veículo abrandar demasiado cedo.
+\paragraph{Limite de velocidade.} A câmara deteta o sinal até 120\,m à frente.
+O \cod{driving_state.pl} guarda-o como pendente, com a sua posição na estrada, e
+carrega-o como \cod{pending_speed_limit(Kmh, SignPositionM)}. Enquanto o sinal
+está à frente, \cod{'Slow down in time for the speed limit ahead'} faz o veículo
+chegar a ele já ao novo limite. Quando o veículo chega ao sinal, o limite
+pendente passa a \cod{speed_limit(Kmh)}, e a regra da
+\cref{lst:regra-limite-pl} pode propor \cod{reduce_speed}. Os dois limites estão
+separados porque, aplicado logo que o sinal era visto, o limite fazia o veículo
+abrandar demasiado cedo.
 
-Para a meteorologia recorre-se a lógica difusa. O ficheiro
-\cod{fuzzy-weather.drl} implementa um controlador de Mamdani, com fuzificação,
-inferência (E como mínimo, OU como máximo), composição e desfuzificação pelo
-centroide. Uma regra típica diz que, com visibilidade ou aderência fracas, se
-deve andar muito devagar, e o resultado é um teto \cod{REDUCE_SPEED} de
-prioridade 40.
+\paragraph{Meteorologia.} Para a meteorologia recorre-se a lógica difusa: um
+controlador de Mamdani com 8 regras, em três níveis de precedência. Duas regras
+de fuzificação (360) convertem a visibilidade e a aderência de
+\cod{weather/3} em graus de pertença, \cod{fuzzy_membership(Variable, Term, Degree)}. Cinco regras de inferência (355) combinam-nos, com E como mínimo e OU
+como máximo, e concluem \cod{fuzzy_conclusion(Term, Degree)}
+(\cref{lst:regra-difusa}). Uma regra de desfuzificação (350) agrega as
+conclusões e calcula o centroide, que é a velocidade recomendada: um único teto
+\cod{reduce_speed} com prioridade de perigo na via (40). A precedência garante
+que cada nível só dispara depois do anterior.
 
-Já a \emph{query} \cod{safeToChangeLane} exprime um objetivo. Mudar de faixa é
-seguro se não houver outra manobra nem linha contínua, se o ângulo morto estiver
-livre e se houver espaço para seguir o carro dessa faixa, com 12\,m de folga
+\begin{lstlisting}[caption={Uma regra de inferência difusa (\texttt{driving\_rules.pl})},label=lst:regra-difusa]
+rule('Fuzzy: poor visibility or poor grip -> very slow',
+     355,
+     [ fuzzy_membership(visibility, poor, V),
+       fuzzy_membership(grip, poor, G),
+       test(( D is max(V, G), D > 0.0 )) ],
+     [ assert(fuzzy_conclusion(very_slow, D)) ]).
+\end{lstlisting}
+
+\paragraph{Mudança de faixa segura.} \cod{safe_to_change_lane/1} é um objetivo,
+provado por encadeamento inverso a partir de quatro subobjetivos
+(\cref{lst:safe-lane}). As regras de desvio chamam-no nas condições com
+\cod{prove(safe_to_change_lane(left))}. Mudar de faixa é seguro se não houver
+outra manobra em curso nem linha contínua, se o ângulo morto estiver livre e se
+houver espaço para seguir o veículo dessa faixa, com 12\,m de folga
 (\cod{StoppingPolicy.roomToFollow}).
+
+\begin{lstlisting}[caption={Objetivo provado por encadeamento inverso (\texttt{driving\_rules.pl})},label=lst:safe-lane]
+safe_to_change_lane(Side) :-
+    maneuver_idle,
+    no_continuous_line(Side),
+    side_clear(Side),
+    room_to_follow(Side).
+\end{lstlisting}
 
 \section{Acesso e manutenção}
 \label{sec:base-manutencao}
 
-Os padrões são unificados com \cod{wm_fact/2} e os
-auxiliares leem factos com \cod{known/1}. Em execução, as crenças mantêm-se
-atualizadas porque as regras de perceção esquecem o que deixou de ser
-observado, os eventos expiram e as conclusões difusas são retiradas pela
-manutenção de verdade. As regras em si não mudam durante a execução. A
-manutenção faz-se editando os ficheiros, e o \cod{PrologDroolsEquivalenceTest}
-confirma que as duas bases continuam coerentes.
+Os padrões das regras são unificados com \cod{wm_fact/2}, e os auxiliares leem
+factos com \cod{known/1}. Dentro de um ciclo, os factos nunca são retirados: não
+há manutenção de verdade. As crenças mantêm-se atualizadas entre ciclos, porque
+cada ciclo começa com os factos carregados de novo a partir do estado em
+\cod{driving_state.pl}. Esse estado esquece o que deixou de ser observado
+(\cod{expire_old_readings/1}): por exemplo, um obstáculo, um buraco ou uma
+barreira desaparecem 1\,s depois da última leitura. As regras em si não mudam
+durante a execução. A manutenção faz-se editando os ficheiros, e o
+\cod{PrologDroolsEquivalenceTest} confirma que as duas bases continuam
+coerentes.

@@ -3,8 +3,9 @@
   Figura 2.1: os dois motores alimentam a mesma arbitragem.
   Fonte vetorial de figuras/arquitetura-motores.png. Para regenerar o PNG: make figuras
   Coordenadas em px, na mesma grelha da figura original (864 x 775).
+  Sem título nem subtítulo (a legenda do LaTeX já os dá): a viewBox começa em y=68.
 -->
-<svg xmlns="http://www.w3.org/2000/svg" width="864" height="775" viewBox="0 0 864 775">
+<svg xmlns="http://www.w3.org/2000/svg" width="864" height="707" viewBox="0 68 864 707">
   <defs>
     <marker id="seta" viewBox="0 0 10 10" refX="9" refY="5"
             markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto">
@@ -13,8 +14,6 @@
     </marker>
     <style>
       text      { font-family: 'Noto Sans', 'Inter', 'Helvetica Neue', Arial, sans-serif; fill: #1f1f1f; }
-      .titulo   { font-size: 17px; font-weight: 700; }
-      .subtitulo{ font-size: 12.5px; fill: #555; }
       .nome     { font-size: 14px; font-weight: 700; text-anchor: middle; }
       .detalhe  { font-size: 12.5px; fill: #333; text-anchor: middle; }
       .rotulo   { font-size: 12.5px; fill: #444; }
@@ -26,11 +25,7 @@
     </style>
   </defs>
 
-  <rect width="864" height="775" fill="#ffffff"/>
-
-  <!-- Título -->
-  <text class="titulo" x="28" y="32">Os dois motores alimentam a mesma arbitragem</text>
-  <text class="subtitulo" x="28" y="55">Só um motor está ativo em cada sessão; ambos devolvem propostas, nunca ações</text>
+  <rect x="0" y="68" width="864" height="707" fill="#ffffff"/>
 
   <!-- SimulationEngine -->
   <rect class="caixa" x="262" y="82" width="340" height="63" rx="8"/>

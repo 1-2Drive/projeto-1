@@ -3,8 +3,9 @@
   Figura: percurso da informação no módulo de explicação (duas vias).
   Fonte vetorial de figuras/explicacao-duas-vias.png. Para regenerar o PNG: make figuras
   Coordenadas em px, na mesma grelha da figura original (864 x 621).
+  Sem título nem subtítulo (a legenda do LaTeX já os dá): a viewBox começa em y=68.
 -->
-<svg xmlns="http://www.w3.org/2000/svg" width="864" height="621" viewBox="0 0 864 621">
+<svg xmlns="http://www.w3.org/2000/svg" width="864" height="553" viewBox="0 68 864 553">
   <defs>
     <marker id="seta" viewBox="0 0 10 10" refX="9" refY="5"
             markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto">
@@ -13,8 +14,6 @@
     </marker>
     <style>
       text      { font-family: 'Noto Sans', 'Inter', 'Helvetica Neue', Arial, sans-serif; fill: #1f1f1f; }
-      .titulo   { font-size: 17px; font-weight: 700; }
-      .subtitulo{ font-size: 12.5px; fill: #555; }
       .nome     { font-size: 14px; font-weight: 700; text-anchor: middle; }
       .detalhe  { font-size: 12.5px; fill: #333; text-anchor: middle; }
       .rotulo   { font-size: 12.5px; fill: #444; }
@@ -24,11 +23,7 @@
     </style>
   </defs>
 
-  <rect width="864" height="621" fill="#ffffff"/>
-
-  <!-- Título -->
-  <text class="titulo" x="28" y="32">Todas as explicações partem do que o motor registou</text>
-  <text class="subtitulo" x="28" y="55">Via em tempo real a cada ciclo; via histórica sobre viagens gravadas no STOP</text>
+  <rect x="0" y="68" width="864" height="553" fill="#ffffff"/>
 
   <!-- Registo durante a inferência -->
   <rect class="destaque" x="216" y="82" width="432" height="99" rx="8"/>

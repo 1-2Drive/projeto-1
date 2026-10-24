@@ -136,6 +136,31 @@
 \pretocmd{\section}{\Needspace{10\baselineskip}}{}{}
 \pretocmd{\subsection}{\Needspace{6\baselineskip}}{}{}
 
+% ===============================================================
+% CAPÍTULOS SEGUIDOS (sem mudança de página) — 24/10/2026
+% ---------------------------------------------------------------
+% Com \quebracapitulofalse (em relatorio.tex, antes do Capítulo 1), um
+% \chapter já não começa numa página nova: segue o texto anterior, com um
+% espaço de 1.2cm, e só muda de página se restarem menos de ~12 linhas.
+% \quebracapitulotrue repõe o comportamento normal (usado antes das
+% Referências e do Anexo, que continuam a abrir página).
+% Reverter: apagar as duas linhas \quebracapitulo... em relatorio.tex
+% (ou este bloco inteiro).
+% ===============================================================
+\newif\ifquebracapitulo
+\quebracapitulotrue
+\makeatletter
+\patchcmd{\chapter}
+  {\if@openright\cleardoublepage\else\clearpage\fi}
+  {\ifquebracapitulo
+     \if@openright\cleardoublepage\else\clearpage\fi
+   \else
+     \par\addvspace{1.2cm}\Needspace{12\baselineskip}%
+   \fi}
+  {}{\PackageWarning{preambulo}{CAPITULOS SEGUIDOS: o patch do chapter falhou}}
+\makeatother
+% --- fim de CAPÍTULOS SEGUIDOS -----------------------------------
+
 % --- Legendas --------------------------------------------------
 \captionsetup{font=small,labelfont={bf,color=corEscura},skip=6pt}
 

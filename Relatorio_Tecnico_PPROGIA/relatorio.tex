@@ -42,6 +42,9 @@
 % As fontes do perito abrem a lista de referências, pela ordem em que foram
 % recolhidas (unsrt numera pela ordem da primeira citação).
 \nocite{cienciavitae,isepcontrato,lopes2006,uminhoteses}
+% Capítulos 1 a 9 seguidos, sem mudança de página (ver CAPÍTULOS SEGUIDOS em
+% preambulo.tex).
+\quebracapitulofalse
 \input{seccoes/perito}
 \input{seccoes/motor}
 \input{seccoes/integracao}
@@ -50,10 +53,9 @@
 \input{seccoes/explicacao}
 \input{seccoes/interface}
 \input{seccoes/dificuldades}
-% A Conclusão segue na mesma página das Dificuldades: sem o \clearpage do
-% \chapter, como a lista de tabelas acima.
-\vspace{0.3cm}
-{\let\clearpage\relax\input{seccoes/conclusao}}
+\input{seccoes/conclusao}
+% As Referências e o Anexo voltam a abrir página.
+\quebracapitulotrue
 
 % Todas as entradas de referencias.bib são citadas no texto. O \nocite{*} só
 % garante que uma entrada nova, ainda por citar, aparece no fim da lista.

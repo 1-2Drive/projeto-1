@@ -74,7 +74,7 @@ USO
     .\build.ps1 [opcoes]
 
 OPCOES
-    -Figures, -f        Regenera os PDF das figuras a partir dos SVG originais
+    -Figures, -f        Regenera os PNG das figuras a partir dos SVG originais
                         antes de compilar (requer inkscape, rsvg-convert ou
                         cairosvg). Por omissao, so sao gerados os que faltarem.
     -Clean, -c          Remove os ficheiros auxiliares de build\ e termina.
@@ -303,16 +303,39 @@ function Convert-SvgToPdf([string]$Src, [string]$Dst) {
     return $false
 }
 
-# Converte os SVG de $SrcDir para PDF em $DstDir (o pdflatex nao le SVG). Sem
-# $Force, so converte os que ainda nao tem PDF. Os logotipos em JPEG/PNG sao
-# usados directamente.
-function Convert-SvgFolder([string]$SrcDir, [string]$DstDir, [bool]$Force, [string]$What) {
+# PNG de 2592 px de largura, fundo branco (como o build.sh e o Makefile): as
+# figuras do relatorio sao rasterizadas; os logotipos continuam em PDF.
+function Convert-SvgToPng([string]$Src, [string]$Dst) {
+    Remove-Item -LiteralPath $Dst -Force -ErrorAction SilentlyContinue
+    if (Have 'inkscape') {
+        & inkscape $Src --export-type=png --export-width=2592 `
+            --export-background=white --export-background-opacity=1 `
+            "--export-filename=$Dst" *> $null
+        if (Test-NonEmptyFile $Dst) { return $true }
+        Remove-Item -LiteralPath $Dst -Force -ErrorAction SilentlyContinue
+    }
+    if (Have 'rsvg-convert') {
+        & rsvg-convert -f png -w 2592 -b white -o $Dst $Src *> $null
+        if ($LASTEXITCODE -eq 0 -and (Test-NonEmptyFile $Dst)) { return $true }
+    }
+    if (Have 'cairosvg') {
+        & cairosvg $Src --output-width 2592 -o $Dst *> $null
+        if ($LASTEXITCODE -eq 0 -and (Test-NonEmptyFile $Dst)) { return $true }
+    }
+    Remove-Item -LiteralPath $Dst -Force -ErrorAction SilentlyContinue
+    return $false
+}
+
+# Converte os SVG de $SrcDir para $Format (pdf ou png) em $DstDir (o pdflatex
+# nao le SVG). Sem $Force, so converte os que ainda nao tem o ficheiro de
+# saida. Os logotipos em JPEG/PNG sao usados directamente.
+function Convert-SvgFolder([string]$SrcDir, [string]$DstDir, [bool]$Force, [string]$What, [string]$Format) {
     if (-not (Test-Path -LiteralPath $SrcDir -PathType Container)) {
         Dbg "sem pasta de SVG ($SrcDir); $What ignorados"
         return $true
     }
     $todo = @(Get-ChildItem -LiteralPath $SrcDir -Filter '*.svg' -File | Where-Object {
-        $Force -or -not (Test-Path -LiteralPath (Join-Path $DstDir "$($_.BaseName).pdf"))
+        $Force -or -not (Test-Path -LiteralPath (Join-Path $DstDir "$($_.BaseName).$Format"))
     })
     if ($todo.Count -eq 0) { return $true }
 
@@ -321,17 +344,19 @@ function Convert-SvgFolder([string]$SrcDir, [string]$DstDir, [bool]$Force, [stri
             Err 'nenhum conversor de SVG disponivel (inkscape, rsvg-convert ou cairosvg)'
             Say '    winget install Inkscape.Inkscape'
         } else {
-            Warn "faltam PDF de $What e nao ha conversor de SVG instalado"
+            Warn "faltam $($Format.ToUpper()) de $What e nao ha conversor de SVG instalado"
         }
         return $false
     }
 
     New-Item -ItemType Directory -Force -Path $DstDir | Out-Null
-    Step "A converter $What SVG para PDF"
+    Step "A converter $What SVG para $($Format.ToUpper())"
     $allOk = $true
     foreach ($svg in $todo) {
-        if (Convert-SvgToPdf $svg.FullName (Join-Path $DstDir "$($svg.BaseName).pdf")) {
-            Ok "$($svg.BaseName).pdf"
+        $dst = Join-Path $DstDir "$($svg.BaseName).$Format"
+        $converted = if ($Format -eq 'png') { Convert-SvgToPng $svg.FullName $dst } else { Convert-SvgToPdf $svg.FullName $dst }
+        if ($converted) {
+            Ok "$($svg.BaseName).$Format"
         } else {
             Err "falhou a conversao de $($svg.Name)"
             $allOk = $false
@@ -341,11 +366,11 @@ function Convert-SvgFolder([string]$SrcDir, [string]$DstDir, [bool]$Force, [stri
 }
 
 if ($Figures) {
-    if (-not (Convert-SvgFolder $LogoDir $LogoDir $true 'logotipos')) { exit 1 }
-    if (-not (Convert-SvgFolder $SvgDir $FigDir $true 'figuras')) { exit 1 }
+    if (-not (Convert-SvgFolder $LogoDir $LogoDir $true 'logotipos' 'pdf')) { exit 1 }
+    if (-not (Convert-SvgFolder $SvgDir $FigDir $true 'figuras' 'png')) { exit 1 }
 } else {
-    Convert-SvgFolder $LogoDir $LogoDir $false 'logotipos' | Out-Null
-    Convert-SvgFolder $SvgDir $FigDir $false 'figuras' | Out-Null
+    Convert-SvgFolder $LogoDir $LogoDir $false 'logotipos' 'pdf' | Out-Null
+    Convert-SvgFolder $SvgDir $FigDir $false 'figuras' 'png' | Out-Null
 }
 
 # Avisa sobre figuras referenciadas mas ausentes

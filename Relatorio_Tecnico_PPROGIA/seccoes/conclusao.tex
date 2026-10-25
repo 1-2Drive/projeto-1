@@ -1,23 +1,16 @@
 \chapter{Conclusão}
 \label{cap:conclusao}
 
-O grupo desenvolveu em SWI-Prolog um motor de regras de produção próprio e, em
-colaboração com o perito, criou uma base de conhecimento com cerca de 120 regras.
-O motor foi integrado num sistema pericial que decide a velocidade e a via de
-um veículo simulado a cada 100\,ms, e torna explícitos mecanismos que noutros
-motores ficam internos: a agenda com resolução de conflitos, a refração, a
-justificação de cada facto e o índice de dependências (\cod{engine.pl}).
-
-O meta-conhecimento é gerado dinamicamente a partir das
-próprias regras, no arranque do motor, e cada instanciação de uma regra dispara
-no máximo uma vez por ciclo. Sem o índice de dependências, cada ciclo de
-processamento demoraria $\sim$4,4 vezes mais tempo.
-
-Como cada facto derivado e cada proposta guardam a regra e a evidência que os
-produziram, as explicações \emph{How}, \emph{Why} e \emph{Why not} são
-construídas a partir do que o motor registou, e não reconstruídas depois. Estas
-explicações podem ser consultadas na interface Web, depois de carregar em
+O motor descrito neste relatório torna explícitos mecanismos que noutros motores
+ficam internos: a agenda com resolução de conflitos, a refração, a justificação de
+cada facto e o índice de dependências. Sem este índice, cada ciclo demoraria
+cerca de 4,4 vezes mais (\cref{tab:desempenho}). As explicações que o motor
+regista podem ser consultadas na interface Web, depois de carregar em
 \enquote{STOP} (\cref{sec:expl-registo}).
+
+Anda do lado do motor, quase todo o custo que resta é a avaliação inicial das regras
+em cada ciclo. Manter as correspondências de um ciclo para o seguinte, reduziria esse custo,
+embora a margem atual (cerca de 1,5\,\% do ciclo) obviamente não o exija.
 
 No entanto, o sistema tem limitações:
 
@@ -28,3 +21,12 @@ No entanto, o sistema tem limitações:
     protótipo académico de apoio à decisão, e não um sistema usável em veículos
     reais.
 \end{itemize}
+
+Como trabalho futuro, a primeira limitação pode ser atenuada com um modo de operação em que
+perguntas que não dependam do ritmo de 100\,ms: as preferências do condutor (por exemplo, uma
+condução mais prudente) ou condições que os sensores medem mal, como o estado do
+piso, pedidas antes de iniciar a viagem ou com o veículo parado. O motor teria de
+tratar a resposta \enquote{não sei} e evitar repetir perguntas, como propõem os
+materiais da unidade curricular~\cite{ucperguntas}, e passaria a fazer sentido o
+\emph{Why} no sentido do MYCIN: explicar porque é que uma pergunta é feita.
+No entanto, esta limitação parece pouco relevante num projeto que decorre inteiramente em simulação.

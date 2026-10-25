@@ -1,5 +1,5 @@
 % ---------------------------------------------------------------
-% preambulo.tex — pacotes, estilos e ambientes
+% preambulo.tex: pacotes, estilos e ambientes
 % ---------------------------------------------------------------
 
 \usepackage[T1]{fontenc}
@@ -13,7 +13,7 @@
 \usepackage{microtype}
 
 % ===============================================================
-% COMPACTAÇÃO LIGEIRA (margens e letra) — 24/10/2026
+% COMPACTAÇÃO LIGEIRA (margens e letra), 24/10/2026
 % ---------------------------------------------------------------
 % Para caber mais texto por página sem se notar à primeira vista,
 % reduziram-se ligeiramente as margens e o tamanho da letra. São só
@@ -106,7 +106,7 @@
 % --- Cabeçalhos e rodapés --------------------------------------
 \pagestyle{fancy}
 \fancyhf{}
-\fancyhead[L]{\small\textcolor{corCinza}{\ucsigla{} --- \cursosigla}}
+\fancyhead[L]{\small\textcolor{corCinza}{\ucsigla{} \textperiodcentered{} \cursosigla}}
 \fancyhead[R]{\small\textcolor{corCinza}{\tituloprincipal}}
 \fancyfoot[C]{\thepage}
 \renewcommand{\headrulewidth}{0.4pt}
@@ -139,7 +139,7 @@
 \pretocmd{\subsection}{\Needspace{6\baselineskip}}{}{}
 
 % ===============================================================
-% CAPÍTULOS SEGUIDOS (sem mudança de página) — 24/10/2026
+% CAPÍTULOS SEGUIDOS (sem mudança de página), 24/10/2026
 % ---------------------------------------------------------------
 % Com \quebracapitulofalse (em relatorio.tex, antes do Capítulo 1), um
 % \chapter já não começa numa página nova: segue o texto anterior, com um

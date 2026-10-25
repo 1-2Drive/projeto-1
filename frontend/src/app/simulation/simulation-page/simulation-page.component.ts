@@ -181,6 +181,10 @@ export class SimulationPageComponent implements OnInit, OnDestroy {
     this.state.updateEnvironment(request);
   }
 
+  protected setRandomObjectFrequency(frequency: number): void {
+    this.state.setRandomObjectFrequency(frequency);
+  }
+
   protected clearError(): void {
     this.state.clearError();
   }

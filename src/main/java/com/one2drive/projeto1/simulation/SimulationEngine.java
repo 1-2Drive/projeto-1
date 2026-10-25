@@ -38,6 +38,7 @@ import com.one2drive.projeto1.inference.ExpertSystemException;
 import com.one2drive.projeto1.history.SessionSnapshot;
 import com.one2drive.projeto1.history.VehicleSample;
 import com.one2drive.projeto1.prolog.PrologBackend;
+import com.one2drive.projeto1.scenario.RandomObjectSpawner;
 import com.one2drive.projeto1.scenario.ScenarioActorDefinition;
 import com.one2drive.projeto1.scenario.ScenarioDefinition;
 import com.one2drive.projeto1.scenario.ScenarioFactory;
@@ -108,6 +109,10 @@ public class SimulationEngine implements AutoCloseable {
     private DrivingDecision currentDecision;
     private String scenarioId;
     private double scenarioInitialSpeedKmh;
+    /** Spawns the random objects of a random scenario; null for any other scenario. */
+    private RandomObjectSpawner randomObjectSpawner;
+    /** A setting of the simulation, not of a scenario: it carries over to the next random scenario loaded. */
+    private int randomObjectFrequency = RandomObjectSpawner.DEFAULT_FREQUENCY;
 
     public SimulationEngine(SimulationConfig config,
                             ScenarioDefinition scenarioDefinition,
@@ -161,6 +166,7 @@ public class SimulationEngine implements AutoCloseable {
         this.timedActions = new ArrayList<>(scenarioDefinition.getTimedActions());
         this.timedActions.sort(Comparator.comparingLong(ScenarioTimedAction::getTriggerTimeMillis));
         this.scenarioActionCursor = 0;
+        this.randomObjectSpawner = randomObjectSpawner(scenarioDefinition);
 
         this.scenarioInitialSpeedKmh = scenarioDefinition.getInitialSpeedKmh();
         holdVehicleAtRest();
@@ -243,6 +249,7 @@ public class SimulationEngine implements AutoCloseable {
         timedActions.clear();
         timedActions.addAll(scenarioDefinition.getTimedActions());
         timedActions.sort(Comparator.comparingLong(ScenarioTimedAction::getTriggerTimeMillis));
+        randomObjectSpawner = randomObjectSpawner(scenarioDefinition);
         status = SimulationStatus.STOPPED;
         sensorManager.reset();
         lastSensorValues.clear();
@@ -309,6 +316,7 @@ public class SimulationEngine implements AutoCloseable {
 
         flushPendingMutations();
         runTimedActions();
+        spawnRandomObjects();
 
         List<Object> events = sensorManager.observe(worldState, simTimeMillis);
         backend.beginDecisionCycle(simTimeMillis, worldState.getEgo().getSpeedKmh());
@@ -729,6 +737,31 @@ public class SimulationEngine implements AutoCloseable {
             executeTimedAction(action);
             scenarioActionCursor++;
         }
+    }
+
+    private RandomObjectSpawner randomObjectSpawner(ScenarioDefinition scenarioDefinition) {
+        Long seed = scenarioDefinition.getRandomObjectSeed();
+        return seed == null ? null : new RandomObjectSpawner(seed, randomObjectFrequency);
+    }
+
+    private void spawnRandomObjects() {
+        if (randomObjectSpawner == null) {
+            return;
+        }
+        boolean raining = worldState.getWeatherState().getCondition() == WeatherCondition.RAIN;
+        randomObjectSpawner.due(worldState.getEgo().getPositionMeters(), raining).forEach(this::executeTimedAction);
+    }
+
+    /** How often random objects appear in a random scenario: 0 none, 100 the most. */
+    public synchronized void setRandomObjectFrequency(int frequency) {
+        randomObjectFrequency = RandomObjectSpawner.checkFrequency(frequency);
+        if (randomObjectSpawner != null) {
+            randomObjectSpawner.setFrequency(frequency);
+        }
+    }
+
+    public synchronized int getRandomObjectFrequency() {
+        return randomObjectFrequency;
     }
 
     private void executeTimedAction(ScenarioTimedAction action) {

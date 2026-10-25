@@ -213,7 +213,9 @@
                 (createActor)="addActor($event)"
                 (updateEnvironment)="updateEnvironment($event)"
               />
-              <app-scenario-library [scenarios]="scenarios()" (loadScenario)="loadScenario($event)" />
+              <app-scenario-library [scenarios]="scenarios()" (loadScenario)="loadScenario($event)"
+                [randomObjectFrequency]="snapshot()?.randomObjectFrequency ?? null"
+                (randomObjectFrequencyChange)="setRandomObjectFrequency($event)" />
             </section>
           }
         }

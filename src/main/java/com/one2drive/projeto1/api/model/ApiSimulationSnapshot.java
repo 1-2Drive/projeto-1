@@ -32,7 +32,9 @@ public record ApiSimulationSnapshot(
     /** The rule engine deciding: DROOLS or PROLOG. */
     String expertBackend,
     /** Why that engine stopped deciding (the simulation is then paused), or null. */
-    String expertBackendError
+    String expertBackendError,
+    /** How often random objects appear in a random scenario, from 0 (none) to 100. */
+    int randomObjectFrequency
 ) {
     /**
      * The road as a matrix: {@code cells[row][lane]}, rows going forward along the

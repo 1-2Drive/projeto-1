@@ -82,6 +82,41 @@
   }
 }
 
+/* Same look as the toolbox sliders. */
+.slider {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 2rem;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 1.1rem;
+  padding-top: 0.15rem;
+
+  > span {
+    font-size: 0.64rem;
+    white-space: nowrap;
+    color: var(--ds-text-muted);
+  }
+
+  output {
+    font-family: var(--ds-font-mono);
+    font-size: 0.62rem;
+    text-align: right;
+    color: var(--ds-text-secondary);
+  }
+
+  input[type='range'] {
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    accent-color: #3f95cf;
+    cursor: pointer;
+
+    &:disabled {
+      cursor: default;
+    }
+  }
+}
+
 /* Wide: the ten scenarios on two rows of five. */
 @container library (min-width: 50rem) {
   .list {

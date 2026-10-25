@@ -10,20 +10,28 @@ Do lado do motor, quase todo o custo que resta é a avaliação inicial das regr
 em cada ciclo. Manter as correspondências de um ciclo para o seguinte reduziria esse custo,
 embora a margem atual (cerca de 1,5\,\% do ciclo) não o exija.
 
-No entanto, o sistema tem limitações:
+O sistema tem limitações, umas por delimitação do âmbito, outras por
+simplificação da simulação. O ambiente simulado tem três vias e modelos simples
+da estrada e dos outros veículos, sem planeamento de percurso, trânsito em
+sentido contrário, ciclistas nem estado do condutor; só o radar tem ruído, e
+não há quase nenhuma informação contraditória entre sensores. O ciclo de 100\,ms
+limita a complexidade do processamento, com um máximo de 5000 disparos por ciclo
+como proteção. Na decisão, uma paragem por um peão e uma travagem de emergência por
+um obstáculo mais próximo pedem ambas 0\,km/h, e a arbitragem não as distingue;
+e uma mudança de via iniciada é levada até ao fim, mesmo que as condições
+mudem. O sistema também não faz perguntas ao utilizador (\cref{sec:expl-why}),
+o que pouco pesa num projeto inteiramente em simulação. O contacto com o perito
+começou com o desenvolvimento já em curso, embora numa fase inicial, e o sistema
+foi-lhe apresentado no fim. Por último, a validação usou apenas cenários
+simulados e testes automáticos, sem deteção automática de colisões no
+simulador: os resultados valem para os cenários considerados, não para
+condições reais de circulação.
 
-\begin{itemize}
-  \item não faz perguntas ao utilizador, porque todos os factos vêm dos sensores
-    (\cref{sec:expl-why});
-  \item o conhecimento só foi exercitado no simulador, pelo que o sistema é um
-    protótipo académico de apoio à decisão, e não um sistema usável em veículos
-    reais.
-\end{itemize}
-
-A primeira limitação parece pouco relevante num projeto que decorre inteiramente
-em simulação, mas poderia ser atenuada, como trabalho futuro, com um modo de
-operação com perguntas que não dependam do ritmo de 100\,ms: as preferências do condutor ou condições que os sensores medem mal, como o estado do
-piso, pedidas antes de iniciar a viagem ou com o veículo parado. O motor teria de
-tratar a resposta \enquote{não sei} e evitar repetir perguntas, como propõem os
-materiais da unidade curricular, e passaria a fazer sentido o
-\emph{Why} no sentido do MYCIN: explicar porque é que uma pergunta é feita.
+Como desenvolvimento futuro, e seguindo as indicações do perito, propõe-se:
+associar um nível de confiança a cada deteção, confirmar as deteções entre
+câmara e radar e parar de forma controlada perante a falha de um sensor;
+escolher, com teoria dos jogos, entre manobras já provadas seguras quando a
+decisão depende do comportamento de outros condutores; alargar o domínio a
+cruzamentos, trânsito em sentido contrário, ciclistas e saída involuntária da
+via; e ligar a camada de decisão a um simulador mais realista e, depois, a
+sensores reais.

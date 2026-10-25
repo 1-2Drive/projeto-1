@@ -20,10 +20,15 @@
 
 \begin{document}
 
-\input{capa}
-
+% A numeração romana começa na capa (página i, sem número impresso), para que o
+% leitor de PDF não a rotule como "1".
 \pagenumbering{roman}
 \setcounter{page}{1}
+
+\input{capa}
+% O ambiente titlepage repõe o contador em 1 ao terminar (classe report, oneside):
+% a capa é a página i, o Resumo a ii.
+\setcounter{page}{2}
 
 \input{seccoes/resumo}
 

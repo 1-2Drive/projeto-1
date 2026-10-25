@@ -21,29 +21,10 @@ e carrega os outros três ficheiros Prolog. Os dois lados trocam mensagens JSON
 por \cod{stdin} e \cod{stdout}: um pedido por linha, e exatamente uma resposta
 por linha, mesmo quando o pedido falhe. O processo é mantido vivo durante toda a
 sessão: lançá-lo custa 150 a 250\,ms, incompatível com um ciclo de 100\,ms, e o
-lado Prolog guarda estado entre ciclos. A \cref{tab:pedidos-json} resume as
-mensagens JSON.
-
-\begin{table}[H]
-  \centering
-  \caption{Pedidos JSON aceites pelo \texttt{server.pl}}
-  \label{tab:pedidos-json}
-  \small
-  \begin{tabularx}{\textwidth}{@{}L{2.9cm}VL{5.0cm}VX@{}}
-    \toprule
-    \textbf{Comando} & \textbf{Entrada principal} & \textbf{Resposta} \\
-    \midrule
-    \cod{tick} & Veículo, eventos e decisão anterior
-      & Propostas, factos, limite, verificações e métricas \\ \linhasep
-    \cod{reset} & Cruzeiro, parâmetros e prioridades
-      & Confirmação e reinicialização do estado \\ \linhasep
-    \cod{whynot} & Identificador da regra
-      & Condições que impediram a correspondência \\ \linhasep
-    \cod{dependencyIndex} & Booleano
-      & Estado do índice para \emph{benchmark} \\
-    \bottomrule
-  \end{tabularx}
-\end{table}
+lado Prolog guarda estado entre ciclos. O \cod{server.pl} aceita quatro pedidos:
+\cod{tick} (o ciclo de decisão), \cod{reset}, \cod{whynot} (\cref{sec:expl-whynot})
+e \cod{dependencyIndex} (liga ou desliga o índice, só para o \emph{benchmark} da
+\cref{sec:meta-indice}).
 
 \paragraph{Pedidos e respostas.} Durante o ciclo, o \cod{PrologBackend} acumula
 os eventos dos sensores. Preenche também um \cod{VehicleInput} com o estado do

@@ -303,6 +303,8 @@ export interface ApiSimulationSnapshot {
   expertBackend?: ExpertBackend;
   /** Why that engine stopped deciding (the simulation is then paused); null while it works. */
   expertBackendError?: string | null;
+  /** How often random objects appear in the random scenario, from 0 (none) to 100. */
+  randomObjectFrequency?: number;
 }
 
 export type ExpertBackend = 'DROOLS' | 'PROLOG';

@@ -44,6 +44,11 @@ export class BackendApiService {
     return this.http.post<CommandResponse>(`${this.baseUrl}/scenarios/${id}/load`, {});
   }
 
+  /** How often random objects appear in the random scenario, 0 to 100; applies at once. */
+  setRandomObjectFrequency(frequency: number): Observable<CommandResponse> {
+    return this.http.post<CommandResponse>(`${this.baseUrl}/scenarios/random/frequency/${frequency}`, {});
+  }
+
   startSimulation(): Observable<CommandResponse> {
     return this.http.post<CommandResponse>(`${this.baseUrl}/simulation/start`, {});
   }

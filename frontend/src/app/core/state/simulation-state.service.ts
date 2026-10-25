@@ -175,6 +175,16 @@ export class SimulationStateService {
     });
   }
 
+  /** The new frequency arrives with the next snapshot. */
+  setRandomObjectFrequency(frequency: number): void {
+    this.api.setRandomObjectFrequency(frequency).subscribe({
+      next: (response) => {
+        if (!response.success) this.patch({ error: response.message });
+      },
+      error: (err) => this.patch({ error: this.errorMessage(err, 'Failed to change the random object frequency.') })
+    });
+  }
+
   runPresentationDemo(scenarioId = 'S12_PRESENTATION_DEMO'): void {
     this.api.loadScenario(scenarioId).subscribe({
       next: (response) => response.success ? this.start() : this.patch({ error: response.message }),

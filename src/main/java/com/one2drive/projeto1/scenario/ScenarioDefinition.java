@@ -28,6 +28,16 @@ public class ScenarioDefinition {
     private com.one2drive.projeto1.domain.RoadMarkingType leftMarking = com.one2drive.projeto1.domain.RoadMarkingType.DASHED;
     private com.one2drive.projeto1.domain.RoadMarkingType rightMarking = com.one2drive.projeto1.domain.RoadMarkingType.DASHED;
     private boolean loopWorldObjects;
+    /** When set, random objects keep appearing ahead of the vehicle, drawn from this seed ({@link RandomObjectSpawner}). */
+    private Long randomObjectSeed;
+
+    public Long getRandomObjectSeed() {
+        return randomObjectSeed;
+    }
+
+    public void setRandomObjectSeed(Long randomObjectSeed) {
+        this.randomObjectSeed = randomObjectSeed;
+    }
 
     public boolean isLoopWorldObjects() {
         return loopWorldObjects;

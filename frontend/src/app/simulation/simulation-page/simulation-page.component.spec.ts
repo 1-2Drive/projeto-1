@@ -75,6 +75,7 @@ class SimulationStateServiceStub {
   openHistoricalSession = jasmine.createSpy('openHistoricalSession');
   reset = jasmine.createSpy('reset');
   loadScenario = jasmine.createSpy('loadScenario');
+  setRandomObjectFrequency = jasmine.createSpy('setRandomObjectFrequency');
   addRoadElement = jasmine.createSpy('addRoadElement');
   addActor = jasmine.createSpy('addActor');
   updateEnvironment = jasmine.createSpy('updateEnvironment');

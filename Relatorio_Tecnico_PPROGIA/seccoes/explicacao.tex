@@ -80,7 +80,10 @@ A árvore tem seis factos, embora as condições da regra só nomeiem três
 \cod{safe_to_change_lane(left)}, feita por \emph{backward chaining}
 (\cod{prove/1}): a prova regista os factos que lê com \cod{known/1}, e estes
 passam a fazer parte da evidência. Quando a decisão depende de conclusões
-intermédias, como \cod{pedestrian_conflict/1}, a árvore desce por elas.
+intermédias, como \cod{pedestrian_conflict/1}, a árvore desce por elas, e uma
+condição negada que se verificou aparece como \cod{absent(Padrão)}, por exemplo
+\cod{absent(pedestrian_conflict(_))} na árvore da regra de circular pela direita
+(\cref{lst:regra-direita}).
 
 Para obter esta árvore não se usa o rastreio do SWI-Prolog (\cod{trace/0}): este
 mostra a resolução de cada predicado pelo interpretador, incluindo os do próprio

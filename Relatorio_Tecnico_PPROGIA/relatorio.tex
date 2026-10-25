@@ -75,6 +75,9 @@
 \bibliography{referencias}
 
 \appendix
+% Depois de \appendix, o cleveref continua a chamar "Capítulo" aos capítulos; o
+% alias faz \cref{anx:...} escrever "Anexo A".
+\crefalias{chapter}{appendix}
 \input{seccoes/anexos}
 
 \end{document}

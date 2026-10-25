@@ -11,9 +11,11 @@ sistema.
 O objetivo é que o comportamento do veículo fique descrito nas regras, e não
 espalhado pelo código de controlo. A base cobre emergências, peões, veículo da
 frente e ultrapassagens, limites de velocidade, STOP, semáforos, perigos na estrada,
-mudanças de via, barreiras e meteorologia. Algumas regras seguem diretamente o
-Código da Estrada~\cite{codigoestrada}, como o Art.~13.º, n.º~3 (circular pela via mais à direita,
-\cref{lst:regra-direita}).
+mudanças de via, barreiras e meteorologia. Várias regras seguem diretamente o Código da Estrada~\cite{codigoestrada}: o
+Art.~13.º, n.º~3 (circular pela via mais à direita, \cref{lst:regra-direita}),
+o Art.~18.º (distância ao veículo da frente), o Art.~24.º (adequar a velocidade
+às condições) e os Arts.~36.º e 38.º (ultrapassar pela esquerda e regressar à
+direita no fim da manobra).
 
 As regras leem $\sim$66 tipos de facto, que se agrupam como mostra a
 \cref{tab:tipos-factos}.
@@ -63,7 +65,17 @@ na \emph{interface} Web, através da explicação \emph{How} (\cref{sec:expl-how
 \section{Representação e organização}
 \label{sec:base-representacao}
 
-A \cref{lst:regra-limite-pl} mostra uma regra da base.
+O ficheiro \cod{driving_rules.pl} está organizado por situação (emergência,
+peões, semáforos, sinal STOP, veículo da frente, ultrapassagem, perigos na
+estrada, barreiras, meteorologia, velocidade, arranque e decisão base), seguido
+dos subobjetivos e dos predicados auxiliares. A precedência acompanha a
+urgência: as regras de emergência têm 870 a 900, as de peões 600 a 1000, as de
+velocidade 205 a 310, e a decisão base é a última (60 a $-100$). Nos termos da
+unidade curricular, a base tem regras de ação, que concluem uma \cod{proposal/5} (a
+maioria), e regras dedutivas, que concluem factos intermédios como
+\cod{pedestrian_conflict/1} ou \cod{fuzzy_conclusion/2}; a negação entra nas
+condições, com \cod{not/1}, e não há regras de refutação: um facto nunca é
+negado, apenas ausente. A \cref{lst:regra-limite-pl} mostra uma regra de ação.
 
 \begin{lstlisting}[caption={Regra de excesso de velocidade em Prolog (\texttt{driving\_rules.pl})},label=lst:regra-limite-pl]
 rule('Reduce speed when exceeding detected limit',
@@ -103,9 +115,10 @@ rule('Enforce keep right road law when right lane is safe',
        not(obstacle(_, _, _, _)),                not(pothole(_, _, _, _)),
        not(barrier(_, _, false, _)),             not(pedestrian_conflict(_)),
        not(test(front_vehicle_within(80.0))),    not(lane_change_request(_)),
-       not(test(driver_lane_change_hold(Now))),  not(test(current_overtaking(true, _, _, _, _))) ],
+       not(test(driver_lane_change_hold(Now))),
+       not(test(current_overtaking(true, _, _, _, _))) ],
      [ assert(proposal(return_right, no_target, low, maneuver_safety,
-                       'Portuguese Highway Code Art. 13: Drive on the rightmost available safe lane')) ]).
+       'Portuguese Highway Code Art. 13: Drive on the rightmost available safe lane')) ]).
 \end{lstlisting}
 \end{minipage}
 
@@ -153,6 +166,14 @@ safe_to_change_lane(Side) :-
     side_clear(Side),
     room_to_follow(Side).
 \end{lstlisting}
+
+\paragraph{Incerteza.} A perceção é tratada como incerta de três formas: as
+leituras vagas, como a visibilidade e a aderência, passam pelo controlador
+difuso; as leituras ruidosas (o radar frontal tem ruído gaussiano com desvio
+padrão de 0,7\,m) só confirmam uma situação crítica quando se repetem, por
+exemplo três amostras de TTC crítico numa janela de 2\,s na regra de travagem
+de emergência; e as leituras que deixam de chegar são esquecidas
+(\cref{sec:base-manutencao}).
 
 \section{Acesso e manutenção}
 \label{sec:base-manutencao}

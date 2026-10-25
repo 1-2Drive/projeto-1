@@ -12,4 +12,14 @@
       </li>
     }
   </ul>
+
+  <label class="slider"
+         title="How often objects appear in the RANDOM scenario: 0 none, 35 one every 25 m, 100 one every 9 m on average. Applies at once, also while it runs.">
+    <span>Random objects</span>
+    <input type="range" min="0" max="100" step="5" data-testid="random-frequency-slider"
+           [value]="randomObjectFrequency() ?? 0" [disabled]="randomObjectFrequency() === null"
+           (input)="dragFrequency($any($event.target).value)"
+           (change)="releaseFrequency($any($event.target).value)" />
+    <output data-testid="random-frequency-value">{{ shownFrequency() === 0 ? 'Off' : shownFrequency() }}</output>
+  </label>
 </section>

@@ -3,6 +3,8 @@ package com.one2drive.projeto1.api.controller;
 import com.one2drive.projeto1.api.model.ApiCommandResponse;
 import com.one2drive.projeto1.api.model.ApiScenarioSummary;
 import com.one2drive.projeto1.api.service.SimulationRuntimeService;
+import com.one2drive.projeto1.scenario.RandomScenarioGenerator;
+import com.one2drive.projeto1.scenario.ScenarioDefinition;
 import com.one2drive.projeto1.scenario.ScenarioLibrary;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -13,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Stream;
 
 @RestController
 @RequestMapping("/api/scenarios")
@@ -35,25 +38,39 @@ public class ScenarioController {
 
     @GetMapping
     public ResponseEntity<List<ApiScenarioSummary>> list() {
-        return ResponseEntity.ok(
+        // The random scenario is drawn anew on each load: one draw stands in for its figures.
+        ApiScenarioSummary random = summary(RandomScenarioGenerator.ID, RandomScenarioGenerator.NAME,
+            RandomScenarioGenerator.generate(0));
+        return ResponseEntity.ok(Stream.concat(
             scenarioLibrary.getScenarios().stream()
                 .filter(s -> VISIBLE_SCENARIOS.contains(s.getId()))
-                .map(s -> new ApiScenarioSummary(
-                    s.getId(),
-                    s.getName(),
-                    s.getInitialSpeedKmh(),
-                    s.getInitialWeather().name(),
-                    s.occupiedCellCount(),
-                    s.getActors().size(),
-                    s.getTimedActions().size()
-                ))
-                .toList()
-        );
+                .map(s -> summary(s.getId(), s.getName(), s)),
+            Stream.of(random)
+        ).toList());
     }
 
     @PostMapping("/{id}/load")
     public ResponseEntity<ApiCommandResponse> load(@PathVariable("id") String id) {
-        runtime.loadScenario(id);
-        return ResponseEntity.ok(new ApiCommandResponse(true, "Scenario loaded: " + id));
+        String loadedId = runtime.loadScenario(id);
+        return ResponseEntity.ok(new ApiCommandResponse(true, "Scenario loaded: " + loadedId));
+    }
+
+    /** How often random objects appear in the random scenario, from 0 (none) to 100; applies at once. */
+    @PostMapping("/random/frequency/{frequency}")
+    public ResponseEntity<ApiCommandResponse> setRandomObjectFrequency(@PathVariable("frequency") int frequency) {
+        runtime.setRandomObjectFrequency(frequency);
+        return ResponseEntity.ok(new ApiCommandResponse(true, "Random object frequency: " + frequency));
+    }
+
+    private static ApiScenarioSummary summary(String id, String name, ScenarioDefinition s) {
+        return new ApiScenarioSummary(
+            id,
+            name,
+            s.getInitialSpeedKmh(),
+            s.getInitialWeather().name(),
+            s.occupiedCellCount(),
+            s.getActors().size(),
+            s.getTimedActions().size()
+        );
     }
 }

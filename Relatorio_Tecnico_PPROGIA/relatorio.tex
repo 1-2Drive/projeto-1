@@ -1,0 +1,83 @@
+% ===============================================================
+%  Relatório Técnico: Sistema Pericial de Apoio à Condução
+%  PPROGIA
+%
+%  Compilação:  ./build.sh
+%          ou:  latexmk -pdf relatorio.tex
+%          ou:  pdflatex relatorio && bibtex relatorio && pdflatex relatorio x2
+% ===============================================================
+
+% 11pt é a base da classe; o tamanho real do texto (10.5pt) é definido em
+% preambulo.tex, secção COMPACTAÇÃO LIGEIRA, com o scrextend.
+\documentclass[11pt,a4paper,oneside]{report}
+
+\input{metadados}
+\input{preambulo}
+
+\title{\tituloprincipal}
+\author{\autoresmeta}
+\date{\datarelatorio}
+
+\begin{document}
+
+% A numeração romana começa na capa (página i, sem número impresso), para que o
+% leitor de PDF não a rotule como "1".
+\pagenumbering{roman}
+\setcounter{page}{1}
+
+\input{capa}
+% O ambiente titlepage repõe o contador em 1 ao terminar (classe report, oneside):
+% a capa é a página i, o Resumo a ii.
+\setcounter{page}{2}
+% COMPACTAÇÃO 2: a partir daqui (tudo menos a capa, que fica em 11pt) a letra
+% passa a 10,5pt, com o \changefontsizes do scrextend (ver COMPACTAÇÃO em
+% preambulo.tex). Reverter: apagar a linha seguinte.
+\changefontsizes{10.5pt}
+
+\input{seccoes/resumo}
+
+\tableofcontents
+% --- LISTAS DE FIGURAS E DE TABELAS (desativadas para poupar uma página) ------
+% Para as repor, tirar o "% " do início das seis linhas seguintes.
+% \clearpage
+% \listoffigures
+% % A lista de tabelas é um \chapter*, que mudaria de página: sem o \clearpage,
+% % fica na mesma página que a lista de figuras.
+% \vspace{1.5cm}
+% {\let\clearpage\relax\listoftables}
+% --- fim das LISTAS DE FIGURAS E DE TABELAS -----------------------------------
+\clearpage
+
+\pagenumbering{arabic}
+\setcounter{page}{1}
+
+% As fontes do perito abrem a lista de referências, pela ordem em que foram
+% recolhidas (unsrt numera pela ordem da primeira citação).
+\nocite{cienciavitae,isepcontrato,lopes2006,uminhoteses}
+% Capítulos 1 a 9 seguidos, sem mudança de página (ver CAPÍTULOS SEGUIDOS em
+% preambulo.tex).
+\quebracapitulofalse
+\input{seccoes/perito}
+\input{seccoes/motor}
+\input{seccoes/base_conhecimento}
+\input{seccoes/metaconhecimento}
+\input{seccoes/explicacao}
+\input{seccoes/arquitetura}
+\input{seccoes/dificuldades}
+\input{seccoes/conclusao}
+% As Referências e o Anexo voltam a abrir página.
+\quebracapitulotrue
+
+% Todas as entradas de referencias.bib são citadas no texto. O \nocite{*} só
+% garante que uma entrada nova, ainda por citar, aparece no fim da lista.
+\nocite{*}
+\bibliographystyle{unsrt}
+\bibliography{referencias}
+
+\appendix
+% Depois de \appendix, o cleveref continua a chamar "Capítulo" aos capítulos; o
+% alias faz \cref{anx:...} escrever "Anexo A".
+\crefalias{chapter}{appendix}
+\input{seccoes/anexos}
+
+\end{document}

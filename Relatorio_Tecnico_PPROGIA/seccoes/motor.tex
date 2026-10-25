@@ -1,0 +1,162 @@
+\chapter{Motor de inferência}
+\label{cap:motor}
+
+O motor de inferência é um motor de regras de produção desenvolvido em
+SWI-Prolog. Em cada ciclo de 100\,ms recebe o estado do veículo e os eventos dos
+sensores, dispara as regras e devolve propostas de decisão, que a arbitragem em
+Java transforma numa única decisão (\cref{fig:arquitetura-motores}).
+
+% Flutuante (e não [H]): com os capítulos seguidos, não cabe por baixo do
+% parágrafo inicial e deixaria meia página em branco.
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.62\textwidth]{figuras/arquitetura-motores.png}
+  \caption{Os dois motores alimentam a mesma arbitragem: só um está ativo em
+    cada sessão, e ambos devolvem propostas, nunca ações.}
+  \label{fig:arquitetura-motores}
+\end{figure}
+
+\section{O motor de regras}
+\label{sec:motor-regras}
+
+As regras são dados, termos \texttt{rule(Id, Precedência, Condições, Ações)}. A
+\cref{lst:regra-peao} mostra um exemplo.
+
+\begin{lstlisting}[caption={Uma regra do motor Prolog (\texttt{driving\_rules.pl})},label=lst:regra-peao]
+rule('Emergency stop for pedestrian extremely close',
+     880,
+     [ pedestrian_conflict(P),
+       pedestrian(P, D),
+       test(D =< 6.0) ],
+     [ assert(proposal(emergency_brake, 0.0, critical, emergency_safety,
+                       'Pedestrian critical distance in current path')) ]).
+\end{lstlisting}
+
+O segundo argumento, a precedência (880 na \cref{lst:regra-peao}), só decide a
+ordem de disparo: entre as regras prontas a disparar, dispara primeiro a de
+número maior. Não se confunde com a
+prioridade da proposta (\cod{emergency_safety}, 70), que decide qual das
+propostas vence na arbitragem (\cref{sec:integracao}); também aí vence o número
+maior.
+
+Uma condição pode ser um padrão a unificar com um facto, \cod{not(C)} (negação
+por falha), \cod{test(Objetivo)} (aritmética ou um predicado auxiliar que lê os
+factos através de \cod{known/1}) ou \cod{prove(Objetivo)}, provado por
+\emph{backward chaining} (\cod{prove_goal/2}). A única ação é \cod{assert(Facto)}.
+
+O motor combina três mecanismos, em níveis diferentes. Ao nível das regras, faz
+\emph{forward chaining}: parte dos factos do ciclo, dispara as regras cujas
+condições se verificam, e cada conclusão pode ativar outras regras, até a agenda
+esvaziar. Este nível é irrevogável: um disparo nunca é desfeito para tentar outra
+ordem, e os factos não são retirados dentro do ciclo. Para encontrar as
+ativações de cada regra, o motor usa o retrocesso (\emph{backtracking}) do
+próprio Prolog: \cod{findall/3} percorre as condições da esquerda para a direita
+e, quando uma falha, o Prolog volta atrás e tenta outro facto para uma condição
+anterior, recolhendo todas as maneiras de as satisfazer. Por fim, as condições
+\cod{prove/1} são provadas por \emph{backward chaining}: \cod{prove_goal/2} parte
+do objetivo, por exemplo \cod{safe_to_change_lane(left)}, e desce pelos
+subobjetivos (\cod{maneuver_idle}, \cod{no_continuous_line}, \cod{side_clear},
+\cod{room_to_follow}) até aos factos percebidos, registando os que leu.
+
+\begin{itemize}
+  \item \textbf{Memória de trabalho:}
+  \begin{itemize}
+    \item \cod{wm_fact(Id, Facto)} guarda os factos do ciclo, tanto os
+      percebidos como os derivados;
+    \item \texttt{wm\_support(Id, Regra, Evidência)} guarda a justificação de cada
+      facto derivado: a regra que o concluiu, os identificadores dos factos em
+      que assentou e os padrões negados que se verificaram. Um facto sem
+      suporte veio da perceção.
+  \end{itemize}
+  \item \textbf{Ciclo:} \cod{run_rules/0} enche a agenda e dispara, uma a uma, as
+    melhores ativações; a refração impede que uma instanciação dispare duas vezes
+    (\cref{sec:meta-controlo}).
+  \item \textbf{Estado entre ciclos:} fica em \cod{driving_state.pl}, que guarda as
+    últimas leituras, a janela de TTC (\emph{Time to Collision}), o compromisso perante o semáforo, o
+    cronómetro do STOP e o estado da ultrapassagem. No início de cada ciclo
+    carrega tudo como factos (\cod{load_cycle_facts/0}). As regras não alteram
+    estado: concluem o que mudou (por exemplo \cod{overtake_started/3}), e
+    \cod{store_conclusions/0} grava-o no fim do ciclo.
+\end{itemize}
+
+\section{Comparação com o motor da unidade curricular}
+\label{sec:comparacao-motor-uc}
+
+O sistema não usa o motor da unidade curricular (\cod{sp_exp1.pl},
+\cod{sp_exp2.pl}~\cite{ucspexp}): o motor (\cod{engine.pl}) foi desenvolvido
+pelo grupo. O problema exige decidir a cada 100\,ms sobre uma memória de trabalho
+que muda em cada ciclo, disparar as regras pela mesma ordem que o Drools e
+devolver explicações como dados ao Java, e não como texto na consola. Do motor da
+UC manteve-se a ideia central: registar a justificação de cada facto quando é
+concluído (\cod{justifica/3} corresponde ao nosso \cod{wm_support/3}) e explicar
+a partir desse registo. As restantes diferenças respondem a pontos que a própria
+UC deixa em aberto (\cref{tab:comparacao-motor-uc}).
+
+\begin{table}[H]
+  \centering
+  \caption{Motor da unidade curricular e motor do projeto}
+  \label{tab:comparacao-motor-uc}
+  \small
+  \begin{tabularx}{\textwidth}{@{}L{2.8cm}VL{5.4cm}V>{\raggedright\arraybackslash}X@{}}
+    \toprule
+    \textbf{Aspeto} & \textbf{\texttt{sp\_exp2.pl}} & \textbf{\texttt{engine.pl}} \\
+    \midrule
+    Regras & \cod{regra N se [...] entao [...]}, com operadores e um número
+      & Termos \texttt{rule(Id, Precedência, Condições, Ações)}, identificados
+        por um nome descritivo \\ \linhasep
+    Condições & Factos, \cod{nao} e \cod{avalia/1}, que compara um valor com uma
+        constante
+      & Padrões, \cod{not/1} sobre padrões e testes, \cod{test/1} (qualquer
+        objetivo) e \cod{prove/1} (\emph{backward chaining}) \\ \linhasep
+    Controlo & Dispara uma regra assim que um facto a satisfaz, pela ordem do
+        \emph{backtracking} sobre factos e regras
+      & Agenda com resolução de conflitos, a começar pela precedência
+        (\cref{sec:meta-controlo}) \\ \linhasep
+    Repetições & \cod{cria_facto} só verifica se a conclusão já existe, e não se
+        o par facto--regra já disparou
+      & Refração por regra e instanciação (\cod{fired/2}); um facto repetido é
+        ignorado \\ \linhasep
+    Meta-conhecimento & \cod{facto_dispara_regras/2} escrito à mão em
+        \cod{veiculos2.txt}; gerá-lo é o exercício proposto
+      & Dinâmico: derivado das regras no arranque (\cod{rule_reads/2}), incluindo os factos
+        lidos pelos predicados auxiliares \\ \linhasep
+    Disjunção & Duas regras com a mesma cabeça, e não um OU dentro da
+        regra
+      & Igual: \cod{pedestrian_conflict/1} tem uma regra por ramo
+        (\cref{lst:regras-ou}) \\ \linhasep
+    Explicações & \cod{como/1} e \cod{whynot/1} escrevem na consola;
+        \cod{whynot/1} parte de um facto
+      & \cod{explain/2} e \cod{why_not/2} devolvem termos; \cod{why_not/2} parte
+        de uma regra (\cref{cap:explicacao}) \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+A diferença principal é o meta-conhecimento: a UC deixa às equipas a obtenção
+automática da lista de termos que gera \cod{facto_dispara_regras/2}, e
+\cod{ensure_index/0} obtém-na de todas as regras, seguindo também os predicados
+auxiliares que as condições chamam (\cref{sec:meta-indice}).
+
+A disjunção \enquote{peão na trajetória ou a atravessar} é uma conclusão
+intermédia, \cod{pedestrian_conflict/1}, lida por várias regras. Como a UC
+aconselha, é uma conclusão própria, com uma regra por ramo (\cref{lst:regras-ou}). A precedência
+1000 garante que o conflito é conhecido antes de qualquer regra que o leia, e a
+explicação mostra qual dos ramos se verificou.
+
+\noindent\begin{minipage}{\linewidth}
+\begin{lstlisting}[caption={Uma disjunção como duas regras (\texttt{driving\_rules.pl})},label=lst:regras-ou]
+rule('Pedestrian conflicts with trajectory (in path)',
+     1000,
+     [ pedestrian_in_path(P) ],
+     [ assert(pedestrian_conflict(P)) ]).
+
+rule('Pedestrian conflicts with trajectory (crossing)',
+     1000,
+     [ crossing_state(P, crossing) ],
+     [ assert(pedestrian_conflict(P)) ]).
+\end{lstlisting}
+\end{minipage}
+
+Os mecanismos internos que controlam este motor, como o índice de dependências,
+a resolução de conflitos e a refração, assentam em meta-conhecimento derivado das
+próprias regras e são descritos em pormenor no \cref{cap:metaconhecimento}.

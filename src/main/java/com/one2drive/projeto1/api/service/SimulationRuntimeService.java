@@ -12,6 +12,7 @@ import com.one2drive.projeto1.history.SimulationSession;
 import com.one2drive.projeto1.history.VehicleSample;
 import com.one2drive.projeto1.explanation.TimelineEntry;
 import com.one2drive.projeto1.scenario.ScenarioDefinition;
+import com.one2drive.projeto1.scenario.RandomScenarioGenerator;
 import com.one2drive.projeto1.scenario.ScenarioLibrary;
 import com.one2drive.projeto1.simulation.SimulationEngine;
 import jakarta.annotation.PostConstruct;
@@ -24,6 +25,7 @@ import java.util.NoSuchElementException;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -167,12 +169,19 @@ public class SimulationRuntimeService {
         publisher.publish(snapshot());
     }
 
-    public synchronized void loadScenario(String scenarioId) {
+    /** @return the id of the loaded scenario, which for {@code RANDOM} names the seed drawn */
+    public synchronized String loadScenario(String scenarioId) {
         finalizeActiveSession("Session finalized by scenario load");
-        ScenarioDefinition scenario = scenarioLibrary.findById(scenarioId)
+        ScenarioDefinition scenario = findScenario(scenarioId)
             .orElseThrow(() -> new NoSuchElementException("Scenario not found: " + scenarioId));
         simulationEngine.reset(scenario);
         publisher.publish(snapshot());
+        return scenario.getId();
+    }
+
+    /** A scenario of the library, or a random one: {@code RANDOM} draws a new seed, {@code RANDOM-<seed>} repeats one. */
+    private Optional<ScenarioDefinition> findScenario(String scenarioId) {
+        return scenarioLibrary.findById(scenarioId).or(() -> RandomScenarioGenerator.forId(scenarioId));
     }
 
     /**
@@ -181,9 +190,14 @@ public class SimulationRuntimeService {
      */
     public synchronized void switchBackend(ExpertBackendType type) {
         finalizeActiveSession("Session finalized by engine switch");
-        ScenarioDefinition scenario = scenarioLibrary.findById(simulationEngine.getScenarioId())
+        ScenarioDefinition scenario = findScenario(simulationEngine.getScenarioId())
             .orElseGet(() -> scenarioLibrary.getScenarios().stream().findFirst().orElseThrow());
         simulationEngine.switchBackend(type, scenario);
+        publisher.publish(snapshot());
+    }
+
+    public synchronized void setRandomObjectFrequency(int frequency) {
+        simulationEngine.setRandomObjectFrequency(frequency);
         publisher.publish(snapshot());
     }
 

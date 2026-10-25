@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Figura 2.1: os dois motores alimentam a mesma arbitragem.
+  Fonte vetorial de figuras/arquitetura-motores.png. Para regenerar o PNG: make figuras
+  Coordenadas em px, na mesma grelha da figura original (864 x 775).
+  Sem título nem subtítulo (a legenda do LaTeX já os dá): a viewBox começa em y=68.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="864" height="707" viewBox="0 68 864 707">
+  <defs>
+    <marker id="seta" viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto">
+      <path d="M1,1 L9,5 L1,9" fill="none" stroke="#b4b4b4" stroke-width="1.6"
+            stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <style>
+      text      { font-family: 'Noto Sans', 'Inter', 'Helvetica Neue', Arial, sans-serif; fill: #1f1f1f; }
+      .nome     { font-size: 14px; font-weight: 700; text-anchor: middle; }
+      .detalhe  { font-size: 12.5px; fill: #333; text-anchor: middle; }
+      .rotulo   { font-size: 12.5px; fill: #444; }
+      .caixa    { fill: #ffffff; stroke: #c9c9c9; stroke-width: 1.4; }
+      .grupo    { fill: #ffffff; stroke: #c9c9c9; stroke-width: 1.4; }
+      .destaque { fill: #eef4fc; stroke: #2f74d0; stroke-width: 2; }
+      .prolog   { stroke: #3a3a3a; stroke-width: 2.6; }
+      .drools   { stroke-dasharray: 7 4; }   /* o motor alternativo: contorno tracejado */
+      .linha    { fill: none; stroke: #b4b4b4; stroke-width: 1.4; }
+    </style>
+  </defs>
+
+  <rect x="0" y="68" width="864" height="707" fill="#ffffff"/>
+
+  <!-- SimulationEngine -->
+  <rect class="caixa" x="262" y="82" width="340" height="63" rx="8"/>
+  <text class="nome" x="432" y="109">SimulationEngine.tick()</text>
+  <text class="detalhe" x="432" y="129">ciclo de 100 ms sobre o tempo simulado</text>
+
+  <path class="linha" d="M432,145 V179" marker-end="url(#seta)"/>
+  <text class="rotulo" x="441" y="167">eventos e estado do veículo</text>
+
+  <!-- ExpertSystemBackend -->
+  <rect class="caixa" x="262" y="181" width="340" height="63" rx="8"/>
+  <text class="nome" x="432" y="208">ExpertSystemBackend</text>
+  <text class="detalhe" x="432" y="228">interface comum: insertEvent, decide…</text>
+
+  <path class="linha" d="M432,244 V265 H233 V283" marker-end="url(#seta)"/>
+  <path class="linha" d="M432,265 H629 V283" marker-end="url(#seta)"/>
+
+  <!-- PrologBackend (à esquerda, com contorno carregado para o destacar) -->
+  <rect class="grupo prolog" x="45" y="286" width="377" height="219" rx="8"/>
+  <text class="nome" x="233" y="311">PrologBackend</text>
+  <rect class="caixa prolog" x="63" y="322" width="341" height="63" rx="8"/>
+  <text class="nome" x="233" y="349">PrologProcess</text>
+  <text class="detalhe" x="233" y="369">pedido JSON por linha (stdin/stdout)</text>
+  <rect class="caixa prolog" x="63" y="403" width="341" height="83" rx="8"/>
+  <text class="nome" x="233" y="430">Processo swipl</text>
+  <text class="detalhe" x="233" y="450">engine.pl e driving_state.pl</text>
+  <text class="detalhe" x="233" y="469">driving_rules.pl: ~120 regras</text>
+
+  <!-- DroolsBackend (à direita, com contorno tracejado) -->
+  <rect class="grupo drools" x="441" y="286" width="377" height="219" rx="8"/>
+  <text class="nome" x="629" y="311">DroolsBackend</text>
+  <rect class="caixa drools" x="459" y="322" width="341" height="63" rx="8"/>
+  <text class="nome" x="629" y="349">KnowledgeSession</text>
+  <text class="detalhe" x="629" y="369">KieSession stateful, relógio simulado</text>
+  <rect class="caixa drools" x="459" y="403" width="341" height="83" rx="8"/>
+  <text class="nome" x="629" y="430">Regras DRL</text>
+  <text class="detalhe" x="629" y="450">~123 regras em 4 agenda groups</text>
+  <text class="detalhe" x="629" y="469">CEP e queries de <tspan font-style="italic">backward chaining</tspan></text>
+
+  <!-- Propostas -->
+  <path class="linha" d="M233,505 V531 H376 V556" marker-end="url(#seta)"/>
+  <path class="linha" d="M629,505 V531 H489 V556" marker-end="url(#seta)"/>
+  <text class="rotulo" x="432" y="537" text-anchor="middle">propostas</text>
+
+  <!-- DecisionContext -->
+  <rect class="destaque" x="262" y="558" width="340" height="82" rx="8"/>
+  <text class="nome" x="432" y="585">DecisionContext</text>
+  <text class="detalhe" x="432" y="605">arbitragem por canal: velocidade e via</text>
+  <text class="detalhe" x="432" y="624">regista WON, LOST_TO, VETOED_BY, CAPPED</text>
+
+  <path class="linha" d="M432,640 V675" marker-end="url(#seta)"/>
+  <text class="rotulo" x="441" y="663">DrivingDecision</text>
+
+  <!-- DecisionActuator -->
+  <rect class="caixa" x="262" y="677" width="340" height="63" rx="8"/>
+  <text class="nome" x="432" y="704">DecisionActuator</text>
+  <text class="detalhe" x="432" y="724">aplica a decisão ao mundo; pode recusar</text>
+
+  <!-- Novo ciclo -->
+  <path class="linha" d="M262,708 H28 V113 H260" marker-end="url(#seta)"/>
+  <text class="rotulo" x="114" y="699">novo ciclo</text>
+</svg>

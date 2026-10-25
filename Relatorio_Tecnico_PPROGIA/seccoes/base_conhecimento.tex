@@ -1,0 +1,183 @@
+\chapter{Base de conhecimento}
+\label{cap:base-conhecimento}
+
+A base de conhecimento (\cod{driving_rules.pl}) é um conjunto de $\sim$120 regras de
+produção sobre condução, que replicam as regras de decisão do motor Drools do
+sistema.
+
+\section{O que a base contém}
+\label{sec:base-conteudo}
+
+O objetivo é que o comportamento do veículo fique descrito nas regras, e não
+espalhado pelo código de controlo. A base cobre emergências, peões, veículo da
+frente e ultrapassagens, limites de velocidade, STOP, semáforos, perigos na estrada,
+mudanças de via, barreiras e meteorologia. Várias regras seguem diretamente o Código da Estrada~\cite{codigoestrada}: o
+Art.~13.º, n.º~3 (circular pela via mais à direita, \cref{lst:regra-direita}),
+o Art.~18.º (distância ao veículo da frente), o Art.~24.º (adequar a velocidade
+às condições) e os Arts.~36.º e 38.º (ultrapassar pela esquerda e regressar à
+direita no fim da manobra).
+
+As regras leem $\sim$66 tipos de facto, que se agrupam como mostra a
+\cref{tab:tipos-factos}.
+
+\begin{table}[H]
+  \centering
+  \caption{Tipos de facto lidos pelas regras}
+  \label{tab:tipos-factos}
+  \small
+  \begin{tabularx}{\textwidth}{@{}L{3.0cm}V>{\raggedright\arraybackslash}XVL{4.2cm}@{}}
+    \toprule
+    \textbf{Tipo} & \textbf{Exemplos} & \textbf{Origem} \\
+    \midrule
+    Perceção & \cod{ego_speed(Kmh)}, \cod{pothole(Id, DistanceM, Severity, Lane)},
+        \cod{traffic_light(Id, red|yellow|green, DistanceM)},
+        \cod{lane_occupancy(Side, Occupied, FrontDistanceM)}
+      & Sensores e veículo, carregados por \cod{driving_state.pl} no início do
+        ciclo \\ \linhasep
+    Estado anterior & \cod{overtaking/5}, \cod{light_commitment/2},
+        \cod{stop_hold_started/2}, \cod{previous_decision/2}
+      & Estado guardado entre ciclos (38 tipos) e a decisão anterior \\ \linhasep
+    Conclusões intermédias & \cod{pedestrian_conflict(Id)},
+        \cod{fuzzy_membership/3}, \cod{fuzzy_conclusion/2},
+        \cod{overtake_started/3}
+      & Concluídas por regras no próprio ciclo \\ \linhasep
+    Propostas & \cod{proposal(Action, SpeedKmh, Risk, Priority, Reason)}
+      & Concluídas por regras, arbitradas no Java \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+Além das regras e dos factos, a base tem predicados auxiliares, que leem os
+factos através de \cod{known/1} (por exemplo \cod{front_vehicle_within/1}), e
+subobjetivos provados por \emph{backward chaining} (\cref{sec:base-exemplos}). As
+constantes numéricas, como as distâncias de paragem e o valor de cada
+prioridade, não estão escritas no Prolog: chegam do Java no pedido
+\cod{reset} (\cod{param/2}, \cod{priority_value/2}).
+
+Dada a extensão recomendada para este relatório (cerca de 10 páginas), não se
+inclui o diagrama completo da árvore de decisão, isto é, o fluxograma de decisão
+da velocidade e da via.
+Esse diagrama pode
+ser consultado junto ao código-fonte do projeto (\cref{anx:mapeamento}).
+O percurso que cada decisão segue nesse fluxograma pode também ser consultado
+na \emph{interface} Web, através da explicação \emph{How} (\cref{sec:expl-how}).
+
+\section{Representação e organização}
+\label{sec:base-representacao}
+
+O ficheiro \cod{driving_rules.pl} está organizado por situação (emergência,
+peões, semáforos, sinal STOP, veículo da frente, ultrapassagem, perigos na
+estrada, barreiras, meteorologia, velocidade, arranque e decisão base), seguido
+dos subobjetivos e dos predicados auxiliares. A precedência acompanha a
+urgência: as regras de emergência têm 870 a 900, as de peões 600 a 1000, as de
+velocidade 205 a 310, e a decisão base é a última (60 a $-100$). Nos termos da
+unidade curricular, a base tem regras de ação, que concluem uma \cod{proposal/5} (a
+maioria), e regras dedutivas, que concluem factos intermédios como
+\cod{pedestrian_conflict/1} ou \cod{fuzzy_conclusion/2}; a negação entra nas
+condições, com \cod{not/1}, e não há regras de refutação: um facto nunca é
+negado, apenas ausente. A \cref{lst:regra-limite-pl} mostra uma regra de ação.
+
+\begin{lstlisting}[caption={Regra de excesso de velocidade em Prolog (\texttt{driving\_rules.pl})},label=lst:regra-limite-pl]
+rule('Reduce speed when exceeding detected limit',
+     300,
+     [ ego_speed(V),
+       speed_limit(Limit),
+       test(V > Limit + 0.1) ],
+     [ assert(proposal(reduce_speed, Limit, moderate, speed_compliance,
+                       'Vehicle exceeds current legal speed limit')) ]).
+\end{lstlisting}
+
+Ou seja, se a velocidade passar o limite em vigor em mais de 0,1\,km/h,
+propõe-se reduzir para o limite, com risco moderado e prioridade de cumprimento
+de velocidade (20).
+
+
+\section{Alguns exemplos}
+\label{sec:base-exemplos}
+
+\paragraph{Circular pela direita.} A \cref{lst:regra-direita}, uma das regras mais longas da base, aplica o Art.~13.º, n.º~3,
+do Código da Estrada (circular pela via mais à direita) e usa todas as formas de
+condição da \cref{sec:motor-regras}. Só propõe voltar à direita quando nada mais
+exige atenção: nenhum obstáculo, buraco, barreira ou
+peão em conflito, nenhum veículo a menos de 80\,m e nenhuma ultrapassagem ou
+mudança de via pedida pelo condutor.
+
+\noindent\begin{minipage}{\linewidth}
+\begin{lstlisting}[caption={Uma das regras mais longas da base de conhecimento (\texttt{driving\_rules.pl})},label=lst:regra-direita]
+rule('Enforce keep right road law when right lane is safe',
+     460,
+     [ ego_lane(Lane),                           test(Lane \== right),
+       not(presentation_demo),                   lane_change_state(idle),
+       prove(no_continuous_line(right)),         not(right_lane_blocked_ahead),
+       time_ms(Now),                             test(Now >= 4000),
+       lane_occupancy(right, false, RightFront), test(RightFront > 80.0),
+       test(fresh_side_reading(right)),          not(move_off_state(true, _)),
+       not(obstacle(_, _, _, _)),                not(pothole(_, _, _, _)),
+       not(barrier(_, _, false, _)),             not(pedestrian_conflict(_)),
+       not(test(front_vehicle_within(80.0))),    not(lane_change_request(_)),
+       not(test(driver_lane_change_hold(Now))),
+       not(test(current_overtaking(true, _, _, _, _))) ],
+     [ assert(proposal(return_right, no_target, low, maneuver_safety,
+       'Portuguese Highway Code Art. 13: Drive on the rightmost available safe lane')) ]).
+\end{lstlisting}
+\end{minipage}
+
+\paragraph{Limite de velocidade.} A câmara deteta o sinal até 120\,m à frente.
+O \cod{driving_state.pl} guarda-o como pendente, com a sua posição na estrada, e
+carrega-o como \cod{pending_speed_limit(Kmh, SignPositionM)}. Enquanto o sinal
+está à frente, \cod{'Slow down in time for the speed limit ahead'} faz o veículo
+chegar a ele já ao novo limite. Quando o veículo chega ao sinal, o limite
+pendente passa a \cod{speed_limit(Kmh)}, e a regra da
+\cref{lst:regra-limite-pl} pode propor \cod{reduce_speed}. Os dois limites estão
+separados porque, aplicado logo que o sinal era visto, o limite fazia o veículo
+abrandar demasiado cedo.
+
+\paragraph{Meteorologia.} Para a meteorologia recorre-se a lógica difusa: um
+controlador de Mamdani com 8 regras, em três níveis de precedência. Duas regras
+de fuzificação (360) convertem a visibilidade e a aderência de
+\cod{weather/3} em graus de pertença, \cod{fuzzy_membership(Variable, Term, Degree)}. Cinco regras de inferência (355) combinam-nos, com E como mínimo e OU
+como máximo, e concluem \cod{fuzzy_conclusion(Term, Degree)}
+(\cref{lst:regra-difusa}). Uma regra de desfuzificação (350) agrega as
+conclusões e calcula o centroide, que é a velocidade recomendada: um único teto
+\cod{reduce_speed} com prioridade de perigo na estrada (40). A precedência garante
+que cada nível só dispara depois do anterior.
+
+\begin{lstlisting}[caption={Uma regra de inferência difusa (\texttt{driving\_rules.pl})},label=lst:regra-difusa]
+rule('Fuzzy: poor visibility or poor grip -> very slow',
+     355,
+     [ fuzzy_membership(visibility, poor, V),
+       fuzzy_membership(grip, poor, G),
+       test(( D is max(V, G), D > 0.0 )) ],
+     [ assert(fuzzy_conclusion(very_slow, D)) ]).
+\end{lstlisting}
+
+\paragraph{Mudança de via segura.} \cod{safe_to_change_lane/1} é um objetivo,
+provado por \emph{backward chaining} a partir de quatro subobjetivos
+(\cref{lst:safe-lane}). As regras de desvio chamam-no nas condições com
+\cod{prove(safe_to_change_lane(left))}. Mudar de via é seguro se não houver
+outra manobra em curso nem linha contínua, se o ângulo morto estiver livre e se
+houver espaço para seguir o veículo dessa via, com 12\,m de folga
+(\cod{StoppingPolicy.roomToFollow}).
+
+\begin{lstlisting}[caption={Objetivo provado por \emph{backward chaining} (\texttt{driving\_rules.pl})},label=lst:safe-lane]
+safe_to_change_lane(Side) :-
+    maneuver_idle,
+    no_continuous_line(Side),
+    side_clear(Side),
+    room_to_follow(Side).
+\end{lstlisting}
+
+\paragraph{Incerteza.} A perceção é tratada como incerta de três formas: as
+leituras vagas, como a visibilidade e a aderência, passam pelo controlador
+difuso; as leituras ruidosas (o radar frontal tem ruído gaussiano com desvio
+padrão de 0,7\,m) só confirmam uma situação crítica quando se repetem, por
+exemplo três amostras de TTC crítico numa janela de 2\,s na regra de travagem
+de emergência; e as leituras que deixam de chegar são esquecidas
+(\cref{sec:base-manutencao}).
+
+\section{Acesso e manutenção}
+\label{sec:base-manutencao}
+
+Não há manutenção de verdade: cada ciclo recarrega os factos a partir do estado em
+\cod{driving_state.pl}, que esquece o que deixou de ser observado
+(\cod{expire_old_readings/1}). As regras só mudam editando os ficheiros.

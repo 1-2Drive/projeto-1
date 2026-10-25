@@ -1,0 +1,50 @@
+% Capítulo resultante da fusão dos antigos capítulos "Integração do motor Prolog
+% com o componente Java" e "Interface gráfica e arquitetura Web"; depois retiraram-se duas repetições.
+% "do~sistema": o espaço inquebrável faz o título passar à linha depois de
+% "arquitetura", com "do sistema" alinhado sob o texto do título.
+\chapter{Notas adicionais sobre a arquitetura do~sistema}
+\label{cap:arquitetura}
+
+\section{Integração do motor Prolog com o componente Java}
+\label{sec:integracao}
+
+O motor corre num processo \cod{swipl} persistente, gerido pela classe
+\cod{PrologProcess}: o Java copia os ficheiros Prolog para uma pasta de trabalho
+e arranca o processo com \cod{swipl -q -g main -t halt server.pl}, que executa
+\cod{main/0} em \cod{server.pl} e carrega os outros três ficheiros. O processo é
+mantido vivo durante toda a sessão, porque lançá-lo custa 150 a 250\,ms,
+incompatível com um ciclo de 100\,ms, e porque o lado Prolog guarda estado entre
+ciclos. Os dois lados trocam mensagens JSON por \cod{stdin} e \cod{stdout}, um
+pedido por linha e exatamente uma resposta por linha, mesmo quando o pedido
+falhe. O \cod{server.pl} aceita três pedidos: \cod{reset}, \cod{tick} e
+\cod{whynot} (\cref{sec:expl-whynot}).
+
+Em cada ciclo, o pedido \cod{tick} leva os eventos dos sensores, o estado do
+veículo e a decisão anterior, e devolve as propostas, os factos do ciclo, o
+limite em vigor e as verificações de segurança de mudança de via. O Java não decide nada por si: o \cod{DecisionContext}
+arbitra as propostas em dois canais, velocidade e via. Em cada canal vence a
+maior prioridade; na velocidade, as emergências e paragens obrigatórias
+(prioridade 60 ou mais) sobrepõem-se a tudo e, abaixo delas, aplica-se o teto de
+velocidade mais baixo; uma mudança de via é vetada quando uma paragem mais
+prioritária está a travar o veículo. O \cod{DecisionActuator} aplica a decisão
+e pode recusar uma mudança de via que não consiga executar; o ciclo, com o
+resultado de cada proposta, é guardado para o módulo de explicação
+(\cref{sec:expl-registo}).
+
+\section{Interface gráfica e arquitetura Web}
+\label{sec:interface}
+
+A aplicação é cliente-servidor: o servidor, em Java~17 com Spring~Boot~3.3.4,
+corre a simulação e o motor de inferência; o cliente, em Angular~18, recebe o
+estado por um WebSocket a cada ciclo de 100\,ms, envia comandos por uma API
+REST e limita-se a desenhar o que o servidor envia, sem avaliar condições de
+condução. A \cref{fig:interface-web} mostra a estrada em perspetiva 3D, os
+painéis de explicação em tempo real (\cref{sec:expl-registo}) e as leituras dos
+sensores.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.62\textwidth]{figuras/screenshot-web-ui.png}
+  \caption{Interface Web com o motor Prolog ativo, durante uma ultrapassagem com chuva.}
+  \label{fig:interface-web}
+\end{figure}

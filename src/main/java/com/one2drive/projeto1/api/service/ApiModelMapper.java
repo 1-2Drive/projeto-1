@@ -177,7 +177,8 @@ public class ApiModelMapper {
                 .map(lane -> new ApiSimulationSnapshot.LaneSafetyView(lane.name(), engine.isLaneSafe(lane)))
                 .toList(),
             engine.getBackendType().name(),
-            engine.getBackendError()
+            engine.getBackendError(),
+            engine.getRandomObjectFrequency()
         );
     }
 

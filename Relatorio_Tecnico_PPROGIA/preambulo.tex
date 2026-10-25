@@ -1,0 +1,280 @@
+% ---------------------------------------------------------------
+% preambulo.tex: pacotes, estilos e ambientes
+% ---------------------------------------------------------------
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[portuguese]{babel}
+\usepackage{lmodern}
+% A bibliografia chama-se «Referências», como na versão Word do relatório.
+\addto\captionsportuguese{\renewcommand{\bibname}{Referências}}
+% O índice chama-se «Índice», como é habitual em pt-PT (o babel diz «Conteúdo»).
+\addto\captionsportuguese{\renewcommand{\contentsname}{Índice}}
+\usepackage{microtype}
+
+% ===============================================================
+% COMPACTAÇÃO (margens e letra), 24-25/10/2026
+% ---------------------------------------------------------------
+% Para caber mais texto por página. São só duas alterações:
+%
+%   1. Margens: 2.6cm -> 2.3cm (todas as margens).
+%      Reverter: voltar a pôr margin=2.6cm na linha do geometry.
+%
+%   2. Letra: a capa fica nos 11pt da classe; o resto do documento passa a
+%      10,5pt com \changefontsizes{10.5pt} em relatorio.tex, logo depois de
+%      \input{capa} (o scrextend, do KOMA-Script, recalcula \small,
+%      \footnotesize, títulos, etc. a partir desse tamanho; carrega-se aqui
+%      com fontsize=11pt só para o disponibilizar).
+%      Reverter: apagar a linha \changefontsizes{10.5pt} em relatorio.tex.
+%      Para compactar mais, \changefontsizes{10pt} (poupa texto, mas não
+%      poupou páginas: os blocos indivisíveis absorvem o ganho).
+%
+% Para compactar mais, o passo seguinte seria margin=2.0cm.
+% ===============================================================
+\usepackage[fontsize=11pt]{scrextend}   % COMPACTAÇÃO 2: \changefontsizes em relatorio.tex
+\usepackage[a4paper,margin=2.3cm,headheight=15pt]{geometry}   % COMPACTAÇÃO 1: era margin=2.6cm
+% --- fim da COMPACTAÇÃO ------------------------------------------
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{multirow}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{enumitem}
+\usepackage[table]{xcolor}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{caption}
+\usepackage{float}
+\usepackage{listings}
+% Bibliografia no índice, com a página e a ligação corretas (no início da
+% bibliografia), sem acrescentar o próprio índice nem as listas.
+\usepackage[nottoc,notlof,notlot]{tocbibind}
+\usepackage{csquotes}
+% Aspas: \enquote{texto} produz “texto” (aspas duplas tipográficas).
+\setquotestyle{english}
+% O babel-portuguese torna " um atalho que «come» o carácter seguinte;
+% desativa-se, para que aspas escritas diretamente não estraguem o texto.
+\AtBeginDocument{\shorthandoff{"}}
+\usepackage{icomma}        % vírgula decimal em modo matemático: $1,5$
+\usepackage[most]{tcolorbox}
+\usetikzlibrary{positioning}  % diagramas TikZ (o tcolorbox já carrega o tikz)
+
+% --- Paleta ----------------------------------------------------
+\definecolor{corEscura}{HTML}{1F3A5F}
+\definecolor{corDestaque}{HTML}{AD451D}  % terracota do logo do MEIA
+\definecolor{corSucesso}{HTML}{0B6E4F}   % verde: apenas marcadores PASSOU
+\definecolor{corCinza}{HTML}{5A6672}
+\definecolor{corFundo}{HTML}{F4F6F8}
+\definecolor{corCritico}{HTML}{9B1C1C}
+\definecolor{corAviso}{HTML}{B45309}
+
+% obeyspaces/spaces: \cod{swipl -q -g main} mantém os espaços e pode quebrar neles.
+\usepackage[obeyspaces,spaces]{url}
+\DeclareUrlCommand\cod{\urlstyle{tt}}
+
+\usepackage[pdfusetitle]{hyperref}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=corEscura,
+  citecolor=corEscura,
+  urlcolor=corDestaque,
+  linktoc=all
+}
+
+% O cleveref não traz nomes em português; definem-se aqui.
+\usepackage[capitalise,noabbrev,nameinlink]{cleveref}
+\crefname{chapter}{Capítulo}{Capítulos}
+\crefname{section}{Secção}{Secções}
+\crefname{subsection}{Secção}{Secções}
+\crefname{appendix}{Anexo}{Anexos}
+\crefname{figure}{Figura}{Figuras}
+\crefname{table}{Tabela}{Tabelas}
+\crefname{equation}{Equação}{Equações}
+\crefname{enumi}{Item}{Itens}
+\newcommand{\crefrangeconjunction}{ a }
+\newcommand{\crefpairconjunction}{ e }
+\newcommand{\crefmiddleconjunction}{, }
+\newcommand{\creflastconjunction}{ e }
+% O cleveref usa o tipo «listing» para o contador lstlisting.
+\crefname{listing}{Listagem}{Listagens}
+
+% --- Cabeçalhos e rodapés --------------------------------------
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textcolor{corCinza}{\ucsigla{} \textperiodcentered{} \cursosigla}}
+\fancyhead[R]{\small\textcolor{corCinza}{\tituloprincipal}}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\fancypagestyle{plain}{%
+  \fancyhf{}%
+  \fancyfoot[C]{\thepage}%
+  \renewcommand{\headrulewidth}{0pt}%
+}
+
+% --- Títulos ---------------------------------------------------
+% Títulos de capítulo sem hifenização: um título longo passa à linha seguinte
+% numa palavra inteira (e não «com-/ponente»), alinhado à esquerda.
+\titleformat{\chapter}[hang]
+  {\normalfont\huge\bfseries\color{corEscura}\raggedright\hyphenpenalty=10000\exhyphenpenalty=10000}
+  {\thechapter\hspace{12pt}\textcolor{corCinza}{|}\hspace{12pt}}{0pt}{\huge}
+\titlespacing*{\chapter}{0pt}{-10pt}{24pt}
+
+\titleformat{\section}
+  {\normalfont\large\bfseries\color{corEscura}}{\thesection}{0.8em}{}
+\titleformat{\subsection}
+  {\normalfont\normalsize\bfseries\color{corEscura}}{\thesubsection}{0.8em}{}
+
+% Uma secção não começa no fundo da página: se restarem menos de 6 linhas
+% (era 10; baixou-se a 25/10/2026 para fechar espaços em branco), passa para a
+% página seguinte.
+\usepackage{needspace}
+\usepackage{placeins}  % \FloatBarrier: impede uma figura de passar para a secção seguinte
+\usepackage{etoolbox}
+\pretocmd{\section}{\Needspace{6\baselineskip}}{}{}
+\pretocmd{\subsection}{\Needspace{6\baselineskip}}{}{}
+
+% ===============================================================
+% CAPÍTULOS SEGUIDOS (sem mudança de página), 24/10/2026
+% ---------------------------------------------------------------
+% Com \quebracapitulofalse (em relatorio.tex, antes do Capítulo 1), um
+% \chapter já não começa numa página nova: segue o texto anterior, com um
+% espaço de 1.2cm, e só muda de página se restarem menos de ~12 linhas.
+% \quebracapitulotrue repõe o comportamento normal (usado antes das
+% Referências e do Anexo, que continuam a abrir página).
+% Reverter: apagar as duas linhas \quebracapitulo... em relatorio.tex
+% (ou este bloco inteiro).
+% ===============================================================
+\newif\ifquebracapitulo
+\quebracapitulotrue
+\makeatletter
+\patchcmd{\chapter}
+  {\if@openright\cleardoublepage\else\clearpage\fi}
+  {\ifquebracapitulo
+     \if@openright\cleardoublepage\else\clearpage\fi
+   \else
+     \par\addvspace{1.2cm}\Needspace{12\baselineskip}%
+   \fi}
+  {}{\PackageWarning{preambulo}{CAPITULOS SEGUIDOS: o patch do chapter falhou}}
+\makeatother
+% --- fim de CAPÍTULOS SEGUIDOS -----------------------------------
+
+% Índice mais compacto: o espaço antes de cada capítulo passa de 1em para 0.3em,
+% para o índice caber na mesma página do Resumo. Reverter: apagar este bloco.
+\makeatletter
+\patchcmd{\l@chapter}{\vskip 1.0em \@plus\p@}{\vskip 0.3em \@plus\p@}
+  {}{\PackageWarning{preambulo}{indice compacto: o patch do l@chapter falhou}}
+\makeatother
+
+% --- Legendas --------------------------------------------------
+\captionsetup{font=small,labelfont={bf,color=corEscura},skip=6pt}
+
+% --- Listagens de código ---------------------------------------
+\lstdefinestyle{codigo}{
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{corEscura}\bfseries,
+  commentstyle=\color{corCinza}\itshape,
+  stringstyle=\color{corDestaque},
+  numbers=left,
+  numberstyle=\tiny\color{corCinza},
+  % Números dentro da caixa, entre a linha vertical e o código: o framesep
+  % deixa espaço para eles (numbersep é a distância número-código), e o
+  % xleftmargin mantém a linha onde estava (xleftmargin - framesep - framerule).
+  numbersep=8pt,
+  backgroundcolor=\color{corFundo},
+  frame=leftline,
+  framerule=1.2pt,
+  rulecolor=\color{corEscura},
+  framesep=20pt,
+  xleftmargin=28pt,
+  breaklines=true,
+  breakatwhitespace=true,
+  showstringspaces=false,
+  % Grelha fixa à largura da Latin Mono (0,525em por carácter): o código fica
+  % em colunas, e o alinhamento feito com espaços (como na árvore do How) não
+  % se perde. keepspaces mantém os espaços repetidos.
+  columns=fixed,
+  basewidth=0.525em,
+  keepspaces=true,
+  % Uma linha longa que tem de quebrar continua com uma seta, para não parecer
+  % uma linha nova.
+  postbreak=\mbox{\textcolor{corCinza}{$\hookrightarrow$}\space},
+  captionpos=b,
+  language=Prolog,
+  literate=%
+    {á}{{\'a}}1 {à}{{\`a}}1 {â}{{\^a}}1 {ã}{{\~a}}1
+    {é}{{\'e}}1 {ê}{{\^e}}1 {í}{{\'i}}1
+    {ó}{{\'o}}1 {ô}{{\^o}}1 {õ}{{\~o}}1
+    {ú}{{\'u}}1 {ç}{{\c c}}1
+    {Á}{{\'A}}1 {É}{{\'E}}1 {Í}{{\'I}}1 {Ó}{{\'O}}1 {Ú}{{\'U}}1 {Ç}{{\c C}}1
+}
+% Prolog (linguagem por omissão neste relatório) e JSON (pedidos ao server.pl).
+% No Prolog, o apóstrofo delimita átomos ('Nome da regra'); as aspas, strings.
+\lstdefinelanguage{JSON}{
+  string=[b]",
+  sensitive=true,
+  morekeywords={true,false,null}
+}
+\lstset{style=codigo,language=Prolog}
+
+\renewcommand{\lstlistingname}{Listagem}
+\renewcommand{\lstlistlistingname}{Lista de Listagens}
+
+% --- Macros auxiliares -----------------------------------------
+\newcommand{\facto}[1]{\texttt{\small #1}}
+\newcommand{\regra}[1]{\texttt{\small #1}}
+% Identificadores de código no texto (predicados, ficheiros, classes), com
+% \cod{...}: definido mais abaixo com o pacote url, que dispensa escapar os _
+% de nomes como wm_support/3 e permite quebrar a linha depois de _ / . e nos
+% espaços. Só ASCII dentro de \cod (para texto acentuado, usar \texttt com \_).
+\newcommand{\pts}[1]{\textbf{#1}}
+
+% Informação em falta (a obter do perito ou dos autores). Fica realçada
+% para não passar despercebida para a versão final.
+\newcommand{\preencher}[1]{\colorbox{corAviso!20}{\textcolor{corAviso}{\small\textbf{[#1]}}}}
+
+% Regra em linguagem natural (SE ... ENTÃO ...), com o identificador no título.
+% Uso: \begin{regranl}{R_CHUVA_01} SE ... \end{regranl}
+\newtcolorbox{regranl}[1]{%
+  enhanced, breakable,
+  colback=corFundo, colframe=corEscura,
+  boxrule=0pt, leftrule=1.2pt, arc=0pt, outer arc=0pt,
+  left=8pt, right=8pt, top=4pt, bottom=4pt,
+  fonttitle=\ttfamily\small\bfseries, coltitle=corEscura,
+  attach title to upper, after title={\par\smallskip},
+  title={REGRA \detokenize{#1}},
+  fontupper=\ttfamily\small
+}
+
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+
+% --- Grelha das tabelas -----------------------------------------
+% V: linha vertical fina e cinzenta entre colunas, p. ex.
+%    \begin{tabularx}{\textwidth}{@{}L{3cm}VX@{}}
+% \linhasep: linha horizontal clara entre linhas de dados, a usar
+%    depois de \\ (exceto na última linha, antes do \bottomrule).
+\newcolumntype{V}{!{\color{corCinza}\vrule width 0.4pt}}
+\newcommand{\linhasep}{%
+  \arrayrulecolor{corCinza!45}\specialrule{0.3pt}{0pt}{0pt}%
+  \arrayrulecolor{black}}
+% Sem o espaço que o booktabs deixa junto às regras, para que as linhas
+% verticais fiquem contínuas; o \extrarowheight compensa esse espaço.
+% Aplica-se só às tabelas de conteúdo (a capa usa tabular).
+\newcommand{\grelhatabelas}{%
+  \setlength{\aboverulesep}{0pt}%
+  \setlength{\belowrulesep}{0pt}%
+  \setlength{\extrarowheight}{2pt}}
+\AtBeginEnvironment{tabularx}{\grelhatabelas}
+\AtBeginEnvironment{longtable}{\grelhatabelas}
+
+% Margem extra que o TeX pode usar como ultimo recurso antes de deixar
+% uma linha a transbordar. Evita \emph{overfull boxes} pontuais em
+% paragrafos com termos longos em teletipo (nomes de predicados).
+\setlength{\emergencystretch}{3em}
+
+\setlist{itemsep=2pt,parsep=0pt,topsep=4pt}
+\renewcommand{\arraystretch}{1.25}

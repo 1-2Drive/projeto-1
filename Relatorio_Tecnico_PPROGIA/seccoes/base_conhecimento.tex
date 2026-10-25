@@ -55,7 +55,8 @@ prioridade, não estão escritas no Prolog: chegam do Java no pedido
 Dada a extensão recomendada para este relatório (cerca de 10 páginas), não se
 inclui o diagrama completo da árvore de decisão, isto é, o fluxograma de decisão
 da velocidade e da via.
-Esse diagrama pode ser consultado junto ao código-fonte do projeto.
+Esse diagrama pode
+ser consultado junto ao código-fonte do projeto (\cref{anx:mapeamento}).
 O percurso que cada decisão segue nesse fluxograma pode também ser consultado
 na \emph{interface} Web, através da explicação \emph{How} (\cref{sec:expl-how}).
 
@@ -156,11 +157,6 @@ safe_to_change_lane(Side) :-
 \section{Acesso e manutenção}
 \label{sec:base-manutencao}
 
-Não há manutenção de verdade: as crenças mantêm-se atualizadas entre ciclos, porque
-cada ciclo começa com os factos carregados de novo a partir do estado em
-\cod{driving_state.pl}. Esse estado esquece o que deixou de ser observado
-(\cod{expire_old_readings/1}): por exemplo, um obstáculo, um buraco ou uma
-barreira desaparecem 1\,s depois da última leitura. As regras em si não mudam
-durante a execução. A manutenção faz-se editando os ficheiros, e o
-\cod{PrologDroolsEquivalenceTest} confirma que as duas bases continuam
-coerentes.
+Não há manutenção de verdade: cada ciclo recarrega os factos a partir do estado em
+\cod{driving_state.pl}, que esquece o que deixou de ser observado
+(\cod{expire_old_readings/1}). As regras só mudam editando os ficheiros.

@@ -6,23 +6,48 @@
   \caption{Localização no código de cada tema do relatório}
   \label{tab:mapeamento}
   \small
-  \begin{tabularx}{\textwidth}{@{}L{5.0cm}VX@{}}
+  \begin{tabularx}{\textwidth}{@{}L{5.0cm}V>{\raggedright\arraybackslash}X@{}}
     \toprule
     \textbf{Tema} & \textbf{Localização principal} \\
     \midrule
-    Motor de inferência com suporte para explicações
+    \multicolumn{2}{@{}l}{\textit{Motor Prolog (\cref{cap:motor,cap:base-conhecimento,cap:metaconhecimento})}} \\ \linhasep
+    Motor de inferência, com meta-conhecimento e suporte para explicações
       & \cod{src/main/prolog/engine.pl} \\ \linhasep
-    Estado temporal & \cod{src/main/prolog/driving_state.pl} \\ \linhasep
-    Implementação da base de conhecimento para apoio à condução autónoma
+    Estado temporal entre ciclos & \cod{src/main/prolog/driving_state.pl} \\ \linhasep
+    Base de conhecimento para apoio à condução autónoma
       & \cod{src/main/prolog/driving_rules.pl} \\ \linhasep
     Interface JSON com o resto do sistema & \cod{src/main/prolog/server.pl} \\ \linhasep
-    Integração Java & \cod{src/main/java/com/one2drive/projeto1/prolog} \\ \linhasep
-    Contrato dos motores
+    Regras Drools que a base Prolog replica
+      & \cod{src/main/resources/rules/} \\ \linhasep
+    \multicolumn{2}{@{}l}{\textit{Integração e arbitragem (\cref{sec:integracao})}} \\ \linhasep
+    Integração Java com o processo Prolog & \cod{src/main/java/com/one2drive/projeto1/prolog/} \\ \linhasep
+    Contrato comum aos motores
       & \cod{src/main/java/com/one2drive/projeto1/inference/ExpertSystemBackend.java} \\ \linhasep
-    Arbitragem de decisões
-      & \cod{src/main/java/com/one2drive/projeto1/decision/DecisionContext.java} \\ \linhasep
-    Testes Prolog & \cod{src/test/java/com/one2drive/projeto1/prolog} \\ \linhasep
-    Interface gráfica Web & \cod{frontend/src/app} \\
+    Arbitragem, prioridades e constantes enviadas no \cod{reset}
+      & \cod{src/main/java/com/one2drive/projeto1/decision/} (\cod{DecisionContext},
+        \cod{DecisionPriority}, \cod{StoppingPolicy}) \\ \linhasep
+    Cenários da biblioteca & \cod{src/main/resources/scenarios/scenarios.json} \\ \linhasep
+    \multicolumn{2}{@{}l}{\textit{Explicações (\cref{cap:explicacao})}} \\ \linhasep
+    Registo de cada ciclo e fluxograma de decisão
+      & \cod{src/main/java/com/one2drive/projeto1/explanation/},
+        \cod{.../history/} \\ \linhasep
+    Respostas \emph{How}, \emph{Why} e \emph{Why not} sobre as viagens gravadas
+      & \cod{src/main/java/com/one2drive/projeto1/api/service/}
+        (\cod{SessionExplanationService}, \cod{AlternativeExplainer}) \\ \linhasep
+    Fluxogramas de decisão (a árvore de decisão referida na \cref{sec:base-conteudo})
+      & \cod{docs/fluxogramas/} \\ \linhasep
+    \multicolumn{2}{@{}l}{\textit{Interface Web (\cref{sec:interface})}} \\ \linhasep
+    Aplicação Angular & \cod{frontend/src/app/} \\ \linhasep
+    Painéis de explicação e diálogo de perguntas
+      & \cod{frontend/src/app/expert-system/} \\ \linhasep
+    \multicolumn{2}{@{}l}{\textit{Testes}} \\ \linhasep
+    Testes Java (JUnit), raiz & \cod{src/test/java/com/one2drive/projeto1/} \\ \linhasep
+    Testes do motor Prolog e de equivalência com o Drools
+      & \cod{src/test/java/com/one2drive/projeto1/prolog/} \\ \linhasep
+    Testes de simulação (E2E) e \emph{benchmark} do índice
+      & \cod{src/test/java/com/one2drive/projeto1/simulation/}
+        (\cod{DependencyIndexBenchmarkTest}) \\ \linhasep
+    Testes Playwright da interface Web & \cod{frontend/e2e/} (\cod{frontend/playwright.config.ts}) \\
     \bottomrule
   \end{tabularx}
 \end{table}

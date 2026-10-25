@@ -128,12 +128,13 @@
 \titleformat{\subsection}
   {\normalfont\normalsize\bfseries\color{corEscura}}{\thesubsection}{0.8em}{}
 
-% Uma secção não começa no fundo da página: se restar pouco espaço,
-% passa para a página seguinte (no máximo ~1/5 da página fica em branco).
+% Uma secção não começa no fundo da página: se restarem menos de 6 linhas
+% (era 10; baixou-se a 25/10/2026 para fechar espaços em branco), passa para a
+% página seguinte.
 \usepackage{needspace}
 \usepackage{placeins}  % \FloatBarrier: impede uma figura de passar para a secção seguinte
 \usepackage{etoolbox}
-\pretocmd{\section}{\Needspace{10\baselineskip}}{}{}
+\pretocmd{\section}{\Needspace{6\baselineskip}}{}{}
 \pretocmd{\subsection}{\Needspace{6\baselineskip}}{}{}
 
 % ===============================================================

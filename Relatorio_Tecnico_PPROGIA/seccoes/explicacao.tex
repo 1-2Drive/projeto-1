@@ -4,9 +4,8 @@
 As explicações assentam num princípio: a justificação de cada conclusão é
 registada no momento da inferência, e não reconstruída depois. É a ideia que
 se manteve do motor da unidade curricular (\cref{sec:comparacao-motor-uc}),
-aplicada a dois níveis. No motor Prolog, cada facto guarda
-como foi obtido. Na aplicação, cada ciclo de decisão guarda as propostas das
-regras e o resultado da arbitragem.
+aplicada a dois níveis: no motor, cada facto guarda como foi obtido; na
+aplicação, cada ciclo guarda as propostas e o resultado da arbitragem.
 
 \section{O que fica registado}
 \label{sec:expl-registo}
@@ -29,8 +28,7 @@ Em cada ciclo, o motor Prolog regista:
 
 A camada Java junta a cada proposta o seu resultado na arbitragem: venceu,
 perdeu para outra, foi vetada por uma paragem obrigatória, foi limitada por um
-teto de velocidade, ou foi recusada pelo atuador. Junta também um detalhe que
-identifica a regra vencedora ou o motivo da recusa.
+teto de velocidade, ou foi recusada pelo atuador.
 
 % Figura das duas vias do módulo de explicação: comentada para poupar espaço
 % (o PNG e o SVG ficam em figuras/). Para a repor, tirar o "% " das seis linhas
@@ -85,12 +83,11 @@ condição negada que se verificou aparece como \cod{absent(Padrão)}, por exemp
 \cod{absent(pedestrian_conflict(_))} na árvore da regra de circular pela direita
 (\cref{lst:regra-direita}).
 
-Para obter esta árvore não se usa o rastreio do SWI-Prolog (\cod{trace/0}): este
-mostra a resolução de cada predicado pelo interpretador, incluindo os do próprio
-motor, e não as regras de condução que dispararam nem os factos em que assentaram;
-além disso, é interativo e exige o modo de depuração, mais lento. Como o motor
-trata as regras como dados, é ele que regista a regra e a evidência de cada
-disparo (\cod{wm_support/3}), e \cod{explain/2} constrói a árvore desse registo.
+Não se usa o rastreio do SWI-Prolog (\cod{trace/0}): mostra a resolução de cada
+predicado pelo interpretador, incluindo os do motor, e não as regras que
+dispararam; é interativo e exige o modo de depuração. Como o motor trata as regras
+como dados, regista ele próprio a regra e a evidência de cada disparo
+(\cod{wm_support/3}), de onde \cod{explain/2} constrói a árvore.
 
 Na aplicação, o \emph{How} mostra o caminho que o ciclo escolhido percorreu no
 fluxograma de decisão da velocidade e no da via. Cada pergunta do fluxograma
@@ -100,23 +97,17 @@ proposta nesse ciclo, e o caminho termina onde a arbitragem fixou a decisão.
 \section{Why}
 \label{sec:expl-why}
 
-Nos materiais da unidade curricular, o \emph{Why} é o do MYCIN: quando o motor
-pergunta um facto ao utilizador, este pode perguntar porquê, e o motor mostra a
-regra que está a tentar provar (o \cod{sp_exp2.pl} não o
-implementa). Este
-sistema não faz perguntas ao utilizador. Todos os factos vêm dos sensores e do
-estado do veículo, dez vezes por segundo, um ritmo a que nenhum condutor
-conseguiria responder. Por isso, aqui, o \emph{Why} justifica uma decisão já
-tomada: responde porque é que o veículo fez o que fez. Para cada canal, a
-aplicação junta a regra que decidiu, a sua razão, a evidência e o resultado da
-arbitragem, bem como as outras propostas que também foram consideradas. No canal
-da via, uma mudança de via inclui ainda os subobjetivos de segurança desse
-lado. No exemplo, o veículo muda para a esquerda porque
-\cod{'Avoid pothole in right lane by changing left'} se verificou, com a razão
-\enquote{Avoiding pothole by moving into the clear left lane}. A evidência são
-os seis factos acima, e os quatro subobjetivos de
-\cod{safe_to_change_lane(left)} verificaram-se. A velocidade mantém-se porque
-nenhuma regra encontrou motivo para acelerar ou abrandar.
+Na UC, o \emph{Why} é o do MYCIN: quando o motor pede um facto, o utilizador
+pergunta porquê (o \cod{sp_exp2.pl} não o implementa). Este sistema não faz
+perguntas: todos os factos vêm dos sensores, dez vezes por segundo. Por isso,
+aqui, o \emph{Why} justifica uma decisão já tomada: responde porque é que o
+veículo fez o que fez. Para cada canal, a aplicação junta a regra que decidiu, a
+sua razão, a evidência e o resultado da arbitragem, bem como as outras propostas
+que também foram consideradas. No canal da via, uma mudança de via inclui ainda
+os subobjetivos de segurança desse lado. No exemplo, a resposta é a regra
+\cod{'Avoid pothole in right lane by changing left'}, a sua razão, os seis
+factos da \cref{lst:arvore-how} e os quatro subobjetivos verificados; a
+velocidade mantém-se porque nenhuma regra propôs alterá-la.
 
 \section{Why not}
 \label{sec:expl-whynot}
@@ -129,10 +120,9 @@ mecanismos. Um terceiro, no motor, desce até à condição exata de uma regra:
 \begin{itemize}
   \item \textbf{Uma alternativa não escolhida.} Para cada alternativa que o
     ciclo não seguiu, na velocidade ou na via, a aplicação explica porquê, a
-    partir do registo do ciclo. Ou foi proposta mas perdeu na arbitragem (e a resposta diz
-    para que regra, e por que princípio), ou nunca foi proposta porque as suas
-    condições não se verificaram, ou não se aplica naquele estado, ou o ciclo
-    não registou o suficiente. No exemplo, \enquote{porque não abrandou?} tem como resposta que
+    partir do registo do ciclo: ou foi proposta mas perdeu na arbitragem, ou nunca
+    foi proposta porque as suas condições não se verificaram, ou não se aplica
+    naquele estado. No exemplo, \enquote{porque não abrandou?} tem como resposta que
     nenhuma regra encontrou uma condição que exigisse abrandar, e
     \enquote{porque não mudou para a direita?} não se aplica, porque o veículo
     já está na via mais à direita.
@@ -143,9 +133,8 @@ mecanismos. Um terceiro, no motor, desce até à condição exata de uma regra:
     morto ocupado, ou falta de distância para seguir o veículo da outra via.
   \item \textbf{Uma regra que não disparou.} No motor, \cod{why_not/2} procura,
     entre todas as correspondências parciais das condições da regra, da esquerda
-    para a direita, a que avançou mais. Devolve a condição onde parou, com as
-    ligações dessa correspondência, seguida das condições posteriores que também
-    falham. Chega-se a ele pelo pedido \cod{whynot} do \cod{server.pl}. No
+    para a direita, a que avançou mais. Devolve a condição onde parou e as
+    posteriores que também falham. Chega-se a ele pelo pedido \cod{whynot} do \cod{server.pl}. No
     exemplo, para a regra que abranda perante um buraco, aponta a condição
     negada que falhou: o buraco ainda pode ser contornado (\cref{lst:whynot}).
 \end{itemize}

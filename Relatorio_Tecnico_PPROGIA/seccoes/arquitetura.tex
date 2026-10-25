@@ -20,10 +20,8 @@ falhe. O \cod{server.pl} aceita três pedidos: \cod{reset}, \cod{tick} e
 \cod{whynot} (\cref{sec:expl-whynot}).
 
 Em cada ciclo, o pedido \cod{tick} leva os eventos dos sensores, o estado do
-veículo e a decisão anterior, e devolve as propostas (ação, velocidade, risco,
-prioridade, razão, regra e evidência), os factos do ciclo, o limite de
-velocidade em vigor, os subobjetivos da segurança de mudança de via e as
-métricas do motor. O Java não decide nada por si: o \cod{DecisionContext}
+veículo e a decisão anterior, e devolve as propostas, os factos do ciclo, o
+limite em vigor e as verificações de segurança de mudança de via. O Java não decide nada por si: o \cod{DecisionContext}
 arbitra as propostas em dois canais, velocidade e via. Em cada canal vence a
 maior prioridade; na velocidade, as emergências e paragens obrigatórias
 (prioridade 60 ou mais) sobrepõem-se a tudo e, abaixo delas, aplica-se o teto de
@@ -46,7 +44,7 @@ sensores.
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.72\textwidth]{figuras/screenshot-web-ui.png}
+  \includegraphics[width=0.62\textwidth]{figuras/screenshot-web-ui.png}
   \caption{Interface Web com o motor Prolog ativo, durante uma ultrapassagem com chuva.}
   \label{fig:interface-web}
 \end{figure}

@@ -5,16 +5,13 @@ A maior parte das dificuldades surgiu ao reproduzir em Prolog o que o Drools
 oferece diretamente, e não ao escrever as regras de condução:
 
 \begin{itemize}
-  \item \textbf{Estado entre ciclos.} Em
-    Prolog foi preciso separar o estado persistente (\cod{driving_state.pl}) da
-    memória de cada ciclo, representar as janelas temporais com
-    \emph{timestamps} e escrever um motor com agenda explícita
-    (\cref{cap:motor}), enquanto o Drools já oferece memória com estado, eventos
-    que expiram, janelas temporais, \emph{salience} e reação a atualizações.
-  \item \textbf{Ordem dos eventos.} Os eventos de um ciclo podem chegar em
-    qualquer ordem. O \cod{driving_state.pl} trata primeiro as distâncias
-    frontais, para que a velocidade relativa e o TTC atualizem o veículo da
-    frente correto, seja qual for a ordem no JSON.
+  \item \textbf{Estado entre ciclos.} O Drools oferece memória com estado,
+    eventos que expiram e \emph{salience}; em Prolog foi preciso separar o estado
+    persistente (\cod{driving_state.pl}) da memória de cada ciclo e escrever um
+    motor com agenda explícita (\cref{cap:motor}).
+  \item \textbf{Ordem dos eventos.} Os eventos de um ciclo chegam em qualquer
+    ordem; o \cod{driving_state.pl} trata primeiro as distâncias frontais, para
+    que a velocidade relativa e o TTC atualizem o veículo da frente correto.
   \item \textbf{Factos lidos por predicados auxiliares.} Um \cod{test/1} esconde
     da explicação os factos que os auxiliares leem; \cod{prove/1} regista-os
     (\cref{sec:expl-how}).

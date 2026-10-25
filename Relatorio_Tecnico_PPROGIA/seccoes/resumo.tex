@@ -6,32 +6,44 @@ Prolog, de um sistema pericial de apoio à condução. A cada 100\,ms, o sistema
 decide a velocidade e a via de um veículo simulado a partir do que os sensores
 observam: veículos à frente, peões, semáforos, sinais, perigos na estrada e
 meteorologia. A simulação está em Java e a interface em Angular, mas todas as
-decisões cabem ao motor de regras. O projeto contou com o apoio de um perito em
-robótica e sistemas autónomos.
+decisões cabem ao motor de regras. A base de conhecimento foi construída com o
+apoio de um perito em robótica e sistemas autónomos, em duas reuniões por
+videoconferência e por correio eletrónico, e o conhecimento normativo vem do
+Código da Estrada.
 
 Não se usou o motor da unidade curricular. O grupo desenvolveu em SWI-Prolog um
 motor de regras de produção próprio, com memória de trabalho, agenda, resolução
 de conflitos por precedência e refração. Combina \emph{forward chaining}
 sobre os factos com \emph{backward chaining} dentro das condições. A base de
 conhecimento tem $\sim$120 regras, incluindo um controlador difuso para a
-meteorologia. Replicam, com os mesmos nomes e pela mesma ordem de disparo, as
-regras do segundo motor do sistema, em Drools.
+meteorologia. Replicam, identificadas pelos nomes das regras e pela mesma ordem
+de disparo, as regras do segundo motor do sistema, em Drools. Do motor da unidade
+curricular manteve-se a ideia de registar a justificação de cada facto; o novo
+motor acrescenta a resolução de conflitos, a refração por instanciação e o
+meta-conhecimento gerado automaticamente, que a aula~6 deixa como exercício às
+equipas.
 
 O meta-conhecimento (os tipos de facto que cada regra lê, a sua precedência e as
 instanciações que já dispararam) é derivado automaticamente das próprias regras
 e serve para controlar e acelerar a inferência. Depois de cada disparo, só se
 avaliam de novo as regras afetadas, o que reduz as avaliações de regras em
-82,5\,\%.
+82,5\,\%; a inferência ocupa, em média, cerca de 1,5\,\% do ciclo de 100\,ms.
 
 Cada facto derivado e cada proposta guardam a regra e a evidência que os
 produziram. A partir desse registo, o sistema responde a três perguntas sobre
 uma decisão: \emph{How} (como foi obtida), \emph{Why} (porque foi tomada) e
 \emph{Why not} (porque não foi tomada uma alternativa, ou porque não disparou
-uma regra).
+uma regra). Na interface Web, estas explicações podem ser consultadas para cada
+decisão registada, depois de carregar em \enquote{STOP}.
+
+A maior dificuldade foi reproduzir em Prolog o que o Drools oferece diretamente,
+como o estado mantido entre ciclos, os eventos que expiram e a ordem de disparo,
+o que levou a separar o estado persistente da memória de cada ciclo e a escrever
+um motor com agenda explícita.
 
 \vspace{0.8cm}
 \noindent\textbf{Palavras-chave:} sistemas periciais; Prolog; motor de
-inferência; regras de produção; meta-conhecimento; explicabilidade; apoio à
-condução.
+inferência; base de conhecimento, regras de produção; meta-conhecimento; explicabilidade;
+apoio à condução.
 
 \clearpage

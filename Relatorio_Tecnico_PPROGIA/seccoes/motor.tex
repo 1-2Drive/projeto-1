@@ -45,6 +45,7 @@ Uma condição pode ser um padrão a unificar com um facto, \cod{not(C)} (negaç
 por falha), \cod{test(Objetivo)} (aritmética ou um predicado auxiliar que lê os
 factos através de \cod{known/1}) ou \cod{prove(Objetivo)}, provado por
 \emph{backward chaining} (\cod{prove_goal/2}). A única ação é \cod{assert(Facto)}.
+
 O motor combina três mecanismos, em níveis diferentes. Ao nível das regras, faz
 \emph{forward chaining}: parte dos factos do ciclo, dispara as regras cujas
 condições se verificam, e cada conclusão pode ativar outras regras, até a agenda
@@ -57,10 +58,7 @@ anterior, recolhendo todas as maneiras de as satisfazer. Por fim, as condições
 \cod{prove/1} são provadas por \emph{backward chaining}: \cod{prove_goal/2} parte
 do objetivo, por exemplo \cod{safe_to_change_lane(left)}, e desce pelos
 subobjetivos (\cod{maneuver_idle}, \cod{no_continuous_line}, \cod{side_clear},
-\cod{room_to_follow}) até aos factos percebidos, registando os que leu. Ao
-contrário do \cod{sp_exp2.pl}, que usa o retrocesso como ciclo de
-controlo~\cite[diap.~38]{uclecture6}, aqui o controlo é a agenda, e o retrocesso
-fica dentro da correspondência das condições.
+\cod{room_to_follow}) até aos factos percebidos, registando os que leu.
 
 \begin{itemize}
   \item \textbf{Memória de trabalho:}

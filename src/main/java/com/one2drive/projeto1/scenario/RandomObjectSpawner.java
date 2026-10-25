@@ -29,6 +29,8 @@ public final class RandomObjectSpawner {
     static final int MAX_AHEAD_METERS = 160;
 
     private static final Lane[] LANES = {Lane.LEFT, Lane.CENTER, Lane.RIGHT};
+    /** Random vehicles never start in the left lane: it stays free for the ego to overtake them. */
+    private static final Lane[] VEHICLE_LANES = {Lane.CENTER, Lane.RIGHT};
     private static final int[] SPEED_LIMITS_KMH = {30, 50, 70, 90};
 
     /** What can appear, with its relative frequency. */
@@ -150,7 +152,7 @@ public final class RandomObjectSpawner {
             }
             case PEDESTRIAN -> actions.add(addActor(pedestrian(ahead)));
             case VEHICLE -> {
-                ScenarioActorDefinition vehicle = actor(ScenarioActorType.FRONT_VEHICLE, ahead, pick(LANES));
+                ScenarioActorDefinition vehicle = actor(ScenarioActorType.FRONT_VEHICLE, ahead, pick(VEHICLE_LANES));
                 vehicle.setSpeedKmh(10 + random.nextInt(31));
                 actions.add(addActor(vehicle));
             }

@@ -85,6 +85,32 @@ de velocidade (20).
 \section{Alguns exemplos}
 \label{sec:base-exemplos}
 
+\paragraph{Circular pela direita.} A \cref{lst:regra-direita}, uma das regras mais longas da base, aplica o Art.~13.º, n.º~3,
+do Código da Estrada (circular pela via mais à direita) e usa todas as formas de
+condição de \cref{sec:motor-regras}. Só propõe voltar à direita quando nada mais
+exige atenção: nenhum obstáculo, buraco, barreira ou
+peão em conflito, nenhum veículo a menos de 80\,m e nenhuma ultrapassagem ou
+mudança de via pedida pelo condutor.
+
+\noindent\begin{minipage}{\linewidth}
+\begin{lstlisting}[caption={Uma das regras mais longas da base de conhecimento (\texttt{driving\_rules.pl})},label=lst:regra-direita]
+rule('Enforce keep right road law when right lane is safe',
+     460,
+     [ ego_lane(Lane),                           test(Lane \== right),
+       not(presentation_demo),                   lane_change_state(idle),
+       prove(no_continuous_line(right)),         not(right_lane_blocked_ahead),
+       time_ms(Now),                             test(Now >= 4000),
+       lane_occupancy(right, false, RightFront), test(RightFront > 80.0),
+       test(fresh_side_reading(right)),          not(move_off_state(true, _)),
+       not(obstacle(_, _, _, _)),                not(pothole(_, _, _, _)),
+       not(barrier(_, _, false, _)),             not(pedestrian_conflict(_)),
+       not(test(front_vehicle_within(80.0))),    not(lane_change_request(_)),
+       not(test(driver_lane_change_hold(Now))),  not(test(current_overtaking(true, _, _, _, _))) ],
+     [ assert(proposal(return_right, no_target, low, maneuver_safety,
+                       'Portuguese Highway Code Art. 13: Drive on the rightmost available safe lane')) ]).
+\end{lstlisting}
+\end{minipage}
+
 \paragraph{Limite de velocidade.} A câmara deteta o sinal até 120\,m à frente.
 O \cod{driving_state.pl} guarda-o como pendente, com a sua posição na estrada, e
 carrega-o como \cod{pending_speed_limit(Kmh, SignPositionM)}. Enquanto o sinal

@@ -62,10 +62,7 @@ na \emph{interface} Web, através da explicação \emph{How} (\cref{sec:expl-how
 \section{Representação e organização}
 \label{sec:base-representacao}
 
-No Prolog, regras e factos são termos,
-como \cod{rule/4} ou \cod{traffic_light(Id, red|yellow|green, DistanceM)}, e as
-conclusões de decisão são factos \cod{proposal/5}. A \cref{lst:regra-limite-pl}
-mostra uma regra da base.
+A \cref{lst:regra-limite-pl} mostra uma regra da base.
 
 \begin{lstlisting}[caption={Regra de excesso de velocidade em Prolog (\texttt{driving\_rules.pl})},label=lst:regra-limite-pl]
 rule('Reduce speed when exceeding detected limit',
@@ -87,7 +84,7 @@ de velocidade (20).
 
 \paragraph{Circular pela direita.} A \cref{lst:regra-direita}, uma das regras mais longas da base, aplica o Art.~13.º, n.º~3,
 do Código da Estrada (circular pela via mais à direita) e usa todas as formas de
-condição de \cref{sec:motor-regras}. Só propõe voltar à direita quando nada mais
+condição da \cref{sec:motor-regras}. Só propõe voltar à direita quando nada mais
 exige atenção: nenhum obstáculo, buraco, barreira ou
 peão em conflito, nenhum veículo a menos de 80\,m e nenhuma ultrapassagem ou
 mudança de via pedida pelo condutor.

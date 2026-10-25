@@ -4,9 +4,7 @@
 O motor de inferência é um motor de regras de produção desenvolvido em
 SWI-Prolog. Em cada ciclo de 100\,ms recebe o estado do veículo e os eventos dos
 sensores, dispara as regras e devolve propostas de decisão, que a arbitragem em
-Java transforma numa única decisão (\cref{fig:arquitetura-motores}). As secções
-seguintes descrevem as regras, a memória de trabalho e o ciclo do motor, e
-comparam-no com o motor da unidade curricular.
+Java transforma numa única decisão (\cref{fig:arquitetura-motores}).
 
 % Flutuante (e não [H]): com os capítulos seguidos, não cabe por baixo do
 % parágrafo inicial e deixaria meia página em branco.
@@ -21,7 +19,7 @@ comparam-no com o motor da unidade curricular.
 \section{O motor de regras}
 \label{sec:motor-regras}
 
-As regras são dados do tipo: \texttt{rule(Id, Precedência, Condições, Ações)}. A
+As regras são dados, termos \texttt{rule(Id, Precedência, Condições, Ações)}. A
 \cref{lst:regra-peao} mostra um exemplo.
 
 \begin{lstlisting}[caption={Uma regra do motor Prolog (\texttt{driving\_rules.pl})},label=lst:regra-peao]

@@ -17,16 +17,12 @@ motor sem modificar o \cod{SimulationEngine}.
 gerido pela classe \cod{PrologProcess}. O Java copia os ficheiros Prolog para
 uma pasta de trabalho e arranca o processo com
 \cod{swipl -q -g main -t halt server.pl}, que executa \cod{main/0} em \cod{server.pl}
-e carrega os outros três ficheiros Prolog. O arranque acontece quando o motor é
-iniciado, num \cod{reset} ou numa troca de motor de inferência. Os dois lados trocam mensagens
-JSON por \cod{stdin} e \cod{stdout} padrão: um pedido por linha, e exatamente uma resposta
-por linha, mesmo quando o pedido falhe. Lançar o interpretador custa cerca de 150 a
-250\,ms, o que é incompatível com uma decisão a cada 100\,ms. Além disso, o lado
-Prolog tem de guardar estado entre ciclos. Por isso o processo é mantido vivo
-durante toda a sessão. O pedido \cod{reset} inicia a sessão com a velocidade de
-cruzeiro do cenário e com as constantes de paragem e as prioridades definidas no
-Java, para que não haja valores duplicados nos dois lados. A
-\cref{tab:pedidos-json} resume as mensagens JSON.
+e carrega os outros três ficheiros Prolog. Os dois lados trocam mensagens JSON
+por \cod{stdin} e \cod{stdout}: um pedido por linha, e exatamente uma resposta
+por linha, mesmo quando o pedido falhe. O processo é mantido vivo durante toda a
+sessão: lançá-lo custa 150 a 250\,ms, incompatível com um ciclo de 100\,ms, e o
+lado Prolog guarda estado entre ciclos. A \cref{tab:pedidos-json} resume as
+mensagens JSON.
 
 \begin{table}[H]
   \centering
@@ -49,14 +45,10 @@ Java, para que não haja valores duplicados nos dois lados. A
   \end{tabularx}
 \end{table}
 
-O \cod{server.pl} converte cada linha num \emph{dict} Prolog~\cite{swijson}.
-
 \paragraph{Pedidos e respostas.} Durante o ciclo, o \cod{PrologBackend} acumula
-os eventos dos sensores e os comandos do condutor. Preenche também um
-\cod{VehicleInput} com o que o Drools lê do facto do veículo: velocidade,
-posição, via, estado da manobra e via de destino, marcações da estrada,
-segurança das vias adjacentes (calculada pela perceção em Java) e se há um
-perigo à frente na via da direita. Tudo segue num único pedido \cod{tick}, com
+os eventos dos sensores. Preenche também um \cod{VehicleInput} com o estado do
+veículo (velocidade, posição, via, manobra em curso, marcações e segurança das
+vias adjacentes). Tudo segue num único pedido \cod{tick}, com
 a decisão anterior (ação, regra e prioridade). A resposta traz as propostas
 (ação, velocidade, risco, prioridade, razão, regra e evidência), os factos do
 ciclo, o limite de velocidade em vigor, os subobjetivos da segurança de mudança de
@@ -90,10 +82,8 @@ resultado de cada proposta, é então guardado para o módulo de explicação
 A aplicação segue uma arquitetura cliente-servidor.
 O servidor, em Java~17 (ou superior) com Spring~Boot~3.3.4, corre a simulação e o motor de inferência.
 O cliente é uma aplicação Angular~18 que só apresenta o estado e envia comandos.
-A \emph{interface} nunca avalia condições de condução: as distâncias de segurança, os
-limites de velocidade e a segurança das mudanças de via são decididos apenas
-no motor de regras.
-A interface limita-se a desenhar o estado da simulação que o servidor envia.
+A interface limita-se a desenhar o estado da simulação que o servidor envia:
+nunca avalia condições de condução.
 
 A comunicação usa dois canais: os comandos seguem por uma API REST, e o estado da
 simulação chega por um WebSocket (\cod{/api/ws/simulation}), num \emph{snapshot}
@@ -107,9 +97,6 @@ as leituras dos sensores.
 Uma biblioteca de cenários e uma caixa de ferramentas permitem montar situações
 durante a execução: veículos, peões, sinais, semáforos, buracos, obstáculos, barreiras e chuva.
 Um seletor troca entre os motores Prolog e Drools, recarregando o cenário.
-Se o motor falhar, um aviso mostra a mensagem de erro.
-O diálogo de perguntas \emph{Why}, \emph{Why not} e \emph{How}, que abre
-quando a simulação para (usando o botão \enquote{STOP}), é explicado na \cref{sec:expl-registo}.
 
 \begin{figure}[H]
   \centering

@@ -84,15 +84,12 @@ A árvore tem seis factos, embora as condições da regra só nomeiem três
 passam a fazer parte da evidência. Quando a decisão depende de conclusões
 intermédias, como \cod{pedestrian_conflict/1}, a árvore desce por elas.
 
-Para obter esta árvore, optou-se por não usar o rastreio do SWI-Prolog
-(\cod{trace/0}). O rastreio mostra a resolução feita pelo próprio interpretador,
-com as chamadas, saídas, retrocessos e falhas de cada predicado, incluindo os do
-motor (\cod{findall/3}, \cod{msort/2}), e não as regras de condução que
-dispararam nem os factos em que assentaram. Além disso, é interativo e obriga
-a executar em modo de depuração, mais lento. Como o motor trata as
-próprias regras como dados, é ele que regista, no momento de cada disparo, a
-regra e a evidência (\cod{wm_support/3}), e é desse registo que \cod{explain/2}
-constrói a árvore.
+Para obter esta árvore não se usa o rastreio do SWI-Prolog (\cod{trace/0}): este
+mostra a resolução de cada predicado pelo interpretador, incluindo os do próprio
+motor, e não as regras de condução que dispararam nem os factos em que assentaram;
+além disso, é interativo e exige o modo de depuração, mais lento. Como o motor
+trata as regras como dados, é ele que regista a regra e a evidência de cada
+disparo (\cod{wm_support/3}), e \cod{explain/2} constrói a árvore desse registo.
 
 Na aplicação, o \emph{How} mostra o caminho que o ciclo escolhido percorreu no
 fluxograma de decisão da velocidade e no da via. Cada pergunta do fluxograma
@@ -134,8 +131,7 @@ mecanismos. Um terceiro, no motor, desce até à condição exata de uma regra:
     partir do registo do ciclo. Ou foi proposta mas perdeu na arbitragem (e a resposta diz
     para que regra, e por que princípio), ou nunca foi proposta porque as suas
     condições não se verificaram, ou não se aplica naquele estado, ou o ciclo
-    não registou o suficiente. No último caso, a resposta di-lo em vez de
-    adivinhar. No exemplo, \enquote{porque não abrandou?} tem como resposta que
+    não registou o suficiente. No exemplo, \enquote{porque não abrandou?} tem como resposta que
     nenhuma regra encontrou uma condição que exigisse abrandar, e
     \enquote{porque não mudou para a direita?} não se aplica, porque o veículo
     já está na via mais à direita.

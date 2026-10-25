@@ -74,7 +74,7 @@ estática da regra:
 
 Com a base de conhecimento atual, o índice tem $\sim$600 entradas, para $\sim$120
 regras e $\sim$66 tipos de facto. A regra
-\cod{"Avoid pothole in centre lane by changing right when right is clear"}, por
+\cod{'Avoid pothole in centre lane by changing right when right is clear'}, por
 exemplo, depende de nove tipos de facto, mas só três aparecem nas suas condições
 (\cod{ego_lane/1}, \cod{pothole/4} e \cod{ego_speed/1}). Os outros seis, como as
 marcações da estrada, a ocupação das vias e o estado da manobra, vêm dos
@@ -93,13 +93,11 @@ Prolog lado a lado, um com o índice e outro sem ele. Em todos os ciclos, as dua
 execuções tomaram a mesma decisão e dispararam as mesmas regras (10\,231
 disparos): o índice só muda o custo, que o próprio motor mede
 (\cod{cycle_stats/3}). Com o índice, a inferência ocupa em média cerca de
-1,5\,\% do ciclo de 100\,ms (\cref{tab:desempenho}). Os tempos cobrem só a
-inferência, sem a comunicação JSON, e foram medidos numa única máquina 
-(Intel~Core~Ultra~7~258V, SWI-Prolog~9.2.9).
+1,5\,\% do ciclo de 100\,ms (\cref{tab:desempenho}).
 
 \begin{table}[H]
   \centering
-  \caption{Efeito do índice de dependências (14 cenários, 2\,100 ciclos)}
+  \caption{Efeito do índice de dependências (14 cenários, 2\,100 ciclos; só a inferência, sem a comunicação JSON; Intel~Core~Ultra~7~258V, SWI-Prolog~9.2.9)}
   \label{tab:desempenho}
   \small
   \begin{tabularx}{\textwidth}{@{}XVC{3.1cm}VC{3.1cm}VC{1.9cm}@{}}

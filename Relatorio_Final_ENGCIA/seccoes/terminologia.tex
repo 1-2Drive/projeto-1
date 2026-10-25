@@ -1,44 +1,35 @@
 % ---------------------------------------------------------------
-% Terminologia específica
+% seccoes/terminologia.tex — Terminologia específica
 % ---------------------------------------------------------------
+
 \chapter*{Terminologia específica}
 \addcontentsline{toc}{chapter}{Terminologia específica}
 
 Termos técnicos usados neste relatório, por ordem alfabética.
 
-\begingroup
-\small
-\rowcolors{2}{white}{corFundo}
-\begin{longtable}{@{}L{0.25\textwidth}L{0.70\textwidth}@{}}
-\linhacab \cab{Termo} & \cab{Definição} \\
+\begin{tabela}{L{\dimexpr0.2182\linewidth-2\tabcolsep\relax}L{\dimexpr0.7798\linewidth-2\tabcolsep\relax}}
+\caption{Terminologia específica}\label{tab:1}\\
+\linhacab \cab{\textbf{Termo}} & \cab{\textbf{Definição}} \\
 \endfirsthead
-\linhacab \cab{Termo} & \cab{Definição} \\
+\linhacab \cab{\textbf{Termo}} & \cab{\textbf{Definição}} \\
 \endhead
 Arbitragem & Escolha, no fim de cada ciclo, da decisão de velocidade e da decisão de via entre todas as propostas das regras. \\
-Base de conhecimento & Conjunto das regras que representam o conhecimento do domínio, separado do motor que as aplica. \\
-Encadeamento progressivo & Inferência que parte dos factos e aplica as regras cujas condições se verificam (\ing{forward chaining}). \\
-Encadeamento regressivo & Inferência que parte de um objetivo e procura os factos que o provam (\ing{backward chaining}). \\
-\ing{Entry point} & Em \ing{Drools}, fluxo com nome pelo qual os eventos de um tipo entram na sessão. \\
-Explicação \ing{Why} / \ing{How} / \ing{Why Not} & Explicações de porque foi tomada uma decisão, de como se chegou a ela e de porque não foi tomada outra. \\
+\rowcolor{corFundo}Base de conhecimento & Conjunto das regras que representam o conhecimento do domínio. \\
+Canal & Cada uma das duas partes independentes da decisão: velocidade e via. \\
+\rowcolor{corFundo}Encadeamento progressivo & Inferência que parte dos factos e aplica as regras cujas condições se verificam (\emph{forward chaining}). \\
+Encadeamento regressivo & Inferência que parte de um objetivo e procura os factos que o provam (\emph{backward chaining}). \\
+\rowcolor{corFundo}\emph{Entry point} & Em \emph{Drools}, fluxo com nome pelo qual os eventos de um tipo entram na sessão. \\
+Evento & Leitura de um sensor num dado instante, que expira ao fim de algum tempo; distingue-se do facto, que descreve o estado atual. \\
+\rowcolor{corFundo}Explicação \emph{Why / How / Why Not} & Explicações de porque foi tomada uma decisão, de como se chegou à mesma e de porque não ter sido tomada outra. \\
 Facto & Unidade de informação sobre a situação atual, mantida na memória de trabalho. \\
-Lógica difusa & Raciocínio com categorias vagas, a que um valor pertence com um grau entre 0 e 1 (\ing{fuzzy logic}). \\
-Manutenção da verdade & Retirada automática de uma conclusão quando o facto que a justificava deixa de existir (\ing{truth maintenance}). \\
-Memória de trabalho & Conjunto dos factos que o sistema conhece num dado momento (\ing{working memory}). \\
-Metaconhecimento & Conhecimento sobre as próprias regras, que controla a inferência: ordem das fases, prioridades, desempate. \\
-Motor de inferência & Componente que avalia as regras sobre a memória de trabalho e produz conclusões. \\
-Nível de risco & Gravidade de uma situação: baixo, moderado, alto ou crítico. Acompanha a decisão, mas não a seleciona. \\
-Operadores de Allen & Relações entre instantes e intervalos de tempo, como \ing{after} ou \ing{coincides}, usadas nas regras temporais. \\
+\rowcolor{corFundo}Lógica difusa & Raciocínio com categorias, a que um valor pertence com um grau entre 0 e 1 (\emph{fuzzy logic}). \\
+Memória de trabalho & Conjunto dos factos que o sistema conhece num dado momento (\emph{working memory}). \\
+\rowcolor{corFundo}Metaconhecimento & Conhecimento sobre as próprias regras, que controla a inferência: ordem das fases, prioridades, desempate. \\
+Motor de inferência & Componente que avalia as regras e produz conclusões. \\
+\rowcolor{corFundo}Nível de risco & Gravidade de uma situação: baixo, moderado, alto ou crítico. Acompanha a decisão, mas não a seleciona. \\
 Prioridade & Categoria, de 10 a 70, que decide entre propostas concorrentes. \\
-Proposta & Ação sugerida por uma regra num ciclo, com velocidade, risco, prioridade, razão e evidência. \\
-Pseudo-relógio & Relógio da sessão \ing{Drools} avançado pelo programa, exatamente 100 ms por ciclo. \\
-Saliência & Em \ing{Drools}, ordem relativa de disparo das regras ativas (\ing{salience}). \\
-Sessão com estado & Sessão do motor que mantém os factos entre ciclos (\ing{stateful KieSession}). \\
-Sistema pericial & Sistema que representa conhecimento especializado de forma explícita e o utiliza, através de um motor de inferência, para chegar a conclusões justificáveis (\ing{expert system}). \\
-\ing{Snapshot} & Estado completo do sistema num ciclo, enviado à interface. \\
-Teto de velocidade & Proposta que diz «não mais depressa do que\ldots»; todos os tetos se aplicam e vence o mais baixo. \\
-TTC & Tempo até à colisão (\ing{time to collision}): distância ao veículo da frente a dividir pela velocidade de aproximação. \\
-\ing{WebSocket} & Protocolo de comunicação persistente e bidirecional sobre uma única ligação TCP (RFC 6455). \\
-\end{longtable}
-\addtocounter{table}{-1} % a tabela da terminologia não tem número (como no Word)
-\endgroup
-\clearpage
+\rowcolor{corFundo}Processamento de eventos complexos (CEP) & Deteção de padrões em sequências de eventos ao longo do tempo, como três leituras de TTC baixo em 2 s (\emph{complex event processing}). \\
+Sistema pericial & Sistema que representa conhecimento especializado de forma explícita e o utiliza, através de um motor de inferência, para chegar a conclusões justificáveis (\emph{expert system}). \\
+\rowcolor{corFundo}TTC & Tempo até à colisão (\emph{time to collision}): distância ao veículo da frente a dividir pela velocidade de aproximação. \\
+\emph{WebSocket} & Protocolo de comunicação persistente e bidirecional sobre uma única ligação TCP (RFC 6455). \\
+\end{tabela}

@@ -1,107 +1,66 @@
 % ---------------------------------------------------------------
-% capa.tex — página de rosto
-% O bloco de autoria é gerado a partir de \listaautores (metadados.tex)
-% e adapta-se a qualquer número de elementos.
+% capa.tex — página de rosto (dados em metadados.tex)
 % ---------------------------------------------------------------
 \begin{titlepage}
 \centering
-\thispagestyle{empty}
 
-\vspace*{0.2cm}
-
-% --- Logotipos -------------------------------------------------
-% ISEP à esquerda (marca horizontal, ~8,2:1) e MEIA à direita
-% (marca vertical). O trim recorta as margens brancas do JPEG
-% original; as medidas estão em bp e o ficheiro é de 72 dpi, pelo
-% que correspondem a pixéis.
 \noindent
-\begin{minipage}[c]{0.60\textwidth}%
-  \raggedright
-  \includegraphics[width=5.6cm]{logos/ISEP_logo.pdf}%
+\begin{minipage}[c]{0.60\textwidth}\raggedright
+  \includegraphics[width=5.2cm]{logos/ISEP_logo.pdf}
 \end{minipage}%
 \hfill
-\begin{minipage}[c]{0.32\textwidth}%
-  \raggedleft
-  \includegraphics[trim=92bp 163bp 72bp 160bp,clip,height=2.1cm]{logos/MEIA_logo.jpg}%
+\begin{minipage}[c]{0.32\textwidth}\raggedleft
+  \includegraphics[trim=92bp 163bp 72bp 160bp,clip,height=2.0cm]{logos/MEIA_logo.jpg}
 \end{minipage}
 
-\vspace{0.7cm}
-
-{\Large\scshape\textcolor{corEscura}{\instituicao}\par}
-\vspace{0.3cm}
-{\large\textcolor{corCinza}{\curso}\par}
-
-\vspace{0.45cm}
-\textcolor{corEscura}{\rule{\textwidth}{1.2pt}}
-\vspace{0.4cm}
-
-{\large\bfseries\textcolor{corDestaque}{\uc{} (\ucsigla)}\par}
-\vspace{0.2cm}
-{\normalsize\textcolor{corCinza}{\anoletivo{} \textperiodcentered{} \semestre}\par}
+\vspace{0.6cm}
+{\fontsize{14}{17}\selectfont\color{corEscura}I\pv{NSTITUTO} S\pv{UPERIOR} \pv{DE} E\pv{NGENHARIA} \pv{DO} P\pv{ORTO}\par}
+\vspace{0.25cm}
+{\large\color{corCinza}\curso\par}
 
 \vspace{0.4cm}
-\textcolor{corEscura}{\rule{\textwidth}{1.2pt}}
+{\color{corEscura}\rule{\textwidth}{0.9pt}}
+\vspace{0.4cm}
 
-\vspace{0.8cm}
+{\titulos\large\bfseries\color{corDestaque}\uc{} (\ucsigla)\par}
+\vspace{0.15cm}
+{\color{corCinza}\anoletivo{} \textperiodcentered{} \semestre\par}
 
-{\Huge\bfseries\textcolor{corEscura}{\tituloprincipal}\par}
+\vspace{0.4cm}
+{\color{corEscura}\rule{\textwidth}{0.9pt}}
 
-\vspace{0.55cm}
-
-{\LARGE\textcolor{corCinza}{\subtitulo}\par}
-
+\vspace{1cm}
+{\titulos\fontsize{24.5}{30}\selectfont\bfseries\color{corEscura}\tituloprincipal\par}
 \vspace{0.5cm}
-
-{\large\textit{\descricao}\par}
+{\fontsize{17}{20}\selectfont\color{corCinza}\subtitulo\par}
+\vspace{0.4cm}
+{\large\descricao\par}
 
 \vfill
 
-% --- Autoria ---------------------------------------------------
-{\bfseries\textcolor{corEscura}{Autores}\par}
-\vspace{6pt}
-
+{\titulos\bfseries\color{corEscura}Autores\par}
+\vspace{4pt}
 \begingroup
-\renewcommand{\arraystretch}{1.15}
-% \autorsep evita uma linha vazia no fim da tabela: fica vazio na
-% primeira invocação e passa a \\ nas seguintes.
 \gdef\autorsep{}%
-% O \textcolor fica DENTRO do \href: de outro modo o colorlinks do
-% hyperref sobrepunha-se e pintava o email com a cor das hiperligacoes.
-\renewcommand{\autor}[2]{%
-  \autorsep\gdef\autorsep{\\}%
-  #1 & \href{mailto:#2}{\textcolor{corCinza}{\small\nolinkurl{#2}}}%
-}%
-\begin{tabular}{@{}l@{\hspace{1.4em}}l@{}}
+\renewcommand{\autor}[2]{\autorsep\gdef\autorsep{\\}#1 & {\color{corCinza}\small #2}}%
+\begin{tabular}{@{}l@{\hspace{1.6em}}l@{}}
 \listaautores
 \end{tabular}
 \endgroup
 
-\vspace{0.7cm}
-
-{\bfseries\textcolor{corEscura}{Docência}\par}
-\vspace{6pt}
-
+\vspace{0.6cm}
+{\titulos\bfseries\color{corEscura}Docentes\par}
+\vspace{4pt}
 \begingroup
-\renewcommand{\arraystretch}{1.15}
 \gdef\docentesep{}%
-% Coluna única centrada; o email só aparece se não estiver vazio.
-\renewcommand{\docente}[2]{%
-  \docentesep\gdef\docentesep{\\}%
-  #1%
-  \if\relax\detokenize{#2}\relax\else
-    \hspace{1.4em}\href{mailto:#2}{\textcolor{corCinza}{\small\nolinkurl{#2}}}%
-  \fi
-}%
+\renewcommand{\docente}[1]{\docentesep\gdef\docentesep{\\}#1}%
 \begin{tabular}{@{}c@{}}
 \listadocentes
 \end{tabular}
 \endgroup
 
-\vspace{0.7cm}
-
-\textcolor{corEscura}{\rule{\textwidth}{0.6pt}}
+\vspace{0.6cm}
+{\color{corEscura}\rule{\textwidth}{0.6pt}}
 \vspace{0.3cm}
-
-{\normalsize\textcolor{corCinza}{\datarelatorio}\par}
-
+{\color{corCinza}\datarelatorio\par}
 \end{titlepage}

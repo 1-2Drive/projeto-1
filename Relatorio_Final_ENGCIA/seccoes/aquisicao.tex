@@ -1,11 +1,12 @@
 % ---------------------------------------------------------------
-% 3. Aquisição de conhecimento
+% seccoes/aquisicao.tex — Aquisição de conhecimento
 % ---------------------------------------------------------------
-\chapter{Aquisição de conhecimento}\label{cap:aquisicao}
 
-A base de conhecimento foi construída de forma iterativa, a partir de quatro tipos de contributo: o perito, a regulamentação rodoviária, a literatura técnica e científica e o conhecimento da equipa (Figura 2). Cada fonte de conhecimento confirmou, corrigiu ou acrescentou critérios de decisão, e cada regra nova foi validada em cenários e testes antes de ser aceite.
+\chapter{Aquisição de conhecimento}\label{sec:3}
 
-\begin{figure}[htbp]
+A base de conhecimento foi construída de forma iterativa, a partir de quatro tipos de contributo: o perito, a regulamentação rodoviária, a literatura técnica e científica e o conhecimento da equipa (Figura~\ref{fig:2}). Cada fonte de conhecimento confirmou, corrigiu ou acrescentou critérios de decisão, e cada regra nova foi validada em cenários e testes antes de ser aceite.
+
+\begin{figure}[H]
 \centering
 \begin{tikzpicture}[
     node distance=6mm and 9mm,
@@ -29,103 +30,83 @@ A base de conhecimento foi construída de forma iterativa, a partir de quatro ti
 \draw[seta] (val) -- (rev);
 \draw[seta] (rev.north) |- node[pos=0.25, right, font=\scriptsize, text=corCinza]{iteração} (aq.east);
 \end{tikzpicture}
-\caption{Processo de aquisição, validação e atualização da base de conhecimento}
-\label{fig:aquisicao}
+\caption{Processo de aquisição, validação e atualização da base de conhecimento}\label{fig:2}
 \end{figure}
 
-\section{Fontes de conhecimento}\label{sec:fontes}
+\section{Fontes de conhecimento}\label{sec:3.1}
 
-A primeira fonte considerada corresponde à pesquisa bibliográfica e técnica, utilizada para
-aprofundar conceitos relacionados com os sistemas periciais, sensores, segurança rodoviária e a
-avaliação de situações de risco. Esta pesquisa permitiu também compreender melhor determinados
-indicadores relevantes para o sistema, como o TTC, utilizado para relacionar a distância a um
-objeto com a velocidade de aproximação.
+A primeira fonte considerada corresponde à pesquisa bibliográfica e técnica, utilizada para aprofundar conceitos relacionados com os sistemas periciais, sensores, segurança rodoviária e a avaliação de situações de risco. Esta pesquisa permitiu também compreender melhor determinados indicadores relevantes para o sistema, como o TTC, utilizado para relacionar a distância a um objeto com a velocidade de aproximação.
 
 A segunda fonte diz respeito ao conhecimento desenvolvido pelo grupo, nomeadamente à identificação dos elementos considerados importantes para a tomada de decisão, às possíveis relações entre estes elementos e as ações que o sistema poderia propor. Este conhecimento foi utilizado para construir uma primeira versão das regras a aplicar e, simultaneamente, permitiu identificar dúvidas a esclarecer com o perito.
 
-Por último, a fonte de conhecimento mais importante foi o contacto com o perito, não só para adquirir novas informações e conhecimento, mas também para rever e questionar algumas decisões inicialmente definidas pelo grupo. Esta fonte de conhecimento permitiu esclarecer aspetos do domínio relacionados, por exemplo, com critérios de criticidade e prioridades. Desta forma, a base de conhecimento é o resultado da combinação entre a pesquisa, o conhecimento desenvolvido pelo grupo e o conhecimento especializado, como apresentado, resumidamente, pela Tabela 1.
+Por último, a fonte de conhecimento mais importante foi o contacto com o perito, não só para adquirir novas informações e conhecimento, mas também para rever e questionar algumas decisões, inicialmente, definidas pelo grupo. Esta fonte de conhecimento permitiu esclarecer aspetos do domínio relacionados, por exemplo, com critérios de criticidade e prioridades. Desta forma, a base de conhecimento é o resultado da combinação entre a pesquisa, o conhecimento desenvolvido pelo grupo e o conhecimento especializado, como apresentado, resumidamente, pela Tabela~\ref{tab:2}.
 
-\begingroup
-\small
-\rowcolors{2}{white}{corFundo}
-\begin{longtable}{@{}L{0.20\textwidth}L{0.33\textwidth}L{0.41\textwidth}@{}}
-\caption{Fontes de conhecimento e respetivo contributo}\label{tab:fontes}\\
-\linhacab \cab{Tipo de fonte} & \cab{Fonte} & \cab{Contributo para a base de conhecimento} \\
+\begin{tabela}{L{\dimexpr0.2026\linewidth-2\tabcolsep\relax}L{\dimexpr0.3588\linewidth-2\tabcolsep\relax}L{\dimexpr0.4367\linewidth-2\tabcolsep\relax}}
+\caption{Fontes de conhecimento e respetivo contributo}\label{tab:2}\\
+\linhacab \cab{\textbf{Tipo de fonte}} & \cab{\textbf{Fonte}} & \cab{\textbf{Contributo para a base de conhecimento}} \\
 \endfirsthead
-\linhacab \cab{Tipo de fonte} & \cab{Fonte} & \cab{Contributo para a base de conhecimento} \\
+\linhacab \cab{\textbf{Tipo de fonte}} & \cab{\textbf{Fonte}} & \cab{\textbf{Contributo para a base de conhecimento}} \\
 \endhead
-Perito & Prof.\ Doutor Agostinho Gil Teixeira Lopes, ISEP (Secção 3.2) & Criticidade a partir da velocidade, da distância e da capacidade de travagem; número de leituras antes de agir; níveis de risco e desempate; validade dos factos; comportamento em caso de falha \\
-Legislação & Código da Estrada~\cite{codigoestrada} & Paragem no vermelho e no STOP, cedência a peões, circulação pela direita, ultrapassagem pela esquerda, velocidade adequada ao espaço livre e visível \\
-Guia técnico & Prevenção Rodoviária Portuguesa~\cite{prp2025} & Distância de segurança e condições climatéricas \\
-Literatura científica & Vogel~\cite{vogel2003} & TTC como indicador de risco de colisão \\
-Literatura científica & Yeong et al.~\cite{yeong2021}; Wei et al.~\cite{wei2022}; Castanedo~\cite{castanedo2013} & Escolha dos sensores e fusão de dados \\
-Material da unidade curricular & Materiais de ENGCIA~\cite{engcia} & \ing{Drools}, raciocínio temporal, lógica difusa \\
+Perito & Prof. Doutor Agostinho Gil Teixeira Lopes, ISEP (Secção~\ref{sec:3.2}) & Criticidade a partir da velocidade, da distância e da capacidade de travagem; número de leituras antes de agir; níveis de risco e desempate; validade dos factos; comportamento em caso de falha \\
+\rowcolor{corFundo}Legislação & Código da Estrada [7] & Paragem no vermelho e no STOP, cedência a peões, circulação pela direita, ultrapassagem pela esquerda, velocidade adequada ao espaço livre e visível \\
+Guia técnico & Prevenção Rodoviária Portuguesa [8] & Distância de segurança e condições climatéricas \\
+\rowcolor{corFundo}Literatura científica & Vogel [9] & TTC como indicador de risco de colisão \\
+Literatura científica & Yeong et al. [10]; Wei et al. [11]; Castanedo [12] & Escolha dos sensores e fusão de dados \\
+\rowcolor{corFundo}Material da unidade curricular & Materiais de ENGCIA [13] & \emph{Drools}, raciocínio temporal, lógica difusa \\
 Equipa & Análise do domínio e dos cenários & Primeira versão das regras e questões a colocar ao perito \\
-\end{longtable}
-\endgroup
+\end{tabela}
 
-\section{O perito}\label{sec:perito}
+\section{O perito}\label{sec:3.2}
 
 O perito selecionado para o desenvolvimento do presente projeto é o Professor Doutor Agostinho Gil Teixeira Lopes, atualmente Professor Adjunto do Departamento de Engenharia Informática do Instituto Superior de Engenharia do Porto (ISEP), desde outubro de 2024 [1, 2]. A escolha deste perito é fundamentada pela formação académica, experiência profissional e atividade de investigação nas áreas diretamente relacionadas com o domínio do trabalho, nomeadamente a robótica autónoma, a perceção sensorial, a automação e os sistemas de controlo.
 
-No que respeita à formação académica, o perito concluiu, em 2002, a licenciatura em Informática e Matemáticas Aplicadas na Universidade Portucalense Infante D. Henrique e, em 2006, o doutoramento em Engenharia Informática na \emph{Cranfield University}, no Reino Unido, com especialização em \emph{Automation, Control and Robotics}. A investigação desenvolvida no âmbito da tese apresentada, intitulada \emph{Arc-Based Sensing in Narrow Groove Pipe Welding}, teve como foco a utilização de informação sensorial em processos de automação e controlo. Seguiram-se, posteriormente, dois projetos de pós-doutoramento em \emph{Cranfield} (2006--2008) [3].
+No que respeita à formação académica, o perito concluiu, em 2002, a licenciatura em Informática e Matemáticas Aplicadas na Universidade Portucalense Infante D. Henrique e, em 2006, o doutoramento em Engenharia Informática na \emph{Cranfield University}, no Reino Unido, com especialização em \emph{Automation, Control and Robotics}. A investigação desenvolvida no âmbito da tese apresentada, intitulada \emph{Arc-Based Sensing in Narrow Groove Pipe Welding}, teve como foco a utilização de informação sensorial em processos de automação e controlo. Seguiram-se, posteriormente, dois projetos de pós-doutoramento em \emph{Cranfield} (2006–2008) [3].
 
 Relativamente ao percurso profissional, conta com a atividade de investigação na Universidade do Minho, entre 2008 e 2013, bem como com funções de Professor Auxiliar na Universidade da Maia, entre 2007 e 2024, e de Professor Auxiliar Convidado na Universidade do Minho, entre 2013 e 2024 [1]. Ainda no decorrer da carreira profissional, participou em projetos de investigação, publicou 76 artigos científicos, 42 dos quais indexados na \emph{Scopus} [1], e orientou projetos académicos em diferentes áreas da robótica e da inteligência artificial. Atualmente, a área de investigação para a qual contribui centra-se na robótica móvel autónoma inteligente, com temas como visão computacional, sistemas multissensoriais, localização, navegação e controlo de plataformas autónomas.
 
-Neste sentido, a escolha deste perito justifica-se, sobretudo, pela proximidade entre as
-respetivas áreas de especialização e os desafios associados ao sistema pericial proposto. Embora o
-projeto não tenha como finalidade o desenvolvimento de um sistema de condução autónoma para
-utilização num veículo real, a representação do conhecimento necessária à análise dos cenários
-simulados depende da compreensão de como a informação deve ser interpretada e utilizada na
-avaliação de situações e na definição das ações realizadas.
+Neste sentido, a escolha deste perito justifica-se, sobretudo, pela proximidade entre as respetivas áreas de especialização e os desafios associados ao sistema pericial proposto. Embora o projeto não tenha como finalidade o desenvolvimento de um sistema de condução autónoma para utilização num veículo real, a representação do conhecimento necessária à análise dos cenários simulados depende da compreensão de como a informação deve ser interpretada e utilizada na avaliação de situações e na definição das ações realizadas.
 
 O contributo do perito foi particularmente pertinente na discussão de aspetos como, por exemplo, a relação entre velocidade, distância e capacidade de travagem, a identificação de situações críticas, o número de leituras necessário para confirmar uma deteção e o tratamento de informação contraditória. Estas questões encontram-se diretamente relacionadas com a aquisição e representação do conhecimento, uma vez que permitem fundamentar as condições, exceções e prioridades consideradas na construção da base de conhecimento. Assim, a participação do perito permitiu complementar a pesquisa realizada pela equipa, questionar pressupostos, inicialmente, definidos e orientar a formalização de conhecimento relevante para um sistema pericial cujas decisões possam ser compreendidas e analisadas pelos utilizadores.
 
-No entanto, uma vez que o perito não é especialista em legislação rodoviária, nem em engenharia e
-homologação automóvel, o conhecimento normativo foi consultado diretamente no Código da Estrada.
+No entanto, uma vez que o perito não é especialista em legislação rodoviária, nem em engenharia e homologação automóvel, o conhecimento normativo foi consultado diretamente no Código da Estrada.
 
-\section{Sessões de aquisição de conhecimento}\label{sec:sessoes}
+\section{Sessões com o perito}\label{sec:3.3}
 
-A aquisição de conhecimento junto do perito decorreu em duas sessões (Tabela 2). As perguntas foram preparadas pela equipa a partir das dúvidas que surgiram na construção da base de conhecimento e tiveram como objetivo identificar as variáveis a avaliar, as condições que podem alterar uma decisão, as exceções e o tratamento de conflitos. O resumo das perguntas e respostas encontra-se no Anexo A.
+O contacto com o perito decorreu em três momentos (Tabela~\ref{tab:3}). As duas primeiras sessões tiveram como objetivo adquirir conhecimento e esclarecer dúvidas relacionadas com a construção da base de conhecimentos, nomeadamente sobre as variáveis avaliar, as condições que pudessem alterar uma decisão, as exceções e o tratamento de conflitos. A terceira sessão teve como objetivo a apresentação da solução implementada e à respetiva apreciação do perito. O resumo das perguntas e respostas, da sessão 1 e sessão 2, encontra-se no Anexo A.
 
-\begin{table}[htbp]
-\centering
-\small
-\caption{Sessões com o perito}\label{tab:sessoes}
-\rowcolors{2}{white}{corFundo}
-\begin{tabular}{@{}L{0.17\textwidth}L{0.38\textwidth}L{0.38\textwidth}@{}}
-\linhacab & \cab{Sessão 1 (S1)} & \cab{Sessão 2 (S2)} \\
-\textbf{Data e formato} & 1 de outubro de 2026, 20h10 · entrevista não estruturada por \ing{Microsoft Teams} & 2 de outubro de 2026 · questionário escrito por \ing{email} \\
-\textbf{Objetivo} & Apresentar o projeto e discutir a respetiva implementação & Esclarecer as questões que ficaram em aberto \\
-\textbf{Temas} & Estrutura do sistema, representação do ambiente, factos, cenários e influência dos factos na decisão & Falhas, relevância dos sensores, criticidade e TTC, número de leituras, prioridades e desempate, memória de trabalho, dados contraditórios, cenários, explicações \\
-\textbf{Principais resultados} & Representar o percurso como uma matriz de vias e posições; centrar o risco na relação entre velocidade e distância; Teoria dos Jogos como evolução possível & Criticidade calculada pela distância de travagem; agir à primeira leitura em situação crítica e confirmar em situação normal; quatro níveis de risco; desempate determinístico \\
-\end{tabular}
-\end{table}
-
-Estas indicações estão refletidas no sistema através da implementação da matriz de vias, da interface na qual é possível inserir novos elementos na simulação, das regras aplicáveis aos peões, aos obstáculos e aos semáforos, assim como através do cálculo da distância de travagem, em detrimento de valores fixos para as distâncias e da implementação das regras de TTC que distinguem a reação imediata da confirmação por leituras sucessivas.
-
-A Tabela 3 reflete de que forma o conhecimento transmitido pelo perito foi aplicado à nossa base de conhecimento.
-
-\begingroup
-\small
-\rowcolors{2}{white}{corFundo}
-\begin{longtable}{@{}L{0.29\textwidth}L{0.48\textwidth}L{0.15\textwidth}@{}}
-\caption{Das indicações do perito à base de conhecimento}\label{tab:perito}\\
-\linhacab \cab{Indicação do perito} & \cab{Representação no sistema} & \cab{Estado} \\
+\begin{tabela}{L{\dimexpr0.1759\linewidth-2\tabcolsep\relax}L{\dimexpr0.2740\linewidth-2\tabcolsep\relax}L{\dimexpr0.2740\linewidth-2\tabcolsep\relax}L{\dimexpr0.2740\linewidth-2\tabcolsep\relax}}
+\caption{Sessões com o perito}\label{tab:3}\\
+\linhacab \cab{} & \cab{\textbf{Sessão 1 (S1)}} & \cab{\textbf{Sessão 2 (S2)}} & \cab{\textbf{Sessão 3 (S3)}} \\
 \endfirsthead
-\linhacab \cab{Indicação do perito} & \cab{Representação no sistema} & \cab{Estado} \\
+\linhacab \cab{} & \cab{\textbf{Sessão 1 (S1)}} & \cab{\textbf{Sessão 2 (S2)}} & \cab{\textbf{Sessão 3 (S3)}} \\
 \endhead
-Representar a estrada como uma matriz & Estrada com 3 vias $\times$ blocos de 5 m, à qual é possível adicionar elementos no decorrer da simulação & Implementada \\
-Criticidade por uma equação de velocidade, distância e capacidade de travagem; nunca travagem instantânea & Distância de paragem com tempo de reação de 0,5 s e desaceleração de 2,8 m/s² (conforto) ou 8,5 m/s² (emergência), usada em semáforos, STOP, peões, obstáculos, barreiras e buracos & Implementada \\
-Situação crítica: agir à primeira leitura; normal: confirmar & TTC $<$ 1,3 s numa leitura dispara a emergência; TTC $<$ 2,5 s exige 3 leituras em 2 s & Implementada \\
-Níveis de risco & Quatro níveis de risco e a decisão usa sete categorias de prioridade (Secção 4.4) & Implementada \\
-Desempate: escolher a primeira de uma lista ordenada & Em empate, vence a proposta de menor velocidade e, depois, a primeira registada & Implementada \\
-Esquecer o que sai do campo de deteção; um sinal é uma mudança de estado & Perceções expiram no caso de não haver novas leituras (250 ms a 1,5 s) & Implementada \\
-Acrescentar a passadeira com peão e elementos fora de contexto & Cenário S7; é possível também inserir elementos com a simulação a correr & Implementada \\
-As explicações devem estar alinhadas com as regras & O texto de cada explicação é a razão e a evidência registada pela regra que disparou & Implementada \\
-Teoria dos Jogos & Não seguida; ver desenvolvimento futuro (Secção 7.3) & Futura \\
-\end{longtable}
-\endgroup
+\textbf{Data e formato} & 1 de outubro de 2026 Reunião via Microsoft Teams & 2 de outubro de 2026\par Email com questões & 24 de outubro de 2026\par Reunião via Microsoft Teams \\
+\rowcolor{corFundo}\textbf{Objetivo} & Apresentar o projeto e discutir a respetiva implementação & Esclarecer as questões que ficaram em aberto & Apresentar o sistema em funcionamento e apreciação final do perito \\
+\textbf{Temas} & Estrutura do sistema, representação do ambiente, factos, cenários e influência dos factos na decisão & Falhas, relevância dos sensores, criticidade e TTC, número de leituras, prioridades e desempate, memória de trabalho, dados contraditórios, cenários, explicações & Simulação e decisões em tempo real, construção de cenários na matriz de vias, funcionamento do motor de inferência e explicações \\
+\rowcolor{corFundo}\textbf{Principais resultados} & Representar o percurso como uma matriz de vias e posições; centrar o risco na relação entre velocidade e distância; Teoria dos Jogos como evolução possível & Criticidade calculada pela distância de travagem; agir à primeira leitura em situação crítica e confirmar em situação normal; quatro níveis de risco; desempate determinístico & Apreciação muito positiva do sistema e, em particular, da matriz de vias \\
+\end{tabela}
 
-As indicações do perito e das restantes fontes foram depois formalizadas na base de conhecimento,
-como se descreve no capítulo seguinte.
+As indicações das duas primeiras sessões com o perito, estão refletidas no sistema através da implementação da matriz de vias, da interface na qual é possível inserir novos elementos na simulação, das regras aplicáveis aos peões, aos obstáculos e aos semáforos, assim como através do cálculo da distância de travagem, em detrimento de valores fixos para as distâncias e da implementação das regras de TTC que distinguem a reação imediata da confirmação por leituras sucessivas.
+
+Por sua vez, na terceira sessão, a equipa apresentou a solução implementada e demonstrou o seu funcionamento através de uma simulação em tempo real. A reação do perito foi muito positiva. Mostrou-se bastante satisfeito com o funcionamento do sistema e com a forma como cada decisão é justificada, e valorizou de forma particular a matriz de vias, que permite criar e alterar cenários de forma rápida e interativa
+
+A Tabela~\ref{tab:4} apresenta a forma como as principais indicações do perito foram representadas na base de conhecimento e o respetivo estado de implementação.
+
+\begin{tabela}{L{\dimexpr0.3101\linewidth-2\tabcolsep\relax}L{\dimexpr0.5154\linewidth-2\tabcolsep\relax}L{\dimexpr0.1724\linewidth-2\tabcolsep\relax}}
+\caption{Das indicações do perito à base de conhecimento}\label{tab:4}\\
+\linhacab \cab{\textbf{Indicação do perito}} & \cab{\textbf{Representação no sistema}} & \cab{\textbf{Estado}} \\
+\endfirsthead
+\linhacab \cab{\textbf{Indicação do perito}} & \cab{\textbf{Representação no sistema}} & \cab{\textbf{Estado}} \\
+\endhead
+Representar a estrada como uma matriz & Estrada com 3 vias × blocos de 5 m, à qual é possível adicionar elementos no decorrer da simulação & Implementada \\
+\rowcolor{corFundo}Criticidade por uma equação de velocidade, distância e capacidade de travagem; nunca travagem instantânea & Distância de paragem com tempo de reação de 0,5 s e desaceleração de 2,8 m/s² (conforto) ou 8,5 m/s² (emergência), usada em semáforos, STOP, peões, obstáculos, barreiras e buracos & Implementada \\
+Situação crítica: agir à primeira leitura; normal: confirmar & TTC < 1,3 s numa leitura dispara a emergência;\par TTC < 2,5 s exige 3 leituras em 2 s & Implementada \\
+\rowcolor{corFundo}Níveis de risco & Quatro níveis de risco e a decisão usa sete categorias de prioridade (Secção~\ref{sec:4.4}) & Implementada \\
+Desempate: escolher a primeira de uma lista ordenada & Em empate, vence a proposta de menor velocidade e, depois, a primeira registada & Implementada \\
+\rowcolor{corFundo}Esquecer o que sai do campo de deteção; um sinal é uma mudança de estado & Perceções expiram no caso de não haver novas leituras (250 ms a 1,5 s) & Implementada \\
+Acrescentar a passadeira com peão e elementos fora de contexto & Cenário S7;\par é possível também inserir elementos com a simulação a correr & Implementada \\
+\rowcolor{corFundo}As explicações devem estar alinhadas com as regras & O texto de cada explicação é a razão e a evidência registada pela regra que disparou & Implementada \\
+Teoria dos Jogos & Não seguida; ver desenvolvimento futuro (Secção~\ref{sec:7.3}) & Futura \\
+\end{tabela}
+
+As indicações recolhidas junto do perito, em conjunto com as restantes fontes de conhecimento, foram formalizadas na base de conhecimento, como se descreve no capítulo seguinte. A apresentação final permitiu demonstrar a aplicação prática destas indicações e recolher uma apreciação qualitativa da solução desenvolvida.

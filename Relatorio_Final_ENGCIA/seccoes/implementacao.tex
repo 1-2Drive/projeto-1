@@ -1,292 +1,154 @@
 % ---------------------------------------------------------------
-% 6. Implementação
+% seccoes/implementacao.tex — Implementação
 % ---------------------------------------------------------------
-\chapter{Implementação}\label{cap:implementacao}
 
-\section{Arquitetura}\label{sec:arquitetura}
+\chapter{Implementação}\label{sec:6}
 
-A arquitetura utilizada separa o mundo simulado, a perceção e o conhecimento (Figura 16). O WorldState contém tudo o que existe no cenário, mas o motor de inferência só conhece o que os sensores detetaram. Toda a política de decisão está nas regras; o código Java simula, encaminha eventos e aplica decisões, e a interface apenas apresenta e envia comandos. A Tabela 8 apresenta os principais componentes, com base em dois princípios:
+\section{Arquitetura}\label{sec:6.1}
+
+A arquitetura utilizada teve como foco separar o mundo simulado, a perceção e o conhecimento (Figura~\ref{fig:8}). O \cod{WorldState} contém tudo o que existe no cenário, mas o motor de inferência só conhece o que os sensores detetaram. Toda a política de decisão está nas regras; o código Java simula, encaminha eventos e aplica decisões. Por sua vez, a interface apenas apresenta a informação e envia comandos. A Tabela~\ref{tab:10} apresenta os principais componentes, com base nos seguintes princípios:
 
 \begin{itemize}
-  \item \textbf{A cada} 100 ms é executado um ciclo; todos os pedidos REST passam por métodos sincronizados do SimulationEngine
-  \item \textbf{Comandos por REST, estado por \ing{WebSocket}.} Cada comando tem a sua resposta; o
-        estado completo é enviado para o \ing{browser} a cada ciclo.
+  \item A cada 100 ms é executado um ciclo;
+  \item todos os pedidos REST passam por métodos sincronizados do SimulationEngine
+  \item Comandos por REST, estado por WebSocket. Cada pedido tem a sua resposta; o estado completo é enviado para o \emph{browser} a cada ciclo.
 \end{itemize}
 
-\begin{figure}[htbp]
+\begin{figure}[H]
 \centering
-\includegraphics[width=0.92\textwidth,height=0.62\textheight,keepaspectratio]{figuras/arquitetura.png}
-\caption{Arquitetura do sistema e fluxo de informação}
-\label{fig:arquitetura}
+\includegraphics[width=\linewidth,height=0.80\textheight,keepaspectratio]{figuras/fig08_arquitetura_do_sistema_e_fluxo}
+\caption{Arquitetura do sistema e fluxo de informação}\label{fig:8}
 \end{figure}
 
-\begin{table}[htbp]
-\centering
-\small
-\caption{Componentes principais}\label{tab:componentes}
-\rowcolors{2}{white}{corFundo}
-\begin{tabular}{@{}L{0.33\textwidth}L{0.61\textwidth}@{}}
-\linhacab \cab{Componente} & \cab{Responsabilidade} \\
-\cod{SimulationRuntimeService} & Agendador de 100 ms; constrói o \ing{snapshot} de cada ciclo e entrega-o ao publicador \\
-\cod{SimulationEngine} & Responsável pelo ciclo; arranque, pausa, paragem, cenários e alterações ao mundo \\
-\cod{WorldState} · \cod{WorldPhysicsEngine} & Mundo simulado (estrada em matriz, veículos, peões, sinais, tempo) e a sua evolução física \\
-\cod{SensorManager} & Os cinco sensores, cada um com cadência e alcance próprios \\
-\cod{EventRouter} · \cod{KnowledgeSession} & Encaminham os eventos para os \ing{entry points} e gerem a \cod{KieSession} \\
-\cod{DecisionContext} & Recolhe as propostas do ciclo e arbitra-as por canal, registando o destino de cada uma \\
-\cod{DecisionActuator} & Aplica a decisão (aceleração, pisca, mudança de via) e recusa manobras inseguras \\
-\cod{ExplanationTrace} · \ing{listeners} & Linha temporal das regras e dos factos; inspetor da memória de trabalho \\
-\cod{SessionHistoryStore} & Grava cada viagem em JSON e responde a \ing{Why}, \ing{Why Not} e \ing{How} a posteriori \\
-\cod{RealtimeSnapshotPublisher} & Envia o \ing{snapshot} a cada \ing{browser} ligado, sem nunca bloquear a simulação \\
-\end{tabular}
-\end{table}
-
-\begin{table}[htbp]
-\centering
-\small
-\caption{Tecnologias utilizadas}\label{tab:tecnologias}
-\rowcolors{2}{white}{corFundo}
-\begin{tabular}{@{}L{0.17\textwidth}L{0.29\textwidth}L{0.48\textwidth}@{}}
-\linhacab \cab{Componente} & \cab{Tecnologia} & \cab{Utilização} \\
-\ing{Backend} & Java 17, Spring Boot 3.3.4 & Simulação, sensores, motor de inferência e API REST/\ing{WebSocket} \\
-Motor de regras & \ing{Drools} / KIE 8.44 & Sessão com estado, regras DRL, CEP, encadeamento progressivo e consultas \\
-\ing{Frontend} & Angular 18, RxJS & Visualização da simulação e dos painéis do sistema pericial \\
-Comunicação & \ing{WebSocket} e REST & Estado em tempo real (\ing{WebSocket}) e comandos (REST) \\
+\begin{tabela}{L{\dimexpr0.1797\linewidth-2\tabcolsep\relax}L{\dimexpr0.2994\linewidth-2\tabcolsep\relax}L{\dimexpr0.5189\linewidth-2\tabcolsep\relax}}
+\caption{Tecnologias utilizadas}\label{tab:10}\\
+\linhacab \cab{\textbf{Componente}} & \cab{\textbf{Tecnologia}} & \cab{\textbf{Utilização}} \\
+\endfirsthead
+\linhacab \cab{\textbf{Componente}} & \cab{\textbf{Tecnologia}} & \cab{\textbf{Utilização}} \\
+\endhead
+Backend & Java 17, Spring Boot 3.3.4 & Simulação, sensores, motor de inferência e API REST/WebSocket \\
+\rowcolor{corFundo}Motor de regras & Drools / KIE 8.44 & Sessão com estado, regras DRL, CEP, encadeamento progressivo e consultas \\
+Frontend & Angular 18, RxJS & Visualização da simulação e dos painéis do sistema pericial \\
+\rowcolor{corFundo}Comunicação & WebSocket e REST & Estado em tempo real (WebSocket) e pedidos (REST) \\
 Testes & JUnit 5, Jasmine/Karma, Playwright & Regras, arbitragem, ciclo de simulação, integração e testes de ponta a ponta \\
-\end{tabular}
-\end{table}
+\end{tabela}
 
-\FloatBarrier
-\section{O ciclo de 100 ms}\label{sec:ciclo}
+\section{O ciclo de simulação e organização do motor de inferência}\label{sec:6.2}
 
-A Figura 17, a título de exemplo, mostra, por ordem, o que acontece em cada ciclo.
+O ciclo de simulação tem por base intervalos de 100 ms, durante os quais são processadas as leituras dos sensores simulados, atualizada a informação disponível na memória de trabalho e avaliadas as regras aplicáveis. As decisões resultantes são utilizadas para atualizar o estado do veículo simulado, o que permite que as alterações do ambiente sejam consideradas nos ciclos seguintes, como representado na Figura~\ref{fig:9}, através da sequência das operações realizadas em cada ciclo.
 
-\begin{figure}[htbp]
+\begin{figure}[H]
 \centering
-\includegraphics[width=\textwidth,height=0.80\textheight,keepaspectratio]{figuras/ciclo_simulacao.png}
-\caption{Sequência de um ciclo de simulação}
-\label{fig:ciclo-simulacao}
+\includegraphics[width=0.94\linewidth,height=0.80\textheight,keepaspectratio]{figuras/fig09_sequencia_de_um_ciclo_de}
+\caption{Sequência de um ciclo de simulação}\label{fig:9}
 \end{figure}
 
-\FloatBarrier
-\section{O motor de inferência}\label{sec:motor}
+Com o objetivo de organizar a informação recebida pelo motor de inferência \emph{Drools}, os eventos são encaminhados através de seis entry points, apresentados na Tabela~\ref{tab:11}. Esta organização permite separar os diferentes tipos de informação e identificar os fluxos relevantes para a avaliação das regras, incluindo aquelas que dependem de condições temporais.
 
-\textbf{Entry points.} Os eventos entram por seis fluxos com nome (Tabela 10), o que separa semanticamente a origem da informação e permite às regras temporais ler só o fluxo de que precisam.
+\begin{tabela}{L{\dimexpr0.2852\linewidth-2\tabcolsep\relax}L{\dimexpr0.7128\linewidth-2\tabcolsep\relax}}
+\caption{Entry points e eventos}\label{tab:11}\\
+\linhacab \cab{\textbf{Entry point}} & \cab{\textbf{Eventos}} \\
+\endfirsthead
+\linhacab \cab{\textbf{Entry point}} & \cab{\textbf{Eventos}} \\
+\endhead
+VEHICLE\_STREAM & Velocidade do veículo \\
+\rowcolor{corFundo}PERCEPTION\_STREAM & Distância, velocidade relativa e TTC; peões; ocupação das vias laterais; veículos nas vias vizinhas \\
+ROAD\_STREAM & Sinais de limite de velocidade e de STOP, passadeiras, buracos, obstáculos, barreiras \\
+\rowcolor{corFundo}TRAFFIC\_STREAM & Estado dos semáforos \\
+ENVIRONMENT\_STREAM & Chuva, visibilidade e aderência \\
+\rowcolor{corFundo}COMMAND\_STREAM & Pedidos de aceleração e de mudança de via \\
+\end{tabela}
 
-\begin{table}[htbp]
-\centering
-\small
-\caption{\ing{Entry points} e eventos encaminhados}\label{tab:entrypoints}
-\rowcolors{2}{white}{corFundo}
-\begin{tabular}{@{}L{0.30\textwidth}L{0.64\textwidth}@{}}
-\linhacab \cab{\ing{Entry point}} & \cab{Eventos} \\
-\cod{VEHICLE\_STREAM} & Velocidade do veículo \\
-\cod{PERCEPTION\_STREAM} & Distância, velocidade relativa e TTC; peões; ocupação das vias laterais; veículos nas vias vizinhas \\
-\cod{ROAD\_STREAM} & Sinais de limite e de STOP, passadeiras, buracos, obstáculos, barreiras \\
-\cod{TRAFFIC\_STREAM} & Estado dos semáforos \\
-\cod{ENVIRONMENT\_STREAM} & Chuva, visibilidade e aderência \\
-\cod{COMMAND\_STREAM} & Pedidos de aceleração e de mudança de via \\
-\end{tabular}
-\end{table}
+As regras são organizadas em quatro grupos, apresentados na Tabela~\ref{tab:12}. Esta divisão permite separar o processamento das perceções, a avaliação das condições de decisão e os comportamentos predefinidos quando nenhuma outra ação é proposta. A sequência de execução é coordenada por uma meta-regra de controlo, através da qual é estabelecida uma ordem entre as diferentes fases do processo de inferência.
 
-Metaconhecimento de controlo. As regras encontram-se organizadas em grupos (Tabela 11), cuja execução é controlada por uma meta-regra.
+\begin{tabela}{L{\dimexpr0.1496\linewidth-2\tabcolsep\relax}L{\dimexpr0.1398\linewidth-2\tabcolsep\relax}L{\dimexpr0.7086\linewidth-2\tabcolsep\relax}}
+\caption{Grupos de agenda}\label{tab:12}\\
+\linhacab \cab{\textbf{Grupo}} & \cab{\textbf{Nº de Regras}} & \cab{\textbf{Função}} \\
+\endfirsthead
+\linhacab \cab{\textbf{Grupo}} & \cab{\textbf{Nº de Regras}} & \cab{\textbf{Função}} \\
+\endhead
+control & 1 & Meta-regra responsável por coordenar a sequência de execução dos grupos de agenda \\
+\rowcolor{corFundo}perception & 33 & Transformação de eventos em factos de estado, gestão da validade das perceções e avaliação da segurança das vias adjacentes \\
+decision & 87 & Avaliação das condições e proposta de ações, assim como o tratamento das condições meteorológicas, o arranque e a ultrapassagem \\
+\rowcolor{corFundo}fallback & 2 & Definição de comportamentos predefinidos quando não existem outras decisões aplicáveis \\
+\end{tabela}
 
-\begin{table}[htbp]
-\centering
-\small
-\caption{Grupos de agenda}\label{tab:grupos}
-\rowcolors{2}{white}{corFundo}
-\begin{tabular}{@{}L{0.16\textwidth}C{0.09\textwidth}L{0.67\textwidth}@{}}
-\linhacab \cab{Grupo} & \cab{Regras} & \cab{Função} \\
-\cod{control} & 1 & Meta-regra «\ing{Control: perceive, then decide, then fall back}» (saliência 10000) \\
-\cod{perception} & 33 & Eventos $\rightarrow$ factos de estado; expiração das perceções; lados seguros para mudar de via \\
-\cod{decision} & 87 & Regras que propõem ações e mantêm estados intermédios (lógica difusa, arranque, ultrapassagem) \\
-\cod{fallback} & 2 & Manter a velocidade se nada foi proposto; arrancar quando nada retém o veículo \\
-\end{tabular}
-\end{table}
-
-\textbf{Raciocínio temporal (CEP).} Os 24 tipos de evento são declarados com @role(event), @timestamp e @expires (3 a 30 s), o que mantém a memória limitada.
-
-\textbf{Encadeamento regressivo.} «É seguro mudar de via para este lado?» é um objetivo, definido por uma consulta que se prova a partir de quatro subobjetivos: maneuverIdle, noContinuousLine, sideClear e roomToFollow.
-
-
-\textbf{Lógica difusa.} A visibilidade e a aderência são vagas, por isso são fuzzificadas em quatro termos (fraca, reduzida, razoável, boa) e combinadas por cinco regras difusas (E = mínimo, OU = máximo) como, por exemplo, com chuva, visibilidade 0,7 e aderência 0,65, o teto obtido é de cerca de 51 km/h. As pertenças e as conclusões difusas são inseridas com insertLogical: quando a leitura meteorológica muda, perdem a justificação e são retiradas pelo próprio motor.
-
-\FloatBarrier
-\section{Comunicação em tempo real: \ing{WebSocket}}\label{sec:websocket}
-
-A interface tem de mostrar, dez vezes por segundo, o veículo, as deteções, a decisão dos dois canais, todas as propostas com o seu destino, a linha temporal e a memória de trabalho. Para isso, o backend mantém com cada browser uma ligação WebSocket em /api/ws/simulation e, a cada ciclo, envia por ela um snapshot JSON completo do sistema. A ligação é aberta uma vez e fica aberta: cada atualização é apenas uma frame de texto e chega à interface no próprio ciclo em que a decisão é tomada. O canal é usado num só sentido, do backend para o frontend, e sem protocolos adicionais (sem STOMP). Os comandos (iniciar, parar, carregar cenários, inserir elementos) continuam em REST (Tabela 12), porque cada um precisa da sua própria resposta e do seu código de erro; depois de cada comando, o backend envia logo um snapshot, para que o efeito apareça sem esperar pelo ciclo seguinte.
-
-\begin{table}[htbp]
-\centering
-\small
-\caption{Separação entre comandos (REST) e estado (\ing{WebSocket})}\label{tab:rest}
-\rowcolors{2}{white}{corFundo}
-\begin{tabular}{@{}L{0.52\textwidth}L{0.42\textwidth}@{}}
-\linhacab \cab{Pedido} & \cab{Função} \\
-\cod{POST /api/simulation/\{start | pause | resume | stop | reset\}} & Ciclo de vida da simulação \\
-\cod{POST /api/scenarios/\{id\}/load} & Carregar um cenário \\
-\cod{POST · PUT · DELETE /api/world/elements}, \cod{/api/world/actors} & Inserir, alterar ou remover elementos e atores durante a simulação \\
-\cod{PUT /api/world/map/cells} & Pintar uma célula da matriz da estrada \\
-\cod{POST /api/environment} & Mudar a meteorologia \\
-\cod{GET /api/history/sessions} · \cod{POST \ldots/\{id\}/why} & Viagens gravadas e perguntas \ing{Why} / \ing{Why Not} / \ing{How} \\
-\cod{ws://\ldots/api/ws/simulation} & Estado completo a cada ciclo e após cada comando \\
-\end{tabular}
-\end{table}
-
-\textbf{Formato da mensagem.} Cada frame tem a forma \{"event":"snapshot","payload":\{\ldots\}\} e é serializada pelo mesmo ObjectMapper da API REST, pelo que é exatamente o mesmo JSON de GET /api/simulation/state. A Tabela 13 resume o conteúdo.
-
-\begin{table}[htbp]
-\centering
-\small
-\caption{Conteúdo de um \ing{snapshot}}\label{tab:snapshot}
-\rowcolors{2}{white}{corFundo}
-\begin{tabular}{@{}L{0.32\textwidth}L{0.62\textwidth}@{}}
-\linhacab \cab{Campo} & \cab{Conteúdo} \\
-\cod{egoVehicle} · \cod{environment} & Velocidade, posição, via, aceleração, estado da manobra, pisca; chuva, visibilidade e aderência \\
-\cod{currentDecision} & Decisão de velocidade e de via, regra, razão, evidência, risco e prioridade; todas as propostas com o seu destino; resposta ao «porque não mudar de via» para cada lado \\
-\cod{sensors} · \cod{detectedObjectIds} & Telemetria de cada sensor e os objetos realmente detetados pela câmara e pelo radar \\
-\cod{worldObjects} · \cod{roadMap} & Elementos do mundo relativos ao veículo e a matriz da estrada \\
-\cod{workingMemory} · \cod{recentTimeline} & Factos ativos (tipo, valor, fonte, \ing{stream}) e as últimas 160 entradas da linha temporal \\
-\cod{status} · \cod{simulationTimeMillis} & Estado da simulação e tempo simulado \\
-\end{tabular}
-\end{table}
-
-A Figura 18 mostra a ligação completa: o handshake, a validação da origem, o snapshot imediato, o envio periódico e a interação com os comandos REST. Como o CORS não se aplica a WebSockets, a origem é verificada no handshake: só a interface do projeto (http://localhost:4200) pode abrir o canal; outra origem recebe 403.
-
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=\textwidth,height=0.78\textheight,keepaspectratio]{figuras/websocket_sequencia.png}
-\caption{Sequência da ligação \ing{WebSocket} e da sua interação com os comandos REST}
-\label{fig:ws-sequencia}
-\end{figure}
-
-A implementação resolve três problemas de um canal de tempo real:
+No que diz respeito ao tratamento das condições meteorológicas, é utilizada a lógica difusa para representar grandezas como a visibilidade e a aderência, na qual cada leitura pertence, com um grau entre 0 e 1, a vários conjuntos ao mesmo tempo, nomeadamente:
 
 \begin{itemize}
-  \item \textbf{Um cliente lento não atrasa a simulação.} A publicação nunca espera pelo envio: cada navegador tem o seu emissor, com no máximo uma escrita em curso e apenas o snapshot mais recente em espera. Um separador em segundo plano perde frames intermédios, mas como cada snapshot é um estado completo não perde informação.
-  \item \textbf{Entrada imediata.} Quem liga, ou volta a ligar, recebe logo o último snapshot, sem esperar pelo ciclo seguinte.
-  \item \textbf{Recuperação automática.} O frontend considera a ligação morta se não receber frames durante 5 s e volta a ligar com esperas crescentes (1 s, 2 s, 4 s, até 8 s). A ligação valida a origem do pedido, para que só a interface do projeto a possa abrir.
+  \item Conjuntos difusos: a visibilidade e a aderência partilham quatro conjuntos linguísticos, designados por fraca, reduzida, razoável e boa (Figura~\ref{fig:10}a). Os conjuntos sobrepõem-se e, em qualquer ponto, os graus de pertença somam 1, pelo que uma leitura pode ser, por exemplo, razoável com grau de 0,75 e reduzida com grau 0,25. A saída é a velocidade máxima recomendada, descrita por cinco conjuntos: muito lenta, lenta, moderada, prudente e ligeira (Figura~\ref{fig:10}b).
 \end{itemize}
 
-Os três problemas são resolvidos em dois lados: no servidor, que nunca pode ficar à espera de um
-\ing{browser}, e no cliente, que tem de perceber sozinho quando a ligação morreu.
-
-\textbf{Servidor: um emissor por cliente.} Uma escrita bloqueante num socket de um browser lento (por exemplo, um separador em segundo plano) pararia o fio da simulação. Por isso, o RealtimeSnapshotPublisher dá a cada sessão o seu próprio emissor (Figura 19):
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.89\linewidth,height=0.80\textheight,keepaspectratio]{figuras/fig10_conjuntos_difusos_a_visibilidade}
+\caption{Conjuntos difusos: (a) visibilidade e aderência e (b) velocidade máxima recomendada}\label{fig:10}
+\end{figure}
 
 \begin{itemize}
-  \item \cod{publish()} guarda o \ing{snapshot} e entrega-o a cada emissor; regressa de imediato e
-        é chamado fora do \ing{lock} da simulação, pelo que os pedidos REST também nunca esperam
-        pela rede;
-  \item cada emissor tem uma só posição de espera (AtomicReference) e no máximo uma escrita em curso (AtomicBoolean): um snapshot novo substitui o que ainda não foi enviado. Um cliente lento perde frames intermédias, mas como cada frame é um estado completo nunca fica com informação errada;
-  \item as escritas correm em \ing{threads} próprias (\cod{ws-sender}), o que também garante que
-        uma \cod{WebSocketSession}, que não é segura entre \ing{threads}, recebe uma escrita de
-        cada vez;
-  \item o registo de um cliente novo e a publicação partilham um lock, pelo que nenhum cliente perde nem recebe fora de ordem um snapshot concorrente;
-  \item se uma escrita falhar ou expirar, o cliente é removido e a sessão fechada; um erro de
-        serialização descarta apenas essa \ing{frame}.
+  \item Regras difusas: As duas grandezas são combinadas, através de cinco regras (Tabela~\ref{tab:13}). As três primeiras utilizam a disjunção (OU), calculada pelo máximo, uma vez que basta uma das grandezas estar degradada para justificar a redução da velocidade. As duas últimas utilizam a conjunção (E), calculada pelo mínimo, e aplicam-se apenas quando ambas são boas, situação em que a chuva distingue uma velocidade prudente de uma velocidade ligeira.
 \end{itemize}
 
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=\textwidth]{figuras/websocket_publicador.png}
-\caption{Publicação sem bloqueio: um emissor e uma posição de espera por cliente}
-\label{fig:ws-publicador}
-\end{figure}
-
-\textbf{Cliente: deteção de falhas e religação.} No Angular, o RealtimeStreamService abre o socket fora da zona do Angular, para que só um snapshot dispare deteção de alterações. Uma ligação é dada como perdida quando fecha, quando chega uma frame que não é JSON ou quando passam 5 s sem frames --- como o backend envia um snapshot a cada ciclo, mesmo parado, este silêncio só acontece se a ligação morreu sem aviso (suspensão do portátil, mudança de rede). O SimulationStateService volta então a ligar com esperas crescentes de 1, 2, 4 e 8 s (Figura 20), mostra o estado do canal (LIVE ou RECONNECTING) e um aviso; o primeiro snapshot repõe tudo.
-
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=\textwidth]{figuras/websocket_estados.png}
-\caption{Estados do canal no \ing{browser}}
-\label{fig:ws-estados}
-\end{figure}
-
-\paragraph{Desempenho medido.} Com a aplicação a correr e um cliente ligado durante 25 s, chegaram
-251 \ing{frames} (10,0 por segundo), com um intervalo médio de 99,8 ms entre \ing{frames}
-(desvio-padrão de 11,5 ms) e 33 a 35 KB por \ing{frame}.
-
-\paragraph{Testes do canal.} O publicador tem testes que confirmam que um cliente bloqueado não
-atrasa os outros nem a simulação, que um cliente cuja escrita falha é removido e que um cliente
-novo recebe logo o último \ing{snapshot}. Um teste de ponta a ponta arranca o servidor real e um
-cliente \ing{WebSocket} real e verifica que a travagem de emergência do cenário S8 chega ao cliente
-no ciclo em que é inferida, que um cliente religado retoma de imediato e que uma origem estranha é
-recusada. No \ing{browser}, os testes Playwright confirmam que a interface se atualiza pelo
-\ing{WebSocket} e que recupera sozinha de uma ligação perdida.
-
-Em síntese, o \ing{WebSocket} é o que torna o sistema pericial observável: cada decisão inferida
-pelo \ing{Drools} chega à interface no mesmo ciclo, com todas as propostas e a sua explicação, sem
-que um \ing{browser} lento ou uma ligação perdida afetem a simulação.
-
-\FloatBarrier
-\section{Cenários}\label{sec:cenarios}
-
-Um cenário define o percurso, os atores e as ações temporizadas (por exemplo, mudar o tempo ou pedir uma mudança de via a meio da simulação). Carregar um cenário não dá ao motor acesso ao que nele existe: cada elemento só influencia a decisão depois de detetado. Estão definidos 14 cenários (Tabela 14).
-
-\begin{table}[htbp]
-\centering
-\small
-\caption{Cenários definidos e conhecimento exercitado}\label{tab:cenarios}
-\rowcolors{2}{white}{corFundo}
-\begin{tabular}{@{}L{0.36\textwidth}L{0.58\textwidth}@{}}
-\linhacab \cab{Cenário} & \cab{Conhecimento} \\
-S1 Estrada livre & Decisão de base e velocidade de cruzeiro \\
-S2 Limite de 90 para 50 km/h & Leitura de sinais e abrandamento a tempo de chegar ao limite \\
-S3 Semáforo vermelho & Paragem obrigatória pela distância de travagem; arranque no verde \\
-S4 Sinal STOP & Paragem completa de 1,2 s (temporal) e arranque \\
-S5 Buraco na via & Desvio para o lado seguro ou redução de velocidade \\
-S6 Barreira fechada & Desvio ou paragem antes da barreira \\
-S7 Peão a atravessar & Curvas de travagem, paragem e emergência \\
-S8 TTC crítico & Janelas temporais (CEP) e travagem de emergência \\
-S9 Mudança de via impedida & Encadeamento regressivo e \ing{Why Not} \\
-S10 Chuva e baixa aderência & Lógica difusa \\
-S11 Cenário sequencial & Várias situações no mesmo percurso \\
-S12 Demonstração completa & Percurso de apresentação com ações temporizadas \\
-S13 Percurso em matriz & Obstáculos definidos na matriz de vias \\
-S14 Ultrapassagem & Ultrapassar um veículo lento e regressar à direita \\
-\end{tabular}
-\end{table}
-
-Foram escolhidos dois cenários a título de exemplo por serem diferentes entre si e, em conjunto, percorrerem um pouco de todo o sistema: regras normativas e heurísticas, raciocínio temporal, lógica difusa, encadeamento regressivo e os dois canais (velocidade e via). Cada figura mostra a traçagem desde o sensor até à decisão e à explicação.
-
-\subsection{Peão a atravessar (S7)}\label{sec:s7}
-
-O veículo circula a 60 km/h na via central e um peão começa a atravessar 95 m à frente.
-
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=\textwidth]{figuras/tracagem_S7.png}
-\caption{Traçagem do cenário S7 --- peão a atravessar}
-\label{fig:S7}
-\end{figure}
-
-\noindent \textbf{O que demonstra:} conhecimento normativo (ceder passagem) e heurístico (curvas de travagem calculadas, como pediu o perito), estado entre ciclos (PedestrianBrakingState), arbitragem por prioridade e Why com evidência.
-
-\subsection{TTC crítico com chuva (S8)}\label{sec:s8}
-
-O veículo segue a 95 km/h na via central, com outro a 30 km/h 40 m à frente (TTC ≈ 2,2 s); a chuva foi ligada na caixa de ferramentas antes do arranque.
-
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=\textwidth]{figuras/tracagem_S8.png}
-\caption{Traçagem do cenário S8 com chuva --- TTC crítico, CEP e lógica difusa}
-\label{fig:S8}
-\end{figure}
-
-\noindent \textbf{O que demonstra:} raciocínio temporal com confirmação adaptada à criticidade, lógica difusa com manutenção da verdade, vários tetos cumpridos em simultâneo e a anulação de uma manobra pelo canal de velocidade.
-
-\FloatBarrier
-\section{Testes}\label{sec:testes}
-
-O comportamento foi validado com os cenários anteriores e com testes automáticos com o objetivo de verificar se a decisão respeita as prioridades, que os conflitos têm o vencedor esperado e que situações iguais produzem decisões iguais. Como critérios de aceitação foram usados:
+\begin{tabela}{L{\dimexpr0.0924\linewidth-2\tabcolsep\relax}L{\dimexpr0.5482\linewidth-2\tabcolsep\relax}L{\dimexpr0.3574\linewidth-2\tabcolsep\relax}}
+\caption{Regras difusas da meteorologia}\label{tab:13}\\
+\linhacab \cab{\textbf{Regra}} & \cab{\textbf{SE}} & \cab{\textbf{ENTÃO velocidade}} \\
+\endfirsthead
+\linhacab \cab{\textbf{Regra}} & \cab{\textbf{SE}} & \cab{\textbf{ENTÃO velocidade}} \\
+\endhead
+1 & visibilidade fraca OU aderência fraca & muito lenta \\
+\rowcolor{corFundo}2 & visibilidade reduzida OU aderência reduzida & lenta \\
+3 & visibilidade razoável OU aderência razoável & moderada \\
+\rowcolor{corFundo}4 & chuva E visibilidade boa E aderência boa & prudente \\
+5 & sem chuva E visibilidade boa E aderência boa & ligeira \\
+\end{tabela}
 
 \begin{itemize}
-  \item os factos na memória de trabalho que correspondem ao que os sensores detetaram;
-  \item a decisão respeita as prioridades e, em conflito, vence a alternativa esperada;
-  \item o sistema acompanha a evolução do cenário ao longo do tempo;
-  \item cada decisão é explicável pela regra e pela evidência que lhe deram origem;
-  \item situações iguais produzem decisões iguais, em execuções repetidas.
+  \item Aplicação no Drools: Uma vez que o Drools não tem suporte nativo para a lógica difusa, o controlador foi implementado através das regras do grupo \emph{decision}, com o apoio da classe \emph{FuzzySupport}. A fuzzificação converte as leituras em graus de pertença, que são, posteriormente, utilizados pelas regras para produzir as conclusões difusas. Tanto os graus de pertença como as conclusões são inseridos através do \emph{insertLogical}, o que permite ao \emph{Drools} removê-los automaticamente quando as leituras meteorológicas mudam. A título de exemplo, com chuva, visibilidade de 0,7 e aderência de 0,65, a visibilidade é razoável com grau 1 e a aderência é razoável com grau 0,75 e reduzida com grau 0,25. Assim, a regra 3 dispara com grau 1, conclui com velocidade moderada, e a regra 2 com grau 0,25, conclui com velocidade lenta. O centroide da área resultante é de 50,6 km/h, ou seja, aproximadamente 51 km/h, um valor próximo da velocidade moderada, mas reduzido pela contribuição da velocidade lenta (Figura~\ref{fig:11}).
 \end{itemize}
 
-Validado o comportamento, o capítulo seguinte discute para quem este sistema é útil, o que ainda o
-limita e como pode evoluir.
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.89\linewidth,height=0.80\textheight,keepaspectratio]{figuras/fig11_exemplo_com_chuva_visibilidade_0}
+\caption{Exemplo com chuva, visibilidade 0,7 e aderência 0,65}\label{fig:11}
+\end{figure}
+
+Desta forma, a organização dos fluxos e dos grupos permite estruturar o processo de inferência, enquanto a utilização das regras temporais e difusas possibilita considerar a evolução das condições observadas durante a simulação.
+
+\section{Comunicação em tempo real: WebSocket}\label{sec:6.3}
+
+A interface tem de mostrar, dez vezes por segundo, o veículo, as deteções, as decisões de velocidade e de via, a linha temporal e a memória de trabalho. Para isso, o backend mantém uma ligação WebSocket com o browser e envia, a cada ciclo, um snapshot JSON completo do sistema, num só sentido, do backend para o frontend. Como o snapshot inclui a decisão, as propostas, a evidência, a memória de trabalho e a linha temporal, a explicação de cada ciclo chega à interface sem cálculo adicional. Os comandos seguem por REST, porque cada um precisa da sua própria resposta e código de erro, e o backend envia um snapshot logo a seguir a cada comando, para que o efeito seja visível sem esperar pelo ciclo seguinte (Tabela~\ref{tab:14}). A ligação só é aceite a partir da origem da interface do projeto; as restantes são rejeitadas (403).
+
+\begin{tabela}{L{\dimexpr0.5267\linewidth-2\tabcolsep\relax}L{\dimexpr0.4713\linewidth-2\tabcolsep\relax}}
+\caption{Canais de comunicação}\label{tab:14}\\
+\linhacab \cab{\textbf{Função}} & \cab{\textbf{Canal}} \\
+\endfirsthead
+\linhacab \cab{\textbf{Função}} & \cab{\textbf{Canal}} \\
+\endhead
+Ciclo de vida (iniciar, pausar, parar, reiniciar) & REST \\
+\rowcolor{corFundo}Carregar cenários & REST \\
+Alterar o mundo (elementos, meteorologia) & REST \\
+\rowcolor{corFundo}Consultar viagens e perguntas Why / Why Not / How & REST \\
+Estado em tempo real & WebSocket \\
+\end{tabela}
+
+A publicação do estado não pode atrasar a inferência. Por isso, cada cliente tem um emissor próprio e uma única posição de espera, que guarda apenas o snapshot mais recente: um browser lento salta estados intermédios, mas como cada snapshot é completo nunca fica com informação errada, e o ciclo de 100 ms mantém-se inalterado. Se a ligação falhar, o frontend deteta a falha e restabelece-a automaticamente.
+
+\section{Cenários}\label{sec:6.4}
+
+Foram definidos cenários pré-construídos que abrangessem um pouco de todo o sistema. Neste sentido, a título de exemplo, apresenta-se a traçagem do cenário de TTC crítico com chuva, na Tabela~\ref{tab:15}. Para este cenário considera-se que o veículo segue a 95 km/h na via do meio, com outro a 30 km/h 40 m à frente (TTC ≈ 2,2 s).
+
+\begin{tabela}{L{\dimexpr0.0741\linewidth-2\tabcolsep\relax}L{\dimexpr0.3513\linewidth-2\tabcolsep\relax}L{\dimexpr0.1671\linewidth-2\tabcolsep\relax}L{\dimexpr0.2078\linewidth-2\tabcolsep\relax}L{\dimexpr0.1977\linewidth-2\tabcolsep\relax}}
+\caption{Traçagem do cenário TTC crítico com chuva}\label{tab:15}\\
+\linhacab \cab{t} & \cab{Perceção e estado} & \multicolumn{2}{L{\dimexpr0.3749\linewidth-2\tabcolsep\relax}}{\cab{Propostas de decisão}} & \cab{Decisão aplicada} \\
+\endfirsthead
+\linhacab \cab{t} & \cab{Perceção e estado} & \multicolumn{2}{L{\dimexpr0.3749\linewidth-2\tabcolsep\relax}}{\cab{Propostas de decisão}} & \cab{Decisão aplicada} \\
+\endhead
+0,1 s & 1.ª leitura de TTC: ainda não há janela; lógica difusa (Mamdani) com insertLogical dá ≈ 51 km/h & \textbf{WON} & Keep safe following distance...: 48 km/h · p50. & Vence o teto mais baixo;\par a ultrapassagem inicia-se \\*
+ &  & \textbf{LOST\_TO} & Defuzzify weather speed ceiling: 51 km/h · p40. &  \\*
+ &  & \textbf{WON} & Overtake slow front vehicle via left lane · p30 &  \\
+\rowcolor{corFundo}0,2 s & 2 leituras de TTC < 3 s em 2 s, cada uma coincide[400ms] com uma leitura de chuva & \textbf{WON} & Persistent low TTC in rain increases conservatism: BRAKE 15 km/h · p50 & \textbf{Trava; }\par \textbf{manobra em curso} \\
+0,3 s & accumulate ... over window.time(2s): 3 leituras de TTC < 2,5 s (mínimo 1,94 s) & \textbf{WON} & Emergency brake when persistent TTC is critical · p70. & \textbf{−8,5 m/s² e luzes de emergência; }\par \textbf{a manobra já iniciada não é abortada} \\*
+ &  & \textbf{LOST\_TO} & chuva, seguimento, aproximação, difusa, cruzeiro &  \\*
+ &  & \textbf{VETOED\_BY} & Maintain ongoing lane change left (anulada) &  \\
+\rowcolor{corFundo}3,1 s & Manobra concluída: via da esquerda, sem veículo à frente & \textbf{WON} & Defuzzify weather speed ceiling: 51 km/h · p40 & Acelera de 10 até ≈ 51 km/h \\
+\end{tabela}

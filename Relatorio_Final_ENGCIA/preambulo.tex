@@ -1,206 +1,128 @@
 % ---------------------------------------------------------------
-% preambulo.tex — pacotes, estilos e ambientes
+% preambulo.tex — pacotes, tipos de letra, cores e estilos
+% Tipos de letra iguais aos do Word: Book Antiqua (texto),
+% Georgia (títulos) e Aptos (legendas). Requer XeLaTeX/Tectonic.
 % ---------------------------------------------------------------
 
-\usepackage{iftex}
-\ifPDFTeX
-  \usepackage[T1]{fontenc}
-  \usepackage[utf8]{inputenc}
-  \usepackage{lmodern}
-\else
-  \usepackage{fontspec}   % XeTeX / LuaTeX (ex.: Tectonic): Latin Modern em OpenType
-\fi
+\usepackage{fontspec}
 \usepackage[portuguese]{babel}
 \usepackage{microtype}
 
-\usepackage[a4paper,margin=2.6cm,headheight=15pt]{geometry}
-\usepackage{graphicx}
-\usepackage{booktabs}
-\usepackage{longtable}
-\usepackage{array}
-\usepackage{tabularx}
-\usepackage{multirow}
-\usepackage{amsmath}
-\usepackage{amssymb}
-\usepackage{enumitem}
-\usepackage[table]{xcolor}
-\usepackage{fancyhdr}
-\usepackage{titlesec}
-\usepackage{caption}
-\usepackage{float}
-\usepackage{listings}
-\usepackage{csquotes}
-\usepackage{icomma}        % vírgula decimal em modo matemático: $1,5$
-\usepackage[most]{tcolorbox}
-\usetikzlibrary{positioning,arrows.meta,calc,fit}  % diagramas TikZ (o tcolorbox já carrega o tikz)
-\usepackage{rotating}      % sidewaysfigure: fluxogramas largos em página rodada
-\usepackage{placeins}       % \FloatBarrier: as figuras não passam para a secção seguinte
+\setmainfont{Book Antiqua}[AutoFakeBold=1.5,AutoFakeSlant=0.2]
+\setmonofont{Consolas}[Scale=0.9]
+\newfontfamily\titulos{Georgia}
+\newfontfamily\legendas{Aptos}[Path=fontes/,Extension=.ttf,
+  UprightFont=*-Regular,BoldFont=*-Bold,ItalicFont=*-Italic,BoldItalicFont=*-BoldItalic]
+% Símbolos que a Book Antiqua não tem (setas, etc.)
+\newfontfamily\simbolosB{Cambria}
+\newfontfamily\simbolos{Segoe UI Symbol}
 
-% --- Paleta ----------------------------------------------------
+\usepackage[a4paper,margin=2.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage[table]{xcolor}
+\usepackage{float}
+\usepackage{pdflscape}
+\usepackage{enumitem}
+\usepackage{caption}
+\usepackage{titlesec}
+\usepackage[titles]{tocloft}
+\usepackage{fancyhdr}
+\usepackage{csquotes}
+\usepackage{url}
+\usepackage[most]{tcolorbox}
+\usetikzlibrary{positioning,arrows.meta,calc,fit}
+
+% --- Cores -----------------------------------------------------
 \definecolor{corEscura}{HTML}{1F3A5F}
-\definecolor{corDestaque}{HTML}{AD451D}  % terracota do logo do MEIA
-\definecolor{corSucesso}{HTML}{0B6E4F}   % verde: apenas marcadores PASSOU
+\definecolor{corDestaque}{HTML}{AD451D}
 \definecolor{corCinza}{HTML}{5A6672}
 \definecolor{corFundo}{HTML}{F4F6F8}
-\definecolor{corCritico}{HTML}{9B1C1C}
-\definecolor{corAviso}{HTML}{B45309}
+\definecolor{corLegenda}{HTML}{404040}
 
-\usepackage[pdfusetitle]{hyperref}
-\hypersetup{
-  colorlinks=true,
-  linkcolor=corEscura,
-  citecolor=corEscura,
-  urlcolor=corDestaque,
-  linktoc=all
-}
-
-% O cleveref não traz nomes em português; definem-se aqui.
-\usepackage[capitalise,noabbrev,nameinlink]{cleveref}
-\crefname{chapter}{Capítulo}{Capítulos}
-\crefname{section}{Secção}{Secções}
-\crefname{subsection}{Secção}{Secções}
-\crefname{appendix}{Anexo}{Anexos}
-\crefname{figure}{Figura}{Figuras}
-\crefname{table}{Tabela}{Tabelas}
-\crefname{equation}{Equação}{Equações}
-\crefname{enumi}{Item}{Itens}
-\newcommand{\crefrangeconjunction}{ a }
-\newcommand{\crefpairconjunction}{ e }
-\newcommand{\crefmiddleconjunction}{, }
-\newcommand{\creflastconjunction}{ e }
-% O cleveref usa o tipo «listing» para o contador lstlisting.
-\crefname{listing}{Listagem}{Listagens}
-
-% --- Cabeçalhos e rodapés --------------------------------------
-\pagestyle{fancy}
-\fancyhf{}
-\fancyhead[L]{\small\textcolor{corCinza}{\ucsigla{} --- \cursosigla}}
-\fancyhead[R]{\small\textcolor{corCinza}{\tituloprincipal}}
-\fancyfoot[C]{\thepage}
-\renewcommand{\headrulewidth}{0.4pt}
-
-\fancypagestyle{plain}{%
-  \fancyhf{}%
-  \fancyfoot[C]{\thepage}%
-  \renewcommand{\headrulewidth}{0pt}%
-}
-
-% --- Títulos ---------------------------------------------------
-\titleformat{\chapter}[hang]
-  {\normalfont\huge\bfseries\color{corEscura}}
-  {\thechapter\hspace{12pt}\textcolor{corCinza}{|}\hspace{12pt}}{0pt}{\huge}
-\titlespacing*{\chapter}{0pt}{-10pt}{24pt}
-
-\titleformat{\section}
-  {\normalfont\large\bfseries\color{corEscura}}{\thesection}{0.8em}{}
-\titleformat{\subsection}
-  {\normalfont\normalsize\bfseries\color{corEscura}}{\thesubsection}{0.8em}{}
-
-% --- Legendas --------------------------------------------------
-\captionsetup{font=small,labelfont={bf,color=corEscura},skip=6pt}
-
-% --- Listagens de código ---------------------------------------
-% Drools (DRL): sintaxe próxima do Java, com as palavras-chave das regras.
-\lstdefinelanguage{Drools}{
-  morekeywords={package,import,global,function,declare,query,rule,when,
-                then,end,salience,agenda-group,activation-group,no-loop,
-                lock-on-active,dialect,and,or,not,exists,forall,from,
-                collect,accumulate,eval,insert,insertLogical,update,modify,
-                retract,delete,new,true,false,null,this,matches,memberOf,
-                contains,extends,if,else,return},
-  otherkeywords={agenda-group,activation-group,no-loop,lock-on-active},
-  sensitive=true,
-  comment=[l]{//},
-  morecomment=[n]{/*}{*/},
-  string=[b]",
-  morestring=[b]'
-}
-
-\lstdefinestyle{codigo}{
-  basicstyle=\ttfamily\footnotesize,
-  keywordstyle=\color{corEscura}\bfseries,
-  commentstyle=\color{corCinza}\itshape,
-  stringstyle=\color{corDestaque},
-  numbers=left,
-  numberstyle=\tiny\color{corCinza},
-  numbersep=8pt,
-  backgroundcolor=\color{corFundo},
-  frame=leftline,
-  framerule=1.2pt,
-  rulecolor=\color{corEscura},
-  framesep=8pt,
-  xleftmargin=16pt,
-  breaklines=true,
-  breakatwhitespace=true,
-  showstringspaces=false,
-  columns=fullflexible,
-  captionpos=b,
-  language=Drools,
-  literate=%
-    {á}{{\'a}}1 {à}{{\`a}}1 {â}{{\^a}}1 {ã}{{\~a}}1
-    {é}{{\'e}}1 {ê}{{\^e}}1 {í}{{\'i}}1
-    {ó}{{\'o}}1 {ô}{{\^o}}1 {õ}{{\~o}}1
-    {ú}{{\'u}}1 {ç}{{\c c}}1
-    {Á}{{\'A}}1 {É}{{\'E}}1 {Í}{{\'I}}1 {Ó}{{\'O}}1 {Ú}{{\'U}}1 {Ç}{{\c C}}1
-}
-\lstset{style=codigo}
-
-\renewcommand{\lstlistingname}{Listagem}
-\renewcommand{\lstlistlistingname}{Lista de Listagens}
-
-% --- Macros auxiliares -----------------------------------------
-\newcommand{\facto}[1]{\texttt{\small #1}}
-\newcommand{\regra}[1]{\texttt{\small #1}}
-\newcommand{\pts}[1]{\textbf{#1}}
-
-% Informação em falta (a obter do perito ou dos autores). Fica realçada
-% para não passar despercebida para a versão final.
-\newcommand{\preencher}[1]{\colorbox{corAviso!20}{\textcolor{corAviso}{\small\textbf{[#1]}}}}
-
-% Regra em linguagem natural (SE ... ENTÃO ...), com o identificador no título.
-% Uso: \begin{regranl}{R_CHUVA_01} SE ... \end{regranl}
-\newtcolorbox{regranl}[1]{%
-  enhanced, breakable,
-  colback=corFundo, colframe=corEscura,
-  boxrule=0pt, leftrule=1.2pt, arc=0pt, outer arc=0pt,
-  left=8pt, right=8pt, top=4pt, bottom=4pt,
-  fonttitle=\ttfamily\small\bfseries, coltitle=corEscura,
-  attach title to upper, after title={\par\smallskip},
-  title={REGRA \detokenize{#1}},
-  fontupper=\ttfamily\small
-}
-
-\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
-\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
-
-% Margem extra que o TeX pode usar como ultimo recurso antes de deixar
-% uma linha a transbordar. Evita \emph{overfull boxes} pontuais em
-% paragrafos com termos longos em teletipo (nomes de predicados).
-\setlength{\emergencystretch}{1.5em}
-
+% --- Parágrafos: texto justificado, sem avanço, espaço entre parágrafos
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt plus 2pt}
+\linespread{1.08}
+\setlength{\emergencystretch}{2em}
 \setlist{itemsep=2pt,parsep=0pt,topsep=4pt}
-\renewcommand{\arraystretch}{1.25}
 
-% --- Tabelas ----------------------------------------------------
-% Cabeçalho das tabelas: fundo escuro e texto branco a negrito.
-\newcommand{\cab}[1]{\textcolor{white}{\bfseries #1}}
-\newcommand{\linhacab}{\rowcolor{corEscura}}
+% --- Títulos (Georgia) -----------------------------------------
+\titleformat{\chapter}[hang]
+  {\titulos\fontsize{20}{24}\selectfont\bfseries\color{corEscura}}{\thechapter.}{0.5em}{}
+\titleformat{name=\chapter,numberless}[hang]
+  {\titulos\fontsize{20}{24}\selectfont\bfseries\color{corEscura}}{}{0pt}{}
+\titlespacing*{\chapter}{0pt}{0pt}{18pt}
+\titleformat{\section}
+  {\titulos\fontsize{12.5}{15}\selectfont\bfseries\color{corEscura}}{\thesection.}{0.5em}{}
+\titlespacing*{\section}{0pt}{16pt}{6pt}
+\titleformat{\subsection}
+  {\titulos\fontsize{11.5}{14}\selectfont\bfseries\itshape\color{corEscura}}{\thesubsection.}{0.5em}{}
 
-% Legendas das tabelas por cima, das figuras por baixo.
+% Anexo: \anexo{A}{Título} — título sem número de capítulo, entrada no índice.
+\newcommand{\anexo}[2]{\chapter*{Anexo #1 – #2}\addcontentsline{toc}{chapter}{Anexo #1 – #2}}
+
+% --- Legendas (Aptos, centradas) -------------------------------
+\DeclareCaptionFont{legenda}{\legendas\fontsize{9}{11}\selectfont\color{corLegenda}}
+\captionsetup{font=legenda,labelsep=endash,justification=centering,singlelinecheck=false,skip=6pt}
 \captionsetup[table]{position=top}
 
-% Os fluxogramas ocupam páginas inteiras; deixa os floats encherem a página.
-\renewcommand{\topfraction}{0.9}
-\renewcommand{\bottomfraction}{0.8}
-\renewcommand{\textfraction}{0.07}
-\renewcommand{\floatpagefraction}{0.75}
-
-% Termos técnicos em inglês (mantidos em itálico).
-\newcommand{\ing}[1]{\emph{#1}}
-% Nomes de componentes e identificadores do código.
-\newcommand{\cod}[1]{\texttt{\small #1}}
-\crefname{lstlisting}{Listagem}{Listagens}
-
-% Numeração seguida das figuras e tabelas (igual ao Word).
+% Figuras e tabelas numeradas de forma seguida (como no Word).
 \counterwithout{figure}{chapter}
 \counterwithout{table}{chapter}
+
+% --- Índice e listas (como no Word) ----------------------------
+\addto\captionsportuguese{%
+  \renewcommand{\contentsname}{Índice}%
+  \renewcommand{\listfigurename}{Lista de figuras}%
+  \renewcommand{\listtablename}{Lista de tabelas}%
+  \renewcommand{\bibname}{Bibliografia}%
+}
+\renewcommand{\cfttoctitlefont}{\titulos\fontsize{20}{24}\selectfont\bfseries\color{corEscura}}
+\renewcommand{\cftloftitlefont}{\cfttoctitlefont}
+\renewcommand{\cftlottitlefont}{\cfttoctitlefont}
+\renewcommand{\cftchapdotsep}{\cftdotsep}
+\renewcommand{\cftfigpresnum}{Figura }
+\renewcommand{\cftfigaftersnum}{ –}
+\setlength{\cftfignumwidth}{5.6em}
+\renewcommand{\cfttabpresnum}{Tabela }
+\renewcommand{\cfttabaftersnum}{ –}
+\setlength{\cfttabnumwidth}{5.6em}
+\setlength{\cftfigindent}{0pt}
+\setlength{\cfttabindent}{0pt}
+% Sem espaço entre capítulos nas listas de figuras e de tabelas (como no Word).
+\usepackage{etoolbox}
+\makeatletter
+\patchcmd{\@chapter}{\addtocontents{lof}{\protect\addvspace{10\p@}}}{}{}{}
+\patchcmd{\@chapter}{\addtocontents{lot}{\protect\addvspace{10\p@}}}{}{}{}
+\makeatother
+\urlstyle{same}
+
+% --- Número de página centrado no rodapé -----------------------
+\pagestyle{plain}
+
+% --- Tabelas (estilo do Word: cabeçalho azul, linhas alternadas)
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcommand{\cab}[1]{{\color{white}\bfseries #1}}
+\newcommand{\linhacab}{\rowcolor{corEscura}}
+% \begin{tabela}{colunas} ... \end{tabela}: longtable em letra pequena, com quebra de página.
+\newenvironment{tabela}[1]
+  {\par\begingroup\footnotesize\renewcommand{\arraystretch}{1.35}%
+   \setlength{\LTpre}{6pt}\setlength{\LTpost}{6pt}%
+   \arrayrulecolor{corEscura}\begin{longtable}{#1}}
+  {\end{longtable}\endgroup}
+
+% --- Caixas e macros -------------------------------------------
+% Estrutura das regras (SE ... ENTÃO ...).
+\newtcolorbox{caixaregra}{enhanced, colback=corFundo, colframe=corEscura,
+  boxrule=0pt, leftrule=1.2pt, arc=0pt, outer arc=0pt, left=8pt, right=8pt,
+  top=4pt, bottom=4pt, fontupper=\ttfamily\small, width=0.75\linewidth, center}
+% Versaletes simuladas (a Book Antiqua não as tem), como faz o Word: \pv{texto} escreve
+% minúsculas como maiúsculas pequenas (80%). Usado na capa.
+\newcommand{\pv}[1]{{\fontsize{0.8\dimexpr\csname f@size\endcsname pt\relax}{0}\selectfont #1}}
+% Nomes de componentes e identificadores do código.
+\newcommand{\cod}[1]{\texttt{#1}}
+
+\usepackage[hidelinks,bookmarks=true]{hyperref}
+\hypersetup{pdftitle={\tituloprincipal},pdfauthor={\autoresmeta},pdflang={pt-PT}}

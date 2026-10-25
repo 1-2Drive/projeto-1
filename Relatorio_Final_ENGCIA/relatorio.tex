@@ -1,10 +1,10 @@
 % ===============================================================
-%  Relatório Final
-%  ENGCIA — Engenharia do Conhecimento
+%  Relatório Final — ENGCIA (Engenharia do Conhecimento)
+%  Sistema Pericial de Apoio à Decisão em Veículos Autónomos
 %
-%  Compilação:  tectonic relatorio.tex        (Windows, recomendado)
-%          ou:  ./build.sh                    (Linux / macOS)
-%          ou:  latexmk -pdf relatorio.tex
+%  Compilar (nesta pasta), com XeLaTeX ou Tectonic:
+%      tectonic relatorio.tex
+%  ou  xelatex relatorio.tex   (duas vezes, para o índice e as referências)
 % ===============================================================
 
 \documentclass[11pt,a4paper,oneside]{report}
@@ -12,26 +12,22 @@
 \input{metadados}
 \input{preambulo}
 
-\title{\tituloprincipal}
-\author{\autoresmeta}
-\date{\datarelatorio}
-
 \begin{document}
 
 \input{capa}
 
+% --- Páginas iniciais (numeração romana) -----------------------
 \pagenumbering{roman}
 \setcounter{page}{1}
-
-
 \tableofcontents
 \clearpage
 \listoffigures
-\listoftables
 \clearpage
-
+\listoftables
 \input{seccoes/terminologia}
 
+% --- Corpo do relatório (numeração árabe) ----------------------
+\clearpage
 \pagenumbering{arabic}
 \setcounter{page}{1}
 
@@ -41,12 +37,13 @@
 \input{seccoes/representacao}
 \input{seccoes/decisao}
 \input{seccoes/implementacao}
-\input{seccoes/adequacao}
+\input{seccoes/ponto_situacao}
 \input{seccoes/conclusao}
 
 \input{seccoes/bibliografia}
 
-\appendix
-\input{seccoes/anexos}
+% --- Anexos ----------------------------------------------------
+\input{seccoes/anexo_a}
+\input{seccoes/anexo_b}
 
 \end{document}

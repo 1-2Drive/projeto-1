@@ -69,7 +69,7 @@ estática da regra:
     \cod{Nome/Aridade};
   \item em \cod{test/1} e \cod{prove/1}, contam os factos lidos com
     \cod{known/1}, no próprio objetivo e nas cláusulas dos predicados auxiliares
-    que ele chama, seguidos transitivamente com \cod{clause/2}.
+    que ele chama, transitivamente.
 \end{itemize}
 
 Com a base de conhecimento atual, o índice tem $\sim$600 entradas, para $\sim$120
@@ -91,8 +91,7 @@ O teste \cod{DependencyIndexBenchmarkTest} mede o efeito do índice. Corre os 14
 cenários da biblioteca durante 150 ciclos cada (2\,100 ciclos) em dois processos
 Prolog lado a lado, um com o índice e outro sem ele. Em todos os ciclos, as duas
 execuções tomaram a mesma decisão e dispararam as mesmas regras (10\,231
-disparos): o índice só muda o custo, que o próprio motor mede
-(\cod{cycle_stats/3}). Com o índice, a inferência ocupa em média cerca de
+disparos): o índice só muda o custo. Com o índice, a inferência ocupa em média cerca de
 1,5\,\% do ciclo de 100\,ms (\cref{tab:desempenho}).
 
 \begin{table}[H]
@@ -125,9 +124,6 @@ exceções são as duas regras intermédias de peões, que só existem em Prolog
 
 A refração usa \cod{fired/2}. Antes de uma instanciação entrar na agenda,
 \cod{already_fired/2} compara as suas condições com as das instanciações que já
-dispararam, por variante (\cod{=@=}), e deixa de fora as repetidas. Como os
-factos nunca são retirados dentro de um ciclo, isto impede que a mesma conclusão
-seja produzida repetidamente. Um limite de 5000 disparos por ciclo
-(\cod{max_firings_per_cycle/1}) protege ainda contra uma base de regras mal construída,
-que não pare de gerar instanciações novas, devolvendo um erro em vez de bloquear a
-simulação.
+dispararam e deixa de fora as repetidas. Como os factos nunca são retirados
+dentro de um ciclo, isto impede que a mesma conclusão seja produzida
+repetidamente.

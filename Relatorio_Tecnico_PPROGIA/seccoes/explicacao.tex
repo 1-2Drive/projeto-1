@@ -24,10 +24,7 @@ Em cada ciclo, o motor Prolog regista:
   \item os quatro subobjetivos de \cod{safe_to_change_lane/1}
     (\cod{maneuver_idle}, \cod{no_continuous_line}, \cod{side_clear},
     \cod{room_to_follow}), provados um a um nos dois lados por
-    \cod{subgoal_results/2}, mesmo quando nenhuma regra propõe mudar de via;
-  \item uma entrada na linha temporal por cada leitura dos sensores
-    (\cod{FACT INSERTED}) e por cada regra que concluiu algo
-    (\cod{RULE FIRED}).
+    \cod{subgoal_results/2}, mesmo quando nenhuma regra propõe mudar de via.
 \end{itemize}
 
 A camada Java junta a cada proposta o seu resultado na arbitragem: venceu,
@@ -35,23 +32,24 @@ perdeu para outra, foi vetada por uma paragem obrigatória, foi limitada por um
 teto de velocidade, ou foi recusada pelo atuador. Junta também um detalhe que
 identifica a regra vencedora ou o motivo da recusa.
 
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=0.70\textwidth]{figuras/explicacao-duas-vias.png}
-  \caption{Percurso da informação no módulo de explicação: o percurso em tempo real, a cada ciclo, e o percurso histórico, sobre a viagem gravada ao parar.}
-  \label{fig:explicacao-duas-vias}
-\end{figure}
+% Figura das duas vias do módulo de explicação: comentada para poupar espaço
+% (o PNG e o SVG ficam em figuras/). Para a repor, tirar o "% " das seis linhas
+% seguintes e voltar a referi-la no parágrafo abaixo.
+% \begin{figure}[H]
+%   \centering
+%   \includegraphics[width=0.70\textwidth]{figuras/explicacao-duas-vias.png}
+%   \caption{Percurso da informação no módulo de explicação: o percurso em tempo real, a cada ciclo, e o percurso histórico, sobre a viagem gravada ao parar.}
+%   \label{fig:explicacao-duas-vias}
+% \end{figure}
 
-Os dois percursos da \cref{fig:explicacao-duas-vias} partem do mesmo registo. No
-percurso em tempo real, o estado de cada ciclo chega à interface pelo WebSocket. O painel
-de decisão mostra cada proposta com o seu resultado na arbitragem, e outros
-painéis mostram a razão, a regra, a evidência, a linha temporal e a memória de
+Este registo segue dois percursos. Em tempo real, o estado de cada ciclo chega à
+interface pelo WebSocket, que mostra cada proposta com o seu resultado na
+arbitragem, a razão, a regra, a evidência, a linha temporal e a memória de
 trabalho. No percurso histórico, guarda-se um registo completo do ciclo
-(\cod{SessionSnapshot}) sempre que a decisão muda. Quando o utilizador carrega
-no botão \enquote{STOP} da interface Web, abre-se um
-diálogo em que pode percorrer as decisões registadas. Para cada uma, a interface
-permite consultar os três tipos de explicação, \emph{How}, \emph{Why} e
-\emph{Why not} (ver também a \cref{sec:interface}).
+(\cod{SessionSnapshot}) sempre que a decisão muda; quando o utilizador carrega
+no botão \enquote{STOP} da interface Web, abre-se um diálogo em que pode
+percorrer as decisões registadas e consultar, para cada uma, as explicações
+\emph{How}, \emph{Why} e \emph{Why not} (ver também a \cref{sec:interface}).
 
 \paragraph{Exemplo.} Nas secções seguintes usa-se a mesma situação, executada no
 motor Prolog. O veículo segue a 50\,km/h na via da direita, há um buraco na

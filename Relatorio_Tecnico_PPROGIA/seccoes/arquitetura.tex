@@ -1,5 +1,5 @@
 % Capítulo resultante da fusão dos antigos capítulos "Integração do motor Prolog
-% com o componente Java" e "Interface gráfica e arquitetura Web", sem cortes de texto.
+% com o componente Java" e "Interface gráfica e arquitetura Web"; depois retiraram-se duas repetições.
 \chapter{Arquitetura do sistema}
 \label{cap:arquitetura}
 
@@ -47,10 +47,10 @@ Java, para que não haja valores duplicados nos dois lados. A
   \end{tabularx}
 \end{table}
 
-O \cod{server.pl} lê uma linha, converte o JSON num \emph{dict} Prolog~\cite{swijson} e
-responde sempre com outra linha. O \emph{stdout} contém apenas respostas.
-Eventuais mensagens de aviso ou erro seguem para o \emph{stderr}. O \emph{flush}
-explícito evita que o Java fique à espera de dados retidos no \emph{buffer}.
+O \cod{server.pl} converte cada linha num \emph{dict} Prolog~\cite{swijson}. O
+\emph{stdout} contém apenas respostas: eventuais mensagens de aviso ou erro
+seguem para o \emph{stderr}, e o \emph{flush} explícito evita que o Java fique à
+espera de dados retidos no \emph{buffer}.
 
 \paragraph{Pedidos e respostas.} Durante o ciclo, o \cod{PrologBackend} acumula
 os eventos dos sensores e os comandos do condutor. Preenche também um
@@ -113,10 +113,9 @@ a ligar-se.
 
 A \emph{interface} (\cref{fig:interface-web}) mostra a estrada em perspetiva 3D, com o
 veículo, os outros atores, a sinalização e a meteorologia.
-Mostra também a decisão atual e as propostas concorrentes, cada uma com o seu resultado na arbitragem.
-Os restantes painéis
-apresentam a regra de origem, a razão e a evidência, a linha temporal das regras
-e dos factos, a memória de trabalho e as leituras dos sensores.
+Mostra também os painéis de explicação em tempo real descritos na
+\cref{sec:expl-registo} (a decisão, as propostas concorrentes, a regra, a razão,
+a evidência, a linha temporal e a memória de trabalho) e as leituras dos sensores.
 
 Uma biblioteca de cenários e uma caixa de ferramentas permitem montar situações
 durante a execução: veículos, peões, sinais, semáforos, buracos, obstáculos, barreiras e chuva.

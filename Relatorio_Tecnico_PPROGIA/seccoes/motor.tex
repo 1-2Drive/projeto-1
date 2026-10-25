@@ -153,26 +153,16 @@ mudança de via pedida pelo condutor.
 \begin{lstlisting}[caption={Uma das regras mais longa da base de conhecimento (\texttt{driving\_rules.pl})},label=lst:regra-direita]
 rule('Enforce keep right road law when right lane is safe',
      460,
-     [ ego_lane(Lane),
-       test(Lane \== right),
-       not(presentation_demo),
-       lane_change_state(idle),
-       prove(no_continuous_line(right)),
-       not(right_lane_blocked_ahead),
-       time_ms(Now),
-       test(Now >= 4000),
-       lane_occupancy(right, false, RightFront),
-       test(RightFront > 80.0),
-       test(fresh_side_reading(right)),
-       not(move_off_state(true, _)),
-       not(obstacle(_, _, _, _)),
-       not(pothole(_, _, _, _)),
-       not(barrier(_, _, false, _)),
-       not(pedestrian_conflict(_)),
-       not(test(front_vehicle_within(80.0))),
-       not(lane_change_request(_)),
-       not(test(driver_lane_change_hold(Now))),
-       not(test(current_overtaking(true, _, _, _, _))) ],
+     [ ego_lane(Lane),                           test(Lane \== right),
+       not(presentation_demo),                   lane_change_state(idle),
+       prove(no_continuous_line(right)),         not(right_lane_blocked_ahead),
+       time_ms(Now),                             test(Now >= 4000),
+       lane_occupancy(right, false, RightFront), test(RightFront > 80.0),
+       test(fresh_side_reading(right)),          not(move_off_state(true, _)),
+       not(obstacle(_, _, _, _)),                not(pothole(_, _, _, _)),
+       not(barrier(_, _, false, _)),             not(pedestrian_conflict(_)),
+       not(test(front_vehicle_within(80.0))),    not(lane_change_request(_)),
+       not(test(driver_lane_change_hold(Now))),  not(test(current_overtaking(true, _, _, _, _))) ],
      [ assert(proposal(return_right, no_target, low, maneuver_safety,
                        'Portuguese Highway Code Art. 13: Drive on the rightmost available safe lane')) ]).
 \end{lstlisting}
@@ -195,3 +185,7 @@ rule('Pedestrian conflicts with trajectory (crossing)',
      [ crossing_state(P, crossing) ],
      [ assert(pedestrian_conflict(P)) ]).
 \end{lstlisting}
+
+Os mecanismos internos que controlam este motor, como o índice de dependências,
+a resolução de conflitos e a refração, assentam em meta-conhecimento derivado das
+próprias regras e são descritos em pormenor no \cref{cap:metaconhecimento}.

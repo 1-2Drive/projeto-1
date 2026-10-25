@@ -7,11 +7,9 @@
 Neste projeto, meta-conhecimento é o conhecimento sobre as próprias regras, e não
 sobre a condução em si, usado para controlar e acelerar a inferência. Saber que
 se deve reduzir a velocidade quando o limite é ultrapassado é conhecimento do
-domínio. Saber que a regra que o faz lê os factos \cod{ego_speed/1} e
+domínio, enquanto que saber que a regra que o faz lê os factos \cod{ego_speed/1} e
 \cod{speed_limit/1}, que tem precedência 300 e que já disparou neste ciclo é
-meta-conhecimento. É esta a definição que está no cabeçalho de \cod{engine.pl},
-onde cada parte do meta-conhecimento está assinalada com comentários
-\enquote{Meta-conhecimento} ou \enquote{Meta-conhecimento dinâmico}.
+meta-conhecimento.
 
 O meta-conhecimento resolve três problemas de controlo do motor de inferência:
 
@@ -53,14 +51,14 @@ predicados têm o prefixo \cod{wm_} (\cref{tab:metaconhecimento}).
   \end{tabularx}
 \end{table}
 
-Este meta-conhecimento é dinâmico, e não escrito à mão, em dois sentidos:
+Este meta-conhecimento é dinâmico, e não escrito manualmente, em dois sentidos:
 
 \begin{enumerate}
   \item \textbf{É derivado das regras durante a execução.} Quando o motor
     arranca, \cod{ensure_index/0} lê as próprias regras como dados e calcula
     \cod{rule_reads/2}, \cod{rule_precedence/2} e \cod{rule_rank/2}, que guarda
     com \cod{assertz}~\cite{swidynamic}. Quando uma regra é acrescentada ou alterada, o
-    meta-conhecimento acompanha-a no arranque seguinte, sem manutenção manual. O
+    meta-conhecimento acompanha-a no ciclo seguinte, sem manutenção manual. O
     mesmo passo verifica que não há duas regras com o mesmo identificador.
   \item \textbf{Muda durante a inferência.} \cod{fired/2} ganha uma entrada a
     cada disparo e é apagado no início de cada ciclo.
@@ -81,9 +79,9 @@ estática da regra:
     que ele chama, seguidos transitivamente com \cod{clause/2}.
 \end{itemize}
 
-Com a base de conhecimento atual, o índice tem 603 entradas, para 120
-regras e 66 tipos de facto. A regra
-\cod{'Avoid pothole in centre lane by changing right when right is clear'}, por
+Com a base de conhecimento atual, o índice tem $\sim$600 entradas, para $\sim$120
+regras e $\sim$66 tipos de facto. A regra
+\cod{"Avoid pothole in centre lane by changing right when right is clear"}, por
 exemplo, depende de nove tipos de facto, mas só três aparecem nas suas condições
 (\cod{ego_lane/1}, \cod{pothole/4} e \cod{ego_speed/1}). Os outros seis, como as
 marcações da estrada, a ocupação das vias e o estado da manobra, vêm dos
@@ -98,7 +96,7 @@ mudam ou são canceladas antes do disparo seguinte, por exemplo quando uma
 condição \cod{not(proposal(...))} deixa de se verificar. Sem o índice, todas as
 regras teriam de ser avaliadas de novo depois de cada disparo.
 
-O teste \cod{DependencyIndexBenchmarkTest} mede o efeito do índice. Corre os 14
+Com um teste \cod{DependencyIndexBenchmarkTest} medimos o efeito do índice. Corre os 14
 cenários da biblioteca durante 150 ciclos cada (2\,100 ciclos) em dois processos
 Prolog lado a lado, um com o índice e outro sem ele. Em todos os ciclos, as duas
 execuções tomaram a mesma decisão e dispararam as mesmas regras (10\,231
@@ -143,6 +141,6 @@ A refração usa \cod{fired/2}. Antes de uma instanciação entrar na agenda,
 dispararam, por variante (\cod{=@=}), e deixa de fora as repetidas. Como os
 factos nunca são retirados dentro de um ciclo, isto impede que a mesma conclusão
 seja produzida repetidamente. Um limite de 5000 disparos por ciclo
-(\cod{max_firings_per_cycle/1}) protege ainda contra uma base de regras que não
-pare de gerar instanciações novas, devolvendo um erro em vez de bloquear a
+(\cod{max_firings_per_cycle/1}) protege ainda contra uma base de regras mal construida,
+que não pare de gerar instanciações novas, devolvendo um erro em vez de bloquear a
 simulação.

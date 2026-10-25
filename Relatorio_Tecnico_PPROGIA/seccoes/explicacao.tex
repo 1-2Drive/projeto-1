@@ -89,6 +89,16 @@ por exemplo, a proposta assenta em \cod{pedestrian_conflict(p1)}, que é ele
 próprio um nó \cod{derived(...)} com a regra que o concluiu e os factos
 percebidos em que esta assentou.
 
+Para obter esta árvore, optou-se por não usar o rastreio do SWI-Prolog
+(\cod{trace/0}). O rastreio mostra a resolução feita pelo próprio interpretador,
+com as chamadas, saídas, retrocessos e falhas de cada predicado, incluindo os do
+motor (\cod{findall/3}, \cod{msort/2}), e não as regras de condução que
+dispararam nem os factos em que assentaram. Além disso, é interativo, e obriga
+a executar em modo de depuração, mais lento. Como o motor trata as
+próprias regras como dados, é ele que regista, no momento de cada disparo, a
+regra e a evidência (\cod{wm_support/3}), e é desse registo que \cod{explain/2}
+constrói a árvore.
+
 Na aplicação, o \emph{How} mostra o caminho que o ciclo escolhido percorreu no
 fluxograma de decisão, um para a velocidade e outro para a via. Cada pergunta
 do fluxograma está associada às regras que lhe respondem. Segue o ramo

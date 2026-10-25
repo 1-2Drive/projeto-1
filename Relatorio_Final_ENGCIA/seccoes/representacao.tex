@@ -1,0 +1,124 @@
+% ---------------------------------------------------------------
+% 4. Representação do conhecimento
+% ---------------------------------------------------------------
+\chapter{Representação do conhecimento}\label{cap:representacao}
+
+Neste capítulo é apresentada a forma como o conhecimento adquirido foi representado no sistema
+pericial, através da definição dos factos, eventos e regras utilizados pelo motor de inferência.
+
+\section{Dos sensores aos factos}\label{sec:sensores}
+
+Cada sensor simulado tem uma cadência e um alcance próprios, que determinam a frequência e a distância a que a informação chega às regras (Tabela 4).
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{Sensores simulados}\label{tab:sensores}
+\rowcolors{2}{white}{corFundo}
+\begin{tabular}{@{}L{0.20\textwidth}L{0.10\textwidth}L{0.22\textwidth}L{0.38\textwidth}@{}}
+\linhacab \cab{Sensor} & \cab{Cadência} & \cab{Alcance} & \cab{Informação para as regras} \\
+Radar frontal & 100 ms & 130 m & Distância, velocidade relativa e TTC do veículo da frente; veículos à frente nas vias vizinhas \\
+Câmara & 200 ms & 120 m $\times$ visibilidade (84 m com chuva) & Peões, sinais, semáforos, buracos, obstáculos, barreiras e marcas da via \\
+Radares de ângulo morto & 200 ms & 30 m (perigos até 60 m) & Ocupação de cada via lateral \\
+Sensor de velocidade & 100 ms & --- & Velocidade do próprio veículo \\
+Sensor de ambiente & 400 ms & 200 m & Chuva, visibilidade e aderência \\
+\end{tabular}
+\end{table}
+
+A informação dos sensores é passada para as regras de três formas distintas:
+
+\begin{itemize}
+  \item medições diretas, nomeadamente, distância, velocidade;
+  \item \textbf{dados derivados}, como o TTC e a distância necessária para parar;
+  \item \textbf{factos semânticos}, como o risco crítico e a via ocupada, que resultam da
+        comparação de um dado derivado com um critério.
+\end{itemize}
+
+\section{Tipos de conhecimento}\label{sec:tipos}
+
+Para decidir, o sistema precisa também de saber como esses factos evoluem no tempo, que regras são aplicadas, que critérios devem ser utilizados quando a norma não é suficiente e como resolver conflitos entre decisões. Neste sentido, o conhecimento foi organizado em seis tipos, apresentados na Tabela 5.
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{Tipos de conhecimento representados}\label{tab:tipos}
+\rowcolors{2}{white}{corFundo}
+\begin{tabular}{@{}L{0.20\textwidth}L{0.74\textwidth}@{}}
+\linhacab \cab{Tipo} & \cab{Exemplos no sistema} \\
+Factual & Velocidade atual, veículo à frente, estado de um semáforo, ocupação de uma via \\
+Temporal & Três leituras de TTC baixo em 2 s; paragem completa de 1,2 s no sinal STOP; TTC baixo registado em simultâneo com chuva \\
+Normativo & Parar no vermelho e no STOP, ceder passagem a peões, respeitar o limite, circular pela direita, ultrapassar pela esquerda \\
+Heurístico & Curvas de travagem para peões e obstáculos; desvio para o lado provado seguro; desistir de uma ultrapassagem impossível \\
+Difuso & Velocidade adequada para situações de visibilidade reduzida ou piso escorregadio \\
+Metaconhecimento & Ordem das fases (perceção, decisão, recurso); categorias de prioridade; critérios de desempate \\
+\end{tabular}
+\end{table}
+
+O conhecimento factual e o temporal descrevem a situação, ou seja, o que está a acontecer e se se mantém ao longo de várias leituras. O conhecimento normativo é proveniente do Código da Estrada, e o heurístico vem sobretudo do perito e da literatura. Por sua vez, o conhecimento difuso possibilita que os conceitos, como a visibilidade reduzida, não sejam definidos por uma fronteira rígida e o metaconhecimento, não decide nenhuma manobra, uma vez que é utilizado para definir a ordem pela qual as regras são avaliadas e qual das opções propostas prevalece quando várias são ativadas ao mesmo tempo. Importa ainda distinguir a base de conhecimento, que contém as regras, da memória de trabalho, que mantém os factos e estados que o sistema conhece num dado momento.
+
+\section{Estrutura das regras e regras representativas}\label{sec:regras}
+
+Todas as regras de decisão seguem a mesma estrutura: \textbf{SE} condições sobre factos e eventos
+\textbf{ENTÃO} propor uma ação, com velocidade recomendada, nível de risco, prioridade, razão e
+evidência. Uma regra nunca atua sobre o veículo; apenas propõe uma ação.
+
+\begin{regranl}{ESTRUTURA}
+SE    condição 1\\
+E     condição 2\\
+E     condição 3\\
+ENTÃO ação proposta\\
+\hspace*{3.2em}NÍVEL DE RISCO = nível\\
+\hspace*{3.2em}PRIORIDADE DA DECISÃO = categoria
+\end{regranl}
+
+A base de conhecimento, atualmente, tem cerca de 123 regras e vários ficheiros DRL, organizados por situação como, por exemplo, peões, semáforos, veículo à frente, mudança de via e meteorologia. A Tabela 6 apresenta algumas das regras representativas do projeto
+
+\begingroup
+\small
+\rowcolors{2}{white}{corFundo}
+\begin{longtable}{@{}L{0.05\textwidth}L{0.30\textwidth}L{0.20\textwidth}L{0.11\textwidth}C{0.07\textwidth}L{0.12\textwidth}@{}}
+\caption{Regras representativas da base de conhecimento}\label{tab:regras}\\
+\linhacab \cab{\#} & \cab{SE} & \cab{ENTÃO} & \cab{Risco} & \cab{Prior.} & \cab{Tipo} \\
+\endfirsthead
+\linhacab \cab{\#} & \cab{SE} & \cab{ENTÃO} & \cab{Risco} & \cab{Prior.} & \cab{Tipo} \\
+\endhead
+R1 & Velocidade acima do limite em vigor & Reduzir até ao limite & Moderado & 20 & Normativo \\
+R2 & Chuva, visibilidade ou aderência reduzidas & Reduzir para a velocidade calculada por lógica difusa & Moderado ou alto & 40 & Difuso \\
+R3 & Semáforo vermelho e veículo junto à linha & Parar e manter parado & Alto & 60 & Normativo \\
+R4 & Sinal STOP, em qualquer via, a menos de 4 m da linha & Parar 1,2 s e depois avançar & Alto & 60 & Normativo e temporal \\
+R5 & Peão no caminho ou a atravessar, entre 6 e 32 m & Parar & Alto & 60 & Normativo \\
+R6 & Peão no caminho ou a atravessar, a 6 m ou menos & Travagem de emergência & Crítico & 70 & Heurístico \\
+R7 & Pelo menos 3 leituras de TTC $<$ 2,5 s nos últimos 2 s & Travagem de emergência & Crítico & 70 & Temporal \\
+R8 & Chuva e pelo menos 2 leituras de TTC $<$ 3,0 s em 2 s, cada uma coincidente com uma leitura de chuva & Travar até 15 km/h & Alto & 50 & Temporal \\
+R9 & Obstáculo na via a 50 m ou menos e mudança para a esquerda provada segura & Mudar para a esquerda & Baixo & 50 & Heurístico \\
+R10 & Pedido de mudança de via com a via de destino ocupada & Manter a via & Moderado & 30 & Normativo \\
+\end{longtable}
+\endgroup
+
+\section{Níveis de risco e prioridades}\label{sec:risco}
+
+O perito sugeriu quatro níveis (baixo, médio, alto e crítico). Durante a implementação verificou-se que um único eixo não chegava para ordenar propostas de natureza diferente: uma regra de conforto e uma regra que evita uma colisão podem ambas ter risco «moderado». Separaram-se, por isso, dois conceitos: os quatro níveis passaram a descrever o \textbf{risco da situação (Figura 3)}, e foi criada uma \textbf{prioridade} com sete categorias para decidir entre propostas (Tabela 7). Desta forma, o risco acompanha a decisão e a explicação, mas não intervém na seleção.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.85\textwidth]{figuras/niveis_risco.png}
+\caption{Níveis de risco}
+\label{fig:risco}
+\end{figure}
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{Categorias de prioridade e o seu papel na arbitragem}\label{tab:prioridades}
+\rowcolors{2}{white}{corFundo}
+\begin{tabular}{@{}L{0.24\textwidth}C{0.07\textwidth}L{0.27\textwidth}L{0.32\textwidth}@{}}
+\linhacab \cab{Categoria} & \cab{Valor} & \cab{Papel na arbitragem da velocidade} & \cab{Exemplos} \\
+Segurança e emergência & 70 & Sobrepõe-se a tudo & Peão a 6 m ou menos; TTC crítico \\
+Paragem legal obrigatória & 60 & Sobrepõe-se a tudo abaixo de 70 & Semáforo vermelho; STOP; peão a atravessar \\
+Prevenção da colisão & 50 & Teto de velocidade & Veículo à frente; obstáculo; TTC baixo com chuva \\
+Perigo rodoviário & 40 & Teto de velocidade & Buraco; meteorologia (lógica difusa) \\
+Segurança na manobra & 30 & Base, se nenhum teto for inferior & Arrancar após paragem; retomar no verde; mudanças de via \\
+Cumprimento da velocidade & 20 & Teto de velocidade & Limite em vigor e limite à frente; não ultrapassar pela direita \\
+Progressão e conforto & 10 & Base, se nada mais se aplicar & Manter a velocidade; pedido de aceleração \\
+\end{tabular}
+\end{table}

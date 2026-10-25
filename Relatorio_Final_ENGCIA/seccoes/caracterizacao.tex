@@ -1,0 +1,71 @@
+% ---------------------------------------------------------------
+% 2. Aspetos caracterizadores e restrições
+% ---------------------------------------------------------------
+\chapter{Aspetos caracterizadores e restrições}\label{cap:caracterizacao}
+
+Antes de abordar a representação do conhecimento, importa identificar as características que
+distinguem este projeto de um sistema pericial tradicional, assim como apresentar as principais
+limitações tidas em conta no decorrer do respetivo desenvolvimento.
+
+\section{Principais aspetos caracterizadores}\label{sec:aspetos}
+
+O que distingue o presente projeto de um sistema pericial de consulta é o domínio dinâmico, ou
+seja, o sistema desenvolvido não faz perguntas ao utilizador, uma vez que recebe observações dez
+vezes por segundo e tem de decidir antes que a situação mude. Daqui resultam os aspetos que
+caracterizam a solução apresentada:
+
+\begin{itemize}
+  \item \textbf{Raciocínio temporal:} as regras analisam janelas de eventos recentes para
+        distinguir uma leitura atípica de um perigo persistente;
+  \item \textbf{Risco separado da prioridade:} o nível de risco descreve a gravidade da situação,
+        enquanto a prioridade, definida por categorias, decide entre propostas. Desta forma, a
+        decisão final não depende da ordem pela qual as regras disparam;
+  \item Dois canais de decisão conjunta: a velocidade e a via decidem em separado. Um veículo pode, no mesmo ciclo, abrandar e iniciar uma ultrapassagem;
+  \item \textbf{Mundo, perceção e conhecimento separados:} o mundo simulado contém tudo o que
+        existe, mas o motor de inferência só conhece o que os sensores detetaram. A título de
+        exemplo, um peão na estrada não influencia a decisão enquanto não for visto;
+  \item Utilização de estratégias como a lógica difusa para adaptar a velocidade à meteorologia;
+  \item \textbf{Explicabilidade completa:} cada decisão regista a regra, a evidência e as
+        propostas concorrentes;
+  \item Tempo real observável: a interface recebe o estado completo do sistema a cada ciclo, por WebSocket
+\end{itemize}
+
+\section{Adequação da tecnologia ao problema}\label{sec:tecnologia}
+
+No sistema desenvolvido, o conhecimento relativo às diferentes situações de condução é
+representado através de regras de produção do tipo «se\ldots{} então\ldots», que relacionam as
+condições identificadas pelos sensores com as ações de condução. Estas regras têm em conta
+situações como a presença de peões, a aproximação a outros veículos, a sinalização rodoviária e as
+condições meteorológicas. Uma vez que os dados dos sensores são atualizados continuamente, o
+sistema tem também de considerar a evolução das leituras ao longo do tempo. Além disso, como várias
+regras podem ser aplicáveis em simultâneo e indicar ações diferentes, foi necessário definir
+critérios para determinar a decisão final e permitir que esta seja justificada através dos factos
+e das regras aplicadas.
+
+Para responder a estas necessidades, são utilizados diferentes mecanismos disponibilizados pelo \emph{Drools}. O modo stream e o processamento de eventos complexos (CEP) permitem analisar sequências de leituras em janelas temporais como, por exemplo, na identificação das três leituras do TTC inferiores a 2,5 segundos num intervalo de 2 segundos. Por outro lado, as regras são executadas nas diferentes fases do ciclo de inferência, enquanto as consultas permitem verificar, através de encadeamento regressivo, se estão reunidas as condições de segurança necessárias para uma mudança de via. No caso de as condições meteorológicas se alterarem, o sistema atualiza automaticamente as conclusões que delas dependem. Por sua vez, os listeners da sessão permitem acompanhar os factos e as regras ativados, com o objetivo de permitir a reconstrução do processo de inferência e a explicação das decisões (How) [16].
+
+No entanto, algumas funcionalidades do sistema tiveram de ser implementadas fora do motor de inferência, como é o caso da resolução de conflitos. Neste caso, a resolução das diferentes ações de velocidade e de via, bem como o registo das alternativas não selecionadas e dos respetivos motivos, são assegurados pelo componente DecisionContext (Secção 6.1). Por outro lado, a lógica difusa utilizada para adaptar a velocidade às condições meteorológicas foi implementada através de regras específicas, uma vez que o \emph{Drools} não dispõe de suporte nativo para este tipo de raciocínio (Secção 6.3).
+
+\section{Restrições no desenvolvimento do projeto}\label{sec:restricoes}
+
+Durante o desenvolvimento do projeto, foram consideradas algumas restrições relacionadas com o
+ambiente de simulação, o âmbito do sistema e os recursos disponíveis, nomeadamente:
+
+\begin{itemize}
+  \item \textbf{Simulação:} o ambiente de condução, apesar de apresentar uma representação visual
+        em 3D, utiliza um modelo simplificado da estrada, do comportamento dos veículos e das
+        condições de circulação. A simulação está limitada a três vias e não tem em conta todas as
+        situações inerentes à experiência de condução real;
+  \item \textbf{Sensores:} os sensores são simulados e fornecem informação estruturada, ou seja, não existe o processamento de imagem ou de sinal. Além disso, não são consideradas leituras com ruído ou informações contraditórias entre sensores;
+  \item \textbf{Âmbito:} o planeamento de um percurso não foi tido em conta, assim como a circulação em sentido contrário, os ciclistas, o estado do condutor ou o controlo detalhado da dinâmica do veículo;
+  \item \textbf{Manobras:} a realização de mudanças de via segue um modelo simplificado, não é possível interromper/cancelar uma manobra depois de esta ter sido iniciada;
+  \item \textbf{Aquisição de conhecimento:} o contacto com o perito deu-se num momento em que o
+        desenvolvimento do projeto, embora numa fase inicial, já se encontrava em curso;
+  \item \textbf{Tempo de resposta:} o sistema foi desenvolvido para executar ciclos de decisão a
+        cada 100 ms, o que impõe restrições à complexidade do processamento realizado. Como medida
+        de proteção, foi definido um limite máximo de 5000 disparos de regras por ciclo;
+  \item \textbf{Validação:} a avaliação do sistema foi realizada através de cenários simulados e testes automáticos, sendo que os testes com veículos reais não foram equacionados. Deste modo, os resultados obtidos permitem analisar o funcionamento da solução desenvolvida, mas não garantem o seu comportamento em condições reais de circulação.
+\end{itemize}
+
+Estas restrições delimitam o âmbito do projeto e foram consideradas durante a aquisição e
+representação do conhecimento, descritas nos capítulos seguintes.

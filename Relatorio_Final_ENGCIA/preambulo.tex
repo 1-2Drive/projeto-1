@@ -1,0 +1,206 @@
+% ---------------------------------------------------------------
+% preambulo.tex — pacotes, estilos e ambientes
+% ---------------------------------------------------------------
+
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{lmodern}
+\else
+  \usepackage{fontspec}   % XeTeX / LuaTeX (ex.: Tectonic): Latin Modern em OpenType
+\fi
+\usepackage[portuguese]{babel}
+\usepackage{microtype}
+
+\usepackage[a4paper,margin=2.6cm,headheight=15pt]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{multirow}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{enumitem}
+\usepackage[table]{xcolor}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{caption}
+\usepackage{float}
+\usepackage{listings}
+\usepackage{csquotes}
+\usepackage{icomma}        % vírgula decimal em modo matemático: $1,5$
+\usepackage[most]{tcolorbox}
+\usetikzlibrary{positioning,arrows.meta,calc,fit}  % diagramas TikZ (o tcolorbox já carrega o tikz)
+\usepackage{rotating}      % sidewaysfigure: fluxogramas largos em página rodada
+\usepackage{placeins}       % \FloatBarrier: as figuras não passam para a secção seguinte
+
+% --- Paleta ----------------------------------------------------
+\definecolor{corEscura}{HTML}{1F3A5F}
+\definecolor{corDestaque}{HTML}{AD451D}  % terracota do logo do MEIA
+\definecolor{corSucesso}{HTML}{0B6E4F}   % verde: apenas marcadores PASSOU
+\definecolor{corCinza}{HTML}{5A6672}
+\definecolor{corFundo}{HTML}{F4F6F8}
+\definecolor{corCritico}{HTML}{9B1C1C}
+\definecolor{corAviso}{HTML}{B45309}
+
+\usepackage[pdfusetitle]{hyperref}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=corEscura,
+  citecolor=corEscura,
+  urlcolor=corDestaque,
+  linktoc=all
+}
+
+% O cleveref não traz nomes em português; definem-se aqui.
+\usepackage[capitalise,noabbrev,nameinlink]{cleveref}
+\crefname{chapter}{Capítulo}{Capítulos}
+\crefname{section}{Secção}{Secções}
+\crefname{subsection}{Secção}{Secções}
+\crefname{appendix}{Anexo}{Anexos}
+\crefname{figure}{Figura}{Figuras}
+\crefname{table}{Tabela}{Tabelas}
+\crefname{equation}{Equação}{Equações}
+\crefname{enumi}{Item}{Itens}
+\newcommand{\crefrangeconjunction}{ a }
+\newcommand{\crefpairconjunction}{ e }
+\newcommand{\crefmiddleconjunction}{, }
+\newcommand{\creflastconjunction}{ e }
+% O cleveref usa o tipo «listing» para o contador lstlisting.
+\crefname{listing}{Listagem}{Listagens}
+
+% --- Cabeçalhos e rodapés --------------------------------------
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textcolor{corCinza}{\ucsigla{} --- \cursosigla}}
+\fancyhead[R]{\small\textcolor{corCinza}{\tituloprincipal}}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\fancypagestyle{plain}{%
+  \fancyhf{}%
+  \fancyfoot[C]{\thepage}%
+  \renewcommand{\headrulewidth}{0pt}%
+}
+
+% --- Títulos ---------------------------------------------------
+\titleformat{\chapter}[hang]
+  {\normalfont\huge\bfseries\color{corEscura}}
+  {\thechapter\hspace{12pt}\textcolor{corCinza}{|}\hspace{12pt}}{0pt}{\huge}
+\titlespacing*{\chapter}{0pt}{-10pt}{24pt}
+
+\titleformat{\section}
+  {\normalfont\large\bfseries\color{corEscura}}{\thesection}{0.8em}{}
+\titleformat{\subsection}
+  {\normalfont\normalsize\bfseries\color{corEscura}}{\thesubsection}{0.8em}{}
+
+% --- Legendas --------------------------------------------------
+\captionsetup{font=small,labelfont={bf,color=corEscura},skip=6pt}
+
+% --- Listagens de código ---------------------------------------
+% Drools (DRL): sintaxe próxima do Java, com as palavras-chave das regras.
+\lstdefinelanguage{Drools}{
+  morekeywords={package,import,global,function,declare,query,rule,when,
+                then,end,salience,agenda-group,activation-group,no-loop,
+                lock-on-active,dialect,and,or,not,exists,forall,from,
+                collect,accumulate,eval,insert,insertLogical,update,modify,
+                retract,delete,new,true,false,null,this,matches,memberOf,
+                contains,extends,if,else,return},
+  otherkeywords={agenda-group,activation-group,no-loop,lock-on-active},
+  sensitive=true,
+  comment=[l]{//},
+  morecomment=[n]{/*}{*/},
+  string=[b]",
+  morestring=[b]'
+}
+
+\lstdefinestyle{codigo}{
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{corEscura}\bfseries,
+  commentstyle=\color{corCinza}\itshape,
+  stringstyle=\color{corDestaque},
+  numbers=left,
+  numberstyle=\tiny\color{corCinza},
+  numbersep=8pt,
+  backgroundcolor=\color{corFundo},
+  frame=leftline,
+  framerule=1.2pt,
+  rulecolor=\color{corEscura},
+  framesep=8pt,
+  xleftmargin=16pt,
+  breaklines=true,
+  breakatwhitespace=true,
+  showstringspaces=false,
+  columns=fullflexible,
+  captionpos=b,
+  language=Drools,
+  literate=%
+    {á}{{\'a}}1 {à}{{\`a}}1 {â}{{\^a}}1 {ã}{{\~a}}1
+    {é}{{\'e}}1 {ê}{{\^e}}1 {í}{{\'i}}1
+    {ó}{{\'o}}1 {ô}{{\^o}}1 {õ}{{\~o}}1
+    {ú}{{\'u}}1 {ç}{{\c c}}1
+    {Á}{{\'A}}1 {É}{{\'E}}1 {Í}{{\'I}}1 {Ó}{{\'O}}1 {Ú}{{\'U}}1 {Ç}{{\c C}}1
+}
+\lstset{style=codigo}
+
+\renewcommand{\lstlistingname}{Listagem}
+\renewcommand{\lstlistlistingname}{Lista de Listagens}
+
+% --- Macros auxiliares -----------------------------------------
+\newcommand{\facto}[1]{\texttt{\small #1}}
+\newcommand{\regra}[1]{\texttt{\small #1}}
+\newcommand{\pts}[1]{\textbf{#1}}
+
+% Informação em falta (a obter do perito ou dos autores). Fica realçada
+% para não passar despercebida para a versão final.
+\newcommand{\preencher}[1]{\colorbox{corAviso!20}{\textcolor{corAviso}{\small\textbf{[#1]}}}}
+
+% Regra em linguagem natural (SE ... ENTÃO ...), com o identificador no título.
+% Uso: \begin{regranl}{R_CHUVA_01} SE ... \end{regranl}
+\newtcolorbox{regranl}[1]{%
+  enhanced, breakable,
+  colback=corFundo, colframe=corEscura,
+  boxrule=0pt, leftrule=1.2pt, arc=0pt, outer arc=0pt,
+  left=8pt, right=8pt, top=4pt, bottom=4pt,
+  fonttitle=\ttfamily\small\bfseries, coltitle=corEscura,
+  attach title to upper, after title={\par\smallskip},
+  title={REGRA \detokenize{#1}},
+  fontupper=\ttfamily\small
+}
+
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+
+% Margem extra que o TeX pode usar como ultimo recurso antes de deixar
+% uma linha a transbordar. Evita \emph{overfull boxes} pontuais em
+% paragrafos com termos longos em teletipo (nomes de predicados).
+\setlength{\emergencystretch}{1.5em}
+
+\setlist{itemsep=2pt,parsep=0pt,topsep=4pt}
+\renewcommand{\arraystretch}{1.25}
+
+% --- Tabelas ----------------------------------------------------
+% Cabeçalho das tabelas: fundo escuro e texto branco a negrito.
+\newcommand{\cab}[1]{\textcolor{white}{\bfseries #1}}
+\newcommand{\linhacab}{\rowcolor{corEscura}}
+
+% Legendas das tabelas por cima, das figuras por baixo.
+\captionsetup[table]{position=top}
+
+% Os fluxogramas ocupam páginas inteiras; deixa os floats encherem a página.
+\renewcommand{\topfraction}{0.9}
+\renewcommand{\bottomfraction}{0.8}
+\renewcommand{\textfraction}{0.07}
+\renewcommand{\floatpagefraction}{0.75}
+
+% Termos técnicos em inglês (mantidos em itálico).
+\newcommand{\ing}[1]{\emph{#1}}
+% Nomes de componentes e identificadores do código.
+\newcommand{\cod}[1]{\texttt{\small #1}}
+\crefname{lstlisting}{Listagem}{Listagens}
+
+% Numeração seguida das figuras e tabelas (igual ao Word).
+\counterwithout{figure}{chapter}
+\counterwithout{table}{chapter}

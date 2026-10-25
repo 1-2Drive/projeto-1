@@ -1,0 +1,21 @@
+% ---------------------------------------------------------------
+% 8. Conclusão
+% ---------------------------------------------------------------
+\chapter{Conclusão}\label{cap:conclusao}
+
+Em resposta à questão central (Secção 1.2): um motor de regras com processamento de eventos complexos consegue usar continuamente dados de sensores com cadências diferentes para decidir a ação de um veículo, desde que a decisão seja separada em perceção, propostas e arbitragem, e que cada proposta guarde a sua justificação.
+
+O projeto passou de uma representação estática do problema para um sistema que decide em tempo real
+a partir de sensores simulados, eventos, factos e regras. A base de conhecimento, construída a
+partir da regulamentação, da literatura e do perito, tem 123 regras e cobre catorze cenários,
+combinando encadeamento progressivo e regressivo, raciocínio temporal sobre eventos e lógica
+difusa.
+
+A separação entre risco e prioridade e a arbitragem em dois canais tornam a decisão independente da
+ordem de execução das regras, e o registo de todas as propostas permite explicar não só o que o
+sistema decidiu, mas também o que rejeitou e porquê, durante a simulação e depois da viagem. O
+canal \ing{WebSocket} torna este raciocínio visível a cada ciclo sem nunca atrasar a decisão.
+
+Para um fabricante de automóveis, este é o principal contributo: uma decisão rastreável, que pode
+ser especificada, testada, auditada e explicada. A fiabilidade dos sensores, o tratamento da
+incerteza e a interação entre veículos são os passos seguintes.

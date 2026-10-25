@@ -1,0 +1,82 @@
+% ---------------------------------------------------------------
+% 7. Adequação ao meio envolvente e desenvolvimento futuro
+% ---------------------------------------------------------------
+\chapter{Adequação ao meio envolvente e desenvolvimento futuro}\label{cap:adequacao}
+
+\section{Adequação a empresas e organizações}\label{sec:empresas}
+
+O sistema pericial desenvolvido destina-se, principalmente, a fabricantes de automóveis que
+investem no desenvolvimento de sistemas de assistência à condução e de condução autónoma. Nestes
+contextos, a capacidade de tomar decisões adequadas às condições de circulação deve ser acompanhada
+pela possibilidade de compreender e justificar essas decisões, especialmente quando estão
+relacionadas com a segurança dos ocupantes do veículo e dos restantes utilizadores da via pública.
+
+Uma das principais aplicações do sistema desenvolvido encontra-se no apoio às atividades de desenvolvimento e validação de funcionalidades de condução autónoma. Através do ambiente de simulação, as equipas de engenharia podem avaliar o comportamento do veículo perante diferentes situações de circulação, como a aproximação a outros veículos, a presença de peões, a sinalização rodoviária ou as alterações das condições meteorológicas. A possibilidade de reproduzir cenários e modificar os elementos presentes na estrada permite observar de que forma o sistema reage a diferentes condições e verificar se as decisões estão de acordo com as regras estabelecidas.
+
+Outro aspeto relevante é a representação explícita do conhecimento através de regras de produção.
+Ao contrário de uma solução em que os critérios de decisão se encontram distribuídos pelo código da
+aplicação, a utilização de uma base de conhecimento permite identificar as condições associadas a
+cada regra e analisar a sua influência no comportamento do veículo. Esta organização pode facilitar
+a revisão das regras por equipas de desenvolvimento e especialistas do domínio, bem como a
+identificação de situações que necessitem de ajustes ou de novos critérios de decisão.
+
+A explicabilidade constitui também uma das principais contribuições do sistema para este contexto.
+Para cada decisão, é possível identificar as regras aplicadas, os factos considerados e os motivos
+que levaram à seleção de uma determinada ação. Além disso, o sistema permite compreender por que
+razão outras alternativas não foram escolhidas. Esta informação é particularmente útil na análise
+de comportamentos inesperados, uma vez que permite distinguir situações em que a decisão resulta
+das condições detetadas pelos sensores, das regras definidas ou dos critérios utilizados na
+resolução de conflitos. O registo das decisões ao longo da simulação permite ainda consultar e
+analisar posteriormente o processo de inferência.
+
+Esta capacidade de rastreabilidade poderá também apoiar atividades de documentação técnica e auditoria, ao disponibilizar informação sobre o comportamento do sistema em diferentes cenários. A identificação das regras e dos factos envolvidos em cada decisão permite reunir evidências sobre o funcionamento da solução, que poderão ser utilizadas durante processos internos de verificação e validação. Contudo, estes registos não substituem os procedimentos de ensaio e certificação exigidos para a homologação de sistemas automóveis.
+
+Para além dos fabricantes, a solução poderá ter interesse para equipas de investigação e
+desenvolvimento, instituições de ensino e organizações que trabalhem na avaliação de sistemas
+inteligentes. A interface gráfica permite acompanhar a evolução da simulação e observar a relação
+entre os dados dos sensores, a aplicação das regras e as decisões executadas. Desta forma, o sistema
+pode ser utilizado para estudar diferentes estratégias de decisão, analisar situações de conflito
+entre regras e demonstrar o funcionamento de mecanismos de inferência e explicabilidade.
+
+Apesar destas possibilidades de aplicação, importa salientar que o sistema desenvolvido constitui
+um protótipo académico, baseado num ambiente de simulação simplificado. A sua utilização direta num
+veículo real exigiria a integração com sensores físicos, modelos mais completos da dinâmica do
+veículo e mecanismos adicionais de segurança e validação. Assim, a principal contribuição do projeto
+para o meio empresarial reside na demonstração de uma abordagem à tomada de decisão baseada em
+conhecimento explícito, que permite especificar, testar e explicar comportamentos de condução de
+forma rastreável.
+
+\section{Limitações}\label{sec:limitacoes}
+
+As restrições da Secção 2.3 foram escolhas de âmbito; as limitações seguintes são o que o sistema atual ainda não faz bem dentro desse âmbito.
+
+\begin{itemize}
+  \item \textbf{Modelo simplificado.} Para além das restrições da Secção 2.3, alguns dados chegam às regras diretamente do mundo simulado e não de um sensor: a posição e o estado da manobra do próprio veículo, as marcas da via e a existência de um perigo na via da direita a mais de 120 m.
+  \item \textbf{Comportamentos a corrigir.} Uma proposta de redução de velocidade cuja velocidade
+        recomendada está acima da atual faz o veículo acelerar até ela: com chuva, numa estrada sem
+        sinais, um veículo a 30 km/h sobe até ao teto difuso de cerca de 51 km/h. Uma paragem por
+        peão pode esconder uma travagem de emergência necessária para um obstáculo mais próximo,
+        porque ambas pedem 0 km/h. Uma mudança de via já iniciada não pode ser abortada.
+  \item \textbf{Validação.} Sem deteção de colisões no simulador, um embate só é detetado por
+        testes que o verifiquem explicitamente. Os limiares foram definidos pela equipa e não foram
+        revistos pelo perito.
+\end{itemize}
+
+\section{Possibilidades de desenvolvimento futuro}\label{sec:futuro}
+
+As possibilidades de evolução decorrem destas limitações e das indicações do perito que ficaram por seguir (Tabela 3):
+
+\begin{itemize}
+  \item Fiabilidade dos sensores: associar um nível de confiança a cada deteção, confirmar deteções entre câmara e radar, acrescentar o LiDAR como terceira fonte em caso de divergência [10, 11, 12] e parar de forma controlada perante a falha de um sensor, como indicou o perito;
+  \item \textbf{Incerteza:} estender a lógica difusa a outras grandezas e avaliar fatores de certeza
+        nas regras;
+  \item \textbf{Interação entre veículos:} usar a Teoria dos Jogos para escolher entre manobras já
+        provadas seguras quando a decisão depende do comportamento esperado de outros condutores,
+        mantendo as regras de segurança como restrições;
+  \item \textbf{Domínio:} cruzamentos e prioridade, trânsito em sentido contrário, ciclistas,
+        intervalo temporal (THW) e saída involuntária da via;
+  \item \textbf{Integração:} ligar a camada de decisão a um simulador de condução mais realista e,
+        depois, a dados de sensores reais;
+  \item \textbf{Perito:} nova sessão com o sistema completo, como o próprio perito sugeriu, para
+        rever regras e limiares.
+\end{itemize}

@@ -66,7 +66,7 @@ subobjetivos (\cod{maneuver_idle}, \cod{no_continuous_line}, \cod{side_clear},
     duas vezes no mesmo ciclo (\cref{sec:meta-controlo}). Os factos nunca são
     retirados dentro de um ciclo.
   \item \textbf{Estado entre ciclos:} fica em \cod{driving_state.pl}, que guarda as
-    últimas leituras, a janela de TTC, o compromisso perante o semáforo, o
+    últimas leituras, a janela de TTC (\emph{Time to Collision}), o compromisso perante o semáforo, o
     cronómetro do STOP e o estado da ultrapassagem. No início de cada ciclo
     carrega tudo como factos (\cod{load_cycle_facts/0}). As regras não alteram
     estado: concluem o que mudou (por exemplo \cod{overtake_started/3}), e

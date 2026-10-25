@@ -112,11 +112,12 @@ class RandomObjectSpawnerTest {
     }
 
     @Test
-    @DisplayName("objects appear ahead of the car, of every kind and in every lane, barriers closed, and the weather turns both ways")
+    @DisplayName("objects appear ahead of the car, of every kind, hazards in every lane and vehicles never on the left, barriers closed, and the weather turns both ways")
     void spawnsAreAheadAndVaried() {
         Set<ScenarioRoadElementType> elementTypes = EnumSet.noneOf(ScenarioRoadElementType.class);
         Set<ScenarioActorType> actorTypes = EnumSet.noneOf(ScenarioActorType.class);
         Set<Lane> hazardLanes = EnumSet.noneOf(Lane.class);
+        Set<Lane> vehicleLanes = EnumSet.noneOf(Lane.class);
         Set<ScenarioTimedActionType> weather = EnumSet.noneOf(ScenarioTimedActionType.class);
 
         RandomObjectSpawner spawner = new RandomObjectSpawner(3, 100);
@@ -144,6 +145,9 @@ class RandomObjectSpawnerTest {
                 }
                 if (actor != null) {
                     actorTypes.add(actor.getType());
+                    if (actor.getType() == ScenarioActorType.FRONT_VEHICLE) {
+                        vehicleLanes.add(actor.getLane());
+                    }
                 }
                 if (action.getType() == ScenarioTimedActionType.SET_RAIN) {
                     assertFalse(raining, "rain set while it already rains");
@@ -160,6 +164,7 @@ class RandomObjectSpawnerTest {
         assertEquals(EnumSet.allOf(ScenarioRoadElementType.class), elementTypes);
         assertEquals(EnumSet.of(ScenarioActorType.FRONT_VEHICLE, ScenarioActorType.PEDESTRIAN), actorTypes);
         assertEquals(EnumSet.of(Lane.LEFT, Lane.CENTER, Lane.RIGHT), hazardLanes);
+        assertEquals(EnumSet.of(Lane.CENTER, Lane.RIGHT), vehicleLanes, "random vehicles keep out of the left lane");
         assertEquals(EnumSet.of(ScenarioTimedActionType.SET_RAIN, ScenarioTimedActionType.CLEAR_WEATHER), weather);
     }
 }

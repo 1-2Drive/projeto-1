@@ -1,5 +1,10 @@
-\chapter{Integração do motor Prolog com o componente Java}
-\label{cap:integracao}
+% Capítulo resultante da fusão dos antigos capítulos "Integração do motor Prolog
+% com o componente Java" e "Interface gráfica e arquitetura Web", sem cortes de texto.
+\chapter{Arquitetura do sistema}
+\label{cap:arquitetura}
+
+\section{Integração do motor Prolog com o componente Java}
+\label{sec:integracao}
 
 \cod{ExpertSystemBackend} define o ciclo comum aos motores: avançar o relógio,
 iniciar o ciclo, inserir eventos, atualizar o veículo, decidir e expor a memória
@@ -85,3 +90,44 @@ Cada proposta fica com o seu resultado: venceu, perdeu, foi vetada ou foi
 limitada. O \cod{DecisionActuator} aplica a decisão ao veículo. Pode recusar uma
 mudança de via que não consiga executar, e essa recusa fica registada. O ciclo
 é então guardado para o módulo de explicação.
+
+\section{Interface gráfica e arquitetura Web}
+\label{sec:interface}
+
+A aplicação segue uma arquitetura cliente-servidor.
+O servidor, em Java 17 (ou superior) com Spring Boot 3.3.4, corre a simulação e o motor de inferência.
+O cliente é uma aplicação Angular 18 que só apresenta o estado e envia comandos.
+A \emph{interface} nunca avalia condições de condução: as distâncias de segurança, os
+limites de velocidade e a segurança das mudanças de via são decididos apenas
+no motor de regras.
+A interface limita-se a desenhar o estado da simulação que o servidor envia.
+
+A comunicação usa dois canais: API REST e WebSockets.
+Os comandos seguem por REST, cada um com a sua
+resposta: iniciar, parar ou reiniciar a simulação, escolher um cenário,
+acrescentar elementos à estrada, trocar de motor de inferência, entre outros.
+O estado da simulação chega por um WebSocket (\cod{/api/ws/simulation}) à \emph{Web UI}.
+O servidor publica um \emph{snapshot} em JSON a cada ciclo de 100\,ms.
+Se a ligação cair ou deixar de receber dados, o cliente volta
+a ligar-se.
+
+A \emph{interface} (\cref{fig:interface-web}) mostra a estrada em perspetiva 3D, com o
+veículo, os outros atores, a sinalização e a meteorologia.
+Mostra também a decisão atual e as propostas concorrentes, cada uma com o seu resultado na arbitragem.
+Os restantes painéis
+apresentam a regra de origem, a razão e a evidência, a linha temporal das regras
+e dos factos, a memória de trabalho e as leituras dos sensores.
+
+Uma biblioteca de cenários e uma caixa de ferramentas permitem montar situações
+durante a execução: veículos, peões, sinais, semáforos, buracos, obstáculos, barreiras e chuva.
+Um seletor troca entre os motores Prolog e Drools, recarregando o cenário.
+Se o motor falhar, um aviso mostra a mensagem de erro.
+O diálogo de perguntas \emph{Why}, \emph{Why not} e \emph{How}, que abre
+quando a simulação para (usando o botão \enquote{STOP}), é explicado na \cref{sec:expl-registo}.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\textwidth]{figuras/screenshot-web-ui.png}
+  \caption{Interface Web com o motor Prolog ativo, durante uma ultrapassagem com chuva.}
+  \label{fig:interface-web}
+\end{figure}

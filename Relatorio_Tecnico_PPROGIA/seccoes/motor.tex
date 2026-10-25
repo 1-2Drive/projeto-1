@@ -87,14 +87,14 @@ subobjetivos (\cod{maneuver_idle}, \cod{no_continuous_line}, \cod{side_clear},
 \label{sec:comparacao-motor-uc}
 
 O sistema não usa o motor da unidade curricular (\cod{sp_exp1.pl},
-\cod{sp_exp2.pl}~\cite{ucspexp}): o motor (\cod{engine.pl}~\cite{codigofonte}) foi desenvolvido
+\cod{sp_exp2.pl}~\cite{ucspexp}): o motor (\cod{engine.pl}) foi desenvolvido
 pelo grupo. O problema exige decidir a cada 100\,ms sobre uma memória de trabalho
 que muda em cada ciclo, disparar as regras pela mesma ordem que o Drools e
 devolver explicações como dados ao Java, e não como texto na consola. Do motor da
 UC manteve-se a ideia central: registar a justificação de cada facto quando é
 concluído (\cod{justifica/3} corresponde ao nosso \cod{wm_support/3}) e explicar
 a partir desse registo. As restantes diferenças respondem a pontos que a própria
-aula~6~\cite{uclecture6} deixa em aberto (\cref{tab:comparacao-motor-uc}).
+aula~6 deixa em aberto (\cref{tab:comparacao-motor-uc}).
 
 \begin{table}[H]
   \centering
@@ -117,15 +117,15 @@ aula~6~\cite{uclecture6} deixa em aberto (\cref{tab:comparacao-motor-uc}).
       & Agenda com resolução de conflitos, a começar pela precedência
         (\cref{sec:meta-controlo}) \\ \linhasep
     Repetições & \cod{cria_facto} só verifica se a conclusão já existe, e não se
-        o par facto--regra já disparou~\cite[diap.~39]{uclecture6}
+        o par facto--regra já disparou
       & Refração por regra e instanciação (\cod{fired/2}); um facto repetido é
         ignorado \\ \linhasep
     Meta-conhecimento & \cod{facto_dispara_regras/2} escrito à mão em
-        \cod{veiculos2.txt}; gerá-lo é o exercício proposto~\cite[diap.~47--50]{uclecture6}
+        \cod{veiculos2.txt}; gerá-lo é o exercício proposto
       & Dinâmico: Derivado das regras no arranque (\cod{rule_reads/2}), incluindo os factos
         lidos pelos predicados auxiliares \\ \linhasep
     Disjunção & Duas regras com a mesma cabeça, e não um OU dentro da
-        regra~\cite[p.~8]{ucajuda}
+        regra
       & Igual: \cod{pedestrian_conflict/1} tem uma regra por ramo
         (\cref{lst:regras-ou}) \\ \linhasep
     Explicações & \cod{como/1} e \cod{whynot/1} escrevem na consola;

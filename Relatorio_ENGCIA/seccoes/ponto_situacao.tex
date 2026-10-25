@@ -1,0 +1,36 @@
+% ---------------------------------------------------------------
+% seccoes/ponto_situacao.tex — Ponto de situação
+% ---------------------------------------------------------------
+
+\chapter{Ponto de situação}\label{sec:7}
+
+\section{Adequação ao meio ambiente, empresas e organizações}\label{sec:7.1}
+
+O principal valor do sistema está na explicabilidade: cada decisão fica ligada à regra que a originou, aos factos usados e às alternativas rejeitadas. Isto interessa a quem tem de desenvolver, testar e justificar sistemas de condução autónoma. Os fabricantes e fornecedores de software automóvel poderão usá-lo como apoio às equipas de engenharia em testes preliminares em simulação, para perceber porque o sistema decidiu de determinada forma e, potencialmente, reduzir o recurso a ensaios físicos. As empresas de simulação e validação poderão integrá-lo como módulo complementar que explica e rastreia as decisões nos resultados dos testes, e os centros de investigação e universidades como plataforma para projetos de sistemas periciais e de IA explicável.
+
+Fora do setor automóvel, a mesma abordagem pode aplicar-se à robótica móvel e à automação industrial, com as devidas adaptações. Sendo um protótipo académico, com sensores e ambiente simulados, qualquer utilização real exigiria integração com sensores reais e validação em ambientes mais realistas.
+
+\section{Restrições e limitações}\label{sec:7.2}
+
+Apesar dos resultados obtidos, importa reconhecer algumas restrições e limitações associadas ao desenvolvimento e funcionamento do sistema. Estas resultam tanto de decisões tomadas para delimitar o âmbito do projeto como de simplificações do ambiente de simulação e de aspetos identificados durante a implementação e validação.
+
+No que diz respeito à simulação de cenários, embora o ambiente apresente uma representação visual em 3D, utiliza modelos simplificados da estrada, do comportamento dos veículos e das condições de circulação, limitado a três vias de trânsito. O âmbito do projeto exclui ainda o planeamento de percursos, a circulação em sentido contrário, os ciclistas, o estado do condutor e o controlo detalhado da dinâmica do veículo.
+
+Relativamente à perceção do ambiente, os sensores simulados apresentam algumas simplificações, nomeadamente a existência de ruído apenas no radar, sem situações de informação contraditória entre sensores. No que respeita ao funcionamento do sistema, a necessidade de executar ciclos de decisão a cada 100 ms condicionou a complexidade do processamento, tendo sido estabelecido um limite máximo de 5000 disparos de regras por ciclo como medida de proteção. Foram também identificadas limitações na gestão de algumas decisões, nomeadamente a possibilidade de uma ordem de paragem perante um peão se sobrepor a uma travagem de emergência necessária devido a um obstáculo mais próximo, uma vez que ambas estabelecem uma velocidade de destino de 0 km/h. Adicionalmente, as mudanças de via seguem um modelo simplificado que não permite cancelar uma manobra depois de iniciada, mesmo perante alterações das condições de circulação.
+
+Quanto à aquisição de conhecimento, o contacto com o perito deu-se quando o desenvolvimento do projeto já se encontrava em curso, embora numa fase inicial. Foram realizadas várias sessões de esclarecimento para apoiar a construção da base de conhecimento e, após a conclusão do desenvolvimento, o sistema foi apresentado ao perito para apreciação.
+
+Por fim, a validação foi realizada através de cenários simulados e testes automáticos, não tendo sido considerados testes com veículos reais. Acresce que o simulador não dispõe de um mecanismo automático de deteção de colisões, sendo necessário recorrer a testes que verifiquem explicitamente a ocorrência de embates. Assim, os resultados obtidos permitem avaliar o funcionamento do sistema nos cenários considerados, mas não garantem o seu comportamento em condições reais de circulação.
+
+Estas restrições e limitações não comprometem os objetivos definidos para o projeto, mas identificam oportunidades de desenvolvimento futuro, nomeadamente ao nível da consistência das decisões, da segurança das manobras e da aproximação do sistema a condições reais de condução.
+
+\section{Possibilidades de desenvolvimento futuro}\label{sec:7.3}
+
+As possibilidades de evolução decorrem destas limitações identificadas e das indicações do perito após a apresentação do resultado final, nomeadamente:
+
+\begin{itemize}
+  \item Fiabilidade dos sensores: associar um nível de confiança a cada deteção, confirmar deteções entre câmara e radar, acrescentar o LiDAR como terceira fonte em caso de divergência [10, 11, 12] e parar de forma controlada perante a falha de um sensor, como indicou o perito;
+  \item Interação entre veículos\textbf{:} usar a Teoria dos Jogos para escolher entre manobras já provadas seguras quando a decisão depende do comportamento esperado de outros condutores, mantendo as regras de segurança como restrições;
+  \item Domínio: cruzamentos e prioridade, trânsito em sentido contrário, ciclistas, intervalo temporal (THW) e saída involuntária da via;
+  \item Integração: ligar a camada de decisão a um simulador de condução mais realista e, depois, a dados de sensores reais;
+\end{itemize}

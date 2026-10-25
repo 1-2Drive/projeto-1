@@ -21,6 +21,7 @@
       .grupo    { fill: #ffffff; stroke: #c9c9c9; stroke-width: 1.4; }
       .destaque { fill: #eef4fc; stroke: #2f74d0; stroke-width: 2; }
       .prolog   { stroke: #3a3a3a; stroke-width: 2.6; }
+      .drools   { stroke-dasharray: 7 4; }   /* o motor alternativo: contorno tracejado */
       .linha    { fill: none; stroke: #b4b4b4; stroke-width: 1.4; }
     </style>
   </defs>
@@ -54,13 +55,13 @@
   <text class="detalhe" x="233" y="450">engine.pl e driving_state.pl</text>
   <text class="detalhe" x="233" y="469">driving_rules.pl: ~120 regras</text>
 
-  <!-- DroolsBackend -->
-  <rect class="grupo" x="441" y="286" width="377" height="219" rx="8"/>
+  <!-- DroolsBackend (à direita, com contorno tracejado) -->
+  <rect class="grupo drools" x="441" y="286" width="377" height="219" rx="8"/>
   <text class="nome" x="629" y="311">DroolsBackend</text>
-  <rect class="caixa" x="459" y="322" width="341" height="63" rx="8"/>
+  <rect class="caixa drools" x="459" y="322" width="341" height="63" rx="8"/>
   <text class="nome" x="629" y="349">KnowledgeSession</text>
   <text class="detalhe" x="629" y="369">KieSession stateful, relógio simulado</text>
-  <rect class="caixa" x="459" y="403" width="341" height="83" rx="8"/>
+  <rect class="caixa drools" x="459" y="403" width="341" height="83" rx="8"/>
   <text class="nome" x="629" y="430">Regras DRL</text>
   <text class="detalhe" x="629" y="450">~123 regras em 4 agenda groups</text>
   <text class="detalhe" x="629" y="469">CEP e queries de encadeamento inverso</text>

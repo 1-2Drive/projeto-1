@@ -34,7 +34,6 @@ seccoes/          um ficheiro por capítulo, bibliografia e anexos
 figuras/          imagens das figuras (nome = número + título)
 logos/            logótipos do ISEP e do MEIA
 fontes/           fonte Aptos (legendas) — não incluída no repositório
-CORRECOES.md      correções feitas ao texto do Word na conversão
 ```
 
 ## Convenções

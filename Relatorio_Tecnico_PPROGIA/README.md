@@ -56,7 +56,7 @@ Teachers_Engine/     motor da UC, para a comparação (não compilado)
 
 Capítulos (`seccoes/`, pela ordem de `relatorio.tex`): `resumo`, `perito`, `motor`,
 `base_conhecimento`, `metaconhecimento`, `explicacao`, `arquitetura`,
-`dificuldades`, `conclusao` e `anexos` (desativado).
+`dificuldades`, `conclusao` e, depois das referências, `anexos`.
 
 ## Configurações a saber
 
@@ -64,8 +64,7 @@ Capítulos (`seccoes/`, pela ordem de `relatorio.tex`): `resumo`, `perito`, `mot
 |---|---|---|
 | `preambulo.tex`, bloco `COMPACTAÇÃO LIGEIRA` | letra de 10,5 pt e margens de 2,3 cm | os comentários do bloco explicam |
 | `preambulo.tex`, bloco `CAPÍTULOS SEGUIDOS`; `\quebracapitulofalse` / `\quebracapitulotrue` em `relatorio.tex` | os capítulos 1 a 8 seguem sem mudar de página | apagar as duas linhas em `relatorio.tex` |
-| `relatorio.tex`, bloco `RESUMO E ÍNDICE NA MESMA PÁGINA`; `resumo.tex`; `\l@chapter` em `preambulo.tex` | o Resumo e o Índice partilham uma página | repor o `\clearpage` em `resumo.tex` e usar só `\tableofcontents` |
-| `relatorio.tex`, bloco `ANEXO` | o anexo está desativado | tirar o `% ` das duas linhas do bloco |
+| `preambulo.tex`, patch de `\l@chapter` | índice mais compacto (menos espaço antes de cada capítulo) | apagar o bloco |
 | `relatorio.tex`, bloco `LISTAS DE FIGURAS E DE TABELAS` | as listas de figuras e de tabelas estão desativadas (poupa uma página) | tirar o `% ` do início das seis linhas do bloco |
 | `relatorio.tex`, `\nocite{...}` antes do Perito | as fontes do perito ficam em [1] a [4] | |
 

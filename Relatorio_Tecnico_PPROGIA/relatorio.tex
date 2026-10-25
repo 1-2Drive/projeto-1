@@ -29,6 +29,10 @@
 % O ambiente titlepage repõe o contador em 1 ao terminar (classe report, oneside):
 % a capa é a página i, o Resumo a ii.
 \setcounter{page}{2}
+% COMPACTAÇÃO 2: a partir daqui (tudo menos a capa, que fica em 11pt) a letra
+% passa a 10,5pt, com o \changefontsizes do scrextend (ver COMPACTAÇÃO em
+% preambulo.tex). Reverter: apagar a linha seguinte.
+\changefontsizes{10.5pt}
 
 \input{seccoes/resumo}
 

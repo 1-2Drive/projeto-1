@@ -13,29 +13,27 @@
 \usepackage{microtype}
 
 % ===============================================================
-% COMPACTAÇÃO LIGEIRA (margens e letra), 24/10/2026
+% COMPACTAÇÃO (margens e letra), 24-25/10/2026
 % ---------------------------------------------------------------
-% Para caber mais texto por página sem se notar à primeira vista,
-% reduziram-se ligeiramente as margens e o tamanho da letra. São só
-% duas alterações, ambas aqui:
+% Para caber mais texto por página. São só duas alterações:
 %
 %   1. Margens: 2.6cm -> 2.3cm (todas as margens).
 %      Reverter: voltar a pôr margin=2.6cm na linha do geometry.
 %
-%   2. Letra do texto: 11pt -> 10.5pt.
-%      A classe report só aceita 10pt, 11pt ou 12pt, por isso a opção
-%      [11pt] do \documentclass em relatorio.tex fica como está e o
-%      scrextend (KOMA-Script) recalcula os tamanhos (\normalsize,
-%      \small, \footnotesize, títulos...) a partir de 10.5pt.
-%      Reverter: apagar a linha \usepackage[fontsize=10.5pt]{scrextend}
-%      (a letra volta aos 11pt da classe).
+%   2. Letra: a capa fica nos 11pt da classe; o resto do documento passa a
+%      10,5pt com \changefontsizes{10.5pt} em relatorio.tex, logo depois de
+%      \input{capa} (o scrextend, do KOMA-Script, recalcula \small,
+%      \footnotesize, títulos, etc. a partir desse tamanho; carrega-se aqui
+%      com fontsize=11pt só para o disponibilizar).
+%      Reverter: apagar a linha \changefontsizes{10.5pt} em relatorio.tex.
+%      Para compactar mais, \changefontsizes{10pt} (poupa texto, mas não
+%      poupou páginas: os blocos indivisíveis absorvem o ganho).
 %
-% Para compactar mais, o passo seguinte natural seria margin=2.0cm e
-% fontsize=10pt (ou [10pt] no \documentclass e retirar o scrextend).
+% Para compactar mais, o passo seguinte seria margin=2.0cm.
 % ===============================================================
-\usepackage[fontsize=10.5pt]{scrextend}   % COMPACTAÇÃO 2: era 11pt (classe)
+\usepackage[fontsize=11pt]{scrextend}   % COMPACTAÇÃO 2: \changefontsizes em relatorio.tex
 \usepackage[a4paper,margin=2.3cm,headheight=15pt]{geometry}   % COMPACTAÇÃO 1: era margin=2.6cm
-% --- fim da COMPACTAÇÃO LIGEIRA ---------------------------------
+% --- fim da COMPACTAÇÃO ------------------------------------------
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{longtable}

@@ -8,9 +8,9 @@ cerca de 4,4 vezes mais (\cref{tab:desempenho}). As explicações que o motor
 regista podem ser consultadas na interface Web, depois de carregar em
 \enquote{STOP} (\cref{sec:expl-registo}).
 
-Anda do lado do motor, quase todo o custo que resta é a avaliação inicial das regras
-em cada ciclo. Manter as correspondências de um ciclo para o seguinte, reduziria esse custo,
-embora a margem atual (cerca de 1,5\,\% do ciclo) obviamente não o exija.
+Do lado do motor, quase todo o custo que resta é a avaliação inicial das regras
+em cada ciclo. Manter as correspondências de um ciclo para o seguinte reduziria esse custo,
+embora a margem atual (cerca de 1,5\,\% do ciclo) não o exija.
 
 No entanto, o sistema tem limitações:
 
@@ -22,11 +22,13 @@ No entanto, o sistema tem limitações:
     reais.
 \end{itemize}
 
-Como trabalho futuro, a primeira limitação pode ser atenuada com um modo de operação em que
+A primeira limitação parece, contudo, pouco relevante num projeto que decorre
+inteiramente em simulação.
+
+Como trabalho futuro, a primeira limitação pode ser atenuada com um modo de operação com
 perguntas que não dependam do ritmo de 100\,ms: as preferências do condutor (por exemplo, uma
 condução mais prudente) ou condições que os sensores medem mal, como o estado do
 piso, pedidas antes de iniciar a viagem ou com o veículo parado. O motor teria de
 tratar a resposta \enquote{não sei} e evitar repetir perguntas, como propõem os
 materiais da unidade curricular, e passaria a fazer sentido o
 \emph{Why} no sentido do MYCIN: explicar porque é que uma pergunta é feita.
-No entanto, esta limitação parece pouco relevante num projeto que decorre inteiramente em simulação.

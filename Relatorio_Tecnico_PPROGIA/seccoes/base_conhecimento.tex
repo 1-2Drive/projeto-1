@@ -56,7 +56,7 @@ Dada a extensão recomendada para este relatório (cerca de 10 páginas), não s
 inclui o diagrama completo da árvore de decisão, isto é, o fluxograma de decisão
 da velocidade e da via.
 Esse diagrama pode ser consultado junto ao código-fonte do projeto.
-O percurso que cada decisão segue nesse fluxograma, pode também ser consultado
+O percurso que cada decisão segue nesse fluxograma pode também ser consultado
 na \emph{interface} Web, através da explicação \emph{How} (\cref{sec:expl-how}).
 
 \section{Representação e organização}
@@ -81,7 +81,6 @@ Ou seja, se a velocidade passar o limite em vigor em mais de 0,1\,km/h,
 propõe-se reduzir para o limite, com risco moderado e prioridade de cumprimento
 de velocidade (20).
 
-A perceção não tem regras Prolog, porque é tratada em \cod{driving_state.pl}.
 
 \section{Alguns exemplos}
 \label{sec:base-exemplos}
@@ -134,9 +133,7 @@ safe_to_change_lane(Side) :-
 \section{Acesso e manutenção}
 \label{sec:base-manutencao}
 
-Os padrões das regras são unificados com \cod{wm_fact/2}, e os auxiliares leem
-factos com \cod{known/1}. Dentro de um ciclo, os factos nunca são retirados: não
-há manutenção de verdade. As crenças mantêm-se atualizadas entre ciclos, porque
+Não há manutenção de verdade: as crenças mantêm-se atualizadas entre ciclos, porque
 cada ciclo começa com os factos carregados de novo a partir do estado em
 \cod{driving_state.pl}. Esse estado esquece o que deixou de ser observado
 (\cod{expire_old_readings/1}): por exemplo, um obstáculo, um buraco ou uma

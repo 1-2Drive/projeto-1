@@ -49,10 +49,7 @@ Java, para que não haja valores duplicados nos dois lados. A
   \end{tabularx}
 \end{table}
 
-O \cod{server.pl} converte cada linha num \emph{dict} Prolog~\cite{swijson}. O
-\emph{stdout} contém apenas respostas: eventuais mensagens de aviso ou erro
-seguem para o \emph{stderr}, e o \emph{flush} explícito evita que o Java fique à
-espera de dados retidos no \emph{buffer}.
+O \cod{server.pl} converte cada linha num \emph{dict} Prolog~\cite{swijson}.
 
 \paragraph{Pedidos e respostas.} Durante o ciclo, o \cod{PrologBackend} acumula
 os eventos dos sensores e os comandos do condutor. Preenche também um
@@ -60,16 +57,10 @@ os eventos dos sensores e os comandos do condutor. Preenche também um
 posição, via, estado da manobra e via de destino, marcações da estrada,
 segurança das vias adjacentes (calculada pela perceção em Java) e se há um
 perigo à frente na via da direita. Tudo segue num único pedido \cod{tick}, com
-a decisão anterior (ação, regra e prioridade). A resposta traz:
-
-\begin{itemize}
-  \item as propostas, cada uma com a ação, a velocidade, o risco, a prioridade,
-    a razão, a regra e a evidência;
-  \item os factos do ciclo;
-  \item o limite de velocidade em vigor;
-  \item os subobjetivos da segurança de mudança de via nos dois lados;
-  \item as métricas do motor.
-\end{itemize}
+a decisão anterior (ação, regra e prioridade). A resposta traz as propostas
+(ação, velocidade, risco, prioridade, razão, regra e evidência), os factos do
+ciclo, o limite de velocidade em vigor, os subobjetivos da segurança de mudança de
+via nos dois lados e as métricas do motor.
 
 \paragraph{Arbitragem e aplicação.} O Java não decide nada por si: entrega as
 propostas ao \cod{DecisionContext}. A
@@ -104,14 +95,9 @@ limites de velocidade e a segurança das mudanças de via são decididos apenas
 no motor de regras.
 A interface limita-se a desenhar o estado da simulação que o servidor envia.
 
-A comunicação usa dois canais: API REST e WebSockets.
-Os comandos seguem por REST, cada um com a sua
-resposta: iniciar, parar ou reiniciar a simulação, escolher um cenário,
-acrescentar elementos à estrada, trocar de motor de inferência, entre outros.
-O estado da simulação chega por um WebSocket (\cod{/api/ws/simulation}) à \emph{Web UI}.
-O servidor publica um \emph{snapshot} em JSON a cada ciclo de 100\,ms.
-Se a ligação cair ou deixar de receber dados, o cliente volta
-a ligar-se.
+A comunicação usa dois canais: os comandos seguem por uma API REST, e o estado da
+simulação chega por um WebSocket (\cod{/api/ws/simulation}), num \emph{snapshot}
+em JSON a cada ciclo de 100\,ms.
 
 A \emph{interface} (\cref{fig:interface-web}) mostra a estrada em perspetiva 3D, com o
 veículo, os outros atores, a sinalização e a meteorologia.

@@ -163,6 +163,13 @@
 \makeatother
 % --- fim de CAPÍTULOS SEGUIDOS -----------------------------------
 
+% Índice mais compacto: o espaço antes de cada capítulo passa de 1em para 0.3em,
+% para o índice caber na mesma página do Resumo. Reverter: apagar este bloco.
+\makeatletter
+\patchcmd{\l@chapter}{\vskip 1.0em \@plus\p@}{\vskip 0.3em \@plus\p@}
+  {}{\PackageWarning{preambulo}{indice compacto: o patch do l@chapter falhou}}
+\makeatother
+
 % --- Legendas --------------------------------------------------
 \captionsetup{font=small,labelfont={bf,color=corEscura},skip=6pt}
 

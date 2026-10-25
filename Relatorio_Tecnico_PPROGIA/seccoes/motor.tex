@@ -12,7 +12,7 @@ comparam-no com o motor da unidade curricular.
 % parágrafo inicial e deixaria meia página em branco.
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=0.78\textwidth]{figuras/arquitetura-motores.png}
+  \includegraphics[width=0.62\textwidth]{figuras/arquitetura-motores.png}
   \caption{Os dois motores alimentam a mesma arbitragem: só um está ativo em
     cada sessão, e ambos devolvem propostas, nunca ações.}
   \label{fig:arquitetura-motores}
@@ -70,11 +70,9 @@ subobjetivos (\cod{maneuver_idle}, \cod{no_continuous_line}, \cod{side_clear},
       que assentou e os padrões negados que se verificaram. Um facto sem
       suporte veio da perceção.
   \end{itemize}
-  \item \textbf{Ciclo:} \cod{run_rules/0} avalia todas as regras e enche a
-    agenda. Depois, até a agenda esvaziar, dispara a melhor ativação, escolhida
-    pela resolução de conflitos; a refração impede que uma instanciação dispare
-    duas vezes no mesmo ciclo (\cref{sec:meta-controlo}). Os factos nunca são
-    retirados dentro de um ciclo.
+  \item \textbf{Ciclo:} \cod{run_rules/0} enche a agenda e dispara, uma a uma, as
+    melhores ativações; a refração impede que uma instanciação dispare duas vezes
+    (\cref{sec:meta-controlo}).
   \item \textbf{Estado entre ciclos:} fica em \cod{driving_state.pl}, que guarda as
     últimas leituras, a janela de TTC (\emph{Time to Collision}), o compromisso perante o semáforo, o
     cronómetro do STOP e o estado da ultrapassagem. No início de cada ciclo
@@ -122,7 +120,7 @@ aula~6 deixa em aberto (\cref{tab:comparacao-motor-uc}).
         ignorado \\ \linhasep
     Meta-conhecimento & \cod{facto_dispara_regras/2} escrito à mão em
         \cod{veiculos2.txt}; gerá-lo é o exercício proposto
-      & Dinâmico: Derivado das regras no arranque (\cod{rule_reads/2}), incluindo os factos
+      & Dinâmico: derivado das regras no arranque (\cod{rule_reads/2}), incluindo os factos
         lidos pelos predicados auxiliares \\ \linhasep
     Disjunção & Duas regras com a mesma cabeça, e não um OU dentro da
         regra
@@ -136,31 +134,20 @@ aula~6 deixa em aberto (\cref{tab:comparacao-motor-uc}).
   \end{tabularx}
 \end{table}
 
-Três destas diferenças merecem nota. A primeira é o meta-conhecimento. A aula~6
-mostra como gerar \cod{facto_dispara_regras/2} a partir de uma lista de termos,
-mas deixa às equipas a obtenção automática dessa lista. \cod{ensure_index/0}
-obtém-na de todas as regras e segue também os predicados auxiliares que as
-condições chamam, onde estão muitas das dependências (\cref{sec:meta-indice}).
-A segunda é a refração: o pseudocódigo da aula pede que cada par facto--regra
-dispare uma vez, mas o código só impede conclusões repetidas. No nosso motor é
-cada instanciação de cada regra que dispara no máximo uma vez por ciclo. A
-terceira é a resolução de conflitos, que a UC não trata
-(\cref{sec:meta-controlo}).
+A diferença principal é o meta-conhecimento: a aula~6 deixa às equipas a obtenção
+automática da lista de termos que gera \cod{facto_dispara_regras/2}, e
+\cod{ensure_index/0} obtém-na de todas as regras, seguindo também os predicados
+auxiliares que as condições chamam (\cref{sec:meta-indice}).
 
-As condições do nosso motor exprimem mais do que factos e constantes. A
-\cref{lst:regra-direita}, a regra mais longa da base, aplica o Art.~13.º, n.º~3, do Código
-da Estrada (circular pela via mais à direita). Usa as cinco formas de
-condição: padrões (\cod{ego_lane(Lane)}), testes aritméticos
-(\cod{test(Now >= 4000)}), padrões negados (\cod{not(obstacle(_, _, _, _))}),
-testes negados sobre predicados auxiliares
-(\cod{not(test(front_vehicle_within(80.0)))}) e um subobjetivo provado por
-\emph{backward chaining} (\cod{prove(no_continuous_line(right))}). Só propõe voltar à
-direita quando nada mais exige atenção: nenhum obstáculo, buraco, barreira ou
+A \cref{lst:regra-direita}, uma das regras mais longas da base, aplica o Art.~13.º, n.º~3,
+do Código da Estrada (circular pela via mais à direita) e usa todas as formas de
+condição de \cref{sec:motor-regras}. Só propõe voltar à direita quando nada mais
+exige atenção: nenhum obstáculo, buraco, barreira ou
 peão em conflito, nenhum veículo a menos de 80\,m e nenhuma ultrapassagem ou
 mudança de via pedida pelo condutor.
 
 \noindent\begin{minipage}{\linewidth}
-\begin{lstlisting}[caption={Uma das regras mais longa da base de conhecimento (\texttt{driving\_rules.pl})},label=lst:regra-direita]
+\begin{lstlisting}[caption={Uma das regras mais longas da base de conhecimento (\texttt{driving\_rules.pl})},label=lst:regra-direita]
 rule('Enforce keep right road law when right lane is safe',
      460,
      [ ego_lane(Lane),                           test(Lane \== right),

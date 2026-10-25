@@ -27,7 +27,12 @@
 
 \input{seccoes/resumo}
 
-\tableofcontents
+% --- RESUMO E ÍNDICE NA MESMA PÁGINA (para poupar uma página) ---------------
+% O \clearpage no fim de seccoes/resumo.tex está comentado, e o índice (um
+% \chapter*) é composto sem a sua própria mudança de página. Para os separar,
+% repor o \clearpage em resumo.tex e usar só \tableofcontents aqui.
+\vspace{-0.4cm}
+{\let\clearpage\relax\tableofcontents}
 % --- LISTAS DE FIGURAS E DE TABELAS (desativadas para poupar uma página) ------
 % Para as repor, tirar o "% " do início das seis linhas seguintes.
 % \clearpage
@@ -65,7 +70,9 @@
 \bibliographystyle{unsrt}
 \bibliography{referencias}
 
-\appendix
-\input{seccoes/anexos}
+% --- ANEXO (desativado para poupar uma página) --------------------------------
+% Para o repor, tirar o "% " do início das duas linhas seguintes.
+% \appendix
+% \input{seccoes/anexos}
 
 \end{document}

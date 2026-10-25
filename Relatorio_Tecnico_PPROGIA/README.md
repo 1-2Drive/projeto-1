@@ -64,6 +64,7 @@ Capítulos (`seccoes/`, pela ordem de `relatorio.tex`): `resumo`, `perito`, `mot
 |---|---|---|
 | `preambulo.tex`, bloco `COMPACTAÇÃO LIGEIRA` | letra de 10,5 pt e margens de 2,3 cm | os comentários do bloco explicam |
 | `preambulo.tex`, bloco `CAPÍTULOS SEGUIDOS`; `\quebracapitulofalse` / `\quebracapitulotrue` em `relatorio.tex` | os capítulos 1 a 8 seguem sem mudar de página | apagar as duas linhas em `relatorio.tex` |
+| `relatorio.tex`, bloco `LISTAS DE FIGURAS E DE TABELAS` | as listas de figuras e de tabelas estão desativadas (poupa uma página) | tirar o `% ` do início das seis linhas do bloco |
 | `relatorio.tex`, `\nocite{...}` antes do Perito | as fontes do perito ficam em [1] a [4] | |
 
 ## Macros próprias

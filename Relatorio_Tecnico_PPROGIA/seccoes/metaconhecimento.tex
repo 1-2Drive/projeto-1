@@ -7,20 +7,12 @@
 Neste projeto, meta-conhecimento é o conhecimento sobre as próprias regras, e não
 sobre a condução em si, usado para controlar e acelerar a inferência. Saber que
 se deve reduzir a velocidade quando o limite é ultrapassado é conhecimento do
-domínio, enquanto que saber que a regra que o faz lê os factos \cod{ego_speed/1} e
+domínio, enquanto saber que a regra que o faz lê os factos \cod{ego_speed/1} e
 \cod{speed_limit/1}, que tem precedência 300 e que já disparou neste ciclo é
 meta-conhecimento.
 
-O meta-conhecimento resolve três problemas de controlo do motor de inferência:
-
-\begin{itemize}
-  \item \textbf{resolução de conflitos}: quando várias regras estão prontas a
-    disparar, qual dispara primeiro;
-  \item \textbf{terminação}: a mesma instanciação de uma regra não pode disparar
-    duas vezes no mesmo ciclo;
-  \item \textbf{eficiência}: depois de cada disparo, só se avaliam de novo as
-    regras que o facto acabado de concluir pode afetar.
-\end{itemize}
+Serve três fins: a resolução de conflitos, a terminação (refração) e a
+eficiência (índice de dependências).
 
 \section{Representação no motor Prolog}
 \label{sec:meta-representacao}
@@ -51,15 +43,16 @@ predicados têm o prefixo \cod{wm_} (\cref{tab:metaconhecimento}).
   \end{tabularx}
 \end{table}
 
-Este meta-conhecimento é gerado dinâmicamente, e não escrito manualmente, em dois sentidos:
+Este meta-conhecimento é gerado dinamicamente, e não escrito manualmente, em dois sentidos:
 
 \begin{enumerate}
   \item \textbf{É derivado das regras durante a execução.} Quando o motor
-    arranca, \cod{ensure_index/0} lê as próprias regras como dados e calcula
-    \cod{rule_reads/2}, \cod{rule_precedence/2} e \cod{rule_rank/2}, que guarda
-    com \cod{assertz}~\cite{swidynamic}. Quando uma regra é acrescentada ou alterada, o
-    meta-conhecimento acompanha-a no ciclo seguinte, sem manutenção manual. O
-    mesmo passo verifica que não há duas regras com o mesmo identificador.
+    arranca, \cod{ensure_index/0} calcula \cod{rule_reads/2},
+    \cod{rule_precedence/2} e \cod{rule_rank/2} a partir das próprias regras
+    (\cref{sec:meta-indice}) e guarda-os com \cod{assertz}~\cite{swidynamic}.
+    Uma regra acrescentada ou alterada é refletida no arranque seguinte, sem
+    manutenção manual, e o mesmo passo verifica que não há identificadores
+    repetidos.
   \item \textbf{Muda durante a inferência.} \cod{fired/2} ganha uma entrada a
     cada disparo e é apagado no início de cada ciclo.
 \end{enumerate}
@@ -91,12 +84,10 @@ estas dependências.
 
 Durante a inferência, \cod{fire/2} recolhe os tipos dos factos novos que o
 disparo acrescentou e, através de \cod{rule_reads/2}, avalia de novo apenas as
-regras que os leem (\cod{rematch/1}). As ativações dessas regras aparecem,
-mudam ou são canceladas antes do disparo seguinte, por exemplo quando uma
-condição \cod{not(proposal(...))} deixa de se verificar. Sem o índice, todas as
+regras que os leem (\cod{rematch/1}). Sem o índice, todas as
 regras teriam de ser avaliadas de novo depois de cada disparo.
 
-Com um teste \cod{DependencyIndexBenchmarkTest} medimos o efeito do índice. Corre os 14
+O teste \cod{DependencyIndexBenchmarkTest} mede o efeito do índice. Corre os 14
 cenários da biblioteca durante 150 ciclos cada (2\,100 ciclos) em dois processos
 Prolog lado a lado, um com o índice e outro sem ele. Em todos os ciclos, as duas
 execuções tomaram a mesma decisão e dispararam as mesmas regras (10\,231
@@ -132,9 +123,7 @@ primeiro (\cod{rule_rank/2}) e, depois, a correspondência encontrada primeiro. 
 precedência de cada regra é a \emph{salience} da regra Drools que ela replica,
 para que os dois motores do sistema disparem pela mesma ordem. As únicas
 exceções são as duas regras intermédias de peões, que só existem em Prolog
-(\cod{'Pedestrian conflicts with trajectory (in path)'} e \cod{'(crossing)'}).
-Estas têm precedência 1000, para concluírem \cod{pedestrian_conflict/1} antes de
-qualquer regra que o leia.
+(\cref{lst:regras-ou}).
 
 A refração usa \cod{fired/2}. Antes de uma instanciação entrar na agenda,
 \cod{already_fired/2} compara as suas condições com as das instanciações que já

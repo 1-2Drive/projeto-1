@@ -6,9 +6,7 @@ registada no momento da inferência, e não reconstruída depois. É a ideia que
 se manteve do motor da unidade curricular (\cref{sec:comparacao-motor-uc}),
 aplicada a dois níveis. No motor Prolog, cada facto guarda
 como foi obtido. Na aplicação, cada ciclo de decisão guarda as propostas das
-regras e o resultado da arbitragem. A interface nunca deduz condições nem volta
-a avaliar regras: mostra apenas o que o motor registou. Por isso as explicações
-funcionam da mesma forma com o Prolog e com o Drools.
+regras e o resultado da arbitragem.
 
 \section{O que fica registado}
 \label{sec:expl-registo}
@@ -84,31 +82,22 @@ A árvore tem seis factos, embora as condições da regra só nomeiem três
 \cod{safe_to_change_lane(left)}, feita por \emph{backward chaining}
 (\cod{prove/1}): a prova regista os factos que lê com \cod{known/1}, e estes
 passam a fazer parte da evidência. Quando a decisão depende de conclusões
-intermédias, a árvore desce por elas. Numa travagem de emergência por um peão,
-por exemplo, a proposta assenta em \cod{pedestrian_conflict(p1)}, que é ele
-próprio um nó \cod{derived(...)} com a regra que o concluiu e os factos
-percebidos em que esta assentou.
+intermédias, como \cod{pedestrian_conflict/1}, a árvore desce por elas.
 
 Para obter esta árvore, optou-se por não usar o rastreio do SWI-Prolog
 (\cod{trace/0}). O rastreio mostra a resolução feita pelo próprio interpretador,
 com as chamadas, saídas, retrocessos e falhas de cada predicado, incluindo os do
 motor (\cod{findall/3}, \cod{msort/2}), e não as regras de condução que
-dispararam nem os factos em que assentaram. Além disso, é interativo, e obriga
+dispararam nem os factos em que assentaram. Além disso, é interativo e obriga
 a executar em modo de depuração, mais lento. Como o motor trata as
 próprias regras como dados, é ele que regista, no momento de cada disparo, a
 regra e a evidência (\cod{wm_support/3}), e é desse registo que \cod{explain/2}
 constrói a árvore.
 
 Na aplicação, o \emph{How} mostra o caminho que o ciclo escolhido percorreu no
-fluxograma de decisão, um para a velocidade e outro para a via. Cada pergunta
-do fluxograma está associada às regras que lhe respondem. Segue o ramo
-\enquote{sim} quando uma dessas regras fez uma proposta nesse ciclo, e o ramo
-\enquote{não} caso contrário. O caminho termina onde a arbitragem fixou a
-decisão. Na velocidade, isso acontece numa paragem de emergência ou obrigatória
-que venceu. Os tetos de velocidade aplicam-se todos, por isso o caminho passa
-por eles até ao mais baixo. Na via, o caminho termina na proposta que venceu.
-As perguntas seguintes aparecem fora do caminho, com o que as suas regras tenham
-proposto.
+fluxograma de decisão da velocidade e no da via. Cada pergunta do fluxograma
+segue o ramo \enquote{sim} quando uma das regras que lhe respondem fez uma
+proposta nesse ciclo, e o caminho termina onde a arbitragem fixou a decisão.
 
 \section{Why}
 \label{sec:expl-why}
@@ -141,10 +130,8 @@ mecanismos. Um terceiro, no motor, desce até à condição exata de uma regra:
 
 \begin{itemize}
   \item \textbf{Uma alternativa não escolhida.} Para cada alternativa que o
-    ciclo não seguiu, a aplicação explica porquê: na velocidade, acelerar,
-    manter ou abrandar; na via, mantê-la, mudar para a esquerda ou para a
-    direita, ou regressar à direita. Cada alternativa é classificada a partir do
-    registo do ciclo. Ou foi proposta mas perdeu na arbitragem (e a resposta diz
+    ciclo não seguiu, na velocidade ou na via, a aplicação explica porquê, a
+    partir do registo do ciclo. Ou foi proposta mas perdeu na arbitragem (e a resposta diz
     para que regra, e por que princípio), ou nunca foi proposta porque as suas
     condições não se verificaram, ou não se aplica naquele estado, ou o ciclo
     não registou o suficiente. No último caso, a resposta di-lo em vez de

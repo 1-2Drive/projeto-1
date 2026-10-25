@@ -1,6 +1,8 @@
 % Capítulo resultante da fusão dos antigos capítulos "Integração do motor Prolog
 % com o componente Java" e "Interface gráfica e arquitetura Web"; depois retiraram-se duas repetições.
-\chapter{Arquitetura do sistema}
+% "do~sistema": o espaço inquebrável faz o título passar à linha depois de
+% "arquitetura", com "do sistema" alinhado sob o texto do título.
+\chapter{Notas adicionais sobre a arquitetura do~sistema}
 \label{cap:arquitetura}
 
 \section{Integração do motor Prolog com o componente Java}
@@ -86,10 +88,10 @@ arbitragem trata em separado a velocidade e a via.
   \item Sem propostas, o veículo mantém a velocidade e a via.
 \end{itemize}
 
-Cada proposta fica com o seu resultado: venceu, perdeu, foi vetada ou foi
-limitada. O \cod{DecisionActuator} aplica a decisão ao veículo. Pode recusar uma
-mudança de via que não consiga executar, e essa recusa fica registada. O ciclo
-é então guardado para o módulo de explicação.
+O \cod{DecisionActuator} aplica a decisão ao veículo. Pode recusar uma mudança de
+via que não consiga executar, e essa recusa fica registada. O ciclo, com o
+resultado de cada proposta, é então guardado para o módulo de explicação
+(\cref{sec:expl-registo}).
 
 \section{Interface gráfica e arquitetura Web}
 \label{sec:interface}
@@ -113,9 +115,8 @@ a ligar-se.
 
 A \emph{interface} (\cref{fig:interface-web}) mostra a estrada em perspetiva 3D, com o
 veículo, os outros atores, a sinalização e a meteorologia.
-Mostra também os painéis de explicação em tempo real descritos na
-\cref{sec:expl-registo} (a decisão, as propostas concorrentes, a regra, a razão,
-a evidência, a linha temporal e a memória de trabalho) e as leituras dos sensores.
+Mostra também os painéis de explicação em tempo real (\cref{sec:expl-registo}) e
+as leituras dos sensores.
 
 Uma biblioteca de cenários e uma caixa de ferramentas permitem montar situações
 durante a execução: veículos, peões, sinais, semáforos, buracos, obstáculos, barreiras e chuva.

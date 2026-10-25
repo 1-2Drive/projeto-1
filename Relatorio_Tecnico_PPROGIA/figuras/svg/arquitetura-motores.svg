@@ -64,7 +64,7 @@
   <rect class="caixa drools" x="459" y="403" width="341" height="83" rx="8"/>
   <text class="nome" x="629" y="430">Regras DRL</text>
   <text class="detalhe" x="629" y="450">~123 regras em 4 agenda groups</text>
-  <text class="detalhe" x="629" y="469">CEP e queries de encadeamento inverso</text>
+  <text class="detalhe" x="629" y="469">CEP e queries de <tspan font-style="italic">backward chaining</tspan></text>
 
   <!-- Propostas -->
   <path class="linha" d="M233,505 V531 H376 V556" marker-end="url(#seta)"/>

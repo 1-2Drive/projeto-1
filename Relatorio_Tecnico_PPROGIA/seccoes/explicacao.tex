@@ -81,7 +81,7 @@ derived(proposal(change_lane_left, no_target, low, road_hazard,
 
 A árvore tem seis factos, embora as condições da regra só nomeiem três
 (\cod{ego_lane}, \cod{pothole} e \cod{ego_speed}). Os outros três vêm da prova de
-\cod{safe_to_change_lane(left)}, feita por encadeamento inverso
+\cod{safe_to_change_lane(left)}, feita por \emph{backward chaining}
 (\cod{prove/1}): a prova regista os factos que lê com \cod{known/1}, e estes
 passam a fazer parte da evidência. Quando a decisão depende de conclusões
 intermédias, a árvore desce por elas. Numa travagem de emergência por um peão,

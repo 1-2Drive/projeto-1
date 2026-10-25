@@ -44,11 +44,23 @@ maior.
 Uma condição pode ser um padrão a unificar com um facto, \cod{not(C)} (negação
 por falha), \cod{test(Objetivo)} (aritmética ou um predicado auxiliar que lê os
 factos através de \cod{known/1}) ou \cod{prove(Objetivo)}, provado por
-encadeamento inverso (\cod{prove_goal/2}). A única ação é \cod{assert(Facto)}.
-O motor faz assim encadeamento para a frente sobre os factos e encadeamento
-inverso dentro das condições, por exemplo em \cod{safe_to_change_lane/1}, cujos
+\emph{backward chaining} (\cod{prove_goal/2}). A única ação é \cod{assert(Facto)}.
+O motor combina três mecanismos, em níveis diferentes. Ao nível das regras, faz
+\emph{forward chaining}: parte dos factos do ciclo, dispara as regras cujas
+condições se verificam, e cada conclusão pode ativar outras regras, até a agenda
+esvaziar. Este nível é irrevogável: um disparo nunca é desfeito para tentar outra
+ordem, e os factos não são retirados dentro do ciclo. Para encontrar as
+ativações de cada regra, o motor usa o retrocesso (\emph{backtracking}) do
+próprio Prolog: \cod{findall/3} percorre as condições da esquerda para a direita
+e, quando uma falha, o Prolog volta atrás e tenta outro facto para uma condição
+anterior, recolhendo todas as maneiras de as satisfazer. Por fim, as condições
+\cod{prove/1} são provadas por \emph{backward chaining}: \cod{prove_goal/2} parte
+do objetivo, por exemplo \cod{safe_to_change_lane(left)}, e desce pelos
 subobjetivos (\cod{maneuver_idle}, \cod{no_continuous_line}, \cod{side_clear},
-\cod{room_to_follow}) descem até aos factos percebidos.
+\cod{room_to_follow}) até aos factos percebidos, registando os que leu. Ao
+contrário do \cod{sp_exp2.pl}, que usa o retrocesso como ciclo de
+controlo~\cite[diap.~38]{uclecture6}, aqui o controlo é a agenda, e o retrocesso
+fica dentro da correspondência das condições.
 
 \begin{itemize}
   \item \textbf{Memória de trabalho:}
@@ -101,7 +113,7 @@ aula~6~\cite{uclecture6} deixa em aberto (\cref{tab:comparacao-motor-uc}).
     Condições & Factos, \cod{nao} e \cod{avalia/1}, que compara um valor com uma
         constante
       & Padrões, \cod{not/1} sobre padrões e testes, \cod{test/1} (qualquer
-        objetivo) e \cod{prove/1} (encadeamento inverso) \\ \linhasep
+        objetivo) e \cod{prove/1} (\emph{backward chaining}) \\ \linhasep
     Controlo & Dispara uma regra assim que um facto a satisfaz, pela ordem do
         \emph{backtracking} sobre factos e regras
       & Agenda com resolução de conflitos, a começar pela precedência
@@ -144,7 +156,7 @@ condição: padrões (\cod{ego_lane(Lane)}), testes aritméticos
 (\cod{test(Now >= 4000)}), padrões negados (\cod{not(obstacle(_, _, _, _))}),
 testes negados sobre predicados auxiliares
 (\cod{not(test(front_vehicle_within(80.0)))}) e um subobjetivo provado por
-encadeamento inverso (\cod{prove(no_continuous_line(right))}). Só propõe voltar à
+\emph{backward chaining} (\cod{prove(no_continuous_line(right))}). Só propõe voltar à
 direita quando nada mais exige atenção: nenhum obstáculo, buraco, barreira ou
 peão em conflito, nenhum veículo a menos de 80\,m e nenhuma ultrapassagem ou
 mudança de via pedida pelo condutor.

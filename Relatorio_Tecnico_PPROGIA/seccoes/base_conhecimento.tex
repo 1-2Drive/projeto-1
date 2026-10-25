@@ -47,7 +47,7 @@ As regras leem 66 tipos de facto, que se agrupam como mostra a
 
 Além das regras e dos factos, a base tem predicados auxiliares, que leem os
 factos através de \cod{known/1} (por exemplo \cod{front_vehicle_within/1}), e
-subobjetivos provados por encadeamento inverso (\cref{sec:base-exemplos}). As
+subobjetivos provados por \emph{backward chaining} (\cref{sec:base-exemplos}). As
 constantes numéricas, como as distâncias de paragem e o valor de cada
 prioridade, não estão escritas no Prolog: chegam do Java no pedido
 \cod{reset} (\cod{param/2}, \cod{priority_value/2}).
@@ -116,14 +116,14 @@ rule('Fuzzy: poor visibility or poor grip -> very slow',
 \end{lstlisting}
 
 \paragraph{Mudança de via segura.} \cod{safe_to_change_lane/1} é um objetivo,
-provado por encadeamento inverso a partir de quatro subobjetivos
+provado por \emph{backward chaining} a partir de quatro subobjetivos
 (\cref{lst:safe-lane}). As regras de desvio chamam-no nas condições com
 \cod{prove(safe_to_change_lane(left))}. Mudar de via é seguro se não houver
 outra manobra em curso nem linha contínua, se o ângulo morto estiver livre e se
 houver espaço para seguir o veículo dessa via, com 12\,m de folga
 (\cod{StoppingPolicy.roomToFollow}).
 
-\begin{lstlisting}[caption={Objetivo provado por encadeamento inverso (\texttt{driving\_rules.pl})},label=lst:safe-lane]
+\begin{lstlisting}[caption={Objetivo provado por \emph{backward chaining} (\texttt{driving\_rules.pl})},label=lst:safe-lane]
 safe_to_change_lane(Side) :-
     maneuver_idle,
     no_continuous_line(Side),
